@@ -1,6 +1,6 @@
-import * as THREE from '/vendor/three.module.min.js';
+let THREE = null;
 
-const startExperience = () => {
+const startExperience = async () => {
   const gsap = window.gsap;
   const ScrollTrigger = window.ScrollTrigger;
   if (!gsap || !ScrollTrigger) return;
@@ -14,7 +14,7 @@ const startExperience = () => {
 
   const buildThreePath = () => {
     const canvas = document.getElementById('story-canvas');
-    if (!canvas) return null;
+    if (!canvas || !THREE || window.matchMedia('(max-width: 720px)').matches) return null;
 
     let renderer;
     try {
@@ -153,6 +153,142 @@ const startExperience = () => {
     activeScrollTriggers.push(storyTimeline.scrollTrigger);
   };
 
+  const setupChitShuffle = () => {
+    const section = document.querySelector('.learning-shuffle-section');
+    const stage = section && section.querySelector('[data-learning-shuffle]');
+    const cards = stage ? gsap.utils.toArray('[data-chit-card]') : [];
+    if (!section || !stage || !cards.length) return;
+
+    const railItems = Array.from(section.querySelectorAll('[data-chit-rail]'));
+    const counter = section.querySelector('#chit-current');
+    const railProgress = section.querySelector('#chit-rail-progress');
+    const setState = (index, progress) => {
+      const current = Math.min(cards.length - 1, Math.max(0, index));
+      cards.forEach((card, cardIndex) => {
+        card.classList.toggle('is-active', cardIndex === current);
+        card.setAttribute('aria-hidden', String(cardIndex !== current));
+      });
+      railItems.forEach((item, itemIndex) => item.classList.toggle('is-active', itemIndex === current));
+      if (counter) counter.textContent = String(current + 1).padStart(2, '0');
+      if (railProgress) railProgress.style.transform = 'scaleY(' + Math.min(Math.max(progress, 0), 1).toFixed(4) + ')';
+    };
+
+    if (motionIsOff()) {
+      cards.forEach((card) => card.setAttribute('aria-hidden', 'false'));
+      return;
+    }
+
+    const compact = window.matchMedia('(max-width: 720px)').matches;
+    if (compact) {
+      const trigger = ScrollTrigger.create({
+        trigger: section,
+        start: 'top top+=80',
+        end: 'bottom bottom',
+        onUpdate: (self) => setState(Math.round(self.progress * (cards.length - 1)), self.progress),
+        invalidateOnRefresh: true
+      });
+      activeScrollTriggers.push(trigger);
+      setState(0, 0);
+      return;
+    }
+
+    gsap.set(cards, { autoAlpha: 0, xPercent: 112, rotation: 2.5 });
+    gsap.set(cards[0], { autoAlpha: 1, xPercent: 0, rotation: 0 });
+    const timeline = gsap.timeline({
+      defaults: { ease: 'none' },
+      scrollTrigger: {
+        trigger: stage,
+        start: 'top top+=90',
+        end: () => '+=' + Math.max(window.innerHeight * 4.9, 3900),
+        pin: stage,
+        scrub: .65,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => setState(Math.round(self.progress * (cards.length - 1)), self.progress)
+      }
+    });
+    timeline.to({}, { duration: .32 });
+    for (let index = 1; index < cards.length; index += 1) {
+      timeline
+        .to(cards[index - 1], { autoAlpha: 0, xPercent: -112, rotation: -2.5, duration: .16 })
+        .set(cards[index], { visibility: 'visible' })
+        .to(cards[index], { autoAlpha: 1, xPercent: 0, rotation: 0, duration: .22 })
+        .to({}, { duration: .34 });
+    }
+    timeline.to({}, { duration: .2 });
+    activeScrollTriggers.push(timeline.scrollTrigger);
+    setState(0, 0);
+  };
+
+  const setupTeamDeck = () => {
+    const deck = document.querySelector('[data-team-deck]');
+    const stack = deck && deck.querySelector('.team-card-stack');
+    const cards = stack ? gsap.utils.toArray('[data-team-card]') : [];
+    if (!deck || !stack || !cards.length) return;
+
+    const counter = deck.querySelector('#team-card-current');
+    const setState = (index, updateAria = true) => {
+      const current = Math.min(cards.length - 1, Math.max(0, index));
+      cards.forEach((card, cardIndex) => {
+        card.classList.toggle('is-active', cardIndex === current);
+        if (updateAria) card.setAttribute('aria-hidden', String(cardIndex !== current));
+      });
+      if (counter) counter.textContent = String(current + 1).padStart(2, '0');
+    };
+
+    if (motionIsOff()) {
+      cards.forEach((card) => card.setAttribute('aria-hidden', 'false'));
+      return;
+    }
+
+    const compact = window.matchMedia('(max-width: 720px)').matches;
+    if (compact) {
+      cards.forEach((card) => card.setAttribute('aria-hidden', 'false'));
+      let framePending = false;
+      stack.addEventListener('scroll', () => {
+        if (framePending) return;
+        framePending = true;
+        window.requestAnimationFrame(() => {
+          const first = cards[0].getBoundingClientRect();
+          const gap = parseFloat(window.getComputedStyle(stack).columnGap || 0);
+          const index = Math.round(stack.scrollLeft / Math.max(first.width + gap, 1));
+          setState(index, false);
+          framePending = false;
+        });
+      }, { passive: true });
+      setState(0, false);
+      return;
+    }
+
+    gsap.set(cards, { autoAlpha: 0, xPercent: 10, y: 18, scale: .985, rotation: 1.2, transformOrigin: '50% 100%' });
+    gsap.set(cards[0], { autoAlpha: 1, xPercent: 0, y: 0, scale: 1, rotation: 0 });
+
+    const timeline = gsap.timeline({
+      defaults: { ease: 'none' },
+      scrollTrigger: {
+        trigger: deck,
+        start: 'top top+=88',
+        end: () => '+=' + Math.max(window.innerHeight * 4.3, 3500),
+        pin: deck,
+        scrub: .72,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => setState(Math.round(self.progress * (cards.length - 1)))
+      }
+    });
+    timeline.to({}, { duration: .34 });
+    for (let index = 0; index < cards.length - 1; index += 1) {
+      timeline
+        .to(cards[index], { xPercent: -112, y: -18, rotation: -3.2, autoAlpha: 0, duration: .2 })
+        .set(cards[index + 1], { visibility: 'visible' })
+        .to(cards[index + 1], { xPercent: 0, y: 0, scale: 1, rotation: 0, autoAlpha: 1, duration: .24 })
+        .to({}, { duration: .38 });
+    }
+    timeline.to({}, { duration: .2 });
+    activeScrollTriggers.push(timeline.scrollTrigger);
+    setState(0);
+  };
+
   const setupSectionMotion = () => {
     if (motionIsOff()) return;
 
@@ -241,12 +377,27 @@ const startExperience = () => {
     });
   };
 
-  setupStory();
-  setupSectionMotion();
-  window.setTimeout(() => ScrollTrigger.refresh(), 120);
+  const initializeMotionExperience = async () => {
+    if (motionIsOff()) return;
+    if (document.getElementById('story-canvas') && window.matchMedia('(min-width: 721px)').matches && !THREE) {
+      try { THREE = await import('/vendor/three.module.min.js'); } catch (error) { /* The photographic story remains fully usable. */ }
+    }
+    setupStory();
+    setupChitShuffle();
+    setupTeamDeck();
+    setupSectionMotion();
+    window.setTimeout(() => ScrollTrigger.refresh(), 120);
+  };
 
-  window.addEventListener('type2learn:motion', (event) => {
+  await initializeMotionExperience();
+
+  window.addEventListener('type2learn:motion', async (event) => {
     const off = Boolean(event.detail && event.detail.off);
+    if (!off && !activeScrollTriggers.length) {
+      await initializeMotionExperience();
+      ScrollTrigger.refresh();
+      return;
+    }
     activeScrollTriggers.forEach((trigger) => {
       if (!trigger) return;
       if (off) trigger.disable(false, true);
@@ -255,11 +406,10 @@ const startExperience = () => {
     const canvas = document.getElementById('story-canvas');
     if (canvas) canvas.hidden = off;
     if (off) {
-      gsap.set('.story-scene, .story-step, .section-heading, .anaphora-panel, .anaphora-drop, .anaphora-lines > span, .support-item, [data-team-feature], [data-team-feature] img, .founder-copy', { clearProps: 'all' });
+      gsap.set('.story-scene, .story-step, .section-heading, .anaphora-panel, .anaphora-drop, .anaphora-lines > span, .support-item, [data-team-feature], [data-team-feature] img, .founder-copy, .loop-chit, .team-profile-card', { clearProps: 'all' });
       setStoryState(0);
-    } else {
-      ScrollTrigger.refresh();
     }
+    ScrollTrigger.refresh();
   });
 };
 

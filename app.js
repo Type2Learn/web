@@ -49,9 +49,27 @@
 
   const footer = () => '<footer class="site-footer"><div class="content-wrap footer-top"><div class="footer-brand">' + brand() + '<p class="footer-description">Active, typing-based learning with learner-controlled support. Built around participation, privacy, and clear next steps.</p><span class="footer-preview-label">Educational product preview</span></div><div class="footer-grid"><div><h2>Explore</h2><a href="/how-it-works/">How it works & evidence</a><a href="/pathways/">Pathways</a><a href="/learners/">For learners</a><a href="/families/">For families</a></div><div><h2>Trust</h2><a href="/trust/#accessibility">Accessibility</a><a href="/trust/#privacy">Privacy</a><a href="/trust/#security">Security</a><a href="/trust/#terms">Terms</a></div><div><h2>Connect</h2><a href="/team/">Team</a><a href="/community/">Community</a><a href="/community/#support">Support</a><a href="/schools/">For schools</a><span>Social channels: planned</span></div></div></div><div class="content-wrap footer-bottom"><span>© 2026 Type2Learn. Educational product preview.</span><span class="footer-status"><i></i>Public information is a work in progress.</span></div></footer>';
 
-  const nativeBuilderCredit = '<section class="builder-credit" aria-label="Website development credit"><div class="content-wrap builder-credit-inner reveal"><span class="builder-monogram" aria-hidden="true">N</span><div class="builder-copy"><p>Made with Native.builder</p><strong>Designed and developed in collaboration with an AI-native building environment.</strong><span>Human direction, product context, and accessibility standards shaped every decision.</span></div><a class="builder-credit-link" href="https://builder.nativelyai.com/" target="_blank" rel="noopener noreferrer"><span>Visit Native.builder</span><span class="builder-link-icon" aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></section>';
+  const nativeBuilderCredit = '<section class="builder-credit" aria-label="Website development credit"><div class="content-wrap builder-credit-inner reveal"><span class="builder-monogram" aria-hidden="true">N</span><div class="builder-copy"><p>Website credit · native.builder</p><strong>Built with native.builder for Type2Learn.</strong><span>Built from 3 August to 6 August · Human direction, product context, and accessibility standards shaped every decision.</span></div><a class="builder-credit-link" href="https://builder.nativelyai.com/" target="_blank" rel="noopener noreferrer"><span>Visit native.builder</span><span class="builder-link-icon" aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></section>';
 
-  const siteCta = () => '<section class="site-cta" aria-labelledby="site-cta-title"><div class="content-wrap"><div class="site-cta-panel reveal"><div class="cta-orbit" aria-hidden="true"><i></i><i></i><i></i></div><div class="site-cta-copy"><p class="section-kicker">Start with one clear next step</p><h2 id="site-cta-title" data-animate-words>See how active learning feels in practice.</h2><p>Explore the learning pathways or try the private, local demonstration. No account, timer, or speed score required.</p></div><div class="site-cta-actions">' + button('Try the learning demo', '/#demo', 'primary') + button('Explore pathways', '/pathways/', 'light') + '</div></div></div></section>';
+  const ctaDefinitions = {
+    home: ['Start with one clear next step', 'See how active learning feels in practice.', 'Explore the learning pathways or begin a guided recall activity designed around one clear next step.', 'Try it now', '/#demo', 'Explore pathways', '/pathways/'],
+    'how-it-works': ['Put the method to work', 'Move from a clear action to durable return.', 'Choose a pathway built around recall, useful feedback, application, and a calm way back in.', 'Explore pathways', '/pathways/', 'Try it now', '/#demo'],
+    pathways: ['Choose a route', 'Start with the work the learner needs to do.', 'Compare the learning pathways, then follow the route that makes the objective and the next action visible.', 'For learners', '/learners/', 'For schools', '/schools/'],
+    learners: ['Keep the learner in control', 'Choose support without lowering the expectation.', 'See the pathways, controls, and learning routines designed to protect progress and learner dignity.', 'Explore pathways', '/pathways/', 'For families', '/families/'],
+    families: ['Support the learning, not surveillance', 'Make the routine clear for everyone around it.', 'Understand what the learner is doing, how support works, and where privacy boundaries stay firm.', 'See learner controls', '/learners/', 'Read the trust center', '/trust/'],
+    schools: ['Plan a responsible route', 'Bring active learning into a clear school workflow.', 'Review the method, evidence boundaries, implementation responsibilities, and safeguards before a pilot.', 'Review the method', '/how-it-works/', 'Read the trust center', '/trust/'],
+    team: ['Build with accountability', 'Meet the people responsible for the next decision.', 'Move through the leadership profiles, then see how evidence, access, and community shape the work.', 'Explore the method', '/how-it-works/', 'Community & help', '/community/'],
+    community: ['Bring a useful question', 'Help make the next learning decision better.', 'Find the right route for support, contribution, co-design, or a clear product question.', 'Explore pathways', '/pathways/', 'Read the trust center', '/trust/'],
+    trust: ['Keep the standard visible', 'Read how access, privacy, security, and terms connect.', 'Use one accountable trust center to understand the safeguards around learning and participation.', 'Explore the method', '/how-it-works/', 'Community & help', '/community/']
+  };
+
+  const ctaRoute = ({ research: 'how-it-works', support: 'community', privacy: 'trust', terms: 'trust', accessibility: 'trust', security: 'trust' })[route] || route;
+  const siteCta = () => {
+    const item = ctaDefinitions[ctaRoute] || ctaDefinitions.home;
+    const isHome = ctaRoute === 'home';
+    const art = isHome ? '<div class="cta-orbit" aria-hidden="true"><i></i><i></i><i></i></div>' : '<div class="route-cta-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>';
+    return '<section class="site-cta site-cta-' + ctaRoute + '" data-cta-route="' + ctaRoute + '" aria-labelledby="site-cta-title"><div class="content-wrap"><div class="site-cta-panel reveal">' + art + '<div class="site-cta-copy"><p class="section-kicker">' + item[0] + '</p><h2 id="site-cta-title" data-animate-words>' + item[1] + '</h2><p>' + item[2] + '</p></div><div class="site-cta-actions">' + button(item[3], item[4], 'primary') + button(item[5], item[6], 'light') + '</div></div></div></section>';
+  };
 
   const shell = (content) => '<div class="site-shell">' + nav() + '<main id="main-content">' + content + siteCta() + nativeBuilderCredit + '</main>' + footer() + '</div>';
 
@@ -175,12 +193,120 @@
     return '<section class="scroll-story" id="learning-story" aria-labelledby="story-title"><div class="story-stage"><canvas class="story-canvas" id="story-canvas" aria-hidden="true"></canvas><div class="story-scenes">' + scenes.map((scene, index) => '<figure class="story-scene' + (index === 0 ? ' is-active' : '') + '" data-story-scene="' + index + '"><img src="' + scene[4] + '" alt="' + scene[5] + '"></figure>').join('') + '</div><div class="story-shade" aria-hidden="true"></div><div class="story-ui content-wrap"><div class="story-topline"><p><span>Type2Learn</span> · Learning route</p><div class="story-counter" aria-live="polite"><span id="story-current">01</span><i></i><span>' + String(scenes.length).padStart(2, '0') + '</span></div></div><div class="story-copy"><p class="story-kicker">Scroll-controlled learning story</p><h2 id="story-title">Learning is something you do.</h2><div class="story-steps">' + scenes.map((scene, index) => '<article class="story-step' + (index === 0 ? ' is-active' : '') + '" data-story-step="' + index + '"><span>' + scene[0] + ' · ' + scene[1] + '</span><h3>' + scene[2] + '</h3><p>' + scene[3] + '</p></article>').join('') + '</div><a class="button button-primary story-action" href="#demo" data-scroll-target="demo">Try the learning demo' + icon('arrow', true) + '</a></div><div class="story-route" aria-hidden="true">' + scenes.map((scene) => '<span>' + scene[1] + '</span>').join('') + '<i id="story-route-progress"></i></div></div></div></section>';
   };
 
+  const learningStages = [
+    ['01', 'Encounter', 'Read / Hear', 'Meet one clear idea.', 'A short, bounded explanation makes the objective and the next action visible.'],
+    ['02', 'Retrieve', 'Recall', 'Bring it back before the reveal.', 'A cue supports memory without replacing the work of remembering.'],
+    ['03', 'Express', 'Type / Produce', 'Make thinking visible.', 'The learner writes, builds, labels, solves, or explains in a usable form.'],
+    ['04', 'Compare', 'Check', 'See exactly what changed.', 'Specific feedback identifies what is strong and what needs another pass.'],
+    ['05', 'Rebuild', 'Correct', 'Improve without shame.', 'After support, the learner reconstructs the idea instead of merely seeing an answer.'],
+    ['06', 'Transfer', 'Apply', 'Use the idea somewhere meaningful.', 'A new task turns recognition into evidence that the idea can travel.'],
+    ['07', 'Strengthen', 'Return', 'Come back and keep it.', 'Later retrieval strengthens durable learning and protects earned progress.']
+  ];
+
+  const homeLearningShuffle = () => {
+    const rail = learningStages.map((stage, index) => '<li class="' + (index === 0 ? 'is-active' : '') + '" data-chit-rail="' + index + '"><span>' + stage[0] + '</span></li>').join('');
+    const chits = learningStages.map((stage, index) => '<article class="loop-chit' + (index === 0 ? ' is-active' : '') + '" data-chit-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><span class="chit-number">' + stage[0] + '</span><div class="chit-copy"><p class="chit-phase">' + stage[1] + ' · ' + stage[2] + '</p><h3>' + stage[3] + '</h3><p>' + stage[4] + '</p></div><span class="chit-edge" aria-hidden="true">' + stage[2] + '</span></article>').join('');
+    return '<section class="section learning-shuffle-section" id="learning-loop" aria-labelledby="learning-shuffle-title"><div class="content-wrap"><div class="section-heading learning-shuffle-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 id="learning-shuffle-title">Learning becomes durable when the learner does the work.</h2><p>Scroll through the seven actions. Each step protects the academic objective while making the next move clear.</p></div><div class="shuffle-position" aria-live="polite"><span id="chit-current">01</span><i></i><span>07</span></div></div><div class="learning-shuffle" data-learning-shuffle><div class="chit-rail" aria-hidden="true"><div class="chit-rail-line"><i id="chit-rail-progress"></i></div><ol>' + rail + '</ol></div><div class="chit-viewport"><div class="chit-stack">' + chits + '</div><p class="chit-instruction"><span>Scroll</span> to shuffle the learning action</p></div></div></div></section>';
+  };
+
+  const howProcessMap = () => {
+    const acts = [
+      ['01', 'Enter with clarity', 'Choose · Understand', 'The learner sees the objective, what success looks like, and an accessible way into the idea.'],
+      ['02', 'Work the memory', 'Recall · Produce · Correct', 'The learner retrieves, makes thinking visible, receives specific feedback, and rebuilds after support.'],
+      ['03', 'Use it and keep it', 'Apply · Return', 'The idea moves into a meaningful task, then returns later so progress becomes durable.']
+    ];
+    return '<section class="page-section how-process-section" aria-labelledby="how-process-title"><div class="content-wrap"><p class="section-kicker">The Type2Learn method</p><h2 id="how-process-title">Seven learning actions, organized into three purposeful acts.</h2><p>The route stays predictable without making every lesson feel identical. The objective remains visible from first instruction to later return.</p><div class="how-process-map">' + acts.map((act, index) => '<article class="how-act reveal" data-delay="' + index + '"><span class="how-act-number">' + act[0] + '</span><p class="how-act-steps">' + act[2] + '</p><h3>' + act[1] + '</h3><p>' + act[3] + '</p><i aria-hidden="true"></i></article>').join('') + '</div></div></section>';
+  };
+
+  const teamDeck = () => {
+    const members = [
+      ['Muhammad Taha Bin Zaeem', 'Founder · Product direction', '/assets/team/founder-muhammad-taha.webp', 'Muhammad Taha Bin Zaeem, founder of Type2Learn', false, 'He leads Type2Learn’s vision, product direction, partnerships, and responsible growth—connecting the learning experience to clear standards for evidence, privacy, accessibility, and learner dignity.', 'Learning technology should make the next meaningful action clearer without making a learner smaller.', ['Vision & strategy', 'Learning experience', 'Responsible growth']],
+      ['Muhammad Hamiz Bin Kashif', 'Co-founder · Engineering lead', '/assets/team/muhammad-hamiz-bin-kashif.webp', 'Muhammad Hamiz Bin Kashif, engineering lead at Type2Learn', false, 'His role focuses on dependable engineering systems, protected progress, accessibility, secure delivery, and calm recovery when learning is interrupted.', 'The strongest system is the one that lets every learner keep what they have earned.', ['Engineering systems', 'Protected progress', 'Reliable delivery']],
+      ['Muhammad Fahad Younus', 'Co-founder · AI lead', '/assets/team/muhammad-fahad-placeholder.webp', 'Non-human editorial placeholder for the Muhammad Fahad Younus profile', true, 'His role focuses on responsible AI direction, model evaluation, useful human oversight, and keeping automated support aligned with the learning objective.', 'Intelligent support should strengthen human judgment, not quietly replace it.', ['Responsible AI', 'Model evaluation', 'Human oversight']],
+      ['Idrees Babar', 'Co-founder · Research lead', '/assets/team/idrees-babar-placeholder.webp', 'Non-human editorial placeholder for the Idrees Babar profile', true, 'His role connects evidence review, research design, measurement quality, and honest public claims to the decisions made in the learning experience.', 'Evidence matters most when it changes what we build and what we are willing to claim.', ['Evidence review', 'Pilot design', 'Measurement quality']],
+      ['Alizay Hassan', 'Co-founder · Product lead', '/assets/team/alizay-hassan-placeholder.webp', 'Non-human editorial placeholder for the Alizay Hassan profile', true, 'Her role brings product strategy, co-design, programme clarity, and age-respectful experience design into one coherent learner journey.', 'A clear product gives every learner a dignified way to begin, continue, and return.', ['Product strategy', 'Co-design', 'Programme clarity']]
+    ];
+    const cards = members.map((member, index) => '<article class="team-profile-card' + (index === 0 ? ' is-active' : '') + (member[4] ? ' has-placeholder' : ' has-portrait') + '" data-team-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><figure class="team-profile-portrait"><img src="' + member[2] + '" alt="' + member[3] + '"><figcaption class="portrait-status' + (member[4] ? ' is-temporary' : ' is-supplied') + '">' + (member[4] ? 'Non-human placeholder' : 'Supplied portrait') + '</figcaption></figure><div class="team-profile-copy"><p class="section-kicker">' + member[1] + '</p><h3>' + member[0] + '</h3><p class="team-profile-statement">“' + member[6] + '”</p><p>' + member[5] + '</p><div class="team-profile-responsibilities">' + member[7].map((item) => '<span>' + item + '</span>').join('') + '</div></div></article>').join('');
+    return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">The people building Type2Learn</p><h2 id="team-deck-title">Different disciplines. One accountable mission.</h2><p>Supplied portraits appear first. Distinct non-human placeholders stand in wherever an approved portrait is not being published.</p></div><div class="team-deck" data-team-deck><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>Scroll</span> to shuffle the team deck</p></div></div></section>';
+  };
+
+  const applyOfficialCopy = () => {
+    const homeHero = document.querySelector('#main-content > .hero');
+    if (homeHero) {
+      const eyebrow = homeHero.querySelector('.eyebrow');
+      const heading = homeHero.querySelector('h1');
+      const copy = homeHero.querySelector('.hero-copy');
+      if (eyebrow) eyebrow.innerHTML = '<span class="eyebrow-dot"></span>Nonprofit education technology';
+      if (heading) {
+        heading.removeAttribute('data-animate-words');
+        heading.classList.add('hero-stacked-title');
+        heading.setAttribute('aria-label', 'Learn by typing. Build knowledge that stays.');
+        heading.innerHTML = '<span class="hero-line" aria-hidden="true" style="--line-index:0">Learn by typing.</span><span class="hero-line" aria-hidden="true" style="--line-index:1">Build knowledge</span><span class="hero-line" aria-hidden="true" style="--line-index:2">that stays.</span>';
+      }
+      if (copy) copy.textContent = 'Type2Learn is a nonprofit building active, typing-based learning that turns ideas into recall, correction, application, and durable progress.';
+      const actions = homeHero.querySelectorAll('.hero-actions .button');
+      if (actions[0]) actions[0].innerHTML = 'Try it now' + icon('arrow', true);
+    }
+
+    const demo = document.getElementById('demo');
+    if (demo) {
+      const headingCopy = demo.querySelector('.section-heading-copy');
+      const badge = demo.querySelector('.section-heading > .status-chip');
+      if (headingCopy) {
+        const kicker = headingCopy.querySelector('.section-kicker');
+        const title = headingCopy.querySelector('h2');
+        const copy = headingCopy.querySelector('p:last-child');
+        if (kicker) kicker.textContent = 'Try active recall';
+        if (title) title.textContent = 'Turn an idea into your own words.';
+        if (copy) copy.textContent = 'Read the cue, retrieve the meaning, and type a response. Specific feedback helps you improve the idea and prepare to apply it.';
+      }
+      if (badge) badge.textContent = 'Interactive practice';
+      const feedback = demo.querySelector('#demo-feedback');
+      const footerCopy = demo.querySelector('.demo-footer > span');
+      const reset = demo.querySelector('#skip-demo');
+      if (feedback) feedback.textContent = 'Start when you are ready. A short, meaningful answer is enough.';
+      if (footerCopy) footerCopy.textContent = 'Strong learning comes from retrieving, checking, and improving an idea.';
+      if (reset) reset.textContent = 'Reset this activity';
+    }
+
+    if (route === 'home') {
+      const ctaCopy = document.querySelector('.site-cta-copy > p:not(.section-kicker)');
+      const ctaAction = document.querySelector('.site-cta-actions .button');
+      if (ctaCopy) ctaCopy.textContent = 'Explore the learning pathways or begin a guided recall activity designed around one clear next step.';
+      if (ctaAction) ctaAction.innerHTML = 'Try it now' + icon('arrow', true);
+    }
+
+    const footerLabel = document.querySelector('.footer-preview-label');
+    const footerBottom = document.querySelectorAll('.footer-bottom > span');
+    if (footerLabel) footerLabel.textContent = 'Official nonprofit website';
+    if (footerBottom[0]) footerBottom[0].textContent = '© 2026 Type2Learn. A nonprofit for active, accessible learning.';
+    if (footerBottom[1]) footerBottom[1].innerHTML = '<i></i>Learning made active, accessible, and accountable.';
+
+    document.querySelectorAll('a[href="/#demo"]').forEach((link) => {
+      if (link.textContent.toLowerCase().includes('local demo')) link.innerHTML = 'Try it now' + icon('arrow', true);
+    });
+
+    if (route === 'how-it-works') {
+      const aside = document.querySelector('.page-hero-aside');
+      if (aside) aside.innerHTML = '<span class="aside-label">Our method</span><strong>Seven connected learning actions</strong><span>Instruction, recall, production, correction, transfer, and return work as one coherent route.</span><i class="aside-path" aria-hidden="true"></i>';
+    }
+    if (route === 'team') {
+      const aside = document.querySelector('.page-hero-aside');
+      if (aside) aside.innerHTML = '<span class="aside-label">Leadership</span><strong>Five connected profiles</strong><span>Scroll through the people shaping product, AI, research, experience, and engineering.</span><i class="aside-path" aria-hidden="true"></i>';
+    }
+  };
+
   const enhancePage = () => {
     document.body.classList.add('route-' + route);
+    applyOfficialCopy();
 
     if (route === 'home') {
       const hero = document.querySelector('#main-content > .hero');
       if (hero) hero.insertAdjacentHTML('afterend', scrollStory());
+
+      const legacyLoop = document.querySelector('.learning-loop');
+      const legacyLoopSection = legacyLoop && legacyLoop.closest('section');
+      if (legacyLoopSection) legacyLoopSection.outerHTML = homeLearningShuffle();
 
       const supportPanel = document.querySelector('.support-panel');
       const supportHeading = supportPanel && supportPanel.querySelector('h2');
@@ -191,6 +317,19 @@
         supportHeading.setAttribute('aria-label', 'Different minds need different controls — not different expectations of dignity.');
         supportHeading.innerHTML = '<span class="anaphora-drop" aria-hidden="true">D</span><span class="anaphora-lines" aria-hidden="true"><span>ifferent minds need</span><span>ifferent controls — not</span><span>ifferent expectations of dignity.</span></span>';
       }
+    }
+
+    if (route === 'how-it-works') {
+      const legacyLoop = document.querySelector('.learning-loop');
+      const legacyLoopSection = legacyLoop && legacyLoop.closest('section');
+      if (legacyLoopSection) legacyLoopSection.outerHTML = howProcessMap();
+    }
+
+    if (route === 'team') {
+      const founderSection = document.querySelector('.founder-section');
+      const collaboratorsSection = document.querySelector('.collaborators-section');
+      if (founderSection) founderSection.outerHTML = teamDeck();
+      if (collaboratorsSection) collaboratorsSection.remove();
     }
 
     const sections = Array.from(document.querySelectorAll('#main-content > section:not(.builder-credit)'));
@@ -351,6 +490,19 @@
     });
   };
 
+  const setupImageDelivery = () => {
+    document.querySelectorAll('img').forEach((image) => {
+      image.decoding = 'async';
+      if (image.classList.contains('brand-mark')) {
+        image.loading = 'eager';
+        image.fetchPriority = 'high';
+        return;
+      }
+      image.loading = 'lazy';
+      image.fetchPriority = 'low';
+    });
+  };
+
   const setupControls = () => {
     const menu = document.getElementById('menu-toggle');
     const mobileNav = document.getElementById('mobile-nav');
@@ -399,13 +551,16 @@
       });
       const skip = document.getElementById('skip-demo');
       if (skip) skip.addEventListener('click', () => {
+        const input = document.getElementById('demo-answer');
+        if (input) input.value = '';
         feedback.className = 'demo-feedback';
-        feedback.textContent = 'Demo skipped. You can return whenever you want; no response was kept.';
+        feedback.textContent = 'The activity is reset. Start again whenever you are ready.';
       });
     }
   };
 
   enhancePage();
+  setupImageDelivery();
   let savedMotion = null;
   try { savedMotion = window.localStorage.getItem('type2learn-motion'); } catch (error) { /* Use the system preference. */ }
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
