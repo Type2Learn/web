@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: type2learn-web
+    runtime: static
+    staticPublishPath: .
+    autoDeployTrigger: commit
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=604800
+      - path: /vendor/*
+        name: Cache-Control
+        value: public, max-age=604800
+    routes:
+      - type: redirect
+        source: /research
+        destination: /how-it-works/#evidence
+      - type: redirect
+        source: /privacy
+        destination: /trust/#privacy
+      - type: redirect
+        source: /terms
+        destination: /trust/#terms
+      - type: redirect
+        source: /accessibility
+        destination: /trust/#accessibility
+      - type: redirect
+        source: /security
+        destination: /trust/#security
+      - type: redirect
+        source: /support
+        destination: /community/#support
