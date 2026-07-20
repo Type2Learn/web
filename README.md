@@ -18,7 +18,7 @@ Then open `http://localhost:8000`.
 
 The root-level `render.yaml` defines a Render static site with `staticPublishPath: .`, automatic deploys from commits, and baseline response headers. Create a new Render Blueprint from this repository; no build command or environment variables are required.
 
-Every primary public route has its own directory and `index.html`, so no single-page-app rewrite is needed. Render redirects the former Research page into How it works, the former Support page into Community, and the former privacy/accessibility/security/terms pages into the consolidated Trust center. The legacy HTML files also contain immediate canonical redirects for hosts that do not process `render.yaml`.
+Every primary public route has its own directory and `index.html`, so no single-page-app rewrite is needed. Privacy and Terms are full, standalone, indexable documents at `/privacy/` and `/terms/`, with downloadable copies of the supplied source PDFs. Render redirects the former Research page into How it works, Support into Community, and the legacy Accessibility and Security routes into the relevant Trust-center sections.
 
 Images are compressed WebP assets where source fidelity allows it, and below-the-fold `<img>` elements use lazy loading, asynchronous decoding, and low fetch priority. The original supplied PNG logo stays unchanged. No image build service or runtime image transformation is required on Render.
 
@@ -35,7 +35,16 @@ Submit the sitemap URL in Google Search Console after deployment. The sitemap al
 
 The Motion control in the header disables the pinned and decorative animation experience. System-level `prefers-reduced-motion` receives the same static presentation. Core content and navigation remain usable without animation.
 
-Desktop sections use browser-native snap stops to prevent a fast wheel gesture from skipping a complete section. Mobile keeps natural document scrolling and lightweight, touch-native versions of the scroll experiences.
+Desktop sections use browser-native snap stops to prevent a fast wheel gesture from skipping a complete section. Vertical wheel, arrow-key, and horizontal trackpad gestures move in the same forward/backward section sequence. Legal documents and mobile pages keep natural document scrolling; mobile also receives lightweight, touch-native versions of the visual experiences.
+
+## Official channels
+
+- GitHub: https://github.com/Type2Learn
+- LinkedIn: https://www.linkedin.com/company/type2learn/
+
+## Policy publication status
+
+The Privacy Policy and Terms of Service reproduce the substantive text supplied in the official PDF pack. The source documents identify themselves as publication drafts and contain unresolved operator, address, market, vendor, payment, and governing-law requirements. Those requirements remain visibly disclosed on the web pages and must be completed with qualified counsel before the documents become operative policies.
 
 ## Website credit
 

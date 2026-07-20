@@ -34,12 +34,6 @@ services:
         source: /research
         destination: /how-it-works/#evidence
       - type: redirect
-        source: /privacy
-        destination: /trust/#privacy
-      - type: redirect
-        source: /terms
-        destination: /trust/#terms
-      - type: redirect
         source: /accessibility
         destination: /trust/#accessibility
       - type: redirect
