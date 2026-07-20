@@ -20,6 +20,8 @@ The root-level `render.yaml` defines a Render static site with `staticPublishPat
 
 Every primary public route has its own directory and `index.html`, so no single-page-app rewrite is needed. Privacy and Terms are full, standalone, indexable documents at `/privacy/` and `/terms/`, with downloadable copies of the supplied source PDFs. Render redirects the former Research page into How it works, Support into Community, and the legacy Accessibility and Security routes into the relevant Trust-center sections.
 
+The centered account experience is available at `/login/`. Sign-in, registration, password visibility, remembered email, Terms acceptance, password recovery, and Google-provider states are complete at the interface level. Authentication deliberately remains non-operative until the Firebase project configuration is supplied; no account data is transmitted or implied to be stored by the static preview.
+
 Images are compressed WebP assets where source fidelity allows it, and below-the-fold `<img>` elements use lazy loading, asynchronous decoding, and low fetch priority. The original supplied PNG logo stays unchanged. No image build service or runtime image transformation is required on Render.
 
 ## Search indexing

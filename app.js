@@ -44,10 +44,10 @@
 
   const nav = () => {
     const links = navItems.map(([key, label]) => '<a href="/' + key + '/"' + (route === key ? ' aria-current="page"' : '') + '>' + label + '</a>').join('');
-    return '<header class="site-header"><div class="scroll-progress" aria-hidden="true"><i id="scroll-progress"></i></div><div class="header-inner">' + brand() + '<nav class="desktop-nav" aria-label="Primary">' + links + '</nav><div class="header-actions"><button class="motion-switch" id="motion-toggle" type="button" aria-pressed="false" aria-label="Motion On — turn off decorative motion">' + icon('pause', true) + '<span class="motion-switch-label">Motion</span><span class="motion-switch-state">On</span></button><a class="button button-primary is-small" href="/pathways/">Explore paths' + icon('arrow', true) + '</a><button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu">' + icon('menu') + '</button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="Mobile primary">' + links + '<a class="button button-primary" href="/pathways/">Explore paths' + icon('arrow', true) + '</a></nav></header>';
+    return '<header class="site-header"><div class="scroll-progress" aria-hidden="true"><i id="scroll-progress"></i></div><div class="header-inner">' + brand() + '<nav class="desktop-nav" aria-label="Primary">' + links + '</nav><div class="header-actions"><a class="header-login-link" href="/login/">Sign in</a><button class="motion-switch" id="motion-toggle" type="button" aria-pressed="false" aria-label="Motion On — turn off decorative motion">' + icon('pause', true) + '<span class="motion-switch-label">Motion</span><span class="motion-switch-state">On</span></button><a class="button button-primary is-small" href="/pathways/">Explore paths' + icon('arrow', true) + '</a><button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu">' + icon('menu') + '</button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="Mobile primary">' + links + '<a href="/login/">Sign in</a><a class="button button-primary" href="/pathways/">Explore paths' + icon('arrow', true) + '</a></nav></header>';
   };
 
-  const footer = () => '<footer class="site-footer"><div class="content-wrap footer-top"><div class="footer-brand">' + brand() + '<p class="footer-description">Active, typing-based learning with learner-controlled support. Built around participation, privacy, and clear next steps.</p><span class="footer-preview-label">Educational product preview</span></div><div class="footer-grid"><div><h2>Explore</h2><a href="/how-it-works/">How it works & evidence</a><a href="/pathways/">Pathways</a><a href="/learners/">For learners</a><a href="/families/">For families</a></div><div><h2>Trust</h2><a href="/trust/#accessibility">Accessibility</a><a href="/privacy/">Privacy Policy</a><a href="/trust/#security">Security</a><a href="/terms/">Terms of Service</a></div><div><h2>Connect</h2><a href="/team/">Team</a><a href="/community/">Community</a><a href="/community/#support">Support</a><a href="/schools/">For schools</a><div class="footer-social-links"><a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></div></div></div><div class="content-wrap footer-bottom"><span>© 2026 Type2Learn. Educational product preview.</span><span class="footer-status"><i></i>Public information is a work in progress.</span></div></footer>';
+  const footer = () => '<footer class="site-footer"><div class="content-wrap footer-top"><div class="footer-brand">' + brand() + '<p class="footer-description">Active, typing-based learning with learner-controlled support. Built around participation, privacy, and clear next steps.</p><span class="footer-preview-label">Educational product preview</span></div><div class="footer-grid"><div><h2>Explore</h2><a href="/how-it-works/">How it works & evidence</a><a href="/pathways/">Pathways</a><a href="/learners/">For learners</a><a href="/families/">For families</a></div><div><h2>Trust</h2><a href="/trust/#accessibility">Accessibility</a><a href="/privacy/">Privacy Policy</a><a href="/trust/#security">Security</a><a href="/terms/">Terms of Service</a></div><div><h2>Connect</h2><a href="/login/">Sign in or register</a><a href="/team/">Team</a><a href="/community/">Community</a><a href="/community/#support">Support</a><a href="/schools/">For schools</a><div class="footer-social-links"><a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></div></div></div><div class="content-wrap footer-bottom"><span>© 2026 Type2Learn. Educational product preview.</span><span class="footer-status"><i></i>Public information is a work in progress.</span></div></footer>';
 
   const nativeBuilderCredit = '<section class="builder-credit" aria-label="Website development credit"><div class="content-wrap builder-credit-inner reveal"><span class="builder-monogram" aria-hidden="true">N</span><div class="builder-copy"><p>Website credit · native.builder</p><strong>Built with native.builder for Type2Learn.</strong><span>Built from 3 August to 6 August · Human direction, product context, and accessibility standards shaped every decision.</span></div><a class="builder-credit-link" href="https://builder.nativelyai.com/" target="_blank" rel="noopener noreferrer"><span>Visit native.builder</span><span class="builder-link-icon" aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></section>';
 
@@ -86,6 +86,18 @@
   const shell = (content) => '<div class="site-shell">' + nav() + '<main id="main-content">' + content + siteCta() + nativeBuilderCredit + '</main>' + footer() + '</div>';
 
   const pageHero = (eyebrow, title, copy, asideTitle, asideCopy) => '<section class="page-hero" data-hero-scene><div class="hero-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div><div class="content-wrap"><div class="breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>' + eyebrow + '</span></div><div class="page-hero-grid"><div class="page-hero-copy"><p class="eyebrow"><span class="eyebrow-dot"></span>' + eyebrow + '</p><h1 data-animate-words>' + title + '</h1><p>' + copy + '</p><button class="scroll-cue" type="button" data-scroll-next aria-label="Scroll to explore the next section"><span class="scroll-mouse" aria-hidden="true"><i></i></span><span>Scroll to explore</span></button></div><aside class="page-hero-aside reveal" data-tilt><span class="aside-label">Current direction</span><strong>' + asideTitle + '</strong><span>' + asideCopy + '</span><i class="aside-path" aria-hidden="true"></i></aside></div></div></section>';
+
+  const authPage = () => {
+    const slides = [
+      ['/assets/auth/login-library.webp', 'Learn in your own way.', 'Private controls. Clear next steps.', '01'],
+      ['/assets/auth/login-studio.webp', 'Return exactly where you stopped.', 'Meaningful work stays ready for you.', '02'],
+      ['/assets/auth/login-community.webp', 'Build knowledge that stays.', 'Recall, produce, correct, and apply.', '03']
+    ];
+    const slideshow = slides.map((slide, index) => '<figure class="auth-slide' + (index === 0 ? ' is-active' : '') + '" data-auth-slide="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><img class="auth-slide-image' + (index === 0 ? ' is-priority' : '') + '" src="' + slide[0] + '" alt="" width="1920" height="1080"' + (index === 0 ? ' loading="eager" fetchpriority="high"' : ' loading="lazy"') + '><figcaption><span>' + slide[3] + '</span><strong>' + slide[1] + '</strong><small>' + slide[2] + '</small></figcaption></figure>').join('');
+    const slideControls = slides.map((slide, index) => '<button type="button" data-auth-slide-button="' + index + '" aria-label="Show background story ' + (index + 1) + '" aria-pressed="' + (index === 0 ? 'true' : 'false') + '"><span>' + slide[3] + '</span><i></i></button>').join('');
+    const passwordControl = (target) => '<button class="auth-password-toggle" type="button" data-password-toggle="' + target + '" aria-label="Show password" aria-pressed="false">' + icon('eye', true) + '</button>';
+    return '<div class="auth-shell"><div class="auth-slideshow" aria-label="Type2Learn learning stories">' + slideshow + '<div class="auth-slide-wash" aria-hidden="true"></div><div class="auth-slide-controls" aria-label="Background stories">' + slideControls + '</div></div><header class="auth-header">' + brand() + '<div class="auth-header-actions"><a href="/">Back to website</a><button class="motion-switch" id="motion-toggle" type="button" aria-pressed="false" aria-label="Motion On — turn off decorative motion">' + icon('pause', true) + '<span class="motion-switch-label">Motion</span><span class="motion-switch-state">On</span></button></div></header><main id="main-content" class="auth-page"><section class="auth-dialog" aria-labelledby="auth-title" data-auth-dialog><div class="auth-dialog-accent" aria-hidden="true"><i></i><i></i><i></i></div><div class="auth-dialog-heading"><p class="section-kicker">Secure learning access</p><h1 id="auth-title">Welcome back.</h1><p id="auth-description">Continue from the exact point where your learning paused.</p></div><div class="auth-form-stage"><form class="auth-form is-active" data-auth-form="login" aria-hidden="false"><button class="auth-google-button" type="button" data-google-auth><span class="google-mark" aria-hidden="true">G</span><span>Continue with Google</span></button><div class="auth-divider"><span>or continue with email</span></div><label class="auth-field"><span>Email address</span><input id="login-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="name@example.com" required></label><label class="auth-field"><span>Password</span><span class="auth-input-control"><input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" minlength="8" required>' + passwordControl('login-password') + '</span></label><div class="auth-form-options"><label class="auth-check"><input id="remember-email" name="remember" type="checkbox"><span class="auth-check-box" aria-hidden="true"></span><span>Remember me</span></label><button type="button" class="auth-text-button" data-auth-mode="reset">Forgot password?</button></div><button class="button button-primary auth-submit" type="submit">Sign in' + icon('arrow', true) + '</button><p class="auth-status" data-auth-status role="status" aria-live="polite"></p><p class="auth-switch">New to Type2Learn? <button type="button" data-auth-mode="register">Create an account</button></p></form><form class="auth-form" data-auth-form="register" aria-hidden="true" hidden><div class="auth-field-row"><label class="auth-field"><span>Full name</span><input id="register-name" name="name" type="text" autocomplete="name" placeholder="Your name" required></label><label class="auth-field"><span>Email address</span><input id="register-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="name@example.com" required></label></div><label class="auth-field"><span>Create password</span><span class="auth-input-control"><input id="register-password" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" required>' + passwordControl('register-password') + '</span></label><label class="auth-field"><span>Confirm password</span><span class="auth-input-control"><input id="register-confirm" name="confirm-password" type="password" autocomplete="new-password" placeholder="Enter it again" minlength="8" required>' + passwordControl('register-confirm') + '</span></label><label class="auth-check auth-terms-check"><input id="register-terms" name="terms" type="checkbox" required><span class="auth-check-box" aria-hidden="true"></span><span>I agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</span></label><button class="button button-primary auth-submit" type="submit">Create account' + icon('arrow', true) + '</button><p class="auth-status" data-auth-status role="status" aria-live="polite"></p><p class="auth-switch">Already have an account? <button type="button" data-auth-mode="login">Sign in</button></p></form><form class="auth-form" data-auth-form="reset" aria-hidden="true" hidden><div class="auth-reset-mark" aria-hidden="true">' + icon('lock') + '</div><p class="auth-reset-copy">Enter the email connected to your Type2Learn account and we will prepare the recovery step.</p><label class="auth-field"><span>Email address</span><input id="reset-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="name@example.com" required></label><button class="button button-primary auth-submit" type="submit">Send reset link' + icon('arrow', true) + '</button><p class="auth-status" data-auth-status role="status" aria-live="polite"></p><p class="auth-switch"><button type="button" data-auth-mode="login">Back to sign in</button></p></form></div><p class="auth-integration-note"><span></span>Account services are currently being connected</p></section></main></div>';
+  };
 
   const card = (iconName, title, text, bullets, badge) => '<article class="page-card reveal">' + (badge || '') + '<div class="page-icon">' + icon(iconName) + '</div><h3>' + title + '</h3><p>' + text + '</p>' + (bullets ? '<ul>' + bullets.map((item) => '<li>' + item + '</li>').join('') + '</ul>' : '') + '</article>';
 
@@ -163,6 +175,7 @@
     team,
     community,
     trust,
+    login: authPage,
     research: howItWorks,
     privacy: trust,
     terms: trust,
@@ -194,6 +207,7 @@
     team: 'Team — Type2Learn',
     community: 'Community and help — Type2Learn',
     trust: 'Trust — Type2Learn',
+    login: 'Sign in or create an account | Type2Learn',
     research: 'How Type2Learn works',
     privacy: 'Privacy Policy | Type2Learn',
     terms: 'Terms of Service | Type2Learn',
@@ -326,7 +340,7 @@
     document.body.classList.add('route-' + route);
     applyOfficialCopy();
 
-    if (document.querySelector('.legal-document')) return;
+    if (document.querySelector('.legal-document, .auth-page')) return;
 
     if (route === 'home') {
       const hero = document.querySelector('#main-content > .hero');
@@ -535,7 +549,7 @@
     let trackpadSettleTimer = 0;
     let drag = null;
 
-    const enabled = () => desktop.matches && !reducedMotion.matches && !main.classList.contains('legal-document') && !document.body.classList.contains('motion-off') && document.body.classList.contains('experience-ready');
+    const enabled = () => desktop.matches && !reducedMotion.matches && !main.matches('.legal-document, .auth-page') && !document.body.classList.contains('motion-off') && document.body.classList.contains('experience-ready');
     const headerOffset = () => Math.max(0, Math.round((header?.getBoundingClientRect().height || 80) + 4));
     const scrollLimit = () => Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     const documentTop = (element) => Math.max(0, Math.min(scrollLimit(), Math.round(element.getBoundingClientRect().top + window.scrollY - headerOffset())));
@@ -795,12 +809,12 @@
 
   let motionRuntimeStarted = false;
   const startMotionRuntime = async () => {
-    if (motionRuntimeStarted || document.querySelector('.legal-document')) return;
+    if (motionRuntimeStarted || document.querySelector('.legal-document, .auth-page')) return;
     motionRuntimeStarted = true;
     try {
       await loadScript('/vendor/gsap.min.js');
       await loadScript('/vendor/ScrollTrigger.min.js');
-      await import('/experience.js?v=20260720-6');
+      await import('/experience.js?v=20260720-7');
     } catch (error) {
       document.body.classList.add('experience-fallback');
     }
@@ -809,7 +823,7 @@
   const setupImageDelivery = () => {
     document.querySelectorAll('img').forEach((image) => {
       image.decoding = 'async';
-      if (image.classList.contains('brand-mark')) {
+      if (image.classList.contains('brand-mark') || image.classList.contains('is-priority')) {
         image.loading = 'eager';
         image.fetchPriority = 'high';
         return;
@@ -902,6 +916,141 @@
     }
   };
 
+  const setupAuthExperience = () => {
+    const authPage = document.querySelector('.auth-page');
+    if (!authPage) return;
+
+    const slides = Array.from(document.querySelectorAll('[data-auth-slide]'));
+    const slideButtons = Array.from(document.querySelectorAll('[data-auth-slide-button]'));
+    const forms = Array.from(document.querySelectorAll('[data-auth-form]'));
+    const title = document.getElementById('auth-title');
+    const description = document.getElementById('auth-description');
+    const modeCopy = {
+      login: ['Welcome back.', 'Continue from the exact point where your learning paused.'],
+      register: ['Create your account.', 'Set up a private place for progress, preferences, and return.'],
+      reset: ['Reset your password.', 'Prepare a secure recovery link for the email connected to your account.']
+    };
+    let activeSlide = 0;
+    let slideTimer = null;
+
+    const canPlaySlides = () => !document.body.classList.contains('motion-off') && !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches && !window.matchMedia('(max-width: 720px)').matches;
+    const showSlide = (index, restart = true) => {
+      activeSlide = (index + slides.length) % slides.length;
+      slides.forEach((slide, slideIndex) => {
+        const active = slideIndex === activeSlide;
+        slide.classList.toggle('is-active', active);
+        slide.setAttribute('aria-hidden', String(!active));
+      });
+      slideButtons.forEach((button, buttonIndex) => button.setAttribute('aria-pressed', String(buttonIndex === activeSlide)));
+      if (restart) startSlides();
+    };
+    const startSlides = () => {
+      window.clearInterval(slideTimer);
+      slideTimer = null;
+      if (!canPlaySlides() || slides.length < 2) return;
+      slideTimer = window.setInterval(() => showSlide(activeSlide + 1, false), 6800);
+    };
+
+    slideButtons.forEach((button) => button.addEventListener('click', () => showSlide(Number(button.dataset.authSlideButton || 0))));
+    window.addEventListener('type2learn:motion', startSlides);
+    window.addEventListener('resize', startSlides, { passive: true });
+    document.addEventListener('visibilitychange', startSlides);
+    startSlides();
+
+    const showMode = (mode, focus = true) => {
+      const copy = modeCopy[mode] || modeCopy.login;
+      if (title) title.textContent = copy[0];
+      if (description) description.textContent = copy[1];
+      forms.forEach((form) => {
+        const active = form.dataset.authForm === mode;
+        form.hidden = !active;
+        form.classList.toggle('is-active', active);
+        form.setAttribute('aria-hidden', String(!active));
+        const status = form.querySelector('[data-auth-status]');
+        if (status) {
+          status.textContent = '';
+          status.className = 'auth-status';
+        }
+      });
+      if (mode === 'reset') {
+        const resetEmail = document.getElementById('reset-email');
+        const loginEmail = document.getElementById('login-email');
+        if (resetEmail && loginEmail?.value && !resetEmail.value) resetEmail.value = loginEmail.value;
+      }
+      if (focus) window.requestAnimationFrame(() => document.querySelector('[data-auth-form="' + mode + '"] input')?.focus());
+    };
+
+    document.querySelectorAll('[data-auth-mode]').forEach((button) => button.addEventListener('click', () => showMode(button.dataset.authMode)));
+
+    document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const input = document.getElementById(button.dataset.passwordToggle);
+        if (!input) return;
+        const visible = input.type === 'text';
+        input.type = visible ? 'password' : 'text';
+        button.setAttribute('aria-pressed', String(!visible));
+        button.setAttribute('aria-label', visible ? 'Show password' : 'Hide password');
+        input.focus({ preventScroll: true });
+      });
+    });
+
+    const setAuthStatus = (form, message, kind = 'ready') => {
+      const status = form.querySelector('[data-auth-status]');
+      if (!status) return;
+      status.className = 'auth-status is-' + kind;
+      status.textContent = message;
+    };
+
+    const loginForm = document.querySelector('[data-auth-form="login"]');
+    const loginEmail = document.getElementById('login-email');
+    const rememberEmail = document.getElementById('remember-email');
+    try {
+      const savedEmail = window.localStorage.getItem('type2learn-remember-email');
+      if (savedEmail && loginEmail && rememberEmail) {
+        loginEmail.value = savedEmail;
+        rememberEmail.checked = true;
+      }
+    } catch (error) { /* The form remains usable when storage is unavailable. */ }
+
+    if (loginForm) loginForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!loginForm.reportValidity()) return;
+      try {
+        if (rememberEmail?.checked) window.localStorage.setItem('type2learn-remember-email', loginEmail.value.trim());
+        else window.localStorage.removeItem('type2learn-remember-email');
+      } catch (error) { /* Sign-in remains available when storage is unavailable. */ }
+      setAuthStatus(loginForm, 'Sign-in will be available as soon as account services are connected.');
+    });
+
+    document.querySelectorAll('[data-google-auth]').forEach((button) => button.addEventListener('click', () => {
+      const form = button.closest('form');
+      if (form) setAuthStatus(form, 'Google sign-in will be available as soon as account services are connected.');
+    }));
+
+    const registerForm = document.querySelector('[data-auth-form="register"]');
+    const registerPassword = document.getElementById('register-password');
+    const registerConfirm = document.getElementById('register-confirm');
+    const validatePasswordMatch = () => {
+      if (!registerConfirm) return;
+      registerConfirm.setCustomValidity(registerPassword?.value === registerConfirm.value ? '' : 'The passwords do not match.');
+    };
+    registerPassword?.addEventListener('input', validatePasswordMatch);
+    registerConfirm?.addEventListener('input', validatePasswordMatch);
+    if (registerForm) registerForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      validatePasswordMatch();
+      if (!registerForm.reportValidity()) return;
+      setAuthStatus(registerForm, 'Registration will be available as soon as account services are connected.');
+    });
+
+    const resetForm = document.querySelector('[data-auth-form="reset"]');
+    if (resetForm) resetForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!resetForm.reportValidity()) return;
+      setAuthStatus(resetForm, 'Password recovery will be available as soon as account services are connected.');
+    });
+  };
+
   setupViewportComposition();
   enhancePage();
   setupImageDelivery();
@@ -912,6 +1061,7 @@
   animateWords();
   setupReveals();
   setupControls();
+  setupAuthExperience();
   setupScrollExperience();
   setupSectionNavigation();
   setupPointerMotion();
