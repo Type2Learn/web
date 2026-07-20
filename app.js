@@ -212,7 +212,7 @@
       ['05', 'Return', 'Come back. Keep what you earned.', 'Revisit the idea later. Durable progress follows learning evidence and return, not speed.', '/assets/story/learner-return.webp', 'The learner returning to a familiar idea in a calm later study session.']
     ];
 
-    return '<section class="scroll-story" id="learning-story" data-scroll-stops="' + scenes.length + '" aria-labelledby="story-title"><div class="story-stage"><canvas class="story-canvas" id="story-canvas" aria-hidden="true"></canvas><div class="story-scenes">' + scenes.map((scene, index) => '<figure class="story-scene' + (index === 0 ? ' is-active' : '') + '" data-story-scene="' + index + '"><img src="' + scene[4] + '" alt="' + scene[5] + '"></figure>').join('') + '</div><div class="story-shade" aria-hidden="true"></div><div class="story-ui content-wrap"><div class="story-topline"><p><span>Type2Learn</span> · Learning route</p><div class="story-counter" aria-live="polite"><span id="story-current">01</span><i></i><span>' + String(scenes.length).padStart(2, '0') + '</span></div></div><div class="story-copy"><p class="story-kicker">Scroll-controlled learning story</p><h2 id="story-title">Learning is something you do.</h2><div class="story-steps">' + scenes.map((scene, index) => '<article class="story-step' + (index === 0 ? ' is-active' : '') + '" data-story-step="' + index + '"><span>' + scene[0] + ' · ' + scene[1] + '</span><h3>' + scene[2] + '</h3><p>' + scene[3] + '</p></article>').join('') + '</div><a class="button button-primary story-action" href="#demo" data-scroll-target="demo">Try the learning demo' + icon('arrow', true) + '</a></div><div class="story-route" aria-hidden="true">' + scenes.map((scene) => '<span>' + scene[1] + '</span>').join('') + '<i id="story-route-progress"></i></div></div></div></section>';
+    return '<section class="scroll-story" id="learning-story" data-scroll-stops="' + scenes.length + '" aria-labelledby="story-title"><div class="story-stage"><canvas class="story-canvas" id="story-canvas" aria-hidden="true"></canvas><div class="story-scenes">' + scenes.map((scene, index) => '<figure class="story-scene' + (index === 0 ? ' is-active' : '') + '" data-story-scene="' + index + '"><img src="' + scene[4] + '" alt="' + scene[5] + '"></figure>').join('') + '</div><div class="story-shade" aria-hidden="true"></div><div class="story-ui content-wrap"><div class="story-topline"><p><span>Type2Learn</span> · Learning route</p><div class="story-counter" aria-live="polite"><span id="story-current">01</span><i></i><span>' + String(scenes.length).padStart(2, '0') + '</span></div></div><div class="story-copy"><p class="story-kicker">Scroll, swipe, or drag through the learning story</p><h2 id="story-title">Learning is something you do.</h2><div class="story-steps">' + scenes.map((scene, index) => '<article class="story-step' + (index === 0 ? ' is-active' : '') + '" data-story-step="' + index + '"><span>' + scene[0] + ' · ' + scene[1] + '</span><h3>' + scene[2] + '</h3><p>' + scene[3] + '</p></article>').join('') + '</div><a class="button button-primary story-action" href="#demo" data-scroll-target="demo">Try the learning demo' + icon('arrow', true) + '</a></div><div class="story-route" aria-hidden="true">' + scenes.map((scene) => '<span>' + scene[1] + '</span>').join('') + '<i id="story-route-progress"></i></div></div></div></section>';
   };
 
   const learningStages = [
@@ -231,7 +231,7 @@
       const title = index === 5 ? '<span>Use the idea</span> <span>somewhere meaningful.</span>' : stage[3];
       return '<article class="loop-chit' + (index === 0 ? ' is-active' : '') + (index === 5 ? ' is-long' : '') + '" data-chit-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><span class="chit-number">' + stage[0] + '</span><div class="chit-copy"><p class="chit-phase">' + stage[1] + ' · ' + stage[2] + '</p><h3>' + title + '</h3><p>' + stage[4] + '</p></div><span class="chit-edge" aria-hidden="true">' + stage[2] + '</span></article>';
     }).join('');
-    return '<section class="section learning-shuffle-section" id="learning-loop" aria-labelledby="learning-shuffle-title"><div class="content-wrap"><div class="section-heading learning-shuffle-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 id="learning-shuffle-title">Learning becomes durable when the learner does the work.</h2><p>Scroll through the seven actions. Each step protects the academic objective while making the next move clear.</p></div><div class="shuffle-position" aria-live="polite"><span id="chit-current">01</span><i></i><span>07</span></div></div><div class="learning-shuffle" data-learning-shuffle data-scroll-stops="' + learningStages.length + '"><div class="chit-rail" aria-hidden="true"><div class="chit-rail-line"><i id="chit-rail-progress"></i></div><ol>' + rail + '</ol></div><div class="chit-viewport"><div class="chit-stack">' + chits + '</div><p class="chit-instruction"><span>Scroll</span> to shuffle the learning action</p></div></div></div></section>';
+    return '<section class="section learning-shuffle-section" id="learning-loop" aria-labelledby="learning-shuffle-title"><div class="content-wrap"><div class="section-heading learning-shuffle-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 id="learning-shuffle-title">Learning becomes durable when the learner does the work.</h2><p>Scroll, swipe, or drag through the seven actions. Each step protects the academic objective while making the next move clear.</p></div><div class="shuffle-position" aria-live="polite"><span id="chit-current">01</span><i></i><span>07</span></div></div><div class="learning-shuffle" data-learning-shuffle data-scroll-stops="' + learningStages.length + '"><div class="chit-rail" aria-hidden="true"><div class="chit-rail-line"><i id="chit-rail-progress"></i></div><ol>' + rail + '</ol></div><div class="chit-viewport"><div class="chit-stack">' + chits + '</div><p class="chit-instruction"><span>Scroll or drag</span> to shuffle the learning action</p></div></div></div></section>';
   };
 
   const howProcessMap = () => {
@@ -253,7 +253,7 @@
     ];
     const statusLabel = { supplied: 'Supplied portrait', edited: 'Portrait from supplied image', placeholder: 'Non-human placeholder' };
     const cards = members.map((member, index) => '<article class="team-profile-card' + (index === 0 ? ' is-active' : '') + ' has-' + member[4] + '" data-team-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><figure class="team-profile-portrait"><img src="' + member[2] + '" alt="' + member[3] + '" width="960" height="1200" loading="lazy" decoding="async"><figcaption class="portrait-status is-' + member[4] + '">' + statusLabel[member[4]] + '</figcaption></figure><div class="team-profile-copy"><p class="section-kicker">' + member[1] + '</p><h3>' + member[0] + '</h3><p class="team-profile-statement">“' + member[6] + '”</p><p>' + member[5] + '</p><div class="team-profile-responsibilities">' + member[7].map((item) => '<span>' + item + '</span>').join('') + '</div></div></article>').join('');
-    return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">The people building Type2Learn</p><h2 id="team-deck-title">Different disciplines. One accountable mission.</h2><p>The founder appears first, followed by the co-founders shaping engineering, research, AI, and product. Edited portraits are identified, and the non-human profile figure is clearly labelled.</p></div><div class="team-deck" data-team-deck data-scroll-stops="' + members.length + '"><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>Scroll</span> to shuffle the team deck</p></div></div></section>';
+    return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">The people building Type2Learn</p><h2 id="team-deck-title">Different disciplines. One accountable mission.</h2><p>The founder appears first, followed by the co-founders shaping engineering, research, AI, and product. Edited portraits are identified, and the non-human profile figure is clearly labelled.</p></div><div class="team-deck" data-team-deck data-scroll-stops="' + members.length + '"><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>Scroll or drag</span> to shuffle the team deck</p></div></div></section>';
   };
 
   const applyOfficialCopy = () => {
@@ -529,7 +529,11 @@
     let lastDirection = 0;
     let wheelAmount = 0;
     let lastWheelAt = 0;
+    let horizontalAmount = 0;
+    let lastHorizontalDirection = 0;
+    let lastHorizontalAt = 0;
     let trackpadSettleTimer = 0;
+    let drag = null;
 
     const enabled = () => desktop.matches && !reducedMotion.matches && !main.classList.contains('legal-document') && !document.body.classList.contains('motion-off') && document.body.classList.contains('experience-ready');
     const headerOffset = () => Math.max(0, Math.round((header?.getBoundingClientRect().height || 80) + 4));
@@ -584,6 +588,26 @@
       return true;
     };
 
+    const handleHorizontalStep = (delta) => {
+      if (!enabled() || !delta) return false;
+      const direction = Math.sign(delta);
+      if (Date.now() < lockedUntil) return true;
+      if (nextStop(direction) === null) return true;
+
+      const now = Date.now();
+      const amount = Math.min(Math.abs(delta), 180);
+      if (direction !== lastHorizontalDirection || now - lastHorizontalAt > 260) horizontalAmount = 0;
+      lastHorizontalDirection = direction;
+      lastHorizontalAt = now;
+      horizontalAmount += amount;
+
+      if (horizontalAmount >= 28) {
+        horizontalAmount = 0;
+        scrollToStop(direction);
+      }
+      return true;
+    };
+
     const settlePinnedChapter = () => {
       if (!enabled() || Date.now() < lockedUntil) return;
       const current = window.scrollY;
@@ -611,13 +635,20 @@
 
     window.addEventListener('wheel', (event) => {
       if (!enabled() || event.ctrlKey) return;
-      const horizontalGesture = Math.abs(event.deltaX) > Math.abs(event.deltaY);
-      const axisDelta = horizontalGesture ? event.deltaX : event.deltaY;
-      if (!axisDelta) return;
-      const direction = Math.sign(axisDelta);
-      const multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
-      const rawAmount = Math.abs(axisDelta * multiplier);
-      const discreteWheel = horizontalGesture || event.deltaMode !== 0 || (rawAmount >= 80 && Math.abs(rawAmount % 10) < .01);
+      const horizontalGesture = event.shiftKey || (Math.abs(event.deltaX) >= 1 && Math.abs(event.deltaX) > Math.abs(event.deltaY));
+      if (horizontalGesture) {
+        const horizontalDelta = event.deltaX || event.deltaY;
+        if (!horizontalDelta) return;
+        const multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+        event.preventDefault();
+        handleHorizontalStep(horizontalDelta * multiplier);
+        return;
+      }
+
+      if (!event.deltaY) return;
+      const direction = Math.sign(event.deltaY);
+      const rawAmount = Math.abs(event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1));
+      const discreteWheel = event.deltaMode !== 0 || (rawAmount >= 80 && Math.abs(rawAmount % 10) < .01);
       if (!discreteWheel) {
         window.clearTimeout(trackpadSettleTimer);
         trackpadSettleTimer = window.setTimeout(settlePinnedChapter, 170);
@@ -643,6 +674,55 @@
       }
     }, { passive: false });
 
+    const isDragSafeTarget = (target) => {
+      const element = target instanceof Element ? target : null;
+      return !element?.closest('a, button, input, textarea, select, label, summary, [contenteditable="true"], [role="button"], [role="textbox"], [data-no-drag]');
+    };
+
+    const clearDrag = () => {
+      if (!drag) return;
+      if (drag.captureTarget?.hasPointerCapture?.(drag.pointerId)) drag.captureTarget.releasePointerCapture(drag.pointerId);
+      drag = null;
+      document.body.classList.remove('is-horizontal-dragging');
+    };
+
+    main.addEventListener('pointerdown', (event) => {
+      if (!enabled() || event.pointerType !== 'mouse' || event.button !== 0 || !isDragSafeTarget(event.target)) return;
+      drag = {
+        pointerId: event.pointerId,
+        captureTarget: main,
+        startX: event.clientX,
+        startY: event.clientY,
+        axis: null,
+        completed: false
+      };
+    });
+
+    main.addEventListener('pointermove', (event) => {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const horizontal = event.clientX - drag.startX;
+      const vertical = event.clientY - drag.startY;
+      if (!drag.axis) {
+        if (Math.max(Math.abs(horizontal), Math.abs(vertical)) < 12) return;
+        if (Math.abs(horizontal) <= Math.abs(vertical) * 1.2) {
+          drag.axis = 'vertical';
+          clearDrag();
+          return;
+        }
+        drag.axis = 'horizontal';
+        main.setPointerCapture(event.pointerId);
+        document.body.classList.add('is-horizontal-dragging');
+      }
+      if (drag.axis !== 'horizontal') return;
+      event.preventDefault();
+      if (drag.completed || Math.abs(horizontal) < 86) return;
+      drag.completed = scrollToStop(horizontal < 0 ? 1 : -1);
+    }, { passive: false });
+
+    main.addEventListener('pointerup', clearDrag);
+    main.addEventListener('pointercancel', clearDrag);
+    main.addEventListener('lostpointercapture', clearDrag);
+
     window.addEventListener('keydown', (event) => {
       if (!enabled() || !canHandleKey(event)) return;
       const forward = event.key === 'ArrowDown' || event.key === 'ArrowRight' || event.key === 'PageDown' || (event.key === ' ' && !event.shiftKey);
@@ -653,8 +733,10 @@
 
     window.addEventListener('type2learn:motion', () => {
       wheelAmount = 0;
+      horizontalAmount = 0;
       lockedUntil = 0;
       window.clearTimeout(trackpadSettleTimer);
+      clearDrag();
     });
   };
 
@@ -718,7 +800,7 @@
     try {
       await loadScript('/vendor/gsap.min.js');
       await loadScript('/vendor/ScrollTrigger.min.js');
-      await import('/experience.js?v=20260720-5');
+      await import('/experience.js?v=20260720-6');
     } catch (error) {
       document.body.classList.add('experience-fallback');
     }

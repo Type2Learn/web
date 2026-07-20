@@ -3716,6 +3716,14 @@ body[data-viewport-shape="tall"] .story-scene img { object-position: 58% center;
 
 /* Reserve every desktop scroll chapter before GSAP starts, preventing late pin-spacer layout shifts. */
 @media (min-width: 721px) {
+  #main-content { touch-action: pan-y; }
+
+  body.is-horizontal-dragging,
+  body.is-horizontal-dragging * {
+    cursor: grabbing !important;
+    user-select: none !important;
+  }
+
   .scroll-story { height: max(5000px, 635dvh); }
   .learning-shuffle-section { padding-bottom: max(3990px, 490dvh); }
   .team-deck-section { padding-bottom: max(3590px, 430dvh); }
