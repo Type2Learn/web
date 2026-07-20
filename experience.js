@@ -423,6 +423,9 @@ const startExperience = async () => {
     setupChitShuffle();
     setupTeamDeck();
     setupSectionMotion();
+    ScrollTrigger.refresh();
+    document.body.classList.add('experience-ready');
+    window.dispatchEvent(new CustomEvent('type2learn:experience-ready'));
     window.setTimeout(() => ScrollTrigger.refresh(), 120);
     if (document.getElementById('story-canvas') && window.matchMedia('(min-width: 721px)').matches && !THREE) {
       const loadThree = async () => {

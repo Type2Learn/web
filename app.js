@@ -521,8 +521,9 @@
     let lastDirection = 0;
     let wheelAmount = 0;
     let lastWheelAt = 0;
+    let trackpadSettleTimer = 0;
 
-    const enabled = () => desktop.matches && !reducedMotion.matches && !document.body.classList.contains('motion-off');
+    const enabled = () => desktop.matches && !reducedMotion.matches && !document.body.classList.contains('motion-off') && document.body.classList.contains('experience-ready');
     const headerOffset = () => Math.max(0, Math.round((header?.getBoundingClientRect().height || 80) + 4));
     const scrollLimit = () => Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     const documentTop = (element) => Math.max(0, Math.min(scrollLimit(), Math.round(element.getBoundingClientRect().top + window.scrollY - headerOffset())));
@@ -575,6 +576,25 @@
       return true;
     };
 
+    const settlePinnedChapter = () => {
+      if (!enabled() || Date.now() < lockedUntil) return;
+      const current = window.scrollY;
+      const trigger = (window.ScrollTrigger?.getAll?.() || []).find((item) => {
+        const count = Number(item.trigger?.dataset?.scrollStops || 0);
+        return count > 1 && item.pin && current >= item.start - 36 && current <= item.end + 36;
+      });
+      const count = Number(trigger?.trigger?.dataset?.scrollStops || 0);
+      if (!trigger || count < 2) return;
+      const distance = trigger.end - trigger.start;
+      const step = distance / (count - 1);
+      const index = Math.min(count - 1, Math.max(0, Math.round((current - trigger.start) / step)));
+      const target = Math.round(trigger.start + step * index);
+      if (Math.abs(target - current) < 22) return;
+      lockedUntil = Date.now() + 420;
+      window.scrollTo({ top: target, behavior: 'smooth' });
+      window.setTimeout(() => { lockedUntil = 0; }, 500);
+    };
+
     const canHandleKey = (event) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return false;
       const element = event.target instanceof Element ? event.target : null;
@@ -584,6 +604,13 @@
     window.addEventListener('wheel', (event) => {
       if (!enabled() || event.ctrlKey || !event.deltaY) return;
       const direction = Math.sign(event.deltaY);
+      const rawAmount = Math.abs(event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1));
+      const discreteWheel = event.deltaMode !== 0 || (rawAmount >= 80 && Math.abs(rawAmount % 10) < .01);
+      if (!discreteWheel) {
+        window.clearTimeout(trackpadSettleTimer);
+        trackpadSettleTimer = window.setTimeout(settlePinnedChapter, 170);
+        return;
+      }
       if (Date.now() < lockedUntil) {
         event.preventDefault();
         return;
@@ -591,16 +618,14 @@
       if (nextStop(direction) === null) return;
 
       const now = Date.now();
-      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
-      const amount = Math.min(Math.abs(event.deltaY * unit), 160);
-      const isTrackpad = event.deltaMode === 0 && amount < 80;
+      const amount = Math.min(rawAmount, 160);
       if (direction !== lastDirection || now - lastWheelAt > 180) wheelAmount = 0;
       lastDirection = direction;
       lastWheelAt = now;
       wheelAmount += amount;
       event.preventDefault();
 
-      if (wheelAmount >= (isTrackpad ? 92 : 40)) {
+      if (wheelAmount >= 40) {
         wheelAmount = 0;
         scrollToStop(direction);
       }
@@ -617,6 +642,7 @@
     window.addEventListener('type2learn:motion', () => {
       wheelAmount = 0;
       lockedUntil = 0;
+      window.clearTimeout(trackpadSettleTimer);
     });
   };
 
@@ -680,7 +706,7 @@
     try {
       await loadScript('/vendor/gsap.min.js');
       await loadScript('/vendor/ScrollTrigger.min.js');
-      await import('/experience.js?v=20260720-2');
+      await import('/experience.js?v=20260720-3');
     } catch (error) {
       document.body.classList.add('experience-fallback');
     }
