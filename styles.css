@@ -3380,3 +3380,57 @@ html:has(body.motion-off) body {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-snap-type: none; }
 }
+
+/* Complete visual frames: never crop a supplied photograph or generated graphic. */
+.hero::before,
+.page-hero::before {
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+
+.story-scenes { background: var(--cloud); }
+.story-scene img {
+  object-fit: contain;
+  object-position: right center;
+  background: var(--cloud);
+}
+
+.team-profile-card.has-placeholder .team-profile-portrait img { object-fit: contain; }
+.route-cta-art { overflow: visible; }
+
+/* The viewport classifier is set on every resize. These are stable frames, not crop rules. */
+body[data-viewport-shape="wide"] .hero::before,
+body[data-viewport-shape="wide"] .page-hero::before {
+  inset: 5% 2% 5% 43%;
+}
+
+body[data-viewport-shape="balanced"] .hero::before,
+body[data-viewport-shape="balanced"] .page-hero::before {
+  inset: 3% 2% 3% 39%;
+}
+
+body[data-viewport-shape="tall"] .hero::before,
+body[data-viewport-shape="tall"] .page-hero::before {
+  inset: 5% 2% 5% 32%;
+}
+
+body[data-viewport-shape="wide"] .story-scene img { object-position: 72% center; }
+body[data-viewport-shape="balanced"] .story-scene img { object-position: 64% center; }
+body[data-viewport-shape="tall"] .story-scene img { object-position: 58% center; }
+
+@media (max-width: 720px) {
+  .hero::before,
+  .page-hero::before {
+    background-position: center top;
+    background-size: contain;
+  }
+
+  .hero-copy-block { padding-top: clamp(220px, 58vw, 250px); }
+  .page-hero { padding-top: clamp(205px, 53vw, 230px); }
+
+  .story-scene img {
+    object-fit: contain;
+    object-position: center top;
+  }
+}

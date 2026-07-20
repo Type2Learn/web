@@ -621,6 +621,33 @@
     });
   };
 
+  const setupViewportComposition = () => {
+    const root = document.documentElement;
+    let framePending = false;
+
+    const sync = () => {
+      const width = Math.max(window.innerWidth || 0, 1);
+      const height = Math.max(window.innerHeight || 0, 1);
+      const ratio = width / height;
+      const shape = width <= 720 ? 'mobile' : ratio >= 1.72 ? 'wide' : ratio >= 1.42 ? 'balanced' : 'tall';
+      document.body.dataset.viewportShape = shape;
+      root.style.setProperty('--viewport-ratio', ratio.toFixed(3));
+      root.style.setProperty('--viewport-width', width + 'px');
+      root.style.setProperty('--viewport-height', height + 'px');
+      framePending = false;
+    };
+
+    const schedule = () => {
+      if (framePending) return;
+      framePending = true;
+      window.requestAnimationFrame(sync);
+    };
+
+    sync();
+    window.addEventListener('resize', schedule, { passive: true });
+    window.visualViewport?.addEventListener('resize', schedule, { passive: true });
+  };
+
   const setupControls = () => {
     const menu = document.getElementById('menu-toggle');
     const mobileNav = document.getElementById('mobile-nav');
@@ -677,6 +704,7 @@
     }
   };
 
+  setupViewportComposition();
   enhancePage();
   setupImageDelivery();
   let savedMotion = null;
