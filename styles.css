@@ -3738,3 +3738,342 @@ body[data-viewport-shape="tall"] .story-scene img { object-position: 58% center;
     padding-bottom: 90px;
   }
 }
+
+/* Composition correction: card 06, reliable team transitions, and finished route art. */
+.loop-chit.is-long {
+  grid-template-columns: 148px minmax(0, 1fr) 42px;
+  gap: clamp(30px, 4.2vw, 64px);
+  padding: clamp(42px, 4.8vw, 62px) clamp(44px, 5vw, 68px) clamp(48px, 5.4vw, 72px);
+}
+
+.loop-chit.is-long .chit-copy {
+  width: min(100%, 760px);
+}
+
+.loop-chit.is-long .chit-copy h3 {
+  max-width: none;
+  font-size: clamp(2.75rem, min(4.35vw, 6.8vh), 4.65rem);
+  line-height: .88;
+}
+
+.loop-chit.is-long .chit-copy h3 span {
+  display: block;
+  white-space: nowrap;
+}
+
+.loop-chit.is-long .chit-copy > p:last-child {
+  max-width: 730px;
+  margin-top: 18px;
+  line-height: 1.62;
+}
+
+.loop-chit.is-long .chit-edge {
+  position: absolute;
+  top: 52px;
+  right: 27px;
+  align-self: auto;
+}
+
+.team-profile-card {
+  background: transparent;
+}
+
+.team-profile-card:not(.is-active) {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.team-profile-card.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.team-profile-copy {
+  padding-right: clamp(18px, 3vw, 48px);
+}
+
+.team-profile-portrait {
+  isolation: isolate;
+  box-shadow: 0 26px 70px rgba(10, 22, 48, .12);
+}
+
+.team-profile-portrait::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, .34);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+
+/* How it works closing graphic: seven active actions converging on doing. */
+.site-cta-how-it-works .method-route-art {
+  display: block;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, .9), rgba(231, 248, 254, .76)),
+    repeating-linear-gradient(90deg, transparent 0 44px, rgba(23, 105, 245, .08) 44px 45px);
+}
+
+.method-route-art::before,
+.method-route-art::after {
+  position: absolute;
+  z-index: 1;
+  content: "";
+  pointer-events: none;
+}
+
+.method-route-art::before {
+  inset: 8% 7%;
+  border: 1px solid rgba(23, 105, 245, .16);
+  clip-path: polygon(0 8%, 89% 8%, 100% 50%, 89% 92%, 0 92%, 11% 50%);
+}
+
+.method-route-art::after {
+  top: 50%;
+  right: 8%;
+  left: 8%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--green), var(--teal), var(--blue));
+  transform-origin: left;
+  animation: method-route-scan 4.8s ease-in-out infinite;
+}
+
+.method-route-core {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-content: center;
+  width: 142px;
+  aspect-ratio: 1;
+  color: #fff;
+  background: linear-gradient(145deg, var(--ink), #16386f);
+  clip-path: polygon(50% 0, 100% 22%, 90% 82%, 50% 100%, 10% 82%, 0 22%);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  animation: method-core-turn 5.8s var(--ease-out) infinite;
+}
+
+.method-route-core strong {
+  font-family: var(--display);
+  font-size: 3.8rem;
+  letter-spacing: -.08em;
+  line-height: .72;
+}
+
+.method-route-core span {
+  margin-top: 12px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.method-route-track {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+}
+
+.site-cta-how-it-works .method-route-track i,
+.site-cta-how-it-works .method-route-track i:nth-child(even) {
+  position: absolute;
+  inset: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 38%;
+  height: 48px;
+  padding: 0 18px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  background: linear-gradient(90deg, rgba(25, 200, 90, .2), rgba(25, 197, 181, .72));
+  box-shadow: none;
+  clip-path: polygon(0 0, 90% 0, 100% 50%, 90% 100%, 0 100%, 8% 50%);
+  font-style: normal;
+  transform-origin: center;
+  animation: method-action-shift 5.6s var(--ease-out) infinite;
+  animation-delay: calc(var(--art-index) * -410ms);
+}
+
+.site-cta-how-it-works .method-route-track i:nth-child(1) { top: 10%; right: auto; bottom: auto; left: 8%; }
+.site-cta-how-it-works .method-route-track i:nth-child(2) { top: 25%; right: auto; bottom: auto; left: 3%; }
+.site-cta-how-it-works .method-route-track i:nth-child(3) { top: 72%; right: auto; bottom: auto; left: 6%; }
+.site-cta-how-it-works .method-route-track i:nth-child(4) { top: 84%; right: auto; bottom: auto; left: 31%; }
+.site-cta-how-it-works .method-route-track i:nth-child(5) { top: 72%; right: 5%; bottom: auto; left: auto; }
+.site-cta-how-it-works .method-route-track i:nth-child(6) { top: 25%; right: 3%; bottom: auto; left: auto; }
+.site-cta-how-it-works .method-route-track i:nth-child(7) { top: 10%; right: 8%; bottom: auto; left: auto; }
+.site-cta-how-it-works .method-route-track i:nth-child(2),
+.site-cta-how-it-works .method-route-track i:nth-child(5) { background: linear-gradient(90deg, rgba(25, 197, 181, .2), rgba(25, 189, 235, .72)); }
+.site-cta-how-it-works .method-route-track i:nth-child(3),
+.site-cta-how-it-works .method-route-track i:nth-child(6) { background: linear-gradient(90deg, rgba(25, 189, 235, .2), rgba(23, 105, 245, .65)); }
+.site-cta-how-it-works .method-route-track i:nth-child(4) { background: linear-gradient(90deg, rgba(25, 200, 90, .28), rgba(23, 105, 245, .62)); }
+
+.method-route-track i b {
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .12em;
+}
+
+.method-route-track i span {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.site-cta-how-it-works .method-route-track i::before,
+.site-cta-how-it-works .method-route-track i::after { display: none; }
+
+@keyframes method-route-scan {
+  0%, 12% { transform: scaleX(.08); opacity: .3; }
+  68%, 100% { transform: scaleX(1); opacity: 1; }
+}
+
+@keyframes method-core-turn {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+  48%, 58% { transform: translate(-50%, -50%) rotate(3deg); }
+}
+
+@keyframes method-action-shift {
+  0%, 100% { translate: 0 0; }
+  42%, 58% { translate: 8px -3px; }
+}
+
+/* Team closing graphic: filled editorial role plates, never empty cards. */
+.site-cta-team .team-route-art {
+  display: block;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(234, 251, 241, .92), rgba(231, 248, 254, .9)),
+    repeating-linear-gradient(0deg, transparent 0 47px, rgba(23, 105, 245, .07) 47px 48px);
+  perspective: 1100px;
+}
+
+.team-route-axis {
+  position: absolute;
+  z-index: 1;
+  inset: 8% 6%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+
+.team-route-axis span {
+  padding-bottom: 12px;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: .15em;
+}
+
+.team-route-axis strong {
+  color: rgba(23, 105, 245, .14);
+  font-family: var(--display);
+  font-size: 8rem;
+  letter-spacing: -.08em;
+  line-height: .58;
+}
+
+.site-cta-team .team-route-art i:nth-of-type(-n+5) {
+  position: absolute;
+  top: 17%;
+  bottom: 14%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: 29%;
+  padding: 18px 15px 15px;
+  overflow: hidden;
+  border: 1px solid rgba(23, 105, 245, .24);
+  border-radius: 12px;
+  color: var(--ink);
+  background: linear-gradient(160deg, #fff 0 24%, #dcf9f1 24% 68%, #eaf2ff 68%);
+  box-shadow: 0 24px 52px rgba(10, 22, 48, .13), inset 0 -7px 0 var(--teal);
+  font-style: normal;
+  transform: rotate(var(--card-tilt));
+  animation: team-role-shuffle 6s var(--ease-out) infinite;
+  animation-delay: calc(var(--art-index) * -330ms);
+}
+
+.site-cta-team .team-route-art i:nth-of-type(1) { z-index: 2; left: 3%; --card-tilt: -7deg; --card-soft-tilt: -3deg; --card-lift: 11px; }
+.site-cta-team .team-route-art i:nth-of-type(2) { z-index: 3; left: 19%; --card-tilt: -3.5deg; --card-soft-tilt: -1deg; --card-lift: 6px; }
+.site-cta-team .team-route-art i:nth-of-type(3) { z-index: 4; left: 35%; --card-tilt: 0deg; --card-soft-tilt: 1deg; --card-lift: 14px; }
+.site-cta-team .team-route-art i:nth-of-type(4) { z-index: 5; left: 51%; --card-tilt: 3.5deg; --card-soft-tilt: 1deg; --card-lift: 7px; }
+.site-cta-team .team-route-art i:nth-of-type(5) { z-index: 6; left: 67%; --card-tilt: 7deg; --card-soft-tilt: 3deg; --card-lift: 12px; }
+
+.team-route-art i b {
+  color: var(--blue);
+  font-family: var(--display);
+  font-size: 2.8rem;
+  letter-spacing: -.06em;
+  line-height: .8;
+}
+
+.team-route-art i span {
+  align-self: center;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+}
+
+.team-route-art i em {
+  display: block;
+  height: 5px;
+  background: linear-gradient(90deg, var(--green), var(--teal), var(--blue));
+  transform-origin: left;
+  animation: team-role-line 6s ease-in-out infinite;
+  animation-delay: calc(var(--art-index) * -330ms);
+}
+
+.site-cta-team .team-route-art i::before,
+.site-cta-team .team-route-art i::after { display: none; }
+
+@keyframes team-role-shuffle {
+  0%, 100% { transform: translateY(0) rotate(var(--card-tilt)); }
+  40%, 56% { transform: translateY(calc(var(--card-lift) * -1)) rotate(var(--card-soft-tilt)); }
+}
+
+@keyframes team-role-line {
+  0%, 18% { transform: scaleX(.2); }
+  58%, 100% { transform: scaleX(1); }
+}
+
+@media (max-width: 1000px) and (min-width: 721px) {
+  .method-route-core { width: 118px; }
+  .method-route-core strong { font-size: 3.2rem; }
+  .site-cta-how-it-works .method-route-track i,
+  .site-cta-how-it-works .method-route-track i:nth-child(even) { width: 43%; padding-inline: 13px; }
+}
+
+@media (max-width: 720px) {
+  .loop-chit.is-long {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 28px 22px 46px;
+  }
+  .loop-chit.is-long .chit-copy h3 span { white-space: normal; }
+  .loop-chit.is-long .chit-edge { display: none; }
+  .team-profile-card:not(.is-active) { opacity: 1; visibility: visible; }
+  .team-profile-copy { padding-right: 24px; }
+  .method-route-core { width: 94px; }
+  .method-route-core strong { font-size: 2.65rem; }
+  .method-route-core span { margin-top: 8px; font-size: 6px; }
+  .site-cta-how-it-works .method-route-track i,
+  .site-cta-how-it-works .method-route-track i:nth-child(even) { width: 42%; height: 34px; padding-inline: 11px; }
+  .method-route-track i b,
+  .method-route-track i span { font-size: 6px; }
+  .team-route-axis strong { font-size: 5.5rem; }
+  .site-cta-team .team-route-art i:nth-of-type(-n+5) { padding: 12px 10px 10px; border-radius: 9px; }
+  .team-route-art i b { font-size: 2rem; }
+  .team-route-art i span { font-size: 6px; }
+}

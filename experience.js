@@ -209,15 +209,14 @@ const startExperience = async () => {
         onUpdate: (self) => setState(Math.round(self.progress * (cards.length - 1)), self.progress)
       }
     });
-    timeline.to({}, { duration: .32 });
+    timeline.to({}, { duration: cards.length - 1 }, 0);
     for (let index = 1; index < cards.length; index += 1) {
+      const changeAt = index - .28;
       timeline
-        .to(cards[index - 1], { autoAlpha: 0, xPercent: -112, rotation: -2.5, duration: .16 })
-        .set(cards[index], { visibility: 'visible' })
-        .to(cards[index], { autoAlpha: 1, xPercent: 0, rotation: 0, duration: .22 })
-        .to({}, { duration: .34 });
+        .to(cards[index - 1], { autoAlpha: 0, xPercent: -112, rotation: -2.5, duration: .16 }, changeAt)
+        .set(cards[index], { visibility: 'visible' }, changeAt + .12)
+        .to(cards[index], { autoAlpha: 1, xPercent: 0, rotation: 0, duration: .16 }, changeAt + .12);
     }
-    timeline.to({}, { duration: .2 });
     activeScrollTriggers.push(timeline.scrollTrigger);
     setState(0, 0);
   };
@@ -290,20 +289,19 @@ const startExperience = async () => {
         onUpdate: (self) => setState(Math.round(self.progress * (cards.length - 1)))
       }
     });
-    timeline.to({}, { duration: .34 });
+    timeline.to({}, { duration: cards.length - 1 }, 0);
     for (let index = 0; index < cards.length - 1; index += 1) {
+      const changeAt = index + .72;
       timeline
-        .to(portraits[index], { clipPath: 'inset(0 100% 0 0 round 18px)', duration: .18 }, 'team-out-' + index)
-        .to(images[index], { scale: 1.055, duration: .18 }, 'team-out-' + index)
-        .to(copyLines[index], { x: -48, autoAlpha: 0, stagger: .012, duration: .14 }, 'team-out-' + index)
-        .set(cards[index], { autoAlpha: 0 })
-        .set(cards[index + 1], { visibility: 'visible', autoAlpha: 1 })
-        .to(portraits[index + 1], { clipPath: 'inset(0 0% 0 0 round 18px)', duration: .28 }, 'team-in-' + index)
-        .to(images[index + 1], { scale: 1, duration: .32 }, 'team-in-' + index)
-        .to(copyLines[index + 1], { x: 0, autoAlpha: 1, stagger: .027, duration: .2 }, 'team-in-' + index + '+=.035')
-        .to({}, { duration: .38 });
+        .set(cards[index + 1], { visibility: 'visible', autoAlpha: 1 }, changeAt)
+        .to(portraits[index], { clipPath: 'inset(0 0 0 100% round 18px)', duration: .22 }, changeAt)
+        .to(images[index], { scale: 1.045, xPercent: -2, duration: .22 }, changeAt)
+        .to(copyLines[index], { x: -52, autoAlpha: 0, stagger: .01, duration: .17 }, changeAt)
+        .to(portraits[index + 1], { clipPath: 'inset(0 0% 0 0 round 18px)', duration: .26 }, changeAt + .02)
+        .to(images[index + 1], { scale: 1, xPercent: 0, duration: .26 }, changeAt + .02)
+        .to(copyLines[index + 1], { x: 0, autoAlpha: 1, stagger: .022, duration: .2 }, changeAt + .04)
+        .set(cards[index], { autoAlpha: 0 }, index + 1);
     }
-    timeline.to({}, { duration: .2 });
     activeScrollTriggers.push(timeline.scrollTrigger);
     setState(0);
   };

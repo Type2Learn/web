@@ -64,10 +64,22 @@
   };
 
   const ctaRoute = ({ research: 'how-it-works', support: 'community', privacy: 'trust', terms: 'trust', accessibility: 'trust', security: 'trust' })[route] || route;
+  const routeCtaArt = (routeName) => {
+    if (routeName === 'how-it-works') {
+      const actions = ['Choose', 'Understand', 'Recall', 'Produce', 'Correct', 'Apply', 'Return'];
+      return '<div class="route-cta-art method-route-art" aria-hidden="true"><div class="method-route-core"><strong>DO</strong><span>Active learning</span></div><div class="method-route-track">' + actions.map((action, index) => '<i style="--art-index:' + (index + 1) + '"><b>' + String(index + 1).padStart(2, '0') + '</b><span>' + action + '</span></i>').join('') + '</div></div>';
+    }
+    if (routeName === 'team') {
+      const roles = [['01', 'Vision'], ['02', 'Engineering'], ['03', 'AI'], ['04', 'Research'], ['05', 'Product']];
+      return '<div class="route-cta-art team-route-art" aria-hidden="true"><div class="team-route-axis"><span>One mission</span><strong>05</strong></div>' + roles.map((role, index) => '<i style="--art-index:' + (index + 1) + '"><b>' + role[0] + '</b><span>' + role[1] + '</span><em></em></i>').join('') + '</div>';
+    }
+    return '<div class="route-cta-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>';
+  };
+
   const siteCta = () => {
     const item = ctaDefinitions[ctaRoute] || ctaDefinitions.home;
     const isHome = ctaRoute === 'home';
-    const art = isHome ? '<div class="cta-orbit" aria-hidden="true"><i></i><i></i><i></i></div>' : '<div class="route-cta-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>';
+    const art = isHome ? '<div class="cta-orbit" aria-hidden="true"><i></i><i></i><i></i></div>' : routeCtaArt(ctaRoute);
     return '<section class="site-cta site-cta-' + ctaRoute + '" data-cta-route="' + ctaRoute + '" aria-labelledby="site-cta-title"><div class="content-wrap"><div class="site-cta-panel reveal">' + art + '<div class="site-cta-copy"><p class="section-kicker">' + item[0] + '</p><h2 id="site-cta-title" data-animate-words>' + item[1] + '</h2><p>' + item[2] + '</p></div><div class="site-cta-actions">' + button(item[3], item[4], 'primary') + button(item[5], item[6], 'light') + '</div></div></div></section>';
   };
 
@@ -210,7 +222,10 @@
 
   const homeLearningShuffle = () => {
     const rail = learningStages.map((stage, index) => '<li class="' + (index === 0 ? 'is-active' : '') + '" data-chit-rail="' + index + '"><span>' + stage[0] + '</span></li>').join('');
-    const chits = learningStages.map((stage, index) => '<article class="loop-chit' + (index === 0 ? ' is-active' : '') + (index === 5 ? ' is-long' : '') + '" data-chit-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><span class="chit-number">' + stage[0] + '</span><div class="chit-copy"><p class="chit-phase">' + stage[1] + ' · ' + stage[2] + '</p><h3>' + stage[3] + '</h3><p>' + stage[4] + '</p></div><span class="chit-edge" aria-hidden="true">' + stage[2] + '</span></article>').join('');
+    const chits = learningStages.map((stage, index) => {
+      const title = index === 5 ? '<span>Use the idea</span> <span>somewhere meaningful.</span>' : stage[3];
+      return '<article class="loop-chit' + (index === 0 ? ' is-active' : '') + (index === 5 ? ' is-long' : '') + '" data-chit-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><span class="chit-number">' + stage[0] + '</span><div class="chit-copy"><p class="chit-phase">' + stage[1] + ' · ' + stage[2] + '</p><h3>' + title + '</h3><p>' + stage[4] + '</p></div><span class="chit-edge" aria-hidden="true">' + stage[2] + '</span></article>';
+    }).join('');
     return '<section class="section learning-shuffle-section" id="learning-loop" aria-labelledby="learning-shuffle-title"><div class="content-wrap"><div class="section-heading learning-shuffle-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 id="learning-shuffle-title">Learning becomes durable when the learner does the work.</h2><p>Scroll through the seven actions. Each step protects the academic objective while making the next move clear.</p></div><div class="shuffle-position" aria-live="polite"><span id="chit-current">01</span><i></i><span>07</span></div></div><div class="learning-shuffle" data-learning-shuffle data-scroll-stops="' + learningStages.length + '"><div class="chit-rail" aria-hidden="true"><div class="chit-rail-line"><i id="chit-rail-progress"></i></div><ol>' + rail + '</ol></div><div class="chit-viewport"><div class="chit-stack">' + chits + '</div><p class="chit-instruction"><span>Scroll</span> to shuffle the learning action</p></div></div></div></section>';
   };
 
@@ -665,7 +680,7 @@
     try {
       await loadScript('/vendor/gsap.min.js');
       await loadScript('/vendor/ScrollTrigger.min.js');
-      await import('/experience.js');
+      await import('/experience.js?v=20260720-2');
     } catch (error) {
       document.body.classList.add('experience-fallback');
     }
