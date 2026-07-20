@@ -4526,21 +4526,6 @@ body.route-terms {
 }
 
 /* Authentication experience */
-.header-login-link {
-  padding: 9px 3px 8px;
-  border-bottom: 2px solid transparent;
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-weight: 850;
-  white-space: nowrap;
-}
-
-.header-login-link:hover,
-.header-login-link[aria-current="page"] {
-  border-color: var(--blue);
-  color: var(--blue);
-}
-
 html:has(body.route-login) {
   scroll-snap-type: none;
   background: var(--cloud);
@@ -4651,12 +4636,12 @@ body.route-login {
   right: clamp(24px, 4vw, 74px);
   bottom: 44px;
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .auth-slide-controls button {
   display: grid;
-  grid-template-columns: auto 44px;
+  grid-template-columns: auto 34px;
   align-items: center;
   gap: 8px;
   padding: 8px 0;
@@ -5098,7 +5083,6 @@ body.route-login {
 }
 
 @media (max-width: 1180px) {
-  .header-login-link { display: none; }
 }
 
 @media (max-width: 720px) {
@@ -5151,11 +5135,20 @@ body.route-login {
   .auth-slide figcaption { display: none; }
 
   .auth-slide-controls {
+    left: 20px;
     right: 20px;
     bottom: 20px;
+    justify-content: center;
+    gap: 7px;
   }
 
-  .auth-slide-controls button { grid-template-columns: auto 28px; }
+  .auth-slide-controls button {
+    display: block;
+    width: 30px;
+  }
+
+  .auth-slide-controls button span { display: none; }
+  .auth-slide-controls i { display: block; width: 30px; }
   .auth-integration-note { line-height: 1.5; text-align: center; }
 }
 
