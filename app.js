@@ -818,7 +818,7 @@
     try {
       await loadScript('/vendor/gsap.min.js');
       await loadScript('/vendor/ScrollTrigger.min.js');
-      await import('/experience.js?v=20260720-8');
+      await import('/experience.js?v=20260720-9');
     } catch (error) {
       document.body.classList.add('experience-fallback');
     }
@@ -927,8 +927,21 @@
     const slides = Array.from(document.querySelectorAll('[data-auth-slide]'));
     const slideButtons = Array.from(document.querySelectorAll('[data-auth-slide-button]'));
     const forms = Array.from(document.querySelectorAll('[data-auth-form]'));
+    const formStage = document.querySelector('.auth-form-stage');
     const title = document.getElementById('auth-title');
     const description = document.getElementById('auth-description');
+    const integrationNote = document.querySelector('.auth-integration-note');
+    if (formStage && !document.querySelector('[data-auth-account]')) {
+      formStage.insertAdjacentHTML('afterend', '<section class="auth-account" data-auth-account aria-hidden="true" hidden><span class="auth-account-avatar" data-auth-account-avatar aria-hidden="true">T2</span><p class="section-kicker">Authenticated account</p><h2 data-auth-account-name>Type2Learn learner</h2><p data-auth-account-email></p><div class="auth-account-actions"><a class="button button-primary" href="/">Continue to Type2Learn' + icon('arrow', true) + '</a><button class="auth-signout" type="button" data-auth-signout>Sign out</button></div></section>');
+    }
+    const googleButton = document.querySelector('[data-google-auth]');
+    if (googleButton && !document.querySelector('.auth-google-terms')) {
+      googleButton.insertAdjacentHTML('afterend', '<p class="auth-google-terms">By continuing with Google, you agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</p>');
+    }
+    if (integrationNote?.lastChild) {
+      integrationNote.lastChild.textContent = 'Connecting secure account services…';
+      integrationNote.classList.add('is-connecting');
+    }
     const modeCopy = {
       login: ['Welcome back.', 'Continue from the exact point where your learning paused.'],
       register: ['Create your account.', 'Set up a private place for progress, preferences, and return.'],
@@ -1032,21 +1045,6 @@
       }
     } catch (error) { /* The form remains usable when storage is unavailable. */ }
 
-    if (loginForm) loginForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (!loginForm.reportValidity()) return;
-      try {
-        if (rememberEmail?.checked) window.localStorage.setItem('type2learn-remember-email', loginEmail.value.trim());
-        else window.localStorage.removeItem('type2learn-remember-email');
-      } catch (error) { /* Sign-in remains available when storage is unavailable. */ }
-      setAuthStatus(loginForm, 'Sign-in will be available as soon as account services are connected.');
-    });
-
-    document.querySelectorAll('[data-google-auth]').forEach((button) => button.addEventListener('click', () => {
-      const form = button.closest('form');
-      if (form) setAuthStatus(form, 'Google sign-in will be available as soon as account services are connected.');
-    }));
-
     const registerForm = document.querySelector('[data-auth-form="register"]');
     const registerPassword = document.getElementById('register-password');
     const registerConfirm = document.getElementById('register-confirm');
@@ -1056,19 +1054,14 @@
     };
     registerPassword?.addEventListener('input', validatePasswordMatch);
     registerConfirm?.addEventListener('input', validatePasswordMatch);
-    if (registerForm) registerForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      validatePasswordMatch();
-      if (!registerForm.reportValidity()) return;
-      setAuthStatus(registerForm, 'Registration will be available as soon as account services are connected.');
-    });
-
-    const resetForm = document.querySelector('[data-auth-form="reset"]');
-    if (resetForm) resetForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (!resetForm.reportValidity()) return;
-      setAuthStatus(resetForm, 'Password recovery will be available as soon as account services are connected.');
-    });
+    import('/firebase-auth.js?v=20260720-9')
+      .then(({ setupFirebaseAuth }) => setupFirebaseAuth({ setStatus: setAuthStatus }))
+      .catch(() => {
+        if (integrationNote?.lastChild) integrationNote.lastChild.textContent = 'Account services could not connect';
+        integrationNote?.classList.remove('is-connecting');
+        integrationNote?.classList.add('is-error');
+        forms.forEach((form) => setAuthStatus(form, 'Account services could not connect. Check your internet connection and reload the page.', 'error'));
+      });
   };
 
   setupViewportComposition();

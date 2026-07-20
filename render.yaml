@@ -11,6 +11,9 @@ services:
       - path: /experience.js
         name: Cache-Control
         value: public, max-age=0, must-revalidate
+      - path: /firebase-auth.js
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
       - path: /styles.css
         name: Cache-Control
         value: public, max-age=0, must-revalidate
