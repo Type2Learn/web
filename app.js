@@ -40,7 +40,7 @@
   const status = (text, kind) => '<span class="status-chip chip-' + (kind || 'blue') + '">' + text + '</span>';
   const button = (label, href, kind, attrs) => '<a class="button button-' + (kind || 'secondary') + '" href="' + href + '"' + (attrs || '') + '>' + label + icon('arrow', true) + '</a>';
 
-  const brand = () => '<a class="brand" href="/" aria-label="Type2Learn home"><img class="brand-mark" src="/assets/type2learn-logo.png" alt=""><span class="brand-copy"><span class="brand-name">TYPE2LEARN</span><span class="brand-tagline">Learn actively</span></span></a>';
+  const brand = () => '<a class="brand" href="/" aria-label="Type2Learn home"><img class="brand-mark" src="/assets/type2learn-logo-nav.webp" width="160" height="141" alt=""><span class="brand-copy"><span class="brand-name">TYPE2LEARN</span><span class="brand-tagline">Learn actively</span></span></a>';
 
   const nav = () => {
     const links = navItems.map(([key, label]) => '<a href="/' + key + '/"' + (route === key ? ' aria-current="page"' : '') + '>' + label + '</a>').join('');
@@ -161,6 +161,11 @@
 
   const root = document.getElementById('app');
   root.innerHTML = (pageMap[route] || landing)();
+  root.querySelectorAll('img[src="/assets/type2learn-logo.png"]').forEach((image) => {
+    image.src = '/assets/type2learn-logo-nav.webp';
+    image.width = 160;
+    image.height = 141;
+  });
 
   const pageTitles = {
     home: 'Type2Learn — Learn by typing',
@@ -429,7 +434,9 @@
     if (persist) {
       try { window.localStorage.setItem('type2learn-motion', off ? 'off' : 'on'); } catch (error) { /* Settings remain available for this page. */ }
     }
-    window.dispatchEvent(new CustomEvent('type2learn:motion', { detail: { off } }));
+    const notifyExperience = () => window.dispatchEvent(new CustomEvent('type2learn:motion', { detail: { off } }));
+    if (persist) window.requestAnimationFrame(() => window.setTimeout(notifyExperience, 0));
+    else notifyExperience();
   };
 
   const setupScrollExperience = () => {
@@ -616,6 +623,54 @@
     });
   };
 
+  const setupFastNavigation = () => {
+    document.querySelectorAll('.desktop-nav a, .mobile-nav a').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const destination = new URL(link.href, window.location.href);
+        if (destination.origin !== window.location.origin) return;
+        event.preventDefault();
+        link.classList.add('is-pending');
+        document.body.classList.add('is-navigating');
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.location.assign(destination.href)));
+      });
+    });
+  };
+
+  const loadScript = (source) => new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src="' + source + '"]');
+    if (existing) {
+      if (existing.dataset.loaded === 'true') resolve();
+      else {
+        existing.addEventListener('load', resolve, { once: true });
+        existing.addEventListener('error', reject, { once: true });
+      }
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = source;
+    script.async = true;
+    script.addEventListener('load', () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    }, { once: true });
+    script.addEventListener('error', reject, { once: true });
+    document.head.append(script);
+  });
+
+  let motionRuntimeStarted = false;
+  const startMotionRuntime = async () => {
+    if (motionRuntimeStarted) return;
+    motionRuntimeStarted = true;
+    try {
+      await loadScript('/vendor/gsap.min.js');
+      await loadScript('/vendor/ScrollTrigger.min.js');
+      await import('/experience.js');
+    } catch (error) {
+      document.body.classList.add('experience-fallback');
+    }
+  };
+
   const setupImageDelivery = () => {
     document.querySelectorAll('img').forEach((image) => {
       image.decoding = 'async';
@@ -725,5 +780,12 @@
   setupScrollExperience();
   setupSectionNavigation();
   setupPointerMotion();
-  import('/experience.js').catch(() => document.body.classList.add('experience-fallback'));
+  setupFastNavigation();
+  window.addEventListener('type2learn:motion', (event) => {
+    if (!event.detail?.off) startMotionRuntime();
+  });
+  if (!document.body.classList.contains('motion-off')) {
+    if (document.readyState === 'complete') window.requestAnimationFrame(startMotionRuntime);
+    else window.addEventListener('load', () => window.requestAnimationFrame(startMotionRuntime), { once: true });
+  }
 })();

@@ -131,6 +131,7 @@ const startExperience = async () => {
         start: 'top top',
         end: () => '+=' + Math.max(window.innerHeight * (scenes.length + .35), 4200),
         pin: stage,
+        pinSpacing: false,
         scrub: .75,
         anticipatePin: 1,
         refreshPriority: 10,
@@ -201,6 +202,7 @@ const startExperience = async () => {
         start: 'top top+=90',
         end: () => '+=' + Math.max(window.innerHeight * 4.9, 3900),
         pin: stage,
+        pinSpacing: false,
         scrub: .65,
         anticipatePin: 1,
         invalidateOnRefresh: true,
@@ -281,6 +283,7 @@ const startExperience = async () => {
         start: 'top top+=88',
         end: () => '+=' + Math.max(window.innerHeight * 4.3, 3500),
         pin: deck,
+        pinSpacing: false,
         scrub: .72,
         anticipatePin: 1,
         invalidateOnRefresh: true,
@@ -338,6 +341,7 @@ const startExperience = async () => {
           start: 'top top+=74',
           end: () => '+=' + Math.max(window.innerHeight * 2.35, 1800),
           pin: section || panel || false,
+          pinSpacing: false,
           scrub: .48,
           anticipatePin: 1,
           invalidateOnRefresh: true
@@ -417,14 +421,24 @@ const startExperience = async () => {
 
   const initializeMotionExperience = async () => {
     if (motionIsOff()) return;
-    if (document.getElementById('story-canvas') && window.matchMedia('(min-width: 721px)').matches && !THREE) {
-      try { THREE = await import('/vendor/three.module.min.js'); } catch (error) { /* The photographic story remains fully usable. */ }
-    }
     setupStory();
     setupChitShuffle();
     setupTeamDeck();
     setupSectionMotion();
     window.setTimeout(() => ScrollTrigger.refresh(), 120);
+    if (document.getElementById('story-canvas') && window.matchMedia('(min-width: 721px)').matches && !THREE) {
+      const loadThree = async () => {
+        try {
+          THREE = await import('/vendor/three.module.min.js');
+          if (!motionIsOff()) {
+            renderPath = buildThreePath();
+            setStoryState(storyTimeline?.scrollTrigger?.progress || 0);
+          }
+        } catch (error) { /* The photographic story remains fully usable. */ }
+      };
+      if ('requestIdleCallback' in window) window.requestIdleCallback(loadThree, { timeout: 2200 });
+      else window.setTimeout(loadThree, 800);
+    }
   };
 
   await initializeMotionExperience();

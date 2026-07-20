@@ -5,7 +5,7 @@
   src: url("/assets/fonts/manrope-latin-wght-normal.woff2") format("woff2-variations");
   font-style: normal;
   font-weight: 200 800;
-  font-display: swap;
+  font-display: optional;
 }
 
 @font-face {
@@ -13,7 +13,7 @@
   src: url("/assets/fonts/cormorant-garamond-latin-wght-normal.woff2") format("woff2-variations");
   font-style: normal;
   font-weight: 300 700;
-  font-display: swap;
+  font-display: optional;
 }
 
 :root {
@@ -1532,6 +1532,14 @@ body {
 
 .desktop-nav a:hover::after,
 .desktop-nav a[aria-current="page"]::after { opacity: 1; transform: scaleX(1); }
+
+.desktop-nav a.is-pending,
+.mobile-nav a.is-pending {
+  color: var(--blue);
+  background: var(--pale-blue);
+}
+
+.desktop-nav a.is-pending::after { opacity: 1; transform: scaleX(1); }
 
 .motion-switch {
   min-height: 40px;
@@ -3702,3 +3710,31 @@ body[data-viewport-shape="tall"] .story-scene img { object-position: 58% center;
 .motion-off .team-profile-portrait,
 .motion-off .team-profile-portrait img,
 .motion-off .team-profile-copy > * { opacity: 1 !important; visibility: visible !important; clip-path: none !important; transform: none !important; }
+
+/* Reserve every desktop scroll chapter before GSAP starts, preventing late pin-spacer layout shifts. */
+@media (min-width: 721px) {
+  .scroll-story { height: max(5000px, 635dvh); }
+  .learning-shuffle-section { padding-bottom: max(3990px, 490dvh); }
+  .team-deck-section { padding-bottom: max(3590px, 430dvh); }
+  .anaphora-section { padding-bottom: max(1880px, 235dvh); }
+
+  .motion-off .scroll-story,
+  .motion-off .learning-shuffle-section,
+  .motion-off .team-deck-section,
+  .motion-off .anaphora-section {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 90px;
+  }
+}
+
+@media (min-width: 721px) and (prefers-reduced-motion: reduce) {
+  .scroll-story,
+  .learning-shuffle-section,
+  .team-deck-section,
+  .anaphora-section {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 90px;
+  }
+}
