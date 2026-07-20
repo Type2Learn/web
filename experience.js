@@ -260,8 +260,19 @@ const startExperience = async () => {
       return;
     }
 
-    gsap.set(cards, { autoAlpha: 0, xPercent: 10, y: 18, scale: .985, rotation: 1.2, transformOrigin: '50% 100%' });
-    gsap.set(cards[0], { autoAlpha: 1, xPercent: 0, y: 0, scale: 1, rotation: 0 });
+    const portraits = cards.map((card) => card.querySelector('.team-profile-portrait'));
+    const images = cards.map((card) => card.querySelector('.team-profile-portrait img'));
+    const copyBlocks = cards.map((card) => card.querySelector('.team-profile-copy'));
+    const copyLines = copyBlocks.map((copy) => copy ? Array.from(copy.children) : []);
+
+    gsap.set(cards, { autoAlpha: 0 });
+    gsap.set(portraits, { clipPath: 'inset(0 100% 0 0 round 18px)' });
+    gsap.set(images, { scale: 1.08, transformOrigin: '50% 50%' });
+    copyLines.forEach((lines) => gsap.set(lines, { x: 58, autoAlpha: 0 }));
+    gsap.set(cards[0], { autoAlpha: 1 });
+    gsap.set(portraits[0], { clipPath: 'inset(0 0% 0 0 round 18px)' });
+    gsap.set(images[0], { scale: 1 });
+    gsap.set(copyLines[0], { x: 0, autoAlpha: 1 });
 
     const timeline = gsap.timeline({
       defaults: { ease: 'none' },
@@ -279,9 +290,14 @@ const startExperience = async () => {
     timeline.to({}, { duration: .34 });
     for (let index = 0; index < cards.length - 1; index += 1) {
       timeline
-        .to(cards[index], { xPercent: -112, y: -18, rotation: -3.2, autoAlpha: 0, duration: .2 })
-        .set(cards[index + 1], { visibility: 'visible' })
-        .to(cards[index + 1], { xPercent: 0, y: 0, scale: 1, rotation: 0, autoAlpha: 1, duration: .24 })
+        .to(portraits[index], { clipPath: 'inset(0 100% 0 0 round 18px)', duration: .18 }, 'team-out-' + index)
+        .to(images[index], { scale: 1.055, duration: .18 }, 'team-out-' + index)
+        .to(copyLines[index], { x: -48, autoAlpha: 0, stagger: .012, duration: .14 }, 'team-out-' + index)
+        .set(cards[index], { autoAlpha: 0 })
+        .set(cards[index + 1], { visibility: 'visible', autoAlpha: 1 })
+        .to(portraits[index + 1], { clipPath: 'inset(0 0% 0 0 round 18px)', duration: .28 }, 'team-in-' + index)
+        .to(images[index + 1], { scale: 1, duration: .32 }, 'team-in-' + index)
+        .to(copyLines[index + 1], { x: 0, autoAlpha: 1, stagger: .027, duration: .2 }, 'team-in-' + index + '+=.035')
         .to({}, { duration: .38 });
     }
     timeline.to({}, { duration: .2 });
@@ -356,6 +372,28 @@ const startExperience = async () => {
       if (tween.scrollTrigger) activeScrollTriggers.push(tween.scrollTrigger);
     });
 
+    const evidenceScene = document.querySelector('.evidence-scene');
+    if (evidenceScene) {
+      const heading = evidenceScene.querySelector('.evidence-scene-heading');
+      const signal = Array.from(evidenceScene.querySelectorAll('.evidence-signal i'));
+      const cards = Array.from(evidenceScene.querySelectorAll('.evidence-card'));
+      const timeline = gsap.timeline({
+        scrollTrigger: {
+          trigger: evidenceScene,
+          start: 'top 76%',
+          end: 'center 48%',
+          scrub: .5,
+          invalidateOnRefresh: true
+        }
+      });
+      if (heading) timeline.fromTo(heading, { y: 42, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .22, ease: 'none' });
+      if (signal.length) timeline.fromTo(signal, { scaleX: 0 }, { scaleX: 1, stagger: .045, duration: .24, ease: 'none' }, '<+.05');
+      if (cards.length) timeline.fromTo(cards,
+        { y: 76, rotationX: 34, autoAlpha: 0, transformOrigin: '50% 100%' },
+        { y: 0, rotationX: 0, autoAlpha: 1, stagger: .075, duration: .38, ease: 'power2.out' }, '<+.08');
+      activeScrollTriggers.push(timeline.scrollTrigger);
+    }
+
     gsap.utils.toArray('[data-team-feature]').forEach((feature) => {
       const visual = feature.matches('figure') ? feature : feature.querySelector('figure');
       const image = visual && visual.querySelector('img');
@@ -406,7 +444,7 @@ const startExperience = async () => {
     const canvas = document.getElementById('story-canvas');
     if (canvas) canvas.hidden = off;
     if (off) {
-      gsap.set('.story-scene, .story-step, .section-heading, .anaphora-panel, .anaphora-drop, .anaphora-lines > span, .support-item, [data-team-feature], [data-team-feature] img, .founder-copy, .loop-chit, .team-profile-card', { clearProps: 'all' });
+      gsap.set('.story-scene, .story-step, .section-heading, .anaphora-panel, .anaphora-drop, .anaphora-lines > span, .support-item, [data-team-feature], [data-team-feature] img, .founder-copy, .loop-chit, .team-profile-card, .team-profile-portrait, .team-profile-portrait img, .team-profile-copy > *, .evidence-scene-heading, .evidence-signal i, .evidence-card', { clearProps: 'all' });
       setStoryState(0);
     }
     ScrollTrigger.refresh();

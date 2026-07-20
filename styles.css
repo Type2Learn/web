@@ -3434,3 +3434,271 @@ body[data-viewport-shape="tall"] .story-scene img { object-position: 58% center;
     object-position: center top;
   }
 }
+
+/* Final refinement: dense card copy, evidence stage, slimmer route labels, and authored CTA art. */
+.page-hero-copy > .eyebrow {
+  width: fit-content;
+  gap: 7px;
+  padding: 6px 10px;
+  font-size: 9px;
+  letter-spacing: .11em;
+  line-height: 1;
+}
+
+.page-hero-copy > .eyebrow .eyebrow-dot {
+  width: 7px;
+  height: 7px;
+}
+
+@media (min-width: 721px) {
+  .chit-stack { height: clamp(370px, 42vh, 430px); }
+  .loop-chit { padding: clamp(34px, 4.3vw, 58px); }
+  .loop-chit.is-long {
+    grid-template-columns: 126px minmax(0, 1fr) auto;
+    gap: clamp(30px, 4vw, 58px);
+  }
+  .loop-chit.is-long .chit-copy { align-self: center; }
+  .loop-chit.is-long .chit-copy h3 {
+    max-width: 650px;
+    font-size: clamp(2.6rem, min(4.1vw, 6.6vh), 4.45rem);
+    line-height: .9;
+  }
+  .loop-chit.is-long .chit-copy > p:last-child {
+    max-width: 650px;
+    margin-top: 15px;
+    line-height: 1.55;
+  }
+}
+
+.evidence-scene {
+  min-height: min(900px, 100dvh);
+  overflow: clip;
+  background: linear-gradient(135deg, var(--cloud), #eef9fa 52%, #eef5ff) !important;
+}
+
+.evidence-scene > .content-wrap { padding-top: 42px; }
+.evidence-scene .section-marker { top: 6px; right: 12px; }
+
+.evidence-scene-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(310px, .6fr);
+  gap: clamp(42px, 8vw, 120px);
+  align-items: end;
+  padding-right: clamp(110px, 13vw, 190px);
+}
+
+.evidence-scene-heading h2 {
+  max-width: 780px;
+  margin: 0;
+  font-size: clamp(3.2rem, 5vw, 6rem);
+  letter-spacing: -.052em;
+  line-height: .88;
+}
+
+.evidence-scene-heading > p {
+  max-width: 540px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.evidence-signal {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  height: 34px;
+  margin: clamp(48px, 6vw, 78px) 0 22px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, .72);
+}
+
+.evidence-signal i {
+  display: block;
+  border-right: 1px solid rgba(255, 255, 255, .72);
+  background: var(--green);
+  transform-origin: left center;
+}
+
+.evidence-signal i:nth-child(2) { background: var(--blue); }
+.evidence-signal i:nth-child(3) { background: var(--teal); }
+.evidence-signal i:nth-child(4) { border-right: 0; background: var(--amber); }
+
+.evidence-scene .evidence-grid { perspective: 1100px; }
+.evidence-scene .evidence-card {
+  min-height: 220px;
+  padding: 30px 22px 24px;
+  border-top-width: 4px;
+  background: rgba(255, 255, 255, .7);
+}
+.evidence-scene .evidence-card:nth-child(1) { border-top-color: var(--green); }
+.evidence-scene .evidence-card:nth-child(2) { border-top-color: var(--blue); }
+.evidence-scene .evidence-card:nth-child(3) { border-top-color: var(--teal); }
+.evidence-scene .evidence-card:nth-child(4) { border-top-color: var(--amber); }
+
+.team-profile-portrait {
+  width: min(100%, 500px);
+  min-height: 0;
+  aspect-ratio: 4 / 5;
+  justify-self: start;
+}
+
+.team-profile-portrait img,
+.team-profile-card.has-placeholder .team-profile-portrait img {
+  object-fit: contain;
+  object-position: center;
+}
+
+/* How it works: seven active learning lanes, each with its own progress pulse. */
+.site-cta-how-it-works .route-cta-art {
+  display: grid;
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  padding: 7% 5%;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(255,255,255,.82), rgba(231,248,254,.84));
+}
+
+.site-cta-how-it-works .route-cta-art i,
+.site-cta-how-it-works .route-cta-art i:nth-child(even) {
+  position: relative;
+  inset: auto;
+  display: block;
+  height: auto;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .92);
+  font-style: normal;
+  transform-origin: left center;
+  animation: how-lane-advance 4.2s var(--ease-out) infinite;
+}
+
+.site-cta-how-it-works .route-cta-art i::before {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  color: var(--ink-soft);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  translate: 0 -50%;
+}
+.site-cta-how-it-works .route-cta-art i:nth-child(1)::before { content: "01  CHOOSE"; }
+.site-cta-how-it-works .route-cta-art i:nth-child(2)::before { content: "02  UNDERSTAND"; }
+.site-cta-how-it-works .route-cta-art i:nth-child(3)::before { content: "03  RECALL"; }
+.site-cta-how-it-works .route-cta-art i:nth-child(4)::before { content: "04  PRODUCE"; }
+.site-cta-how-it-works .route-cta-art i:nth-child(5)::before { content: "05  CORRECT"; }
+.site-cta-how-it-works .route-cta-art i:nth-child(6)::before { content: "06  APPLY"; }
+.site-cta-how-it-works .route-cta-art i:nth-child(7)::before { content: "07  RETURN"; }
+
+.site-cta-how-it-works .route-cta-art i::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--green), var(--teal), var(--blue));
+  content: "";
+  transform: scaleX(.15);
+  transform-origin: left;
+  animation: how-lane-fill 4.2s ease-in-out infinite;
+  animation-delay: calc(var(--art-index) * .18s);
+}
+
+@keyframes how-lane-advance {
+  0%, 100% { transform: translateX(0); }
+  42%, 58% { transform: translateX(6px); }
+}
+@keyframes how-lane-fill {
+  0%, 12% { transform: scaleX(.12); }
+  58%, 100% { transform: scaleX(1); }
+}
+
+/* Team: authored profile planes with independent shuffle timing, not blank cards. */
+.site-cta-team .route-cta-art {
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(234,251,241,.82), rgba(231,248,254,.8));
+  perspective: 1000px;
+}
+
+.site-cta-team .route-cta-art i:nth-child(-n+5) {
+  top: 11%;
+  bottom: 11%;
+  width: 32%;
+  overflow: hidden;
+  border: 1px solid rgba(23, 105, 245, .24);
+  border-radius: 16px;
+  background: linear-gradient(160deg, #fff 0 26%, #ddf9f2 26% 64%, #18c9b7 64% 67%, #eaf2ff 67%);
+  box-shadow: 0 24px 50px rgba(10,22,48,.12), inset 0 -7px 0 var(--teal);
+  animation: team-plane-shuffle 5.6s var(--ease-out) infinite;
+}
+.site-cta-team .route-cta-art i:nth-child(1) { left: 3%; --card-tilt: -7deg; --card-soft-tilt: -4deg; --card-shift: 8px; }
+.site-cta-team .route-cta-art i:nth-child(2) { left: 19%; --card-tilt: -3.5deg; --card-soft-tilt: -2deg; --card-shift: 4px; }
+.site-cta-team .route-cta-art i:nth-child(3) { left: 35%; --card-tilt: 0deg; --card-soft-tilt: 0deg; --card-shift: 0px; }
+.site-cta-team .route-cta-art i:nth-child(4) { left: 51%; --card-tilt: 3.5deg; --card-soft-tilt: 2deg; --card-shift: -4px; }
+.site-cta-team .route-cta-art i:nth-child(5) { left: 67%; --card-tilt: 7deg; --card-soft-tilt: 4deg; --card-shift: -8px; }
+
+.site-cta-team .route-cta-art i::before {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  color: var(--ink);
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: .13em;
+}
+.site-cta-team .route-cta-art i:nth-child(1)::before { content: "VISION"; }
+.site-cta-team .route-cta-art i:nth-child(2)::before { content: "ENGINEERING"; }
+.site-cta-team .route-cta-art i:nth-child(3)::before { content: "AI"; }
+.site-cta-team .route-cta-art i:nth-child(4)::before { content: "RESEARCH"; }
+.site-cta-team .route-cta-art i:nth-child(5)::before { content: "PRODUCT"; }
+
+.site-cta-team .route-cta-art i::after {
+  position: absolute;
+  right: 14px;
+  bottom: 17px;
+  color: rgba(23, 105, 245, .22);
+  font-family: var(--display);
+  font-size: clamp(4rem, 6vw, 7rem);
+  font-weight: 650;
+  letter-spacing: -.08em;
+  line-height: .7;
+}
+.site-cta-team .route-cta-art i:nth-child(1)::after { content: "01"; }
+.site-cta-team .route-cta-art i:nth-child(2)::after { content: "02"; }
+.site-cta-team .route-cta-art i:nth-child(3)::after { content: "03"; }
+.site-cta-team .route-cta-art i:nth-child(4)::after { content: "04"; }
+.site-cta-team .route-cta-art i:nth-child(5)::after { content: "05"; }
+
+@keyframes team-plane-shuffle {
+  0%, 100% { transform: translateY(0) rotate(var(--card-tilt)); }
+  38%, 55% { transform: translateY(var(--card-shift)) rotate(var(--card-soft-tilt)); }
+}
+
+@media (max-width: 1000px) {
+  .evidence-scene-heading { grid-template-columns: 1fr; gap: 22px; padding-right: 100px; }
+  .evidence-scene-heading > p { max-width: 700px; }
+  .team-profile-portrait { width: min(100%, 430px); }
+}
+
+@media (max-width: 720px) {
+  .page-hero-copy > .eyebrow { padding: 5px 9px; font-size: 8px; }
+  .loop-chit.is-long .chit-copy h3 { font-size: clamp(1.9rem, 9.5vw, 2.8rem); }
+  .loop-chit.is-long .chit-copy > p:last-child { margin-top: 12px; line-height: 1.45; }
+  .evidence-scene { min-height: 0; }
+  .evidence-scene > .content-wrap { padding-top: 20px; }
+  .evidence-scene-heading { padding-right: 0; }
+  .evidence-scene-heading h2 { font-size: clamp(2.6rem, 12vw, 4rem); }
+  .evidence-signal { height: 22px; margin-top: 38px; }
+  .evidence-scene .evidence-grid { grid-template-columns: 1fr; }
+  .evidence-scene .evidence-card { min-height: 0; }
+  .team-profile-portrait { width: 100%; aspect-ratio: 4 / 5; }
+}
+
+.motion-off .evidence-signal { display: none; }
+.motion-off .evidence-scene-heading,
+.motion-off .evidence-card,
+.motion-off .team-profile-portrait,
+.motion-off .team-profile-portrait img,
+.motion-off .team-profile-copy > * { opacity: 1 !important; visibility: visible !important; clip-path: none !important; transform: none !important; }
