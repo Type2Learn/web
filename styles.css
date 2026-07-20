@@ -3264,3 +3264,119 @@ html:has(body.motion-off) { scroll-behavior: auto; }
   .motion-off .loop-chit { grid-template-columns: 1fr; }
   .motion-off .team-profile-card { min-height: 0; }
 }
+
+/* Viewport-aware composition and deliberate desktop navigation ---------------- */
+:root {
+  --site-header-height: 80px;
+  --desktop-stage-height: clamp(640px, calc(100dvh - var(--site-header-height)), 1120px);
+}
+
+@media (min-width: 721px) {
+  html { scroll-padding-top: var(--site-header-height); }
+
+  .hero,
+  .page-hero {
+    min-height: var(--desktop-stage-height);
+  }
+
+  .hero::before,
+  .page-hero::before {
+    inset: 0 0 0 var(--photo-start, 36%);
+    background-position: var(--photo-position, 68% center);
+  }
+
+  .hero::after,
+  .page-hero::after {
+    background: linear-gradient(90deg, var(--cloud) 0%, var(--cloud) var(--photo-fade-start, 34%), rgba(245, 250, 255, .96) var(--photo-fade-mid, 45%), rgba(245, 250, 255, .62) var(--photo-fade-end, 58%), rgba(245, 250, 255, .05) 78%);
+  }
+
+  .hero h1,
+  .page-hero h1 {
+    font-size: clamp(3.55rem, min(6.4vw, 10.35vh), 7.4rem);
+  }
+
+  .page-hero h1 { font-size: clamp(3.1rem, min(4.7vw, 8.1vh), 5.45rem); }
+
+  .story-stage {
+    height: clamp(640px, 100dvh, 1120px);
+    min-height: 0;
+  }
+
+  .story-ui {
+    padding-top: clamp(26px, 4vh, 42px);
+    padding-bottom: clamp(26px, 3.6vh, 38px);
+  }
+
+  .story-copy,
+  .story-route { width: min(760px, 51vw); }
+
+  .story-copy > h2 { font-size: clamp(3.55rem, min(6.2vw, 9.7vh), 7.2rem); }
+  .story-step h3 { font-size: clamp(1.85rem, min(3vw, 5vh), 3.4rem); }
+  .story-steps { min-height: clamp(214px, 25vh, 250px); }
+
+  .learning-shuffle,
+  .chit-rail { min-height: clamp(620px, calc(100dvh - 110px), 1010px); }
+
+  .chit-stack { height: clamp(300px, 34vh, 390px); }
+  .chit-copy h3 { font-size: clamp(2.25rem, min(4vw, 6.8vh), 4.7rem); }
+
+  .team-deck { min-height: clamp(650px, calc(100dvh - 120px), 940px); }
+  .team-profile-portrait { min-height: clamp(510px, 64dvh, 720px); }
+  .team-profile-copy h3 { font-size: clamp(3.3rem, min(6vw, 10.8vh), 7rem); }
+  .team-profile-statement { font-size: clamp(1.65rem, min(2.7vw, 4.5vh), 3rem) !important; }
+}
+
+/* A wide 16:9/21:9 frame needs more room for the copy and a tighter image crop. */
+@media (min-width: 721px) and (min-aspect-ratio: 17 / 10) {
+  .hero,
+  .page-hero {
+    --photo-start: 40%;
+    --photo-position: 72% center;
+    --photo-fade-start: 39%;
+    --photo-fade-mid: 50%;
+    --photo-fade-end: 63%;
+  }
+
+  .hero-grid { grid-template-columns: minmax(0, 650px) 1fr; }
+  .story-copy,
+  .story-route { width: min(700px, 48vw); }
+  .story-scene img { object-position: 70% center; }
+  .story-shade { background: linear-gradient(90deg, rgba(245, 250, 255, .995) 0%, rgba(245, 250, 255, .98) 37%, rgba(245, 250, 255, .84) 49%, rgba(245, 250, 255, .18) 68%, transparent 84%); }
+}
+
+/* Taller desktop frames can show more of the people and use the original, broader composition. */
+@media (min-width: 721px) and (max-aspect-ratio: 17 / 10) {
+  .hero,
+  .page-hero {
+    --photo-start: 33%;
+    --photo-position: 66% center;
+    --photo-fade-start: 32%;
+    --photo-fade-mid: 43%;
+    --photo-fade-end: 57%;
+  }
+
+  .story-scene img { object-position: 63% center; }
+}
+
+/* Short laptop displays keep every important graphic and control inside the frame. */
+@media (min-width: 721px) and (max-height: 820px) {
+  :root { --desktop-stage-height: clamp(600px, calc(100dvh - var(--site-header-height)), 820px); }
+  .hero-copy-block { padding-block: 12px; }
+  .hero-copy { margin-top: 17px; }
+  .hero-actions { margin-top: 23px; }
+  .trust-inline { margin-top: 19px; }
+  .scroll-cue { margin-top: 20px; }
+  .story-step p { margin-top: 12px; line-height: 1.55; }
+  .team-profile-copy > p:not(.section-kicker):not(.team-profile-statement) { margin-top: 15px; line-height: 1.58; }
+  .team-profile-responsibilities { margin-top: 24px; }
+}
+
+html:has(body.motion-off),
+html:has(body.motion-off) body {
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-snap-type: none; }
+}

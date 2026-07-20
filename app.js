@@ -190,7 +190,7 @@
       ['05', 'Return', 'Come back. Keep what you earned.', 'Revisit the idea later. Durable progress follows learning evidence and return, not speed.', '/assets/story/learner-return.webp', 'The learner returning to a familiar idea in a calm later study session.']
     ];
 
-    return '<section class="scroll-story" id="learning-story" aria-labelledby="story-title"><div class="story-stage"><canvas class="story-canvas" id="story-canvas" aria-hidden="true"></canvas><div class="story-scenes">' + scenes.map((scene, index) => '<figure class="story-scene' + (index === 0 ? ' is-active' : '') + '" data-story-scene="' + index + '"><img src="' + scene[4] + '" alt="' + scene[5] + '"></figure>').join('') + '</div><div class="story-shade" aria-hidden="true"></div><div class="story-ui content-wrap"><div class="story-topline"><p><span>Type2Learn</span> · Learning route</p><div class="story-counter" aria-live="polite"><span id="story-current">01</span><i></i><span>' + String(scenes.length).padStart(2, '0') + '</span></div></div><div class="story-copy"><p class="story-kicker">Scroll-controlled learning story</p><h2 id="story-title">Learning is something you do.</h2><div class="story-steps">' + scenes.map((scene, index) => '<article class="story-step' + (index === 0 ? ' is-active' : '') + '" data-story-step="' + index + '"><span>' + scene[0] + ' · ' + scene[1] + '</span><h3>' + scene[2] + '</h3><p>' + scene[3] + '</p></article>').join('') + '</div><a class="button button-primary story-action" href="#demo" data-scroll-target="demo">Try the learning demo' + icon('arrow', true) + '</a></div><div class="story-route" aria-hidden="true">' + scenes.map((scene) => '<span>' + scene[1] + '</span>').join('') + '<i id="story-route-progress"></i></div></div></div></section>';
+    return '<section class="scroll-story" id="learning-story" data-scroll-stops="' + scenes.length + '" aria-labelledby="story-title"><div class="story-stage"><canvas class="story-canvas" id="story-canvas" aria-hidden="true"></canvas><div class="story-scenes">' + scenes.map((scene, index) => '<figure class="story-scene' + (index === 0 ? ' is-active' : '') + '" data-story-scene="' + index + '"><img src="' + scene[4] + '" alt="' + scene[5] + '"></figure>').join('') + '</div><div class="story-shade" aria-hidden="true"></div><div class="story-ui content-wrap"><div class="story-topline"><p><span>Type2Learn</span> · Learning route</p><div class="story-counter" aria-live="polite"><span id="story-current">01</span><i></i><span>' + String(scenes.length).padStart(2, '0') + '</span></div></div><div class="story-copy"><p class="story-kicker">Scroll-controlled learning story</p><h2 id="story-title">Learning is something you do.</h2><div class="story-steps">' + scenes.map((scene, index) => '<article class="story-step' + (index === 0 ? ' is-active' : '') + '" data-story-step="' + index + '"><span>' + scene[0] + ' · ' + scene[1] + '</span><h3>' + scene[2] + '</h3><p>' + scene[3] + '</p></article>').join('') + '</div><a class="button button-primary story-action" href="#demo" data-scroll-target="demo">Try the learning demo' + icon('arrow', true) + '</a></div><div class="story-route" aria-hidden="true">' + scenes.map((scene) => '<span>' + scene[1] + '</span>').join('') + '<i id="story-route-progress"></i></div></div></div></section>';
   };
 
   const learningStages = [
@@ -206,7 +206,7 @@
   const homeLearningShuffle = () => {
     const rail = learningStages.map((stage, index) => '<li class="' + (index === 0 ? 'is-active' : '') + '" data-chit-rail="' + index + '"><span>' + stage[0] + '</span></li>').join('');
     const chits = learningStages.map((stage, index) => '<article class="loop-chit' + (index === 0 ? ' is-active' : '') + '" data-chit-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><span class="chit-number">' + stage[0] + '</span><div class="chit-copy"><p class="chit-phase">' + stage[1] + ' · ' + stage[2] + '</p><h3>' + stage[3] + '</h3><p>' + stage[4] + '</p></div><span class="chit-edge" aria-hidden="true">' + stage[2] + '</span></article>').join('');
-    return '<section class="section learning-shuffle-section" id="learning-loop" aria-labelledby="learning-shuffle-title"><div class="content-wrap"><div class="section-heading learning-shuffle-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 id="learning-shuffle-title">Learning becomes durable when the learner does the work.</h2><p>Scroll through the seven actions. Each step protects the academic objective while making the next move clear.</p></div><div class="shuffle-position" aria-live="polite"><span id="chit-current">01</span><i></i><span>07</span></div></div><div class="learning-shuffle" data-learning-shuffle><div class="chit-rail" aria-hidden="true"><div class="chit-rail-line"><i id="chit-rail-progress"></i></div><ol>' + rail + '</ol></div><div class="chit-viewport"><div class="chit-stack">' + chits + '</div><p class="chit-instruction"><span>Scroll</span> to shuffle the learning action</p></div></div></div></section>';
+    return '<section class="section learning-shuffle-section" id="learning-loop" aria-labelledby="learning-shuffle-title"><div class="content-wrap"><div class="section-heading learning-shuffle-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 id="learning-shuffle-title">Learning becomes durable when the learner does the work.</h2><p>Scroll through the seven actions. Each step protects the academic objective while making the next move clear.</p></div><div class="shuffle-position" aria-live="polite"><span id="chit-current">01</span><i></i><span>07</span></div></div><div class="learning-shuffle" data-learning-shuffle data-scroll-stops="' + learningStages.length + '"><div class="chit-rail" aria-hidden="true"><div class="chit-rail-line"><i id="chit-rail-progress"></i></div><ol>' + rail + '</ol></div><div class="chit-viewport"><div class="chit-stack">' + chits + '</div><p class="chit-instruction"><span>Scroll</span> to shuffle the learning action</p></div></div></div></section>';
   };
 
   const howProcessMap = () => {
@@ -227,7 +227,7 @@
       ['Alizay Hassan', 'Co-founder · Product lead', '/assets/team/alizay-hassan-placeholder.webp', 'Non-human editorial placeholder for the Alizay Hassan profile', true, 'Her role brings product strategy, co-design, programme clarity, and age-respectful experience design into one coherent learner journey.', 'A clear product gives every learner a dignified way to begin, continue, and return.', ['Product strategy', 'Co-design', 'Programme clarity']]
     ];
     const cards = members.map((member, index) => '<article class="team-profile-card' + (index === 0 ? ' is-active' : '') + (member[4] ? ' has-placeholder' : ' has-portrait') + '" data-team-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><figure class="team-profile-portrait"><img src="' + member[2] + '" alt="' + member[3] + '"><figcaption class="portrait-status' + (member[4] ? ' is-temporary' : ' is-supplied') + '">' + (member[4] ? 'Non-human placeholder' : 'Supplied portrait') + '</figcaption></figure><div class="team-profile-copy"><p class="section-kicker">' + member[1] + '</p><h3>' + member[0] + '</h3><p class="team-profile-statement">“' + member[6] + '”</p><p>' + member[5] + '</p><div class="team-profile-responsibilities">' + member[7].map((item) => '<span>' + item + '</span>').join('') + '</div></div></article>').join('');
-    return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">The people building Type2Learn</p><h2 id="team-deck-title">Different disciplines. One accountable mission.</h2><p>Supplied portraits appear first. Distinct non-human placeholders stand in wherever an approved portrait is not being published.</p></div><div class="team-deck" data-team-deck><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>Scroll</span> to shuffle the team deck</p></div></div></section>';
+    return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">The people building Type2Learn</p><h2 id="team-deck-title">Different disciplines. One accountable mission.</h2><p>Supplied portraits appear first. Distinct non-human placeholders stand in wherever an approved portrait is not being published.</p></div><div class="team-deck" data-team-deck data-scroll-stops="' + members.length + '"><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>Scroll</span> to shuffle the team deck</p></div></div></section>';
   };
 
   const applyOfficialCopy = () => {
@@ -312,7 +312,9 @@
       const supportHeading = supportPanel && supportPanel.querySelector('h2');
       if (supportPanel && supportHeading) {
         supportPanel.classList.add('anaphora-panel');
-        supportPanel.closest('section').classList.add('anaphora-section');
+        const anaphoraSection = supportPanel.closest('section');
+        anaphoraSection.classList.add('anaphora-section');
+        anaphoraSection.dataset.scrollStops = '4';
         supportHeading.className = 'anaphora-heading';
         supportHeading.setAttribute('aria-label', 'Different minds need different controls — not different expectations of dignity.');
         supportHeading.innerHTML = '<span class="anaphora-drop" aria-hidden="true">D</span><span class="anaphora-lines" aria-hidden="true"><span>ifferent minds need</span><span>ifferent controls — not</span><span>ifferent expectations of dignity.</span></span>';
@@ -472,6 +474,122 @@
     }
   };
 
+  const setupSectionNavigation = () => {
+    const desktop = window.matchMedia('(min-width: 721px)');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const header = document.querySelector('.site-header');
+    const main = document.getElementById('main-content');
+    if (!main) return;
+
+    const announcer = document.createElement('p');
+    announcer.className = 'sr-only';
+    announcer.setAttribute('aria-live', 'polite');
+    announcer.setAttribute('aria-atomic', 'true');
+    document.body.append(announcer);
+
+    let lockedUntil = 0;
+    let lastDirection = 0;
+    let wheelAmount = 0;
+    let lastWheelAt = 0;
+
+    const enabled = () => desktop.matches && !reducedMotion.matches && !document.body.classList.contains('motion-off');
+    const headerOffset = () => Math.max(0, Math.round((header?.getBoundingClientRect().height || 80) + 4));
+    const scrollLimit = () => Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const documentTop = (element) => Math.max(0, Math.min(scrollLimit(), Math.round(element.getBoundingClientRect().top + window.scrollY - headerOffset())));
+
+    const uniqueStops = (stops) => stops
+      .filter((stop) => Number.isFinite(stop))
+      .sort((first, second) => first - second)
+      .filter((stop, index, ordered) => index === 0 || Math.abs(stop - ordered[index - 1]) > 96);
+
+    const getStops = () => {
+      const stops = Array.from(main.querySelectorAll(':scope > section:not(.builder-credit)')).map(documentTop);
+      const triggers = window.ScrollTrigger?.getAll?.() || [];
+
+      triggers.forEach((trigger) => {
+        const element = trigger.trigger;
+        const count = Number(element?.dataset?.scrollStops || 0);
+        if (!count || !trigger.pin || !Number.isFinite(trigger.start) || !Number.isFinite(trigger.end)) return;
+        const distance = trigger.end - trigger.start;
+        if (distance < 120) return;
+        for (let index = 0; index < count; index += 1) {
+          stops.push(Math.max(0, Math.min(scrollLimit(), Math.round(trigger.start + (distance * index) / Math.max(count - 1, 1)))));
+        }
+      });
+
+      return uniqueStops(stops);
+    };
+
+    const nextStop = (direction) => {
+      const current = window.scrollY;
+      const tolerance = 30;
+      const stops = getStops();
+      if (direction > 0) return stops.find((stop) => stop > current + tolerance);
+      for (let index = stops.length - 1; index >= 0; index -= 1) {
+        if (stops[index] < current - tolerance) return stops[index];
+      }
+      return null;
+    };
+
+    const scrollToStop = (direction) => {
+      if (!enabled() || Date.now() < lockedUntil) return false;
+      const target = nextStop(direction);
+      if (target === null || target === undefined) return false;
+
+      const travel = Math.abs(target - window.scrollY);
+      const duration = Math.min(1150, Math.max(460, 260 + travel * .32));
+      lockedUntil = Date.now() + duration;
+      window.scrollTo({ top: target, behavior: 'smooth' });
+      announcer.textContent = direction > 0 ? 'Moved to the next section.' : 'Moved to the previous section.';
+      window.setTimeout(() => { lockedUntil = 0; }, duration + 80);
+      return true;
+    };
+
+    const canHandleKey = (event) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return false;
+      const element = event.target instanceof Element ? event.target : null;
+      return !element?.closest('input, textarea, select, [contenteditable="true"], [role="textbox"], [role="listbox"], [role="menu"], dialog');
+    };
+
+    window.addEventListener('wheel', (event) => {
+      if (!enabled() || event.ctrlKey || !event.deltaY) return;
+      const direction = Math.sign(event.deltaY);
+      if (Date.now() < lockedUntil) {
+        event.preventDefault();
+        return;
+      }
+      if (nextStop(direction) === null) return;
+
+      const now = Date.now();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+      const amount = Math.min(Math.abs(event.deltaY * unit), 160);
+      const isTrackpad = event.deltaMode === 0 && amount < 80;
+      if (direction !== lastDirection || now - lastWheelAt > 180) wheelAmount = 0;
+      lastDirection = direction;
+      lastWheelAt = now;
+      wheelAmount += amount;
+      event.preventDefault();
+
+      if (wheelAmount >= (isTrackpad ? 92 : 40)) {
+        wheelAmount = 0;
+        scrollToStop(direction);
+      }
+    }, { passive: false });
+
+    window.addEventListener('keydown', (event) => {
+      if (!enabled() || !canHandleKey(event)) return;
+      const forward = event.key === 'ArrowDown' || event.key === 'ArrowRight' || event.key === 'PageDown' || (event.key === ' ' && !event.shiftKey);
+      const backward = event.key === 'ArrowUp' || event.key === 'ArrowLeft' || event.key === 'PageUp' || (event.key === ' ' && event.shiftKey);
+      if (!forward && !backward) return;
+      if (scrollToStop(forward ? 1 : -1)) event.preventDefault();
+    });
+
+    window.addEventListener('type2learn:motion', () => {
+      wheelAmount = 0;
+      lockedUntil = 0;
+    });
+  };
+
   const setupPointerMotion = () => {
     if (!window.matchMedia('(pointer: fine)').matches) return;
     document.querySelectorAll('[data-hero-scene]').forEach((scene) => {
@@ -569,6 +687,7 @@
   setupReveals();
   setupControls();
   setupScrollExperience();
+  setupSectionNavigation();
   setupPointerMotion();
   import('/experience.js').catch(() => document.body.classList.add('experience-fallback'));
 })();
