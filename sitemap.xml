@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://type2learn.tech/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/story/hero-learner.webp</image:loc><image:title>Type2Learn active learning</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://type2learn.tech/how-it-works/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/pages/how-learning.webp</image:loc><image:title>How Type2Learn works</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://type2learn.tech/pathways/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/pages/pathways-learner.webp</image:loc><image:title>Type2Learn learning pathways</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://type2learn.tech/learners/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/pages/learners-access.webp</image:loc><image:title>Type2Learn for learners</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://type2learn.tech/families/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/story/family-learning.webp</image:loc><image:title>Type2Learn for families</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://type2learn.tech/schools/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/story/school-learning.webp</image:loc><image:title>Type2Learn for schools</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://type2learn.tech/team/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/team/founder-muhammad-taha.webp</image:loc><image:title>Type2Learn founder Muhammad Taha Bin Zaeem</image:title></image:image>
+    <image:image><image:loc>https://type2learn.tech/assets/team/muhammad-hamiz-bin-kashif-studio.webp</image:loc><image:title>Type2Learn co-founder Muhammad Hamiz Bin Kashif</image:title></image:image>
+    <image:image><image:loc>https://type2learn.tech/assets/team/idrees-babar-studio.webp</image:loc><image:title>Type2Learn co-founder Idrees Babar</image:title></image:image>
+    <image:image><image:loc>https://type2learn.tech/assets/team/muhammad-fahad-younus-studio.webp</image:loc><image:title>Type2Learn co-founder Muhammad Fahad Younus</image:title></image:image>
+    <image:image><image:loc>https://type2learn.tech/assets/team/alizay-hassan-figure.webp</image:loc><image:title>Non-human profile figure representing Type2Learn co-founder Alizay Hassan</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://type2learn.tech/community/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/pages/community-workshop.webp</image:loc><image:title>Type2Learn community co-design</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://type2learn.tech/trust/</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://type2learn.tech/assets/pages/trust-family.webp</image:loc><image:title>Type2Learn trust center</image:title></image:image>
+  </url>
+</urlset>

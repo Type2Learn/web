@@ -1,8 +1,8 @@
 # Type2Learn website
 
-Official static, multi-page website for the Type2Learn nonprofit. It uses page-specific photography, module identity marks, Manrope and Cormorant Garamond fonts, GSAP ScrollTrigger, and Three.js. Cloudflare Web Analytics is loaded from the official Cloudflare beacon URL.
+Official static, multi-page website for the Type2Learn nonprofit. It uses page-specific photography, module identity marks, Manrope and Cormorant Garamond fonts, GSAP ScrollTrigger, and Three.js. Cloudflare Web Analytics and Google Analytics (`G-9ER1QJLGCW`) are loaded on every HTML page.
 
-The supplied Type2Learn logo is used unchanged in the header and as the browser favicon. Approved team portraits are shown first; profiles without an approved portrait use distinct non-human editorial placeholders.
+The supplied Type2Learn logo is used unchanged in the header and as the browser favicon. The founder's supplied portrait appears first. Co-founder portraits edited from supplied images are labelled as such, and profiles without an approved portrait use a clearly labelled non-human editorial figure.
 
 ## Run locally
 
@@ -21,6 +21,15 @@ The root-level `render.yaml` defines a Render static site with `staticPublishPat
 Every primary public route has its own directory and `index.html`, so no single-page-app rewrite is needed. Render redirects the former Research page into How it works, the former Support page into Community, and the former privacy/accessibility/security/terms pages into the consolidated Trust center. The legacy HTML files also contain immediate canonical redirects for hosts that do not process `render.yaml`.
 
 Images are compressed WebP assets where source fidelity allows it, and below-the-fold `<img>` elements use lazy loading, asynchronous decoding, and low fetch priority. The original supplied PNG logo stays unchanged. No image build service or runtime image transformation is required on Render.
+
+## Search indexing
+
+Every primary route has a unique title, description, canonical URL, Open Graph and Twitter metadata, index directives, and Schema.org structured data. Duplicate legacy routes are excluded from indexing and canonicalized to their consolidated pages.
+
+- Sitemap: `https://type2learn.tech/sitemap.xml`
+- Crawler rules: `https://type2learn.tech/robots.txt`
+
+Submit the sitemap URL in Google Search Console after deployment. The sitemap also includes the primary page and team images so eligible image assets can be discovered with their page context.
 
 ## Motion and accessibility
 
