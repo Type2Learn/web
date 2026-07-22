@@ -42,9 +42,29 @@ const errorMessages = {
 
 const messageFor = (error) => errorMessages[error?.code] || 'Authentication could not be completed. Please try again.';
 
-export const setupFirebaseAuth = ({ setStatus }) => {
+export const getType2LearnAuth = () => {
   const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   const auth = getAuth(firebaseApp);
+  auth.useDeviceLanguage();
+  return auth;
+};
+
+export const waitForType2LearnUser = () => new Promise((resolve) => {
+  const auth = getType2LearnAuth();
+  let unsubscribe = () => {};
+  unsubscribe = onAuthStateChanged(auth, (user) => {
+    unsubscribe();
+    resolve(user);
+  }, () => {
+    unsubscribe();
+    resolve(null);
+  });
+});
+
+export const signOutType2LearnUser = () => signOut(getType2LearnAuth());
+
+export const setupFirebaseAuth = ({ setStatus }) => {
+  const auth = getType2LearnAuth();
   const provider = new GoogleAuthProvider();
   const dialog = document.querySelector('[data-auth-dialog]');
   const formStage = document.querySelector('.auth-form-stage');
@@ -62,7 +82,22 @@ export const setupFirebaseAuth = ({ setStatus }) => {
   const loginEmail = document.getElementById('login-email');
   const rememberEmail = document.getElementById('remember-email');
 
-  auth.useDeviceLanguage();
+  const safeAuthDestination = () => {
+    const fallback = '/learn/';
+    const next = new URLSearchParams(window.location.search).get('next') || fallback;
+    try {
+      const destination = new URL(next, window.location.origin);
+      if (destination.origin !== window.location.origin) return fallback;
+      if (destination.pathname === '/login/') return fallback;
+      return destination.pathname + destination.search + destination.hash;
+    } catch (error) {
+      return fallback;
+    }
+  };
+
+  const redirectAfterAuth = () => {
+    window.location.assign(safeAuthDestination());
+  };
 
   const setBusy = (form, busy) => {
     dialog?.setAttribute('aria-busy', String(busy));
@@ -124,6 +159,7 @@ export const setupFirebaseAuth = ({ setStatus }) => {
         if (rememberEmail?.checked) window.localStorage.setItem('type2learn-remember-email', loginEmail.value.trim());
         else window.localStorage.removeItem('type2learn-remember-email');
       } catch (error) { /* Authentication remains available if storage is restricted. */ }
+      redirectAfterAuth();
     } catch (error) {
       setStatus(loginForm, messageFor(error), 'error');
     } finally {
@@ -141,6 +177,7 @@ export const setupFirebaseAuth = ({ setStatus }) => {
         provider.setCustomParameters({ prompt: 'select_account' });
         await signInWithPopup(auth, provider);
         await setPersistence(auth, persistence);
+        redirectAfterAuth();
       } catch (error) {
         setStatus(form, messageFor(error), 'error');
       } finally {
@@ -163,6 +200,7 @@ export const setupFirebaseAuth = ({ setStatus }) => {
       const displayName = document.getElementById('register-name').value.trim();
       if (displayName) await updateProfile(credential.user, { displayName });
       showAuthenticatedUser(credential.user);
+      redirectAfterAuth();
     } catch (error) {
       setStatus(registerForm, messageFor(error), 'error');
     } finally {

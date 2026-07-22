@@ -14,6 +14,18 @@ services:
       - path: /firebase-auth.js
         name: Cache-Control
         value: public, max-age=0, must-revalidate
+      - path: /learn/learn.js
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /learn/learn.css
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /mascot.js
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /mascot.css
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
       - path: /styles.css
         name: Cache-Control
         value: public, max-age=0, must-revalidate

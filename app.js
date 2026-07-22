@@ -818,7 +818,7 @@
     try {
       await loadScript('/vendor/gsap.min.js');
       await loadScript('/vendor/ScrollTrigger.min.js');
-      await import('/experience.js?v=20260720-9');
+      await import('/experience.js?v=20260722-1');
     } catch (error) {
       document.body.classList.add('experience-fallback');
     }
@@ -932,7 +932,7 @@
     const description = document.getElementById('auth-description');
     const integrationNote = document.querySelector('.auth-integration-note');
     if (formStage && !document.querySelector('[data-auth-account]')) {
-      formStage.insertAdjacentHTML('afterend', '<section class="auth-account" data-auth-account aria-hidden="true" hidden><span class="auth-account-avatar" data-auth-account-avatar aria-hidden="true">T2</span><p class="section-kicker">Authenticated account</p><h2 data-auth-account-name>Type2Learn learner</h2><p data-auth-account-email></p><div class="auth-account-actions"><a class="button button-primary" href="/">Continue to Type2Learn' + icon('arrow', true) + '</a><button class="auth-signout" type="button" data-auth-signout>Sign out</button></div></section>');
+      formStage.insertAdjacentHTML('afterend', '<section class="auth-account" data-auth-account aria-hidden="true" hidden><span class="auth-account-avatar" data-auth-account-avatar aria-hidden="true">T2</span><p class="section-kicker">Authenticated account</p><h2 data-auth-account-name>Type2Learn learner</h2><p data-auth-account-email></p><div class="auth-account-actions"><a class="button button-primary" href="/learn/">Continue to Type2Learn' + icon('arrow', true) + '</a><button class="auth-signout" type="button" data-auth-signout>Sign out</button></div></section>');
     }
     const googleButton = document.querySelector('[data-google-auth]');
     if (googleButton && !document.querySelector('.auth-google-terms')) {
@@ -1054,7 +1054,7 @@
     };
     registerPassword?.addEventListener('input', validatePasswordMatch);
     registerConfirm?.addEventListener('input', validatePasswordMatch);
-    import('/firebase-auth.js?v=20260720-9')
+    import('/firebase-auth.js?v=20260722-1')
       .then(({ setupFirebaseAuth }) => setupFirebaseAuth({ setStatus: setAuthStatus }))
       .catch(() => {
         if (integrationNote?.lastChild) integrationNote.lastChild.textContent = 'Account services could not connect';
