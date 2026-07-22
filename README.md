@@ -24,6 +24,10 @@ The centered account experience is available at `/login/`. All marketing CTA but
 
 The `/learn/` route is a temporary authenticated learning home for the next import phase, with `/afterlogin/` kept as a literal alias during development. It includes a desktop auto-hide sidebar inspired by the `newwebsite` workspace behavior, mobile-friendly static navigation, and the Type2Learn companion mascot from the working preview. Unauthenticated visitors are sent back to `/login/?next=%2Flearn%2F`.
 
+## LinkedIn campaign
+
+Publication-ready 4:5 campaign images, a featured project overview, caption openers, alt text, and source files are in [`campaign/linkedin-2026-07/`](campaign/linkedin-2026-07/). The campaign uses the strict supplied logo, dated web-analytics figures, honest prototype labels, and one consistent invitation for neurodivergent contributors to contact `contact@type2learn.tech`.
+
 Images are compressed WebP assets where source fidelity allows it, and below-the-fold `<img>` elements use lazy loading, asynchronous decoding, and low fetch priority. The original supplied PNG logo stays unchanged. No image build service or runtime image transformation is required on Render.
 
 ## Search indexing
