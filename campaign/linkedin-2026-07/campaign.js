@@ -201,24 +201,40 @@ const posts = [
     title: 'Learn by typing.\nBuild knowledge\nthat stays.',
     body: 'Type2Learn is a nonprofit building active, typing-based learning for K–12 learners in Pakistan—with low-literacy and neurodivergent learners considered from the start.',
     useCase: 'For neurodivergent and low-literacy K–12 learners, with supports available without diagnosis or disclosure.',
+    reach: {
+      sessions: '1,959',
+      engagedSessions: '1,940',
+      date: '22 JULY 2026',
+      source: 'Google Analytics 4 · one-day session acquisition · sessions are not unique people'
+    },
     image: './generated/featured-learning-path.png',
     position: 'center center',
     generated: true
   }
 ];
 
-const sharedFooter = `
-  <footer class="post-footer">
-    <div class="footer-rule" aria-hidden="true"></div>
-    <div class="footer-grid">
-      <div>
-        <p class="footer-kicker">NEURODIVERGENT VOICES WANTED</p>
-        <p class="footer-question">Are you neurodivergent and willing to help shape Type2Learn?</p>
+function mascotPath(post) {
+  const number = post.id === 'FEATURED' ? '16' : post.id;
+  return `./assets/mascot/${number}-${post.slug}.png`;
+}
+
+function sharedFooter(post) {
+  return `
+    <footer class="post-footer">
+      <div class="footer-rule" aria-hidden="true"></div>
+      <div class="footer-mascot">
+        <img src="${mascotPath(post)}" alt="Type2Learn bunny mascot inviting people to help shape the project">
       </div>
-      <a class="footer-email" href="mailto:contact@type2learn.tech">contact@type2learn.tech</a>
-    </div>
-    <p class="footer-note">Voluntary. No diagnosis details needed. Under 18? Ask a parent or guardian to contact us.</p>
-  </footer>`;
+      <div class="footer-speech">
+        <div>
+          <p class="footer-kicker">NEURODIVERGENT VOICES WANTED</p>
+          <p class="footer-question">Interested in helping us shape Type2Learn?</p>
+        </div>
+        <a class="footer-email" href="mailto:contact@type2learn.tech">contact@type2learn.tech</a>
+      </div>
+      <p class="footer-note">Are you neurodivergent? Your perspective is enough—no diagnosis details needed. Under 18? Ask a parent or guardian to contact us.</p>
+    </footer>`;
+}
 
 function brandHeader(post) {
   const number = post.id === 'FEATURED' ? 'FEATURED' : `${post.id} / 15`;
@@ -288,6 +304,12 @@ function featuredStage(post) {
         <h2 class="post-title">${post.title.replaceAll('\n', '<br>')}</h2>
         <p class="post-body">${post.body}</p>
         <p class="use-case"><b>NEUROINCLUSIVE USE CASE</b><span>${post.useCase}</span></p>
+        <div class="featured-reach" aria-label="${post.reach.sessions} sessions and ${post.reach.engagedSessions} engaged sessions on 22 July 2026">
+          <p class="reach-heading">EARLY LANDING-PAGE REACH · ${post.reach.date}</p>
+          <p class="reach-stat"><strong>${post.reach.sessions}</strong><span>sessions in one day</span></p>
+          <p class="reach-stat"><strong>${post.reach.engagedSessions}</strong><span>engaged sessions</span></p>
+          <p class="reach-source">${post.reach.source}</p>
+        </div>
         <div class="learning-route">
           <div><span>READ / HEAR</span><b>→</b><span>RECALL</span><b>→</b><span>TYPE / PRODUCE</span><b>→</b><span>CHECK</span></div>
           <div><b class="route-continuation">↳</b><span>CORRECT</span><b>→</b><span>APPLY</span><b>→</b><span>RETURN</span></div>
@@ -315,7 +337,7 @@ function renderPost(post) {
     <article class="post template-${post.template}" id="post-${post.slug}" data-slug="${post.slug}" aria-label="Type2Learn LinkedIn post ${post.id}">
       ${brandHeader(post)}
       ${stage}
-      ${sharedFooter}
+      ${sharedFooter(post)}
     </article>`;
 }
 

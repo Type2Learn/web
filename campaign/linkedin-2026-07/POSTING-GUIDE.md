@@ -8,6 +8,8 @@ Append this same invitation to each LinkedIn caption:
 
 Suggested core hashtags: `#Type2Learn #Neurodiversity #AccessibleLearning #EdTech`
 
+Every final image includes a purpose-made pose of the owner-supplied white-and-blue Type2Learn bunny. The bunny appears as the active speaker in the help-us-shape-Type2Learn invitation.
+
 ## 01 — The promise
 
 Caption opener: Learning should require action, not just attention. Type2Learn is being built around a simple route: encounter an idea, recall it, produce a response, correct it, use it, and return to it. What helps an idea stay with you?
@@ -100,6 +102,6 @@ Alt text: Type2Learn traffic poster showing 1,372 unique visitors in seven days.
 
 ## 16 — Featured project overview
 
-Caption opener: Type2Learn is a nonprofit building active, typing-based learning for K–12 learners in Pakistan, with low-literacy and neurodivergent learners considered from the start. The current stage is a product preview and literacy-first foundation; features and outcomes still need responsible testing with people.
+Caption opener: Type2Learn is a nonprofit building active, typing-based learning for K–12 learners in Pakistan, with low-literacy and neurodivergent learners considered from the start. On 22 July 2026, the landing page recorded 1,959 sessions in one day, including 1,940 engaged sessions. These are GA4 sessions, not unique people. The current stage is a product preview and literacy-first foundation; features and outcomes still need responsible testing with people.
 
-Alt text: Featured Type2Learn project poster. A keyboard becomes a sequence of learning stages leading to an open book. The poster explains the Read/Hear → Recall → Type/Produce → Check → Correct → Apply → Return route and introduces Word Builder, Focus Sprint, and Predictable Path. The neuroinclusive use case is neurodivergent and low-literacy K–12 learners receiving supports without diagnosis or disclosure.
+Alt text: Featured Type2Learn project poster with the white-and-blue bunny mascot presenting the participation invitation. A keyboard becomes a sequence of learning stages leading to an open book. The poster explains the Read/Hear → Recall → Type/Produce → Check → Correct → Apply → Return route and introduces Word Builder, Focus Sprint, and Predictable Path. It reports 1,959 sessions and 1,940 engaged sessions on 22 July 2026, labelled as GA4 sessions rather than unique people. The neuroinclusive use case is neurodivergent and low-literacy K–12 learners receiving supports without diagnosis or disclosure.

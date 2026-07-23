@@ -2,6 +2,31 @@
 
 The four selected illustrative assets were created with the built-in image generation tool. Exact Type2Learn text, email, fonts, status labels, and the strict supplied logo were added afterward in HTML/CSS so they remain accurate. No generated logo or generated text is used in a final post.
 
+The white-and-blue bunny mascot uses the exact owner-supplied image as the identity reference. Purpose-made poses were generated for the campaign so the mascot can reinforce each post’s subject and actively deliver the participation invitation. The owner-supplied reference remains preserved at `assets/type2learn-bunny-mascot.png`.
+
+## Mascot pose direction
+
+All sixteen pose renders preserve the mascot’s white fur, blue inner ears and eyes, blue collar, friendly proportions, and Type2Learn pendant. They use a seamless white background so the character integrates into the shared call-to-action without a decorative box.
+
+| Post | Pose direction |
+| --- | --- |
+| 01 · The promise | Welcoming the viewer and pointing toward the learning route |
+| 02 · Active, not passive | Actively producing a response |
+| 03 · Beyond speed | Calm “slow down” hand gesture |
+| 04 · Dignity and control | Adjusting a learner-controlled setting |
+| 05 · Support without a label | Open, supportive invitation |
+| 06 · One clear next action | Pointing to one clear next step |
+| 07 · Dignified correction | Thoughtful comparison and encouraging approval |
+| 08 · Calm return | Reassuring return and wave |
+| 09 · Word Builder | Presenting an open learning book |
+| 10 · Focus Sprint | Guiding a three-step route |
+| 11 · Predictable Path | Presenting a clear route map |
+| 12 · Evidence, not surveillance | Presenting learning evidence while protecting privacy |
+| 13 · Private by default | Protecting a blue trust shield |
+| 14 · Made with, not for | Listening and inviting lived-experience input |
+| 15 · Early website reach | Presenting a blue-green globe |
+| 16 · Featured overview | Confident project-presenter pose |
+
 ## Learner controls
 
 Output: `generated/learner-controls.png`

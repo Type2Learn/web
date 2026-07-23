@@ -8,18 +8,18 @@ This folder contains a publication-ready 4:5 LinkedIn campaign built from the Ty
 - `posts/16-project-overview.jpg`: the featured project overview.
 - `campaign-contact-sheet.jpg`: one-page visual index of all exports.
 - `POSTING-GUIDE.md`: recommended sequence, caption openers, and alt text.
-- `IMAGEGEN-PROMPTS.md`: final prompts and provenance for the four new illustrative scenes.
+- `IMAGEGEN-PROMPTS.md`: final direction and provenance for the four illustrative scenes and sixteen mascot poses.
 
-Every final post is 1200 × 1500 pixels, exported as a high-quality JPEG. Every post uses the same invitation:
+Every final post is a true 2× source render at 2400 × 3000 pixels, exported as a maximum-quality JPEG. The images are rendered from the live layout rather than enlarged from earlier JPEGs. Every post uses the same invitation:
 
 > **NEURODIVERGENT VOICES WANTED**<br>
-> Are you neurodivergent and willing to help shape Type2Learn?<br>
+> Interested in helping us shape Type2Learn?<br>
 > **contact@type2learn.tech**<br>
-> Voluntary. No diagnosis details needed. Under 18? Ask a parent or guardian to contact us.
+> Are you neurodivergent? Your perspective is enough—no diagnosis details needed. Under 18? Ask a parent or guardian to contact us.
 
 Every post also includes a tailored **NEUROINCLUSIVE USE CASE** inside its main content—not only in the recruitment footer—so the specific neurodivergent need or design purpose remains explicit when the image is viewed on its own.
 
-The official supplied logo at `../../assets/type2learn-logo.png` is composited unchanged. Headlines use the locally licensed Cormorant Garamond font; supporting copy uses Manrope. The campaign follows the project palette: Growth Green, Learning Teal, Focus Cyan, Trust Blue, Deep Ink, and Cloud White.
+The official supplied logo at `../../assets/type2learn-logo.png` is composited unchanged. The exact owner-supplied Type2Learn bunny at `assets/type2learn-bunny-mascot.png` is preserved as the mascot identity reference. Each post uses a purpose-made pose in `assets/mascot/` so the bunny actively reinforces that post’s idea and delivers the shared invitation. Headlines use the locally licensed Cormorant Garamond font; supporting copy uses Manrope. The campaign follows the project palette: Growth Green, Learning Teal, Focus Cyan, Trust Blue, Deep Ink, and Cloud White.
 
 ## Publication safeguards
 
@@ -27,6 +27,7 @@ The official supplied logo at `../../assets/type2learn-logo.png` is composited u
 - Product directions and module concepts are labelled as in development rather than released or proven.
 - The campaign does not claim diagnosis, treatment, guaranteed retention, universal effectiveness, accreditation, or measured learning outcomes.
 - The traffic post distinguishes unique visitors from request counts and dates the metric.
+- The featured post labels the owner-supplied GA4 export as one-day sessions, not unique people: 1,959 sessions and 1,940 engaged sessions on 22 July 2026.
 - Confirm that `contact@type2learn.tech` is monitored before publication. Do not ask contributors to disclose a diagnosis or child information in public comments.
 
 ## Re-export
