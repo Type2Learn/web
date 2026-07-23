@@ -8,6 +8,8 @@ This folder contains a publication-ready 4:5 LinkedIn campaign built from the Ty
 - `posts/16-project-overview.jpg`: the featured project overview.
 - `campaign-contact-sheet.jpg`: one-page visual index of all exports.
 - `POSTING-GUIDE.md`: recommended sequence, caption openers, and alt text.
+- `UPLOAD-SCHEDULE-2026-07-23-to-2026-08-02.md`: exact PKT publishing path and upload routine.
+- `type2learn-linkedin-upload-calendar.ics`: importable calendar containing every upload and engagement window.
 - `IMAGEGEN-PROMPTS.md`: final direction and provenance for the four illustrative scenes and sixteen mascot poses.
 
 Every final post is a true 2× source render at 2400 × 3000 pixels, exported as a maximum-quality JPEG. The images are rendered from the live layout rather than enlarged from earlier JPEGs. Every post uses the same invitation:

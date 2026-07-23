@@ -1,0 +1,162 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Type2Learn//LinkedIn Campaign 2026//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Type2Learn LinkedIn Campaign
+X-WR-TIMEZONE:Asia/Karachi
+BEGIN:VTIMEZONE
+TZID:Asia/Karachi
+X-LIC-LOCATION:Asia/Karachi
+BEGIN:STANDARD
+TZOFFSETFROM:+0500
+TZOFFSETTO:+0500
+TZNAME:PKT
+DTSTART:19700101T000000
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:type2learn-linkedin-01-20260723@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260723T150500
+DTEND;TZID=Asia/Karachi:20260723T160500
+SUMMARY:Upload 01 — The promise
+DESCRIPTION:Publish posts/01-the-promise.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-02-20260723@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260723T191000
+DTEND;TZID=Asia/Karachi:20260723T201000
+SUMMARY:Upload 02 — Active\, not passive
+DESCRIPTION:Publish posts/02-active-not-passive.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-03-20260724@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260724T110500
+DTEND;TZID=Asia/Karachi:20260724T120500
+SUMMARY:Upload 03 — Beyond speed
+DESCRIPTION:Publish posts/03-beyond-speed.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-04-20260724@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260724T161000
+DTEND;TZID=Asia/Karachi:20260724T171000
+SUMMARY:Upload 04 — Dignity and control
+DESCRIPTION:Publish posts/04-dignity-and-control.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-05-20260725@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260725T181000
+DTEND;TZID=Asia/Karachi:20260725T191000
+SUMMARY:Upload 05 — Support without a label
+DESCRIPTION:Publish posts/05-support-without-a-label.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-engage-20260726@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260726T190000
+DTEND;TZID=Asia/Karachi:20260726T194500
+SUMMARY:Type2Learn LinkedIn engagement day
+DESCRIPTION:No new upload. Reply to unanswered comments and ask one thoughtful follow-up question under posts 01–05.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-06-20260727@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260727T131000
+DTEND;TZID=Asia/Karachi:20260727T141000
+SUMMARY:Upload 06 — One clear next action
+DESCRIPTION:Publish posts/06-one-clear-next-action.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-07-20260727@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260727T184000
+DTEND;TZID=Asia/Karachi:20260727T194000
+SUMMARY:Upload 07 — Dignified correction
+DESCRIPTION:Publish posts/07-dignified-correction.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-08-20260728@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260728T111000
+DTEND;TZID=Asia/Karachi:20260728T121000
+SUMMARY:Upload 08 — Calm return
+DESCRIPTION:Publish posts/08-calm-return.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-09-20260728@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260728T161000
+DTEND;TZID=Asia/Karachi:20260728T171000
+SUMMARY:Upload 09 — Word Builder
+DESCRIPTION:Publish posts/09-word-builder.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-10-20260729@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260729T111000
+DTEND;TZID=Asia/Karachi:20260729T121000
+SUMMARY:Upload 10 — Focus Sprint
+DESCRIPTION:Publish posts/10-focus-sprint.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-11-20260729@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260729T160500
+DTEND;TZID=Asia/Karachi:20260729T170500
+SUMMARY:Upload 11 — Predictable Path
+DESCRIPTION:Publish posts/11-predictable-path.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-12-20260730@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260730T111000
+DTEND;TZID=Asia/Karachi:20260730T121000
+SUMMARY:Upload 12 — Evidence\, not surveillance
+DESCRIPTION:Publish posts/12-evidence-not-surveillance.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-13-20260730@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260730T170500
+DTEND;TZID=Asia/Karachi:20260730T180500
+SUMMARY:Upload 13 — Private by default
+DESCRIPTION:Publish posts/13-private-by-default.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-14-20260731@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260731T110500
+DTEND;TZID=Asia/Karachi:20260731T120500
+SUMMARY:Upload 14 — Made with\, not for
+DESCRIPTION:Publish posts/14-made-with-not-for.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-15-20260731@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260731T161000
+DTEND;TZID=Asia/Karachi:20260731T171000
+SUMMARY:Upload 15 — Early website reach
+DESCRIPTION:Publish posts/15-global-interest.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-engage-20260801@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260801T181000
+DTEND;TZID=Asia/Karachi:20260801T185500
+SUMMARY:Type2Learn LinkedIn engagement day
+DESCRIPTION:No new upload. Reply\, thank contributors\, and collect recurring questions for the final post.
+END:VEVENT
+BEGIN:VEVENT
+UID:type2learn-linkedin-16-20260802@type2learn.tech
+DTSTAMP:20260723T083000Z
+DTSTART;TZID=Asia/Karachi:20260802T220500
+DTEND;TZID=Asia/Karachi:20260802T230500
+SUMMARY:Upload and pin 16 — Featured project overview
+DESCRIPTION:Publish posts/16-project-overview.jpg from the Type2Learn LinkedIn Page. Add the caption and alt text from POSTING-GUIDE.md. Stay available for comments and pin the post.
+END:VEVENT
+END:VCALENDAR

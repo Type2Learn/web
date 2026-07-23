@@ -1,6 +1,6 @@
 # LinkedIn posting guide
 
-Use the posts as standalone pieces rather than uploading the entire sequence at once. A practical rhythm is two or three posts per week, followed by the featured overview once the audience has seen the core principles.
+Use the posts as standalone pieces rather than uploading the entire sequence at once. For the requested 23 July–2 August 2026 launch sprint, follow the exact PKT calendar in `UPLOAD-SCHEDULE-2026-07-23-to-2026-08-02.md`. It includes two engagement-only days and at least five hours between same-day uploads. Outside this launch sprint, a practical long-term rhythm is two or three posts per week.
 
 Append this same invitation to each LinkedIn caption:
 
