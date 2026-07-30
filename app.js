@@ -2,13 +2,28 @@
   "use strict";
 
   const route = document.body.dataset.route || "home";
-  const navItems = [
+  const locale = document.body.dataset.locale || document.documentElement.lang || "en";
+  const isUrdu = locale.toLowerCase().startsWith("ur");
+  const routeKey = route.endsWith("-ur") ? route.slice(0, -3) : route;
+  const isHomeRoute = routeKey === "home";
+  const navItems = isUrdu ? [
+    ["how-it-works", "طریقۂ کار"],
+    ["pathways", "راستے"],
+    ["learners", "سیکھنے والے"],
+    ["families", "خاندان"],
+    ["schools", "اسکول"],
+    ["team", "ٹیم"],
+    ["co-design", "مشترکہ ڈیزائن"],
+    ["community", "کمیونٹی"],
+    ["trust", "اعتماد"]
+  ] : [
     ["how-it-works", "How it works"],
     ["pathways", "Pathways"],
     ["learners", "Learners"],
     ["families", "Families"],
     ["schools", "Schools"],
     ["team", "Team"],
+    ["co-design", "Co-design"],
     ["community", "Community & help"],
     ["trust", "Trust"]
   ];
@@ -40,16 +55,24 @@
   const status = (text, kind) => '<span class="status-chip chip-' + (kind || 'blue') + '">' + text + '</span>';
   const button = (label, href, kind) => '<a class="button button-' + (kind || 'secondary') + '" href="/login/">' + label + icon('arrow', true) + '</a>';
 
-  const brand = () => '<a class="brand" href="/" aria-label="Type2Learn — Learn actively — home"><img class="brand-mark" src="/assets/type2learn-logo-nav.webp" width="160" height="141" alt=""><span class="brand-copy"><span class="brand-name">TYPE2LEARN</span><span class="brand-tagline">Learn actively</span></span></a>';
+  const brand = () => '<a class="brand" href="' + (isUrdu ? "/ur/" : "/") + '" aria-label="' + (isUrdu ? "Type2Learn — فعال سیکھیں — مرکزی صفحہ" : "Type2Learn — Learn actively — home") + '"><img class="brand-mark" src="/assets/type2learn-logo-nav.webp" width="160" height="141" alt=""><span class="brand-copy"><span class="brand-name">TYPE2LEARN</span><span class="brand-tagline">' + (isUrdu ? "فعال سیکھیں" : "Learn actively") + '</span></span></a>';
 
   const nav = () => {
-    const links = navItems.map(([key, label]) => '<a href="/' + key + '/"' + (route === key ? ' aria-current="page"' : '') + '>' + label + '</a>').join('');
-    return '<header class="site-header"><div class="scroll-progress" aria-hidden="true"><i id="scroll-progress"></i></div><div class="header-inner">' + brand() + '<nav class="desktop-nav" aria-label="Primary">' + links + '</nav><div class="header-actions"><button class="motion-switch" id="motion-toggle" type="button" aria-pressed="false" aria-label="Motion On — turn off decorative motion">' + icon('pause', true) + '<span class="motion-switch-label">Motion</span><span class="motion-switch-state">On</span></button><a class="button button-primary is-small" href="/login/">Get started' + icon('arrow', true) + '</a><button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu">' + icon('menu') + '</button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="Mobile primary">' + links + '<a class="button button-primary" href="/login/">Get started' + icon('arrow', true) + '</a></nav></header>';
+    const links = navItems.map(([key, label]) => '<a href="' + (isUrdu ? "/ur/" + key + "/" : "/" + key + "/") + '"' + (routeKey === key ? ' aria-current="page"' : '') + '>' + label + '</a>').join('');
+    const englishRoute = isHomeRoute ? "/" : "/" + routeKey + "/";
+    const urduRoute = isHomeRoute ? "/ur/" : "/ur/" + routeKey + "/";
+    const languageSwitch = '<a class="language-switch" href="' + (isUrdu ? englishRoute + "?lang=en" : urduRoute + "?lang=ur") + '" lang="' + (isUrdu ? "en" : "ur") + '">' + (isUrdu ? "English" : "اردو") + '</a>';
+    const motionLabel = isUrdu ? "حرکت" : "Motion";
+    const motionState = isUrdu ? "آن" : "On";
+    const getStarted = isUrdu ? "شروع کریں" : "Get started";
+    const openMenu = isUrdu ? "مینو کھولیں" : "Open menu";
+    return '<header class="site-header"><div class="scroll-progress" aria-hidden="true"><i id="scroll-progress"></i></div><div class="header-inner">' + brand() + '<nav class="desktop-nav" aria-label="' + (isUrdu ? "مرکزی نیویگیشن" : "Primary") + '">' + links + '</nav><div class="header-actions">' + languageSwitch + '<button class="motion-switch" id="motion-toggle" type="button" aria-pressed="false" aria-label="' + motionLabel + ' ' + motionState + '">' + icon('pause', true) + '<span class="motion-switch-label">' + motionLabel + '</span><span class="motion-switch-state">' + motionState + '</span></button><a class="button button-primary is-small" href="/login/">' + getStarted + icon('arrow', true) + '</a><button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="' + openMenu + '">' + icon('menu') + '</button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="' + (isUrdu ? "موبائل نیویگیشن" : "Mobile primary") + '">' + links + languageSwitch + '<a class="button button-primary" href="/login/">' + getStarted + icon('arrow', true) + '</a></nav></header>';
   };
 
-  const footer = () => '<footer class="site-footer"><div class="content-wrap footer-top"><div class="footer-brand">' + brand() + '<p class="footer-description">Active, typing-based learning with learner-controlled support. Built around participation, privacy, and clear next steps.</p><span class="footer-preview-label">Educational product preview</span></div><div class="footer-grid"><div><h2>Explore</h2><a href="/how-it-works/">How it works & evidence</a><a href="/pathways/">Pathways</a><a href="/learners/">For learners</a><a href="/families/">For families</a></div><div><h2>Trust</h2><a href="/trust/#accessibility">Accessibility</a><a href="/privacy/">Privacy Policy</a><a href="/trust/#security">Security</a><a href="/terms/">Terms of Service</a></div><div><h2>Connect</h2><a href="/team/">Team</a><a href="/community/">Community</a><a href="/community/#support">Support</a><a href="/schools/">For schools</a><div class="footer-social-links"><a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></div></div></div><div class="content-wrap footer-bottom"><span>© 2026 Type2Learn. Educational product preview.</span><span class="footer-status"><i></i>Public information is a work in progress.</span></div></footer>';
+  const urduFooter = () => '<footer class="site-footer"><div class="content-wrap footer-top"><div class="footer-brand">' + brand() + '<p class="footer-description">فعال، ٹائپنگ پر مبنی سیکھنا جس میں سیکھنے والے کے اپنے کنٹرولز موجود ہیں۔ شرکت، رازداری اور واضح اگلے قدم کے گرد بنایا گیا۔</p><span class="footer-preview-label">تعلیمی مصنوعات کا پیش منظر</span></div><div class="footer-grid"><div><h2>دریافت کریں</h2><a href="/ur/how-it-works/">طریقۂ کار اور بنیاد</a><a href="/ur/pathways/">سیکھنے کے راستے</a><a href="/ur/learners/">سیکھنے والے کے کنٹرولز</a><a href="/ur/families/">خاندانوں کے لیے</a></div><div><h2>اعتماد</h2><a href="/ur/trust/#accessibility">رسائی پذیری</a><a href="/privacy/">رازداری پالیسی <span lang="en">(English)</span></a><a href="/ur/trust/#security">سکیورٹی</a><a href="/terms/">سروس کی شرائط <span lang="en">(English)</span></a></div><div><h2>رابطہ</h2><a href="/ur/team/">بانی ٹیم</a><a href="/ur/co-design/">مشترکہ ڈیزائن</a><a href="/ur/community/">کمیونٹی</a><a href="/ur/schools/">اسکولوں کے لیے</a><div class="footer-social-links"><a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (نئے ٹیب میں کھلتا ہے)</span></a><a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span><span class="sr-only"> (نئے ٹیب میں کھلتا ہے)</span></a></div></div></div></div><div class="content-wrap footer-bottom"><span>© 2026 Type2Learn۔ غیر منافع بخش مقصد کے ساتھ زیرِ تیاری تعلیمی اقدام۔</span><span class="footer-status"><i></i>عوامی معلومات پر مسلسل کام جاری ہے۔</span></div></footer>';
+  const footer = () => isUrdu ? urduFooter() : '<footer class="site-footer"><div class="content-wrap footer-top"><div class="footer-brand">' + brand() + '<p class="footer-description">Active, typing-based learning with learner-controlled support. Built around participation, privacy, and clear next steps.</p><span class="footer-preview-label">Educational product preview</span></div><div class="footer-grid"><div><h2>Explore</h2><a href="/how-it-works/">How it works & evidence</a><a href="/pathways/">Pathways</a><a href="/learners/">For learners</a><a href="/families/">For families</a></div><div><h2>Trust</h2><a href="/trust/#accessibility">Accessibility</a><a href="/privacy/">Privacy Policy</a><a href="/trust/#security">Security</a><a href="/terms/">Terms of Service</a></div><div><h2>Connect</h2><a href="/team/">Founding team</a><a href="/co-design/">Co-design</a><a href="/community/">Community</a><a href="/community/#support">Support</a><a href="/schools/">For schools</a><div class="footer-social-links"><a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></div></div></div><div class="content-wrap footer-bottom"><span>© 2026 Type2Learn. An education initiative being developed with a nonprofit mission.</span><span class="footer-status"><i></i>Public information is a work in progress.</span></div></footer>';
 
-  const nativeBuilderCredit = '<section class="builder-credit" aria-label="Website development credit"><div class="content-wrap builder-credit-inner reveal"><span class="builder-monogram" aria-hidden="true">N</span><div class="builder-copy"><p>Website credit · native.builder</p><strong>Built with native.builder for Type2Learn.</strong><span>Built from 3 August to 6 August · Human direction, product context, and accessibility standards shaped every decision.</span></div><a class="builder-credit-link" href="https://builder.nativelyai.com/" target="_blank" rel="noopener noreferrer"><span>Visit native.builder</span><span class="builder-link-icon" aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></section>';
+  const nativeBuilderCredit = isUrdu ? '<section class="builder-credit" aria-label="ویب سائٹ کی تیاری کا کریڈٹ"><div class="content-wrap builder-credit-inner reveal"><span class="builder-monogram" aria-hidden="true">N</span><div class="builder-copy"><p>ویب سائٹ کا کریڈٹ · native.builder</p><strong>Type2Learn کے لیے native.builder کے ساتھ تیار کیا گیا۔</strong><span>3 اگست سے 6 اگست تک تعمیر کیا گیا · انسانی رہنمائی، مصنوعات کا تناظر، اور رسائی پذیری کے معیارات نے ہر فیصلہ تشکیل دیا۔</span></div><a class="builder-credit-link" href="https://builder.nativelyai.com/" target="_blank" rel="noopener noreferrer"><span>native.builder ملاحظہ کریں</span><span class="builder-link-icon" aria-hidden="true">↗</span><span class="sr-only"> (نئے ٹیب میں کھلتا ہے)</span></a></div></section>' : '<section class="builder-credit" aria-label="Website development credit"><div class="content-wrap builder-credit-inner reveal"><span class="builder-monogram" aria-hidden="true">N</span><div class="builder-copy"><p>Website credit · native.builder</p><strong>Built with native.builder for Type2Learn.</strong><span>Built from 3 August to 6 August · Human direction, product context, and accessibility standards shaped every decision.</span></div><a class="builder-credit-link" href="https://builder.nativelyai.com/" target="_blank" rel="noopener noreferrer"><span>Visit native.builder</span><span class="builder-link-icon" aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a></div></section>';
 
   const ctaDefinitions = {
     home: ['Start with one clear next step', 'See how active learning feels in practice.', 'Explore the learning pathways or begin a guided recall activity designed around one clear next step.', 'Try it now', '/#demo', 'Explore pathways', '/pathways/'],
@@ -59,25 +82,46 @@
     families: ['Support the learning, not surveillance', 'Make the routine clear for everyone around it.', 'Understand what the learner is doing, how support works, and where privacy boundaries stay firm.', 'See learner controls', '/learners/', 'Read the trust center', '/trust/'],
     schools: ['Plan a responsible route', 'Bring active learning into a clear school workflow.', 'Review the method, evidence boundaries, implementation responsibilities, and safeguards before a pilot.', 'Review the method', '/how-it-works/', 'Read the trust center', '/trust/'],
     team: ['Build with accountability', 'Meet the people responsible for the next decision.', 'Move through the leadership profiles, then see how evidence, access, and community shape the work.', 'Explore the method', '/how-it-works/', 'Community & help', '/community/'],
+    'co-design': ['Shape a decision, not a slogan', 'Help make active learning clearer and more respectful.', 'Read the current participation status, the safeguards required before testing, and the decisions contributors are intended to influence.', 'Meet the founding team', '/team/', 'Community & help', '/community/'],
     community: ['Bring a useful question', 'Help make the next learning decision better.', 'Find the right route for support, contribution, co-design, or a clear product question.', 'Explore pathways', '/pathways/', 'Read the trust center', '/trust/'],
     trust: ['Keep the standard visible', 'Read how access, privacy, security, and terms connect.', 'Use one accountable trust center to understand the safeguards around learning and participation.', 'Explore the method', '/how-it-works/', 'Community & help', '/community/']
   };
+  const urduCtaDefinitions = {
+    "how-it-works": ['طریقے کو عمل میں لائیں', 'واضح عمل سے پائیدار واپسی تک جائیں۔', 'یادداشت، مفید رائے، استعمال اور پرسکون واپسی کے گرد بنایا گیا راستہ منتخب کریں۔', 'راستے دریافت کریں', '/ur/pathways/', 'اب آزمائیں', '/login/'],
+    pathways: ['اپنا راستہ منتخب کریں', 'وہاں سے آغاز کریں جہاں سیکھنے والے کو کام کرنا ہے۔', 'تین راستوں کا موازنہ کریں اور وہ راستہ چنیں جو مقصد اور اگلا قدم واضح رکھے۔', 'سیکھنے والوں کے لیے', '/ur/learners/', 'اسکولوں کے لیے', '/ur/schools/'],
+    learners: ['اختیار سیکھنے والے کے پاس', 'مدد منتخب کریں، توقع کم نہ کریں۔', 'راستے، کنٹرولز اور روٹین دیکھیں جو پیش رفت اور وقار کی حفاظت کرتے ہیں۔', 'راستے دریافت کریں', '/ur/pathways/', 'خاندانوں کے لیے', '/ur/families/'],
+    families: ['مدد، نگرانی نہیں', 'سیکھنے کی روٹین سب کے لیے واضح بنائیں۔', 'جانیں کہ سیکھنے والا کیا کر رہا ہے، مدد کیسے کام کرتی ہے، اور رازداری کی حد کہاں قائم رہتی ہے۔', 'سیکھنے والے کے کنٹرولز', '/ur/learners/', 'اعتماد کا مرکز', '/ur/trust/'],
+    schools: ['ذمہ دار راستہ بنائیں', 'فعال سیکھنے کو واضح اسکولی عمل میں لائیں۔', 'آزمائش سے پہلے طریقہ، ثبوت کی حدود، نفاذ کی ذمہ داریاں اور حفاظتی اصول دیکھیں۔', 'طریقہ دیکھیں', '/ur/how-it-works/', 'اعتماد کا مرکز', '/ur/trust/'],
+    team: ['جوابدہی کے ساتھ تعمیر', 'اگلے فیصلے کے ذمہ دار لوگوں سے ملیں۔', 'قیادت کے پروفائلز دیکھیں، پھر جانیں کہ ثبوت، رسائی اور کمیونٹی کام کو کیسے ڈھالتے ہیں۔', 'طریقہ دریافت کریں', '/ur/how-it-works/', 'کمیونٹی اور مدد', '/ur/community/'],
+    "co-design": ['نعرے نہیں، فیصلے بدلیں', 'فعال سیکھنے کو زیادہ واضح اور باوقار بنانے میں مدد کریں۔', 'شرکت کی موجودہ حیثیت، جانچ سے پہلے ضروری حفاظتی اصول، اور وہ فیصلے دیکھیں جن پر شراکت دار اثر ڈال سکیں گے۔', 'بانی ٹیم سے ملیں', '/ur/team/', 'کمیونٹی اور مدد', '/ur/community/'],
+    community: ['ایک مفید سوال لائیں', 'اگلے تعلیمی فیصلے کو بہتر بنانے میں مدد کریں۔', 'سپورٹ، شراکت، مشترکہ ڈیزائن یا واضح مصنوعات کے سوال کے لیے درست راستہ تلاش کریں۔', 'راستے دریافت کریں', '/ur/pathways/', 'اعتماد کا مرکز', '/ur/trust/'],
+    trust: ['معیار واضح رکھیں', 'رسائی، رازداری، سکیورٹی اور شرائط کا تعلق سمجھیں۔', 'سیکھنے اور شرکت کے حفاظتی اصول ایک جواب دہ مرکز میں دیکھیں۔', 'طریقہ دریافت کریں', '/ur/how-it-works/', 'کمیونٹی اور مدد', '/ur/community/']
+  };
 
-  const ctaRoute = ({ research: 'how-it-works', support: 'community', privacy: 'trust', terms: 'trust', accessibility: 'trust', security: 'trust' })[route] || route;
+  const ctaRoute = ({ research: 'how-it-works', support: 'community', privacy: 'trust', terms: 'trust', accessibility: 'trust', security: 'trust' })[routeKey] || routeKey;
   const routeCtaArt = (routeName) => {
     if (routeName === 'how-it-works') {
-      const actions = ['Choose', 'Understand', 'Recall', 'Produce', 'Correct', 'Apply', 'Return'];
-      return '<div class="route-cta-art method-route-art" aria-hidden="true"><div class="method-route-core"><strong>DO</strong><span>Active learning</span></div><div class="method-route-track">' + actions.map((action, index) => '<i style="--art-index:' + (index + 1) + '"><b>' + String(index + 1).padStart(2, '0') + '</b><span>' + action + '</span></i>').join('') + '</div></div>';
+      const actions = isUrdu ? ['منتخب', 'سمجھیں', 'یاد', 'بنائیں', 'درست', 'استعمال', 'واپسی'] : ['Choose', 'Understand', 'Recall', 'Produce', 'Correct', 'Apply', 'Return'];
+      return '<div class="route-cta-art method-route-art" aria-hidden="true"><div class="method-route-core"><strong>' + (isUrdu ? 'عمل' : 'DO') + '</strong><span>' + (isUrdu ? 'فعال سیکھنا' : 'Active learning') + '</span></div><div class="method-route-track">' + actions.map((action, index) => '<i style="--art-index:' + (index + 1) + '"><b>' + String(index + 1).padStart(2, '0') + '</b><span>' + action + '</span></i>').join('') + '</div></div>';
     }
     if (routeName === 'team') {
-      const roles = [['01', 'Vision'], ['02', 'Engineering'], ['03', 'Research'], ['04', 'AI'], ['05', 'Product']];
-      return '<div class="route-cta-art team-route-art" aria-hidden="true"><div class="team-route-axis"><span>One mission</span><strong>05</strong></div>' + roles.map((role, index) => '<i style="--art-index:' + (index + 1) + '"><b>' + role[0] + '</b><span>' + role[1] + '</span><em></em></i>').join('') + '</div>';
+      const roles = isUrdu ? [['01', 'سمت'], ['02', 'انجینئرنگ'], ['03', 'تحقیق'], ['04', 'AI'], ['05', 'مصنوعات']] : [['01', 'Vision'], ['02', 'Engineering'], ['03', 'Research'], ['04', 'AI'], ['05', 'Product']];
+      return '<div class="route-cta-art team-route-art" aria-hidden="true"><div class="team-route-axis"><span>' + (isUrdu ? 'ایک مقصد' : 'One mission') + '</span><strong>05</strong></div>' + roles.map((role, index) => '<i style="--art-index:' + (index + 1) + '"><b>' + role[0] + '</b><span>' + role[1] + '</span><em></em></i>').join('') + '</div>';
+    }
+    if (routeName === 'co-design') {
+      const decisions = isUrdu
+        ? [['01', 'حد طے کریں'], ['02', 'رضامندی'], ['03', 'سنیں'], ['04', 'فیصلہ بدلیں'], ['05', 'حیثیت شائع کریں']]
+        : [['01', 'Define'], ['02', 'Consent'], ['03', 'Listen'], ['04', 'Change'], ['05', 'Publish status']];
+      return '<div class="route-cta-art codesign-route-art" aria-hidden="true"><div class="codesign-route-spine"><span>' + (isUrdu ? 'رائے' : 'Input') + '</span><strong>' + (isUrdu ? 'فیصلہ' : 'Decide') + '</strong></div><ol>' + decisions.map((decision, index) => '<li style="--art-index:' + (index + 1) + '"><b>' + decision[0] + '</b><span>' + decision[1] + '</span><i></i></li>').join('') + '</ol></div>';
     }
     return '<div class="route-cta-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>';
   };
 
   const siteCta = () => {
-    const item = ctaDefinitions[ctaRoute] || ctaDefinitions.home;
+    if (isUrdu && isHomeRoute) {
+      return '<section class="site-cta site-cta-home" data-cta-route="home" aria-labelledby="site-cta-title"><div class="content-wrap"><div class="site-cta-panel reveal"><div class="cta-orbit" aria-hidden="true"><i></i><i></i><i></i></div><div class="site-cta-copy"><p class="section-kicker">ایک واضح اگلے قدم سے آغاز کریں</p><h2 id="site-cta-title">دیکھیں کہ فعال سیکھنا عمل میں کیسا محسوس ہوتا ہے۔</h2><p>سیکھنے کے راستے دریافت کریں یا ایک واضح اگلے قدم کے گرد بنائی گئی رہنمائی والی یادداشت کی سرگرمی سے آغاز کریں۔</p></div><div class="site-cta-actions">' + button('اب آزمائیں', '#demo', 'primary') + button('راستے دریافت کریں', '#pathways', 'light') + '</div></div></div></section>';
+    }
+    const item = (isUrdu ? urduCtaDefinitions : ctaDefinitions)[ctaRoute] || ctaDefinitions.home;
     const isHome = ctaRoute === 'home';
     const art = isHome ? '<div class="cta-orbit" aria-hidden="true"><i></i><i></i><i></i></div>' : routeCtaArt(ctaRoute);
     return '<section class="site-cta site-cta-' + ctaRoute + '" data-cta-route="' + ctaRoute + '" aria-labelledby="site-cta-title"><div class="content-wrap"><div class="site-cta-panel reveal">' + art + '<div class="site-cta-copy"><p class="section-kicker">' + item[0] + '</p><h2 id="site-cta-title" data-animate-words>' + item[1] + '</h2><p>' + item[2] + '</p></div><div class="site-cta-actions">' + button(item[3], item[4], 'primary') + button(item[5], item[6], 'light') + '</div></div></div></section>';
@@ -85,7 +129,7 @@
 
   const shell = (content) => '<div class="site-shell">' + nav() + '<main id="main-content">' + content + siteCta() + nativeBuilderCredit + '</main>' + footer() + '</div>';
 
-  const pageHero = (eyebrow, title, copy, asideTitle, asideCopy) => '<section class="page-hero" data-hero-scene><div class="hero-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div><div class="content-wrap"><div class="breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>' + eyebrow + '</span></div><div class="page-hero-grid"><div class="page-hero-copy"><p class="eyebrow"><span class="eyebrow-dot"></span>' + eyebrow + '</p><h1 data-animate-words>' + title + '</h1><p>' + copy + '</p><button class="scroll-cue" type="button" data-scroll-next aria-label="Scroll to explore the next section"><span class="scroll-mouse" aria-hidden="true"><i></i></span><span>Scroll to explore</span></button></div><aside class="page-hero-aside reveal" data-tilt><span class="aside-label">Current direction</span><strong>' + asideTitle + '</strong><span>' + asideCopy + '</span><i class="aside-path" aria-hidden="true"></i></aside></div></div></section>';
+  const pageHero = (eyebrow, title, copy, asideTitle, asideCopy) => '<section class="page-hero" data-hero-scene><div class="hero-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div><div class="content-wrap"><div class="breadcrumb"><a href="' + (isUrdu ? '/ur/' : '/') + '">' + (isUrdu ? 'مرکزی صفحہ' : 'Home') + '</a><span aria-hidden="true">/</span><span>' + eyebrow + '</span></div><div class="page-hero-grid"><div class="page-hero-copy"><p class="eyebrow"><span class="eyebrow-dot"></span>' + eyebrow + '</p><h1 data-animate-words>' + title + '</h1><p>' + copy + '</p><button class="scroll-cue" type="button" data-scroll-next aria-label="' + (isUrdu ? 'اگلا حصہ دیکھنے کے لیے اسکرول کریں' : 'Scroll to explore the next section') + '"><span class="scroll-mouse" aria-hidden="true"><i></i></span><span>' + (isUrdu ? 'آگے دیکھنے کے لیے اسکرول کریں' : 'Scroll to explore') + '</span></button></div><aside class="page-hero-aside reveal" data-tilt><span class="aside-label">' + (isUrdu ? 'موجودہ سمت' : 'Current direction') + '</span><strong>' + asideTitle + '</strong><span>' + asideCopy + '</span><i class="aside-path" aria-hidden="true"></i></aside></div></div></section>';
 
   const authPage = () => {
     const slides = [
@@ -126,7 +170,7 @@
 
     const modules = moduleCard('book', 'Word Builder', 'Adapted', 'Structured literacy and academic word learning through sound, spelling, meaning, correction, and return.', ['Reviewed word objects', 'Meaningful reconstruction', 'Delayed retrieval'], 'blue') + moduleCard('path', 'Focus Sprint', 'Adapted', 'Bounded grade-level work with a visible plan, one current action, and calm re-entry.', ['Now → Next → Done', 'Autosave and resume', 'Support without focus scores'], 'teal') + moduleCard('layers', 'Predictable Path', 'Adapted', 'Stable lesson structure, explicit transition information, and learner-controlled sensory settings.', ['Preview Card', 'Literal instruction options', 'Declared sensory events'], 'green');
 
-    return shell('<section class="hero" data-hero-scene><div class="hero-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div><div class="content-wrap hero-grid"><div class="hero-copy-block"><p class="eyebrow"><span class="eyebrow-dot"></span>Active learning, one keystroke at a time</p><h1 data-animate-words>Learn by typing. Build knowledge that stays.</h1><p class="hero-copy">Type2Learn turns lessons into guided recall, correction, and practice - so progress means participation, not just pressing play.</p><div class="hero-actions">' + button('Try the learning demo', '#demo', 'primary') + button('Explore pathways', '/pathways/', 'secondary') + '</div><div class="trust-inline"><span>' + icon('check', true) + 'No speed-first ranking</span><span>' + icon('shield', true) + 'Private by default for young learners</span><span>' + icon('sliders', true) + 'Controls before assumptions</span></div><button class="scroll-cue" type="button" data-scroll-next aria-label="See the learning loop — scroll to the learning demonstration"><span class="scroll-mouse" aria-hidden="true"><i></i></span><span>See the learning loop</span></button></div><div class="hero-workspace reveal" data-delay="1" data-tilt><div class="workspace-top"><div class="workspace-brand">' + brand() + '<span>Guided lesson preview</span></div><div class="workspace-controls">' + status('Prototype', 'amber') + '</div></div><div class="workspace-surface"><div class="workspace-heading"><span class="workspace-number">01</span><div><h2>Explain what a variable stores</h2><p>One useful idea. One visible next action.</p></div></div><div class="now-next-done"><div class="task-state is-now"><span class="state-name">Now</span><strong>Complete the idea</strong><span>A variable stores a value that can...</span></div><div class="task-state"><span class="state-name">Next</span><strong>Check your wording</strong><span>See what the definition means.</span></div><div class="task-state"><span class="state-name">Done</span><strong>Apply it in code</strong><span>Create a score value.</span></div></div><div class="workspace-progress"><span>Learning path</span><div class="progress-bar"><i></i></div><span>1 of 3</span></div></div><div class="logo-source-frame"><img src="/assets/type2learn-logo.png" alt="Type2Learn T2L logo"></div></div></div></section><section class="section is-paper" id="demo"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Try the mechanism</p><h2 data-animate-words>A small interaction. A genuine learning moment.</h2><p>This local demo does not create an account or store your response. It demonstrates the first part of the Type2Learn loop.</p></div>' + status('Live on this page', 'green') + '</div><div class="demo-card reveal"><div class="demo-top"><div><p class="card-label">Step 3 of 7 · Type / Produce</p><h2>Complete the idea without looking.</h2></div>' + status('No timer', 'teal') + '</div><div class="demo-prompt"><strong>Recall cue</strong><p>A variable stores a value that can ...</p></div><form class="demo-form" id="typing-demo"><label class="sr-only" for="demo-answer">Your answer</label><input id="demo-answer" autocomplete="off" spellcheck="false" placeholder="Type your response here"><button class="button button-primary" type="submit">Check response' + icon('arrow', true) + '</button></form><p class="demo-feedback" id="demo-feedback" aria-live="polite">You can skip this preview at any time.</p><div class="demo-footer"><span>Meaningful variants are accepted where the objective allows them.</span><button class="text-link" id="skip-demo" type="button">Skip this demo</button></div><div class="controls-row"><span class="control-preview">' + icon('pause', true) + 'Reduced motion ready</span><span class="control-preview">' + icon('headphones', true) + 'Sound is off</span><span class="control-preview">' + icon('message', true) + 'Literal instructions available</span><span class="control-preview">' + icon('keyboard', true) + 'Keyboard first</span></div></div></div></section><section class="section is-cloud"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 data-animate-words>Watching can feel productive. Learning asks you to retrieve.</h2><p>Video, audio, examples, and support can all be valuable. Type2Learn adds the action layer: a clear objective, active response, correction, application, and return.</p></div></div><div class="learning-loop">' + loop + '</div></div></section><section class="section is-paper"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Three connected experiences</p><h2 data-animate-words>Support the work - not a label.</h2><p>Each experience keeps the academic target visible while offering private, configurable ways to enter, sustain, and complete meaningful learning.</p></div></div><div class="module-grid">' + modules + '</div></div></section><section class="section is-cloud"><div class="content-wrap"><div class="support-panel reveal"><p class="section-kicker">Private learning controls</p><h2>Different minds need different controls - not different expectations of dignity.</h2><p>Every learner can choose what helps them participate. Settings are private by default and are not a diagnosis.</p><div class="support-items"><div class="support-item"><strong>Motion and sound</strong><span>Reduced motion, no surprise animation, no autoplay audio.</span></div><div class="support-item"><strong>Reading and response</strong><span>Text size, spacing, read-aloud, captions, typing, speech, and more.</span></div><div class="support-item"><strong>Planning and pacing</strong><span>Visible steps, timer choice, pause, resume, and one next action.</span></div><div class="support-item"><strong>Help and clarity</strong><span>Literal instructions, examples, source highlights, and alternatives.</span></div></div></div></div></section><section class="section is-paper"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Built for the real people around learning</p><h2 data-animate-words>One learning tool. Clear routes for every audience.</h2></div></div><div class="audience-grid"><article class="audience-card reveal"><div class="audience-icon">' + icon('keyboard') + '</div><h3>Learners</h3><p>See what to do now, keep your work, choose your controls, and build proof of what you can do.</p><a class="card-footer" href="/learners/">See learner controls ' + icon('arrow', true) + '</a></article><article class="audience-card reveal" data-delay="1"><div class="audience-icon">' + icon('users') + '</div><h3>Families</h3><p>Understand the learning routine and privacy defaults without being asked to monitor every moment.</p><a class="card-footer" href="/families/">Explore family use ' + icon('arrow', true) + '</a></article><article class="audience-card reveal" data-delay="2"><div class="audience-icon">' + icon('school') + '</div><h3>Schools and professionals</h3><p>See meaningful learning evidence, support context, and clear boundaries - never a surveillance score.</p><a class="card-footer" href="/schools/">See the school approach ' + icon('arrow', true) + '</a></article></div></div></section><section class="section is-pale"><div class="content-wrap"><div class="evidence-grid"><article class="evidence-card reveal">' + status('Supported', 'green') + '<h3>Active practice</h3><p>Retrieval, feedback, and return shape the interaction model.</p></article><article class="evidence-card reveal" data-delay="1">' + status('Adapted', 'blue') + '<h3>Product translation</h3><p>Interface mechanics are designed hypotheses, not automatic proof.</p></article><article class="evidence-card reveal" data-delay="2">' + status('Community-informed', 'teal') + '<h3>Co-design</h3><p>Lived experience should change product decisions, not decorate a launch story.</p></article><article class="evidence-card reveal" data-delay="3">' + status('Planned', 'amber') + '<h3>Pilot and measurement</h3><p>Learning claims follow defined study, consent, and outcome evidence.</p></article></div></div></section><section class="section is-paper"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Common questions</p><h2 data-animate-words>Clear about what Type2Learn is - and what it is not.</h2></div><a class="button button-secondary" href="/login/">Get support' + icon('arrow', true) + '</a></div><div class="faq-list"><details class="faq-card reveal"><summary>Is Type2Learn a typing tutor?</summary><p>Typing is the active interaction layer. The goal is subject and skill learning through recall, feedback, correction, transfer, and review - not speed alone.</p></details><details class="faq-card reveal" data-delay="1"><summary>Does it diagnose or treat dyslexia, ADHD, or autism?</summary><p>No. Type2Learn offers learner-controlled supports and evidence-informed product ideas. It is an educational platform, not a clinical, diagnostic, or treatment service.</p></details><details class="faq-card reveal" data-delay="2"><summary>What does the platform collect?</summary><p>The product direction is data minimization: private learning work and settings, no targeted advertising, no learner-data sale, and no public-model training without explicit age-appropriate permission.</p></details><details class="faq-card reveal" data-delay="3"><summary>Are all of these experiences released?</summary><p>No. This public preview labels the status of concepts honestly. The first build focuses on one complete literacy-first learning route and a reusable active-learning engine.</p></details></div></div></section><section class="section is-cloud"><div class="content-wrap"><div class="quote-block reveal"><p>Made with learners. Led with accountability.</p><span>Meet the team, inspect the evidence approach, or explore the learning pathways.</span><div class="inline-actions">' + button('Meet the team', '/team/', 'secondary') + button('Explore pathways', '/pathways/', 'primary') + '</div></div></div></section>');
+    return shell('<section class="hero" data-hero-scene><div class="hero-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div><div class="content-wrap hero-grid"><div class="hero-copy-block"><p class="eyebrow"><span class="eyebrow-dot"></span>Active learning, one keystroke at a time</p><h1 data-animate-words>Learn by typing. Build knowledge that stays.</h1><p class="hero-copy">Type2Learn turns lessons into guided recall, correction, and practice - so progress means participation, not just pressing play.</p><div class="hero-actions">' + button('Try the learning demo', '#demo', 'primary') + button('Explore pathways', '/pathways/', 'secondary') + '</div><div class="trust-inline"><span>' + icon('check', true) + 'No speed-first ranking</span><span>' + icon('shield', true) + 'Private by default for young learners</span><span>' + icon('sliders', true) + 'Controls before assumptions</span></div><button class="scroll-cue" type="button" data-scroll-next aria-label="See the learning loop — scroll to the learning demonstration"><span class="scroll-mouse" aria-hidden="true"><i></i></span><span>See the learning loop</span></button></div><div class="hero-workspace reveal" data-delay="1" data-tilt><div class="workspace-top"><div class="workspace-brand">' + brand() + '<span>Guided lesson preview</span></div><div class="workspace-controls">' + status('Prototype', 'amber') + '</div></div><div class="workspace-surface"><div class="workspace-heading"><span class="workspace-number">01</span><div><h2>Explain what a variable stores</h2><p>One useful idea. One visible next action.</p></div></div><div class="now-next-done"><div class="task-state is-now"><span class="state-name">Now</span><strong>Complete the idea</strong><span>A variable stores a value that can...</span></div><div class="task-state"><span class="state-name">Next</span><strong>Check your wording</strong><span>See what the definition means.</span></div><div class="task-state"><span class="state-name">Done</span><strong>Apply it in code</strong><span>Create a score value.</span></div></div><div class="workspace-progress"><span>Learning path</span><div class="progress-bar"><i></i></div><span>1 of 3</span></div></div><div class="logo-source-frame"><img src="/assets/type2learn-logo.png" alt="Type2Learn T2L logo"></div></div></div></section><section class="section is-paper" id="demo"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Try the mechanism</p><h2 data-animate-words>A small interaction. A genuine learning moment.</h2><p>This local demo does not create an account or store your response. It demonstrates the first part of the Type2Learn loop.</p></div>' + status('Live on this page', 'green') + '</div><div class="demo-card reveal"><div class="demo-top"><div><p class="card-label">Step 3 of 7 · Type / Produce</p><h2>Complete the idea without looking.</h2></div>' + status('No timer', 'teal') + '</div><div class="demo-prompt"><strong>Recall cue</strong><p>A variable stores a value that can ...</p></div><form class="demo-form" id="typing-demo"><label class="sr-only" for="demo-answer">Your answer</label><input id="demo-answer" autocomplete="off" spellcheck="false" placeholder="Type your response here"><button class="button button-primary" type="submit">Check response' + icon('arrow', true) + '</button></form><p class="demo-feedback" id="demo-feedback" aria-live="polite">You can skip this preview at any time.</p><div class="demo-footer"><span>Meaningful variants are accepted where the objective allows them.</span><button class="text-link" id="skip-demo" type="button">Skip this demo</button></div><div class="controls-row"><span class="control-preview">' + icon('pause', true) + 'Reduced motion ready</span><span class="control-preview">' + icon('headphones', true) + 'Sound is off</span><span class="control-preview">' + icon('message', true) + 'Literal instructions available</span><span class="control-preview">' + icon('keyboard', true) + 'Keyboard first</span></div></div></div></section><section class="section is-cloud"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 data-animate-words>Watching can feel productive. Learning asks you to retrieve.</h2><p>Video, audio, examples, and support can all be valuable. Type2Learn adds the action layer: a clear objective, active response, correction, application, and return.</p></div></div><div class="learning-loop">' + loop + '</div></div></section><section class="section is-paper"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Three connected experiences</p><h2 data-animate-words>Support the work - not a label.</h2><p>Each experience keeps the academic target visible while offering private, configurable ways to enter, sustain, and complete meaningful learning.</p></div></div><div class="module-grid">' + modules + '</div></div></section><section class="section is-cloud"><div class="content-wrap"><div class="support-panel reveal"><p class="section-kicker">Private learning controls</p><h2>Different minds need different controls - not different expectations of dignity.</h2><p>Every learner can choose what helps them participate. Settings are private by default and are not a diagnosis.</p><div class="support-items"><div class="support-item"><strong>Motion and sound</strong><span>Reduced motion, no surprise animation, no autoplay audio.</span></div><div class="support-item"><strong>Reading and response</strong><span>Text size, spacing, read-aloud, captions, typing, speech, and more.</span></div><div class="support-item"><strong>Planning and pacing</strong><span>Visible steps, timer choice, pause, resume, and one next action.</span></div><div class="support-item"><strong>Help and clarity</strong><span>Literal instructions, examples, source highlights, and alternatives.</span></div></div></div></div></section><section class="section is-paper"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Built for the real people around learning</p><h2 data-animate-words>One learning tool. Clear routes for every audience.</h2></div></div><div class="audience-grid"><article class="audience-card reveal"><div class="audience-icon">' + icon('keyboard') + '</div><h3>Learners</h3><p>See what to do now, keep your work, choose your controls, and build proof of what you can do.</p><a class="card-footer" href="/learners/">See learner controls ' + icon('arrow', true) + '</a></article><article class="audience-card reveal" data-delay="1"><div class="audience-icon">' + icon('users') + '</div><h3>Families</h3><p>Understand the learning routine and privacy defaults without being asked to monitor every moment.</p><a class="card-footer" href="/families/">Explore family use ' + icon('arrow', true) + '</a></article><article class="audience-card reveal" data-delay="2"><div class="audience-icon">' + icon('school') + '</div><h3>Schools and professionals</h3><p>See meaningful learning evidence, support context, and clear boundaries - never a surveillance score.</p><a class="card-footer" href="/schools/">See the school approach ' + icon('arrow', true) + '</a></article></div></div></section><section class="section is-pale"><div class="content-wrap"><div class="evidence-grid"><article class="evidence-card reveal">' + status('Supported', 'green') + '<h3>Active practice</h3><p>Retrieval, feedback, and return shape the interaction model.</p></article><article class="evidence-card reveal" data-delay="1">' + status('Adapted', 'blue') + '<h3>Product translation</h3><p>Interface mechanics are designed hypotheses, not automatic proof.</p></article><article class="evidence-card reveal" data-delay="2">' + status('In preparation', 'teal') + '<h3>Co-design process</h3><p>Participation criteria and safeguards are being prepared; no completed external findings are claimed.</p></article><article class="evidence-card reveal" data-delay="3">' + status('Planned', 'amber') + '<h3>Pilot and measurement</h3><p>Learning claims follow defined study, consent, and outcome evidence.</p></article></div></div></section><section class="section is-paper"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Common questions</p><h2 data-animate-words>Clear about what Type2Learn is - and what it is not.</h2></div><a class="button button-secondary" href="/login/">Get support' + icon('arrow', true) + '</a></div><div class="faq-list"><details class="faq-card reveal"><summary>Is Type2Learn a typing tutor?</summary><p>Typing is the active interaction layer. The goal is subject and skill learning through recall, feedback, correction, transfer, and review - not speed alone.</p></details><details class="faq-card reveal" data-delay="1"><summary>Does it diagnose or treat dyslexia, ADHD, or autism?</summary><p>No. Type2Learn offers learner-controlled supports and evidence-informed product ideas. It is an educational platform, not a clinical, diagnostic, or treatment service.</p></details><details class="faq-card reveal" data-delay="2"><summary>What does the platform collect?</summary><p>The product direction is data minimization: private learning work and settings, no targeted advertising, no learner-data sale, and no public-model training without explicit age-appropriate permission.</p></details><details class="faq-card reveal" data-delay="3"><summary>Are all of these experiences released?</summary><p>No. This public preview labels the status of concepts honestly. The first build focuses on one complete literacy-first learning route and a reusable active-learning engine.</p></details></div></div></section><section class="section is-cloud"><div class="content-wrap"><div class="quote-block reveal"><p>Designed for participation. Led with accountability.</p><span>Meet the team, inspect the evidence approach, or explore the learning pathways.</span><div class="inline-actions">' + button('Meet the team', '/team/', 'secondary') + button('Explore pathways', '/pathways/', 'primary') + '</div></div></div></section>');
   };
 
   const howItWorks = () => shell(pageHero('How it works', 'A clear learning action, then a useful next step.', 'Type2Learn structures participation around small, meaningful objectives. The mechanism is designed to make learning visible without turning the learner into a timer, score, or data point.', 'Status', 'The active-learning demonstration on the home page is a local prototype. Broader learning routes are planned.') + '<section class="page-section"><div class="content-wrap"><h2>One loop, from first instruction to durable return.</h2><p>The product makes the task concrete, protects the learner’s work, and only recognizes completion when the academic objective has meaningful evidence.</p><div class="learning-loop">' + [['01', 'Choose', 'See the objective, prerequisite, duration range, and options.'], ['02', 'Understand', 'Read, hear, inspect, or ask for literal wording.'], ['03', 'Recall', 'Work from a cue before the complete model appears.'], ['04', 'Produce', 'Type, build, label, solve, or answer using an accessible route.'], ['05', 'Correct', 'Receive focused feedback and reconstruct after support.'], ['06', 'Apply', 'Use the idea in a new problem, sentence, project, or explanation.'], ['07', 'Return', 'Review later and resume calmly after interruption.']].map((item) => '<article class="loop-step reveal"><span class="loop-index">' + item[0] + '</span><h3>' + item[1] + '</h3><p>' + item[2] + '</p></article>').join('') + '</div></div></section><section class="page-section is-pale"><div class="content-wrap"><h2>Learning support that stays in proportion.</h2><p>Closed and structured responses can receive immediate feedback. Open responses may be queued for human review rather than treated as definitely right or wrong.</p><div class="page-grid">' + card('file', 'Protected progress', 'Autosave and precise resume preserve meaningful work.', ['Typing state and response', 'Hints, evidence, and scratch work', 'Pause and recovery path']) + card('sliders', 'Learner controls', 'Settings affect presentation, not the academic value of a learner.', ['Motion, sound, text, and spacing', 'Timer visibility and focus mode', 'Literal instructions and alternatives']) + card('shield', 'Useful integrity', 'Learning evidence is not invisible surveillance.', ['No webcam or gaze tracking', 'No public speed rank', 'Human review for consequential decisions']) + '</div></div></section><section class="page-section"><div class="content-wrap"><div class="callout"><h3>What “done” means</h3><p>A lesson ends when the learner has supplied the agreed learning evidence - such as a corrected response, explanation, transfer task, or project step. Waiting out a timer, tapping randomly, or exposing an answer is never the goal.</p></div></div></section><section class="page-section is-pale" id="evidence"><div class="content-wrap"><h2>Evidence informs the design. Learners test the decision.</h2><p>A learning principle can guide a product hypothesis, but it does not prove that every implementation works. Type2Learn separates what is supported, adapted, experimental, and community-informed.</p><div class="evidence-grid"><article class="evidence-card reveal">' + status('Supported', 'green') + '<h3>General principle</h3><p>Direct research informs the learning or accessibility principle.</p></article><article class="evidence-card reveal" data-delay="1">' + status('Adapted', 'blue') + '<h3>Product translation</h3><p>A design choice applies the principle and still needs testing.</p></article><article class="evidence-card reveal" data-delay="2">' + status('Experimental', 'violet') + '<h3>Measured hypothesis</h3><p>An uncertain interaction is evaluated, not marketed as fact.</p></article><article class="evidence-card reveal" data-delay="3">' + status('Community-informed', 'teal') + '<h3>Lived experience</h3><p>A decision changed after feedback from people affected by it.</p></article></div><div class="callout evidence-callout"><h3>A responsible pilot measures more than clicks.</h3><p>Future pilots must name the version, course, population, consent, governance, transfer, delayed retention, learner experience, limitations, and adverse experiences.</p></div></div></section>');
@@ -154,6 +198,83 @@
 
   const trust = () => shell(pageHero('Trust', 'One clear place for access, privacy, security, and terms.', 'Trust information should be easy to find and consistent with the service that actually exists. This consolidated page separates current preview behaviour from requirements that still need implementation or legal review.', 'Publication status', 'Product requirements are shown transparently. Final legal notices and monitored reporting routes remain pending review.') + '<section class="page-section trust-overview"><div class="content-wrap"><h2>Four commitments. One accountable standard.</h2><p>Use this page to understand how Type2Learn approaches access, data, protection, and service boundaries without searching across several thin policy pages.</p><nav class="trust-index" aria-label="Trust page sections"><a href="#accessibility"><span>01</span>Accessibility</a><a href="/privacy/"><span>02</span>Privacy Policy</a><a href="#security"><span>03</span>Security</a><a href="/terms/"><span>04</span>Terms of Service</a></nav></div></section><section class="page-section is-pale trust-section" id="accessibility"><div class="content-wrap"><p class="section-kicker">01 · Accessibility</p><h2>Access is a requirement, not an add-on.</h2><p>Type2Learn targets WCAG 2.2 AA and task-level testing with people who use assistive technology. Keyboard operation, useful zoom and reflow, understandable status, and reduced-motion alternatives are product requirements.</p><div class="page-grid">' + card('keyboard', 'Operate', 'Primary tasks work by keyboard with clear focus, logical order, and touch-safe targets.', ['No mouse-only action', 'No precision drag requirement', 'Named controls and status']) + card('eye', 'Perceive', 'Content remains understandable with text controls, contrast, captions, and no color-only state.', ['Readable at zoom', 'No essential motion', 'Sound independent']) + card('message', 'Understand', 'Instructions, errors, completion, and recovery remain clear and programmatically exposed.', ['Literal wording option', 'Visible completion condition', 'Useful recovery messages']) + '</div></div></section><section class="page-section trust-section" id="privacy"><div class="content-wrap"><p class="section-kicker">02 · Privacy</p><h2>Collect less. Explain it clearly.</h2><p>The intended product posture is data minimization, private learner work, purpose-limited progress records, no targeted advertising, and no sale of learner data. This public site loads Cloudflare Web Analytics and Google Analytics (measurement ID G-9ER1QJLGCW) for site-use measurement; the local learning-demo response is not sent to either analytics tag. Read the <a href="/privacy/">complete Privacy Policy</a> for the supplied publication draft and implementation requirements.</p><div class="page-grid">' + card('shield', 'Data boundaries', 'Collect only what is needed to run learning, save progress, secure accounts, and provide chosen controls.', ['Private by default', 'No diagnosis inference', 'Documented retention']) + card('lock', 'Young learner safeguards', 'Consent, school authority, role access, export, and deletion must match launch geography and service behaviour.', ['Age-appropriate defaults', 'Permission-aware sharing', 'No marketing profile']) + card('school', 'School controls', 'School deployment requires a defined educational purpose, access boundaries, and an appropriate data agreement.', ['School-controlled records', 'Export and deletion paths', 'Clear incident process']) + '</div></div></section><section class="page-section is-pale trust-section" id="security"><div class="content-wrap"><p class="section-kicker">03 · Security</p><h2>Protect learning with reviewable controls.</h2><p>The intended posture is least privilege, secure engineering, safe logging, dependency review, recovery planning, and transparent incident handling. These are requirements—not certification claims.</p><div class="page-grid">' + card('lock', 'Access control', 'Role boundaries, unique accounts, privileged access protection, audit history, and prompt offboarding.', ['Teacher and school separation', 'Least privilege', 'Human review']) + card('shield', 'Secure delivery', 'Encrypted transport and storage, protected secrets, dependency monitoring, backups, and recovery.', ['Vulnerability handling', 'Safe operational logging', 'Incident exercises']) + card('file', 'Transparent response', 'Contain, investigate, preserve evidence, assess risk, and communicate appropriately.', ['Documented ownership', 'Clear escalation', 'No silent data practice']) + '</div><div class="status-banner support-status">' + icon('lock') + '<div><strong>Security disclosure route pending governance</strong><p>A monitored security contact should be published only after response ownership and handling safeguards are ready.</p></div></div></div></section><section class="page-section trust-section" id="terms"><div class="content-wrap"><p class="section-kicker">04 · Terms</p><h2>Terms must match the service that launches.</h2><p>The supplied publication draft addresses accounts, learners, schools, AI, integrity, public sharing, intellectual property and service boundaries. Read the <a href="/terms/">complete Terms of Service</a>, including every implementation and counsel-review requirement.</p><div class="page-grid">' + card('file', 'Honest service description', 'Describe released, beta, experimental, and planned features accurately.', ['No guarantee of future features', 'No false accreditation', 'No clinical positioning']) + card('users', 'Young learner boundaries', 'Eligibility, consent, public sharing, accounts, and school authority must remain age-appropriate.', ['Private defaults for minors', 'Accessible appeal path', 'No required social profile']) + card('shield', 'Counsel-required review', 'Payments, refunds, liability, governing law, and school terms need market-specific approval.', ['Entity and notice details', 'Update and acceptance process', 'Separate school agreements']) + '</div><div class="callout evidence-callout"><h3>Publication boundary</h3><p>The full Terms page preserves the unresolved entity, market, payment, and governing-law requirements from the supplied document so they can be completed before the terms become operative.</p></div></div></section>');
 
+  const urduHowProcessMap = () => {
+    const acts = [
+      ['01', 'وضاحت کے ساتھ داخل ہوں', 'منتخب کریں · سمجھیں', 'سیکھنے والا مقصد، کامیابی کی صورت اور خیال تک رسائی کا قابلِ استعمال راستہ دیکھتا ہے۔'],
+      ['02', 'یادداشت پر کام کریں', 'یاد کریں · بنائیں · درست کریں', 'سیکھنے والا یاد کرتا، اپنی سوچ واضح کرتا، مخصوص رائے لیتا اور مدد کے بعد خیال دوبارہ بناتا ہے۔'],
+      ['03', 'استعمال کریں اور محفوظ رکھیں', 'لاگو کریں · واپس آئیں', 'خیال بامعنی کام میں جاتا ہے، پھر بعد میں واپس آتا ہے تاکہ پیش رفت پائیدار بنے۔']
+    ];
+    return '<section class="page-section how-process-section" aria-labelledby="how-process-title"><div class="content-wrap"><p class="section-kicker">Type2Learn کا طریقہ</p><h2 id="how-process-title">سات تعلیمی عمل، تین بامقصد مرحلوں میں۔</h2><p>راستہ قابلِ پیش گوئی رہتا ہے، مگر ہر سبق ایک جیسا محسوس نہیں ہوتا۔ مقصد پہلی ہدایت سے بعد کی واپسی تک واضح رہتا ہے۔</p><div class="how-process-map">' + acts.map((act, index) => '<article class="how-act reveal" data-delay="' + index + '"><span class="how-act-number">' + act[0] + '</span><p class="how-act-steps">' + act[2] + '</p><h3>' + act[1] + '</h3><p>' + act[3] + '</p><i aria-hidden="true"></i></article>').join('') + '</div></div></section>';
+  };
+
+  const urduHowItWorks = () => {
+    const loopItems = [
+      ['01', 'منتخب کریں', 'مقصد، ضروری تیاری، وقت کی حد اور اختیارات دیکھیں۔'],
+      ['02', 'سمجھیں', 'پڑھیں، سنیں، دیکھیں یا لفظی وضاحت مانگیں۔'],
+      ['03', 'یاد کریں', 'مکمل نمونہ سامنے آنے سے پہلے اشارے سے خیال واپس لائیں۔'],
+      ['04', 'بنائیں', 'قابلِ رسائی راستے سے ٹائپ کریں، بنائیں، نام دیں، حل کریں یا جواب دیں۔'],
+      ['05', 'درست کریں', 'مخصوص رائے لیں اور مدد کے بعد خیال دوبارہ بنائیں۔'],
+      ['06', 'استعمال کریں', 'خیال کو نئے مسئلے، جملے، منصوبے یا وضاحت میں استعمال کریں۔'],
+      ['07', 'واپس آئیں', 'بعد میں جائزہ لیں اور وقفے کے بعد پرسکون انداز میں وہیں سے شروع کریں۔']
+    ];
+    return shell(pageHero('طریقۂ کار', 'ایک واضح تعلیمی عمل، پھر ایک مفید اگلا قدم۔', 'Type2Learn شرکت کو مختصر، بامعنی مقاصد کے گرد منظم کرتا ہے۔ طریقہ سیکھنے کو نمایاں کرتا ہے، سیکھنے والے کو ٹائمر، اسکور یا ڈیٹا پوائنٹ نہیں بناتا۔', 'موجودہ حیثیت', 'مرکزی صفحے کی فعال سیکھنے والی سرگرمی ابتدائی نمونہ ہے۔ وسیع تعلیمی راستے منصوبہ بندی میں ہیں۔') + urduHowProcessMap() + '<section class="page-section"><div class="content-wrap"><h2>پہلی ہدایت سے پائیدار واپسی تک ایک چکر۔</h2><p>مصنوعات کام کو واضح بناتی ہے، سیکھنے والے کی محنت محفوظ رکھتی ہے، اور تکمیل تب مانتی ہے جب تعلیمی مقصد کا بامعنی ثبوت موجود ہو۔</p><div class="learning-loop">' + loopItems.map((item) => '<article class="loop-step reveal"><span class="loop-index">' + item[0] + '</span><h3>' + item[1] + '</h3><p>' + item[2] + '</p></article>').join('') + '</div></div></section><section class="page-section is-pale"><div class="content-wrap"><h2>مدد جو کام کے تناسب میں رہے۔</h2><p>بند یا منظم جوابات کو فوری رائے مل سکتی ہے۔ کھلے جوابات کو قطعی درست یا غلط کہنے کے بجائے انسانی جائزے کے لیے رکھا جا سکتا ہے۔</p><div class="page-grid">' + card('file', 'محفوظ پیش رفت', 'خودکار محفوظ کاری اور درست واپسی بامعنی کام کو سنبھالتی ہے۔', ['ٹائپنگ کی حالت اور جواب', 'اشارے، ثبوت اور ابتدائی کام', 'توقف اور واپسی کا راستہ']) + card('sliders', 'سیکھنے والے کے کنٹرولز', 'ترتیبات پیشکش بدلتی ہیں، سیکھنے والے کی علمی قدر نہیں۔', ['حرکت، آواز، متن اور وقفہ', 'ٹائمر اور توجہ کا اختیار', 'لفظی ہدایات اور متبادل']) + card('shield', 'بامعنی دیانت', 'سیکھنے کا ثبوت پوشیدہ نگرانی نہیں بنتا۔', ['ویب کیم یا نظر کی نگرانی نہیں', 'رفتار کی عوامی درجہ بندی نہیں', 'اہم فیصلوں کے لیے انسانی جائزہ']) + '</div></div></section><section class="page-section" id="evidence"><div class="content-wrap"><div class="callout"><h3>“مکمل” کا مطلب</h3><p>سبق تب مکمل ہوتا ہے جب طے شدہ تعلیمی ثبوت دیا جائے، جیسے درست کیا گیا جواب، وضاحت، منتقلی کا کام یا منصوبے کا مرحلہ۔ صرف ٹائمر پورا کرنا، بے ترتیب کلک کرنا یا جواب کھول لینا مقصد نہیں۔</p></div></div></section>');
+  };
+
+  const urduPathways = () => shell(pageHero('سیکھنے کے راستے', 'ایک مشترک انجن۔ بامقصد راستے۔', 'پہلی سمت خواندگی پر مبنی، آواز کے ساتھ ایک مکمل کورس ہے۔ لفظ سازی، توجہ کا مرحلہ اور واضح راستہ ایک ہی مواد اور مدد کی بنیاد بانٹتے ہیں مگر مختلف تعلیمی کاموں کے لیے ہیں۔', 'ابتدائی سمت', 'منظم مواد، محفوظ مقامی پیش رفت اور دوبارہ استعمال ہونے والے تعلیمی چکر کے ساتھ خواندگی پہلے۔') + '<section class="page-section"><div class="content-wrap"><h2>تین تجربات، وقار کو مقدم رکھنے والی ایک بنیاد۔</h2><p>تعلیمی سطح، پیشکش کی عمر اور مدد کی ضرورت الگ چیزیں ہیں۔ زیادہ ساخت کی ضرورت کسی سیکھنے والے کو بچگانہ تجربہ قبول کرنے پر مجبور نہیں کرتی۔</p><div class="module-grid">' + moduleCard('book', 'لفظ سازی', 'ڈھالا گیا', 'منظم خواندگی اور تعلیمی الفاظ کی تربیت۔', ['آواز، ساخت اور معنی', 'مدد کم ہونے کے بعد ٹائپنگ', 'درستگی، استعمال اور واپسی'], 'blue') + moduleCard('path', 'توجہ کا مرحلہ', 'ڈھالا گیا', 'واضح منصوبے کے ساتھ محدود جماعتی درجے کا کام۔', ['ایک مقصد', 'اب ← اگلا ← مکمل', 'توقف، وقفہ اور واپسی'], 'teal') + moduleCard('layers', 'واضح راستہ', 'ڈھالا گیا', 'کم پوشیدہ توقعات کے ساتھ مستحکم سبق۔', ['آغاز سے پہلے پیش منظر', 'واضح راستہ اور تبدیلی کی اطلاع', 'حسی اور مدد کے کنٹرولز'], 'green') + '</div></div></section><section class="page-section is-pale"><div class="content-wrap"><h2>پہلا راستہ جان بوجھ کر مختصر ہے۔</h2><p>قابلِ اعتماد پہلی ریلیز ایک بڑے مگر سطحی ذخیرے کے بجائے مکمل تعلیمی چکر ثابت کرتی ہے۔</p><div class="path-grid"><article class="path-card reveal">' + status('پہلا', 'green') + '<div class="path-icon">' + icon('headphones') + '</div><h3>آواز سے رہنمائی والی خواندگی</h3><p>عمر کے احترام کے ساتھ ایک مکمل کورس، جہاں سیکھنے والا سنتا، یاد کرتا، ٹائپ کرتا، درست کرتا، استعمال کرتا اور واپس آتا ہے۔</p></article><article class="path-card reveal" data-delay="1">' + status('بنیاد', 'blue') + '<div class="path-icon">' + icon('keyboard') + '</div><h3>دوبارہ استعمال ہونے والا جوابی انجن</h3><p>منظم مواد، درست جوابی راستے، واضح رائے اور محفوظ پیش رفت۔</p></article><article class="path-card reveal" data-delay="2">' + status('منصوبہ شدہ توسیع', 'amber') + '<div class="path-icon">' + icon('layers') + '</div><h3>مضمون اور مدد کے راستے</h3><p>لوگوں کے ساتھ آزمائش اور مواد کے جائزے کے بعد نیا مواد اور مخصوص طریقے شامل کیے جائیں گے۔</p></article></div></div></section>');
+
+  const urduLearners = () => shell(pageHero('سیکھنے والوں کے لیے', 'آپ کی سیکھائی۔ آپ کے کنٹرولز۔ آپ کا اگلا قدم۔', 'Type2Learn کام کو واضح بنانے کے لیے ہے، آپ کے بارے میں اندازے لگانے کے لیے نہیں۔ جو مدد کرے اسے منتخب کریں، پیش رفت محفوظ رکھیں، اور وقفے کے بعد بغیر شرمندگی واپس آئیں۔', 'بطورِ ڈیفالٹ نجی', 'ترتیبات سیکھنے والے کے کنٹرولز ہیں، تشخیص یا عوامی اسکور نہیں۔') + '<section class="page-section"><div class="content-wrap"><h2>ہر بنیادی اسکرین کو کن سوالوں کا جواب دینا چاہیے؟</h2><p>میں ابھی کیا کر رہا ہوں، اس کے بعد کیا ہے، کیا مکمل ہو چکا ہے، اور اگر یہ پیشکش کام نہیں کر رہی تو میں کیا بدل سکتا ہوں؟</p><div class="page-grid">' + card('path', 'راستہ جانیں', 'ایک موجودہ عمل نمایاں رہتا ہے؛ اگلا اور مکمل دکھائی دیتے مگر پرسکون رہتے ہیں۔', ['واضح مقصد', 'تکمیل کی نظر آنے والی شرط', 'کوئی اچانک مرحلہ نہیں']) + card('sliders', 'مدد منتخب کریں', 'کریڈٹ یا تعلیمی رسائی کھوئے بغیر پیشکش بدلیں۔', ['متن، وقفہ اور تضاد', 'آواز، حرکت اور حسی اختیارات', 'لفظی ہدایات اور مثالیں']) + card('pause', 'رکیں اور واپس آئیں', 'توقف، اخراج یا بعد کی واپسی پر کام محفوظ رہتا ہے۔', ['بالکل وہی واپسی کی حالت', 'سزا دینے والا سلسلہ نہیں', 'پرسکون واپسی']) + '</div></div></section><section class="page-section is-pale"><div class="content-wrap"><div class="support-panel"><p class="section-kicker">سیکھنے والوں سے وعدہ</p><h2>واضح سیکھنے کے تجربے کے لیے ہم آپ سے کسی لیبل کا ثبوت نہیں مانگیں گے۔</h2><p>وہ ترتیبات استعمال کریں جو شرکت میں مدد دیں۔ آپ کے مدد کے اختیارات بطورِ ڈیفالٹ نجی رہیں اور آپ کے علم کی قدر کبھی کم نہ کریں۔</p><div class="inline-actions">' + button('اب آزمائیں', '/login/', 'primary') + button('طریقہ دیکھیں', '/ur/how-it-works/', 'secondary') + '</div></div></div></section>');
+
+  const urduFamilies = () => shell(pageHero('خاندانوں کے لیے', 'ایسی پیش رفت جو سمجھ آئے — مستقل نگرانی کے بغیر۔', 'Type2Learn آغاز، بامعنی کام جاری رکھنے اور وقفے کے بعد واپسی کی رکاوٹ کم کرتا ہے۔ یہ انسانی تعلقات، پیشہ ورانہ مدد یا خاندانی فیصلے کی جگہ نہیں لیتا۔', 'اکاؤنٹ کے مناظر', 'خاندانی رپورٹس اور اکاؤنٹ کنٹرولز منصوبہ بندی میں ہیں اور واضح اجازتوں کے ساتھ نافذ ہوں گے۔') + '<section class="page-section"><div class="content-wrap"><h2>گھر میں مددگار روٹین، دباؤ نہیں۔</h2><p>خاندان کے لیے معلومات مقررہ سیکھائی، بامعنی تکمیل، آئندہ جائزے اور ایک مفید روٹین پر مرکوز ہوں — نجی ابتدائی جوابات یا رویے کی تشریح کی مسلسل نگرانی پر نہیں۔</p><div class="page-grid">' + card('home', 'محفوظ کام کھولیں', 'مددگار اشارہ یہ ہے کہ نظر آنے والا “اب” پڑھیں اور محفوظ مرحلے پر واپس جائیں۔', ['زبردستی طویل نشست نہیں', 'پرسکون دوبارہ آغاز', 'سیکھنے والے کا واضح اختیار']) + card('shield', 'بطورِ ڈیفالٹ نجی', 'ذاتی ترتیبات، تاثرات اور نامکمل کوششیں خاندانی نگرانی کا ذریعہ نہیں بنتیں۔', ['اجازت کے مطابق اشتراک', 'اشتہاری پروفائل نہیں', 'عمر کے مطابق بنیادی ترتیب']) + card('message', 'سیکھائی کے بارے میں پوچھیں', 'مفید سوال یہ ہے کہ کیا سیکھا، درست کیا یا استعمال کیا گیا — نہ کہ توجہ ہر لمحہ کامل تھی یا نہیں۔', ['احترام والی زبان', 'کمی پر مبنی انداز نہیں', 'واضح مدد کا راستہ']) + '</div></div></section><section class="page-section is-pale"><div class="content-wrap"><div class="callout"><h3>اہم حد</h3><p>Type2Learn ایک تعلیمی مصنوعات ہے۔ یہ تشخیص یا علاج نہیں کرتا اور پیشہ ورانہ جانچ، سہولت، ادویات، نگہداشت، نیند یا انسانی مدد کی جگہ نہیں لیتا۔</p></div></div></section>');
+
+  const urduSchools = () => shell(pageHero('اسکولوں کے لیے', 'بامعنی ثبوت۔ واضح حفاظت۔ نگرانی کا اسکور نہیں۔', 'استاد کا منظر تعلیمی کام، استعمال شدہ مدد، درستگی، تکمیل اور جائزے کی ضرورت الگ دکھانے کے لیے ہے۔ یہ سیکھنے والے کو توجہ کے فیصد یا رویے کی درجہ بندی میں تبدیل نہیں کرتا۔', 'اسکولی تیاری', 'اسکول میں نفاذ منصوبہ بندی میں ہے اور الگ معاہدے، کردار کے کنٹرولز، رازداری کے جائزے اور رسائی کی تیاری کا تقاضا کرتا ہے۔') + '<section class="page-section"><div class="content-wrap"><h2>مجاز اساتذہ کو کیا دیکھنا چاہیے؟</h2><p>رپورٹنگ تب مفید ہے جب وہ پڑھانے، کام بدلنے یا انسانی جائزے کی درست وجہ پہچاننے میں مدد دے۔</p><div class="page-grid">' + card('file', 'تعلیمی ثبوت', 'حتمی کام، منتخب ثبوت، حکمت عملی اور منتقلی قابلِ جائزہ ہوں۔', ['مقصد کی سطح پر پیش رفت', 'اجازت کے مطابق حتمی کام', 'استاد کے جائزے والی حالت']) + card('sliders', 'مدد کا تناظر', 'رپورٹ دکھا سکتی ہے کہ کس مدد نے فائدہ دیا، اسے منفی رویے کے اسکور میں بدلے بغیر۔', ['اشارے اور درستگی کی سطح', 'قابلِ رسائی جوابی راستہ', 'توقف یا واپسی کی حالت']) + card('shield', 'واضح حدود', 'براہِ راست کی اسٹروک فیڈ، ویب کیم، نظر کی نگرانی یا کلاس روم فرمانبرداری کا اسکور نہیں۔', ['کردار پر مبنی رسائی', 'قابلِ جانچ ریکارڈ', 'انسانی اختیار']) + '</div></div></section><section class="page-section is-pale"><div class="content-wrap"><h2>اسکولی ڈیٹا سے پہلے نفاذ کی شرائط۔</h2><table class="plain-table"><thead><tr><th>حلقہ</th><th>ضروری سمت</th></tr></thead><tbody><tr><td>ڈیٹا</td><td>اسکول کا طے شدہ مقصد، کردار کی حدود، برآمد و حذف کے راستے، اور مناسب ڈیٹا معاہدہ۔</td></tr><tr><td>رسائی</td><td>WCAG 2.2 AA کا ہدف اور معاون ٹیکنالوجی استعمال کرنے والوں کے ساتھ عملی جانچ۔</td></tr><tr><td>حفاظت</td><td>وسیع طلبہ استعمال سے پہلے واضح شکایت، واقعہ اور رازداری کا عمل۔</td></tr><tr><td>دعوے</td><td>صرف جاری شدہ نصاب اور ماپے گئے نتائج؛ بغیر ثبوت اثر پذیری کا دعویٰ نہیں۔</td></tr></tbody></table></div></section>');
+
+  const urduTeamDeck = () => {
+    const members = [
+      ['Muhammad Taha Bin Zaeem', 'بانی · مصنوعات کی سمت', '/assets/team/founder-muhammad-taha.webp', 'Type2Learn کے بانی Muhammad Taha Bin Zaeem', 'supplied', 'وہ Type2Learn کے وژن، مصنوعات کی سمت، شراکت داریوں اور ذمہ دار ترقی کی رہنمائی کرتے ہیں، اور سیکھنے کے تجربے کو ثبوت، رازداری، رسائی اور سیکھنے والے کے وقار کے واضح معیار سے جوڑتے ہیں۔', 'تعلیمی ٹیکنالوجی اگلا بامعنی قدم واضح کرے، سیکھنے والے کو چھوٹا محسوس نہ کرائے۔', ['وژن اور حکمتِ عملی', 'سیکھنے کا تجربہ', 'ذمہ دار ترقی']],
+      ['Muhammad Hamiz Bin Kashif', 'شریک بانی · انجینئرنگ', '/assets/team/muhammad-hamiz-bin-kashif-studio.webp', 'سرمئی اسٹوڈیو پس منظر میں Type2Learn کے انجینئرنگ سربراہ Muhammad Hamiz Bin Kashif', 'edited', 'ان کا کردار قابلِ اعتماد انجینئرنگ، محفوظ پیش رفت، رسائی، محفوظ ترسیل اور تعلیمی رکاوٹ کے بعد پرسکون بحالی پر مرکوز ہے۔', 'مضبوط نظام وہ ہے جو ہر سیکھنے والے کو اپنی حاصل شدہ پیش رفت محفوظ رکھنے دے۔', ['انجینئرنگ نظام', 'محفوظ پیش رفت', 'قابلِ اعتماد ترسیل']],
+      ['Idrees Babar', 'شریک بانی · تحقیق', '/assets/team/idrees-babar-studio.webp', 'سرمئی اسٹوڈیو پس منظر میں Type2Learn کے تحقیقی سربراہ Idrees Babar', 'edited', 'ان کا کردار ثبوت کے جائزے، تحقیق کے ڈیزائن، پیمائش کے معیار اور دیانت دار عوامی دعووں کو مصنوعات کے فیصلوں سے جوڑتا ہے۔', 'ثبوت تب سب سے زیادہ اہم ہوتا ہے جب وہ ہمارے بنائے ہوئے کام اور دعووں کو بدلتا ہے۔', ['ثبوت کا جائزہ', 'آزمائش کا ڈیزائن', 'پیمائش کا معیار']],
+      ['Muhammad Fahad Younus', 'شریک بانی · AI', '/assets/team/muhammad-fahad-younus-studio.webp', 'سرمئی اسٹوڈیو پس منظر میں Type2Learn کے AI سربراہ Muhammad Fahad Younus', 'edited', 'ان کا کردار ذمہ دار AI سمت، ماڈل کی جانچ، مؤثر انسانی نگرانی اور خودکار مدد کو تعلیمی مقصد کے مطابق رکھنے پر مرکوز ہے۔', 'ذہین مدد انسانی فیصلے کو مضبوط کرے، خاموشی سے اس کی جگہ نہ لے۔', ['ذمہ دار AI', 'ماڈل کی جانچ', 'انسانی نگرانی']],
+      ['Alizay Hassan', 'شریک بانی · مصنوعات', '/assets/team/alizay-hassan-figure.webp', 'Alizay Hassan کے پروفائل کی نمائندگی کرنے والی واضح طور پر غیر انسانی سرمئی 3D شکل', 'placeholder', 'ان کا کردار مصنوعات کی حکمتِ عملی، مشترکہ ڈیزائن، پروگرام کی وضاحت اور عمر کے احترام والی تجرباتی ترتیب کو ایک مربوط سفر میں لاتا ہے۔', 'واضح مصنوعات ہر سیکھنے والے کو آغاز، جاری رکھنے اور واپسی کا باوقار راستہ دیتی ہے۔', ['مصنوعات کی حکمتِ عملی', 'مشترکہ ڈیزائن', 'پروگرام کی وضاحت']]
+    ];
+    const statusLabel = { supplied: 'فراہم کردہ تصویر', edited: 'فراہم کردہ تصویر سے تیار کردہ پورٹریٹ', placeholder: 'غیر انسانی متبادل تصویر' };
+    const cards = members.map((member, index) => '<article class="team-profile-card' + (index === 0 ? ' is-active' : '') + ' has-' + member[4] + '" data-team-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><figure class="team-profile-portrait"><img src="' + member[2] + '" alt="' + member[3] + '" width="960" height="1200" loading="lazy" decoding="async"><figcaption class="portrait-status is-' + member[4] + '">' + statusLabel[member[4]] + '</figcaption></figure><div class="team-profile-copy"><p class="section-kicker">' + member[1] + '</p><h2 lang="en">' + member[0] + '</h2><p class="team-profile-statement">“' + member[6] + '”</p><p>' + member[5] + '</p><div class="team-profile-responsibilities">' + member[7].map((item) => '<span>' + item + '</span>').join('') + '</div></div></article>').join('');
+    return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">Type2Learn بنانے والے لوگ</p><h2 id="team-deck-title">مختلف شعبے۔ ایک جواب دہ مقصد۔</h2><p>بانی پہلے ہیں، پھر انجینئرنگ، تحقیق، AI اور مصنوعات کو تشکیل دینے والے شریک بانی۔ تیار کردہ تصاویر واضح نشان زد ہیں اور غیر انسانی پروفائل شکل صاف طور پر بیان کی گئی ہے۔</p></div><div class="team-deck" data-team-deck data-scroll-stops="' + members.length + '"><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>اسکرول یا ڈریگ کریں</span> تاکہ ٹیم کے کارڈ بدلیں</p></div></div></section>';
+  };
+
+  const urduTeam = () => shell(pageHero('ٹیم', 'سیکھنے والوں کے ساتھ تعمیر۔ جواب دہ قیادت۔', 'Type2Learn مصنوعات، تحقیق، رسائی اور انجینئرنگ کو فعال سیکھنے کے گرد جوڑتا ہے جو مختلف ذہنوں اور اعتماد تک مختلف راستوں کا احترام کرے۔', 'پروفائل کا معیار', 'بانی کی تصویر فراہم کردہ ہے۔ شریک بانیوں کی تیار کردہ تصاویر اور غیر انسانی متبادل واضح طور پر نشان زد ہیں۔') + urduTeamDeck() + '<section class="page-section is-pale"><div class="content-wrap"><div class="support-panel"><p class="section-kicker">لوگوں کے ساتھ، ان کے لیے نہیں</p><h2>شرکت کو مصنوعات بدلنی چاہیے۔</h2><p>سیکھنے والے، اساتذہ، خاندان، رسائی کے ماہرین اور پیشہ ور افراد رکاوٹیں پہچاننے، راستے آزمانے، زبان کا جائزہ لینے اور تبدیلی طے کرنے میں شامل ہوں۔ شرکت رضاکارانہ، محفوظ، قابلِ رسائی اور مناسب طور پر تسلیم شدہ ہو۔</p><div class="support-items"><div class="support-item"><strong>سنیں</strong><span>حقیقی رکاوٹوں، روٹین اور مقاصد سے آغاز کریں۔</span></div><div class="support-item"><strong>نمونہ بنائیں</strong><span>زبان، راستہ، حسی بوجھ اور افادیت آزمائیں۔</span></div><div class="support-item"><strong>پیمائش کریں</strong><span>رفتار سے آگے سمجھ اور خودمختاری دیکھیں۔</span></div><div class="support-item"><strong>حدود شائع کریں</strong><span>ثبوت، اندازہ، نمونہ اور منصوبہ الگ رکھیں۔</span></div></div></div></div></section>');
+
+  const urduCommunity = () => shell(pageHero('کمیونٹی', 'ایسا سوال، خیال یا چیلنج لائیں جو سیکھنے کو بہتر کرے۔', 'Type2Learn سیکھنے والوں، خاندانوں، اساتذہ، ماہرین، محققین اور شراکت داروں کے ساتھ احترام والی شراکت سے بڑھنا چاہتا ہے۔ عام تعلیمی خصوصیات کے لیے کسی عوامی سوشل پروفائل کی ضرورت نہیں۔', 'سرکاری چینلز', 'Type2Learn کو LinkedIn پر فالو کریں اور GitHub پر ادارے کے عوامی کام کو دیکھیں۔') + '<section class="page-section"><div class="content-wrap"><h2>مختلف مہارت، ایک معیار: سیکھنے والے کا احترام۔</h2><p>شراکت کو مصنوعات کے فیصلے بہتر کرنے چاہئیں، نہ کہ کسی کی ذاتی معلومات کو تشہیری بیان میں بدلنا چاہیے۔</p><div class="page-grid">' + card('users', 'زندہ تجربہ', 'رائے رکاوٹیں پہچان سکتی، کنٹرولز آزما سکتی اور مفروضوں کو چیلنج کر سکتی ہے۔', ['رضاکارانہ شرکت', 'عوامی نام ضروری نہیں', 'تشخیص بتانے کا دباؤ نہیں']) + card('school', 'تعلیمی عمل', 'اساتذہ اور اسکول رہنما نصابی مناسبت، وضاحت اور روزمرہ عمل آزما سکتے ہیں۔', ['واضح نفاذی سوالات', 'عمر کے احترام والا مواد', 'اجازت کے بغیر دعوے نہیں']) + card('flask', 'تحقیق اور رسائی', 'ماہرین ثبوت، زبان، پیمائش، رسائی اور حفاظت کا جائزہ لے سکتے ہیں۔', ['مناسب دائرہ', 'جہاں ممکن ہو معاوضہ', 'قابلِ سراغ فیصلے']) + '</div></div></section><section class="page-section is-pale"><div class="content-wrap"><div class="status-banner community-social-banner">' + icon('message') + '<div><strong>Type2Learn کے سرکاری چینلز سے جڑیں</strong><p>ادارے کی تازہ معلومات کے لیے <a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">LinkedIn<span class="sr-only"> (نئے ٹیب میں کھلتا ہے)</span></a> فالو کریں یا <a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">GitHub<span class="sr-only"> (نئے ٹیب میں کھلتا ہے)</span></a> پر عوامی ذخیرے دیکھیں۔ سیکھنے والوں کے لیے زیرِ نگرانی مدد کا چینل ابھی تیاری میں ہے۔</p></div></div></div></section><section class="page-section" id="support"><div class="content-wrap"><h2>مدد کا اختتام ایک پرسکون اگلے قدم پر ہونا چاہیے۔</h2><p>مدد سادہ، قابلِ رسائی اور اصل مصنوعات کی حالت سے جڑی رہے۔ رکاوٹ سے نکلنے کے لیے صرف ضروری معلومات مانگی جائیں۔</p><div class="page-grid">' + card('home', 'آغاز', 'راستہ منتخب کریں، کنٹرولز بدلیں، پہلا مقصد سمجھیں اور محفوظ انداز میں شروع کریں۔', ['نمونہ کیا کرتا ہے', 'ترتیبات کہاں ہیں', 'پیش منظر دوبارہ کیسے شروع ہو']) + card('sliders', 'کنٹرولز اور رسائی', 'حرکت، آواز، متن، وقفہ، توجہ، لفظی ہدایات اور جوابی اختیارات استعمال کریں۔', ['کی بورڈ مدد', 'توقف اور واپسی', 'قابلِ رسائی بحالی']) + card('shield', 'رازداری اور رہنمائی', 'بغیر ضرورت سے زیادہ ذاتی معلومات دیے جانیں کہ خاندان، اسکول یا ذمہ دار مدد کب شامل ہو۔', ['رازداری کی درخواست', 'رسائی کی رکاوٹ', 'اسکولی مدد کی ذمہ داری']) + '</div></div></section>');
+
+  const urduTrust = () => shell(pageHero('اعتماد', 'رسائی، رازداری، سکیورٹی اور شرائط کے لیے ایک واضح جگہ۔', 'اعتماد کی معلومات آسانی سے ملنی چاہئیں اور موجودہ خدمت کے مطابق ہوں۔ یہ مرکز موجودہ پیش منظر اور ان تقاضوں کو الگ رکھتا ہے جن پر ابھی نفاذ یا قانونی جائزہ باقی ہے۔', 'اشاعت کی حیثیت', 'مصنوعات کے تقاضے واضح دکھائے گئے ہیں۔ حتمی قانونی نوٹس اور زیرِ نگرانی رپورٹنگ کے راستے جائزے کے منتظر ہیں۔') + '<section class="page-section trust-overview"><div class="content-wrap"><h2>چار وعدے۔ ایک جواب دہ معیار۔</h2><p>یہاں دیکھیں کہ Type2Learn رسائی، ڈیٹا، حفاظت اور خدمت کی حدود کو کیسے دیکھتا ہے۔</p><nav class="trust-index" aria-label="اعتماد کے حصے"><a href="#accessibility"><span>01</span>رسائی</a><a href="/privacy/"><span>02</span>رازداری پالیسی <small lang="en">English</small></a><a href="#security"><span>03</span>سکیورٹی</a><a href="/terms/"><span>04</span>سروس کی شرائط <small lang="en">English</small></a></nav></div></section><section class="page-section is-pale trust-section" id="accessibility"><div class="content-wrap"><p class="section-kicker">01 · رسائی</p><h2>رسائی بنیادی شرط ہے، اضافی خصوصیت نہیں۔</h2><p>Type2Learn کا ہدف WCAG 2.2 AA اور معاون ٹیکنالوجی استعمال کرنے والوں کے ساتھ عملی جانچ ہے۔ کی بورڈ، مفید زوم اور ری فلو، قابلِ فہم حالت اور کم حرکت کے متبادل مصنوعات کی شرط ہیں۔</p><div class="page-grid">' + card('keyboard', 'استعمال کریں', 'بنیادی کام واضح فوکس، منطقی ترتیب اور لمس کے لیے محفوظ اہداف کے ساتھ کی بورڈ سے چلیں۔', ['صرف ماؤس والا کام نہیں', 'باریک ڈریگ ضروری نہیں', 'نام والے کنٹرولز اور حالت']) + card('eye', 'دیکھیں اور سمجھیں', 'متن کے کنٹرولز، تضاد، کیپشن اور رنگ سے آزاد معنی کے ساتھ مواد واضح رہے۔', ['زوم پر قابلِ مطالعہ', 'ضروری معلومات حرکت پر منحصر نہیں', 'آواز سے آزاد']) + card('message', 'ہدایات سمجھیں', 'ہدایات، غلطیاں، تکمیل اور واپسی واضح اور معاون ٹیکنالوجی کے لیے قابلِ فہم رہیں۔', ['لفظی انداز', 'واضح تکمیل کی شرط', 'مفید بحالی کے پیغامات']) + '</div></div></section><section class="page-section trust-section" id="privacy"><div class="content-wrap"><p class="section-kicker">02 · رازداری</p><h2>کم جمع کریں۔ صاف بتائیں۔</h2><p>مقصد کم سے کم ڈیٹا، نجی تعلیمی کام، محدود مقصد والے پیش رفت ریکارڈ، ہدفی اشتہارات سے اجتناب اور سیکھنے والے کے ڈیٹا کی فروخت نہ کرنا ہے۔ موجودہ عوامی سائٹ استعمال کی پیمائش کے لیے Cloudflare Web Analytics اور Google Analytics استعمال کرتی ہے؛ مقامی سرگرمی کا جواب ان ٹیگز کو نہیں بھیجا جاتا۔ مکمل اشاعتی مسودے اور نفاذی تقاضوں کے لیے <a href="/privacy/">Privacy Policy <span lang="en">(English)</span></a> پڑھیں۔</p><div class="page-grid">' + card('shield', 'ڈیٹا کی حد', 'صرف وہ معلومات جمع کریں جو سیکھنے، پیش رفت محفوظ کرنے، اکاؤنٹ محفوظ رکھنے اور منتخب کنٹرولز کے لیے ضروری ہوں۔', ['بطورِ ڈیفالٹ نجی', 'تشخیص کا اندازہ نہیں', 'واضح مدتِ تحفظ']) + card('lock', 'کم عمر سیکھنے والے', 'رضامندی، اسکولی اختیار، کردار کی رسائی، برآمد اور حذف اصل جغرافیہ اور خدمت کے مطابق ہوں۔', ['عمر کے مطابق ترتیب', 'اجازت کے مطابق اشتراک', 'اشتہاری پروفائل نہیں']) + card('school', 'اسکولی کنٹرولز', 'اسکولی نفاذ کے لیے واضح تعلیمی مقصد، رسائی کی حد اور مناسب ڈیٹا معاہدہ ضروری ہے۔', ['اسکول کے اختیار والے ریکارڈ', 'برآمد اور حذف', 'واضح واقعہ عمل']) + '</div></div></section><section class="page-section is-pale trust-section" id="security"><div class="content-wrap"><p class="section-kicker">03 · سکیورٹی</p><h2>سیکھنے کی حفاظت قابلِ جائزہ کنٹرولز سے کریں۔</h2><p>مطلوبہ سمت کم ترین اختیار، محفوظ انجینئرنگ، محفوظ لاگنگ، انحصارات کا جائزہ، بحالی کی منصوبہ بندی اور واضح واقعہ سنبھالنا ہے۔ یہ تقاضے ہیں، سرٹیفیکیشن کے دعوے نہیں۔</p><div class="page-grid">' + card('lock', 'رسائی کا اختیار', 'کردار کی حدود، منفرد اکاؤنٹس، بااختیار رسائی کی حفاظت، جائزہ ریکارڈ اور فوری اخراج۔', ['استاد اور اسکول کی علیحدگی', 'کم ترین اختیار', 'انسانی جائزہ']) + card('shield', 'محفوظ ترسیل', 'محفوظ نقل و ذخیرہ، رازوں کی حفاظت، انحصارات کی نگرانی، بیک اپ اور بحالی۔', ['کمزوری کا عمل', 'محفوظ عملی لاگنگ', 'واقعہ مشق']) + card('file', 'واضح ردعمل', 'واقعہ محدود کریں، تحقیق کریں، ثبوت محفوظ کریں، خطرہ جانچیں اور مناسب رابطہ کریں۔', ['واضح ذمہ داری', 'درست رہنمائی', 'پوشیدہ ڈیٹا عمل نہیں']) + '</div></div></section><section class="page-section trust-section" id="terms"><div class="content-wrap"><p class="section-kicker">04 · شرائط</p><h2>شرائط جاری ہونے والی اصل خدمت کے مطابق ہوں۔</h2><p>فراہم کردہ اشاعتی مسودہ اکاؤنٹس، سیکھنے والوں، اسکولوں، AI، دیانت، عوامی اشتراک، فکری ملکیت اور خدمت کی حدود بیان کرتا ہے۔ تمام نفاذی اور قانونی جائزے کے تقاضوں سمیت مکمل <a href="/terms/">Terms of Service <span lang="en">(English)</span></a> پڑھیں۔</p><div class="callout evidence-callout"><h3>اشاعت کی حد</h3><p>قانونی ادارہ، منڈیاں، ادائیگی اور قانون کے انتخاب جیسے حل طلب امور مکمل ہونے تک یہ مسودات حتمی یا نافذ العمل شرائط نہیں ہیں۔</p></div></div></section>');
+
+  const coDesign = () => shell(
+    pageHero(
+      'Co-design',
+      'Neurodivergent voices should change the product—not decorate it.',
+      'Type2Learn is being designed to involve neurodivergent learners, educators, families, accessibility specialists, learning professionals, and researchers through structured, safeguarded participation.',
+      'Current status',
+      'The participation model is being prepared. Type2Learn does not yet claim completed external co-design findings or clinical validation.'
+    ) +
+    '<section class="page-section codesign-overview"><div class="content-wrap"><p class="section-kicker">Who the process is intended to involve</p><h2>Different experience. Shared authority over the decisions that matter.</h2><p>Participation should include people affected by the learning experience and people responsible for safe, accessible educational practice. A contributor is not described as a team member, advisor, or validator unless that relationship has been explicitly agreed.</p><div class="codesign-roster"><article><span>01</span><h3>Neurodivergent learners</h3><p>People with dyslexia, ADHD, autism, and other learning or access experiences, without requiring a diagnosis or public disclosure.</p></article><article><span>02</span><h3>Families and educators</h3><p>People who understand everyday learning routines, classroom constraints, transitions, support, and re-entry after interruption.</p></article><article><span>03</span><h3>Relevant professionals</h3><p>Accessibility specialists, special-education professionals, learning professionals, and learning-science researchers whose actual contribution is clearly described.</p></article></div></div></section>' +
+    '<section class="page-section is-pale"><div class="content-wrap"><p class="section-kicker">What contributors are intended to influence</p><h2>Feedback belongs next to the product decision.</h2><div class="codesign-influence"><article><span>01</span><div><h3>Learning structure</h3><p>Objectives, step order, retrieval cues, correction, application, review, and what counts as meaningful completion.</p></div></article><article><span>02</span><div><h3>Access and sensory control</h3><p>Text, spacing, read-aloud, motion, sound, timing, literal instructions, alternative input, pause, and return.</p></div></article><article><span>03</span><div><h3>Language and feedback</h3><p>Whether instructions are understandable, feedback is respectful, and recovery offers a useful next action without shame.</p></div></article><article><span>04</span><div><h3>Navigation and pacing</h3><p>What stays predictable, what changes visibly, how progress is protected, and how a learner resumes after interruption.</p></div></article></div></div></section>' +
+    '<section class="page-section"><div class="content-wrap"><p class="section-kicker">Participation standard</p><h2>Consent, privacy, safeguarding, access, and recognition come first.</h2><div class="codesign-standard"><div><strong>Before a session</strong><p>Define the purpose, participant role, age-appropriate consent or assent, safeguarding owner, accessibility needs, information collected, retention, withdrawal, and whether compensation is offered.</p></div><div><strong>During a session</strong><p>Use accessible tasks, allow breaks and alternative response routes, collect only necessary information, avoid diagnosis pressure, and never turn feedback into a hidden learner score.</p></div><div><strong>After a session</strong><p>Record the decision, publish an appropriately de-identified change note, explain what did not change and why, and keep contributors distinct from formal staff or clinical validators.</p></div></div></div></section>' +
+    '<section class="page-section is-pale"><div class="content-wrap"><p class="section-kicker">Public decision ledger</p><h2>Completed, underway, and planned must remain visibly different.</h2><dl class="codesign-ledger"><div><dt>Published findings</dt><dd><strong>None yet.</strong> No completed external neurodivergent co-design findings are currently claimed on this site.</dd></div><div><dt>In preparation</dt><dd>Participation criteria, consent and safeguarding routes, accessible feedback formats, decision records, and contributor recognition.</dd></div><div><dt>Planned</dt><dd>Structured review and task testing with neurodivergent learners and relevant education and accessibility professionals before outcome claims are made.</dd></div></dl><div class="callout evidence-callout"><h3>Truthful boundary</h3><p>General feedback does not create clinical validation, research evidence, endorsement, or a formal advisory role. Those claims require their own explicit process and documentation.</p></div><p class="codesign-contact">Neurodivergent people and relevant professionals interested in future participation can contact <a href="mailto:contact@type2learn.tech">contact@type2learn.tech</a>. Contact does not create an enrolment, advisory, or employment relationship.</p></div></section>'
+  );
+
+  const urduCoDesign = () => shell(
+    pageHero(
+      'مشترکہ ڈیزائن',
+      'نیوروڈائیورجینٹ آوازیں مصنوعات کا فیصلہ بدلیں—صرف سجاوٹ نہ بنیں۔',
+      'Type2Learn کو اس طرح ڈیزائن کیا جا رہا ہے کہ نیوروڈائیورجینٹ سیکھنے والے، اساتذہ، خاندان، رسائی کے ماہرین، تعلیمی پیشہ ور افراد اور محققین منظم اور محفوظ شرکت کے ذریعے اس کی تشکیل میں حصہ لے سکیں۔',
+      'موجودہ حیثیت',
+      'شرکت کا طریقہ تیار کیا جا رہا ہے۔ Type2Learn ابھی مکمل بیرونی مشترکہ ڈیزائن کے نتائج یا طبی توثیق کا دعویٰ نہیں کرتا۔'
+    ) +
+    '<section class="page-section codesign-overview"><div class="content-wrap"><p class="section-kicker">کن لوگوں کو شامل کرنے کا ارادہ ہے</p><h2>مختلف تجربہ۔ اہم فیصلوں پر مشترکہ اختیار۔</h2><p>شرکت میں وہ لوگ شامل ہونے چاہئیں جو سیکھنے کے تجربے سے براہِ راست متاثر ہوتے ہیں اور وہ لوگ جو محفوظ، قابلِ رسائی تعلیمی عمل کے ذمہ دار ہیں۔ کسی شریک کو ٹیم ممبر، مشیر یا توثیق کنندہ نہیں کہا جائے گا جب تک یہ تعلق واضح طور پر طے نہ ہو۔</p><div class="codesign-roster"><article><span>01</span><h3>نیوروڈائیورجینٹ سیکھنے والے</h3><p>ڈسلیکسیا، ADHD، آٹزم اور دیگر تعلیمی یا رسائی کے تجربات رکھنے والے افراد—تشخیص یا عوامی انکشاف ضروری نہیں۔</p></article><article><span>02</span><h3>خاندان اور اساتذہ</h3><p>وہ لوگ جو روزمرہ تعلیمی معمول، جماعتی حدود، تبدیلیوں، مدد اور وقفے کے بعد واپسی کو سمجھتے ہیں۔</p></article><article><span>03</span><h3>متعلقہ پیشہ ور افراد</h3><p>رسائی کے ماہرین، خصوصی تعلیم کے پیشہ ور افراد، تعلیمی ماہرین اور سیکھنے کی سائنس کے محققین—جن کی اصل شراکت واضح طور پر بیان کی جائے۔</p></article></div></div></section>' +
+    '<section class="page-section is-pale"><div class="content-wrap"><p class="section-kicker">شراکت دار کن فیصلوں پر اثر ڈال سکیں گے</p><h2>رائے کو مصنوعات کے فیصلے کے ساتھ جوڑا جائے۔</h2><div class="codesign-influence"><article><span>01</span><div><h3>سیکھنے کی ساخت</h3><p>مقاصد، مراحل کی ترتیب، یادداشت کے اشارے، درستگی، استعمال، دہرائی اور بامعنی تکمیل کی شرط۔</p></div></article><article><span>02</span><div><h3>رسائی اور حسی کنٹرول</h3><p>متن، وقفہ، بلند آواز سے پڑھنا، حرکت، آواز، وقت، لفظی ہدایات، متبادل جواب، توقف اور واپسی۔</p></div></article><article><span>03</span><div><h3>زبان اور رائے</h3><p>کیا ہدایات قابلِ فہم، رائے باعزت، اور بحالی شرمندگی کے بغیر ایک مفید اگلا قدم دیتی ہے۔</p></div></article><article><span>04</span><div><h3>نیویگیشن اور رفتار</h3><p>کیا مستقل رہتا ہے، تبدیلی کیسے واضح ہوتی ہے، پیش رفت کیسے محفوظ ہوتی ہے، اور وقفے کے بعد واپسی کیسے ہوتی ہے۔</p></div></article></div></div></section>' +
+    '<section class="page-section"><div class="content-wrap"><p class="section-kicker">شرکت کا معیار</p><h2>رضامندی، رازداری، حفاظت، رسائی اور مناسب شناخت پہلے آتے ہیں۔</h2><div class="codesign-standard"><div><strong>سیشن سے پہلے</strong><p>مقصد، شریک کا کردار، عمر کے مطابق رضامندی، حفاظتی ذمہ دار، رسائی کی ضروریات، جمع ہونے والی معلومات، مدتِ تحفظ، واپسی اور معاوضے کی حیثیت واضح کریں۔</p></div><div><strong>سیشن کے دوران</strong><p>قابلِ رسائی کام دیں، وقفہ اور متبادل جواب کی اجازت دیں، صرف ضروری معلومات جمع کریں، تشخیص کا دباؤ نہ ڈالیں، اور رائے کو پوشیدہ اسکور نہ بنائیں۔</p></div><div><strong>سیشن کے بعد</strong><p>فیصلہ درج کریں، مناسب طور پر غیر شناخت شدہ تبدیلی کا نوٹ شائع کریں، جو نہ بدلا اس کی وجہ بتائیں، اور شراکت داروں کو رسمی عملے یا طبی توثیق کنندگان سے الگ رکھیں۔</p></div></div></div></section>' +
+    '<section class="page-section is-pale"><div class="content-wrap"><p class="section-kicker">عوامی فیصلہ رجسٹر</p><h2>مکمل، زیرِ تیاری اور منصوبہ شدہ کام واضح طور پر الگ رہیں۔</h2><dl class="codesign-ledger"><div><dt>شائع شدہ نتائج</dt><dd><strong>ابھی کوئی نہیں۔</strong> اس سائٹ پر مکمل بیرونی نیوروڈائیورجینٹ مشترکہ ڈیزائن کے نتائج کا دعویٰ نہیں کیا جا رہا۔</dd></div><div><dt>زیرِ تیاری</dt><dd>شرکت کے معیار، رضامندی اور حفاظت کے راستے، قابلِ رسائی رائے کے طریقے، فیصلہ ریکارڈ اور شراکت داروں کی شناخت۔</dd></div><div><dt>منصوبہ شدہ</dt><dd>نتائج کے دعووں سے پہلے نیوروڈائیورجینٹ سیکھنے والوں اور متعلقہ تعلیمی و رسائی کے پیشہ ور افراد کے ساتھ منظم جائزہ اور عملی جانچ۔</dd></div></dl><div class="callout evidence-callout"><h3>سچائی کی حد</h3><p>عمومی رائے طبی توثیق، تحقیقی ثبوت، حمایت یا رسمی مشاورتی کردار نہیں بناتی۔ ان دعووں کے لیے الگ واضح عمل اور دستاویز درکار ہیں۔</p></div><p class="codesign-contact">مستقبل میں شرکت میں دلچسپی رکھنے والے نیوروڈائیورجینٹ افراد اور متعلقہ پیشہ ور افراد <a href="mailto:contact@type2learn.tech">contact@type2learn.tech</a> پر رابطہ کر سکتے ہیں۔ رابطہ کسی داخلے، مشاورتی یا ملازمت کے تعلق کی ضمانت نہیں۔</p></div></section>'
+  );
+
   const legalPage = (kind) => {
     const isPrivacy = kind === 'privacy';
     const title = isPrivacy ? 'Privacy should be clear, minimal, and child-aware.' : 'Terms should match the service that actually exists.';
@@ -171,14 +292,25 @@
 
   const pageMap = {
     home: landing,
+    "home-ur": landing,
     "how-it-works": howItWorks,
+    "how-it-works-ur": urduHowItWorks,
     pathways,
+    "pathways-ur": urduPathways,
     learners,
+    "learners-ur": urduLearners,
     families,
+    "families-ur": urduFamilies,
     schools,
+    "schools-ur": urduSchools,
     team,
+    "team-ur": urduTeam,
+    "co-design": coDesign,
+    "co-design-ur": urduCoDesign,
     community,
+    "community-ur": urduCommunity,
     trust,
+    "trust-ur": urduTrust,
     login: authPage,
     research: howItWorks,
     privacy: trust,
@@ -203,14 +335,25 @@
 
   const pageTitles = {
     home: 'Type2Learn — Learn by typing',
+    "home-ur": 'Type2Learn | ٹائپ کر کے سیکھیں',
     "how-it-works": 'How Type2Learn works',
+    "how-it-works-ur": 'Type2Learn کا طریقۂ کار',
     pathways: 'Type2Learn pathways',
+    "pathways-ur": 'Type2Learn کے سیکھنے کے راستے',
     learners: 'For learners — Type2Learn',
+    "learners-ur": 'سیکھنے والوں کے لیے — Type2Learn',
     families: 'For families — Type2Learn',
+    "families-ur": 'خاندانوں کے لیے — Type2Learn',
     schools: 'For schools — Type2Learn',
-    team: 'Team — Type2Learn',
+    "schools-ur": 'اسکولوں کے لیے — Type2Learn',
+    team: 'Meet the Type2Learn Founding Team',
+    "team-ur": 'Type2Learn کی بانی ٹیم سے ملیں',
+    "co-design": 'Neurodivergent co-design and professional input | Type2Learn',
+    "co-design-ur": 'نیوروڈائیورجینٹ مشترکہ ڈیزائن | Type2Learn',
     community: 'Community and help — Type2Learn',
+    "community-ur": 'کمیونٹی اور مدد — Type2Learn',
     trust: 'Trust — Type2Learn',
+    "trust-ur": 'اعتماد — Type2Learn',
     login: 'Sign in or create an account | Type2Learn',
     research: 'How Type2Learn works',
     privacy: 'Privacy Policy | Type2Learn',
@@ -252,6 +395,33 @@
     return '<section class="section learning-shuffle-section" id="learning-loop" aria-labelledby="learning-shuffle-title"><div class="content-wrap"><div class="section-heading learning-shuffle-heading"><div class="section-heading-copy"><p class="section-kicker">The learning loop</p><h2 id="learning-shuffle-title">Learning becomes durable when the learner does the work.</h2><p>Scroll, swipe, or drag through the seven actions. Each step protects the academic objective while making the next move clear.</p></div><div class="shuffle-position" aria-live="polite"><span id="chit-current">01</span><i></i><span>07</span></div></div><div class="learning-shuffle" data-learning-shuffle data-scroll-stops="' + learningStages.length + '"><div class="chit-rail" aria-hidden="true"><div class="chit-rail-line"><i id="chit-rail-progress"></i></div><ol>' + rail + '</ol></div><div class="chit-viewport"><div class="chit-stack">' + chits + '</div><p class="chit-instruction"><span>Scroll or drag</span> to shuffle the learning action</p></div></div></div></section>';
   };
 
+  const urduScrollStory = () => {
+    const scenes = [
+      ['01', 'آغاز', 'ایک واضح خیال سے شروع کریں۔', 'ایک محدود خیال پڑھیں یا سنیں، جہاں مقصد اور اگلا قدم صاف دکھائی دے۔', '/assets/story/learner-encounter.webp', 'گھر میں مطالعہ کی میز پر ٹائپ کرتا ہوا ایک پاکستانی ثانوی درجے کا سیکھنے والا۔'],
+      ['02', 'یاد کریں', 'جواب سامنے آنے سے پہلے یاد کریں۔', 'اشارہ استعمال کریں، رکیں، اور مکمل نمونہ دیکھنے سے پہلے خیال کو یادداشت سے واپس لائیں۔', '/assets/story/learner-recall.webp', 'لیپ ٹاپ اور نوٹ بک کے پاس خیال کو یاد کرنے کے لیے رکتا ہوا سیکھنے والا۔'],
+      ['03', 'بنائیں', 'اپنی سوچ کو واضح کریں۔', 'اپنے الفاظ میں مفید جواب ٹائپ کریں تاکہ سمجھ ایسی چیز بنے جس پر کام کیا جا سکے۔', '/assets/story/learner-produce.webp', 'سبق کے دوران فعال طور پر جواب ٹائپ کرتا ہوا سیکھنے والا۔'],
+      ['04', 'درست کریں اور استعمال کریں', 'اسے بہتر بنائیں، پھر استعمال کریں۔', 'بغیر شرمندگی کے موازنہ کریں، درست کریں، اور بہتر خیال کو کسی بامعنی کام میں استعمال کریں۔', '/assets/story/learner-apply.webp', 'پرسکون اعتماد کے ساتھ خیال کو استعمال کرتا اور ٹائپ کرتا ہوا سیکھنے والا۔'],
+      ['05', 'واپس آئیں', 'واپس آئیں۔ جو حاصل کیا ہے وہ ساتھ رکھیں۔', 'بعد میں خیال کی طرف واپس آئیں۔ پائیدار پیش رفت رفتار سے نہیں، سیکھنے کے ثبوت اور واپسی سے بنتی ہے۔', '/assets/story/learner-return.webp', 'پرسکون بعد کی مطالعہ نشست میں ایک مانوس خیال کی طرف لوٹتا ہوا سیکھنے والا۔']
+    ];
+    return '<section class="scroll-story" id="learning-story" data-scroll-stops="' + scenes.length + '" aria-labelledby="story-title"><div class="story-stage"><canvas class="story-canvas" id="story-canvas" aria-hidden="true"></canvas><div class="story-scenes">' + scenes.map((scene, index) => '<figure class="story-scene' + (index === 0 ? ' is-active' : '') + '" data-story-scene="' + index + '"><img src="' + scene[4] + '" alt="' + scene[5] + '"></figure>').join('') + '</div><div class="story-shade" aria-hidden="true"></div><div class="story-ui content-wrap"><div class="story-topline"><p><span>Type2Learn</span> · سیکھنے کا راستہ</p><div class="story-counter" aria-live="polite"><span id="story-current">01</span><i></i><span>' + String(scenes.length).padStart(2, '0') + '</span></div></div><div class="story-copy"><p class="story-kicker">سیکھنے کی کہانی میں اسکرول، سوائپ یا ڈریگ کریں</p><h2 id="story-title">سیکھنا وہ ہے جو آپ خود کرتے ہیں۔</h2><div class="story-steps">' + scenes.map((scene, index) => '<article class="story-step' + (index === 0 ? ' is-active' : '') + '" data-story-step="' + index + '"><span>' + scene[0] + ' · ' + scene[1] + '</span><h3>' + scene[2] + '</h3><p>' + scene[3] + '</p></article>').join('') + '</div><a class="button button-primary story-action" href="/login/">سیکھنے کا نمونہ آزمائیں' + icon('arrow', true) + '</a></div><div class="story-route" aria-hidden="true">' + scenes.map((scene) => '<span>' + scene[1] + '</span>').join('') + '<i id="story-route-progress"></i></div></div></div></section>';
+  };
+
+  const urduLearningStages = [
+    ['01', 'آغاز', 'پڑھیں / سنیں', 'ایک واضح خیال سے آغاز کریں۔', 'مختصر اور محدود وضاحت مقصد اور اگلے قدم کو صاف دکھاتی ہے۔'],
+    ['02', 'یاد', 'یاد کریں', 'جواب سامنے آنے سے پہلے اسے یاد کریں۔', 'ایک اشارہ یاد کرنے کے اصل کام کی جگہ لیے بغیر یادداشت میں مدد دیتا ہے۔'],
+    ['03', 'اظہار', 'ٹائپ کریں / بنائیں', 'اپنی سمجھ کو واضح کریں۔', 'سیکھنے والا لکھتا، بناتا، نام دیتا، حل کرتا یا قابلِ استعمال صورت میں وضاحت کرتا ہے۔'],
+    ['04', 'موازنہ', 'جانچیں', 'سمجھیں کہ کیا بدلا ہے۔', 'مخصوص رائے بتاتی ہے کہ کیا مضبوط ہے اور کس چیز پر ایک اور کوشش درکار ہے۔'],
+    ['05', 'تعمیرِ نو', 'درست کریں', 'بغیر شرمندگی کے بہتر بنائیں۔', 'مدد کے بعد سیکھنے والا صرف جواب دیکھنے کے بجائے خیال کو دوبارہ بناتا ہے۔'],
+    ['06', 'استعمال', 'لاگو کریں', 'خیال کو کسی بامعنی جگہ استعمال کریں۔', 'نیا کام شناخت کو اس ثبوت میں بدلتا ہے کہ خیال کسی اور جگہ بھی کام آ سکتا ہے۔'],
+    ['07', 'مضبوطی', 'واپس آئیں', 'بعد میں واپس آ کر اسے مضبوط کریں۔', 'بعد کی بازیافت علم کو پائیدار بناتی اور حاصل شدہ پیش رفت کی حفاظت کرتی ہے۔']
+  ];
+
+  const urduHomeLearningShuffle = () => {
+    const rail = urduLearningStages.map((stage, index) => '<li class="' + (index === 0 ? 'is-active' : '') + '" data-chit-rail="' + index + '"><span>' + stage[0] + '</span></li>').join('');
+    const chits = urduLearningStages.map((stage, index) => '<article class="loop-chit' + (index === 0 ? ' is-active' : '') + (index === 5 ? ' is-long' : '') + '" data-chit-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><span class="chit-number">' + stage[0] + '</span><div class="chit-copy"><p class="chit-phase">' + stage[1] + ' · ' + stage[2] + '</p><h3>' + stage[3] + '</h3><p>' + stage[4] + '</p></div><span class="chit-edge" aria-hidden="true">' + stage[2] + '</span></article>').join('');
+    return '<section class="section learning-shuffle-section" id="learning-loop" aria-labelledby="learning-shuffle-title"><div class="content-wrap"><div class="section-heading learning-shuffle-heading"><div class="section-heading-copy"><p class="section-kicker">سیکھنے کا چکر</p><h2 id="learning-shuffle-title">علم اس وقت پائیدار بنتا ہے جب سیکھنے والا خود کام کرتا ہے۔</h2><p>سات عملی مراحل میں اسکرول، سوائپ یا ڈریگ کریں۔ ہر مرحلہ تعلیمی مقصد کو محفوظ رکھتا اور اگلی حرکت واضح کرتا ہے۔</p></div><div class="shuffle-position" aria-live="polite"><span id="chit-current">01</span><i></i><span>07</span></div></div><div class="learning-shuffle" data-learning-shuffle data-scroll-stops="' + urduLearningStages.length + '"><div class="chit-rail" aria-hidden="true"><div class="chit-rail-line"><i id="chit-rail-progress"></i></div><ol>' + rail + '</ol></div><div class="chit-viewport"><div class="chit-stack">' + chits + '</div><p class="chit-instruction"><span>اسکرول یا ڈریگ کریں</span> تاکہ اگلا عملی مرحلہ دیکھ سکیں</p></div></div></div></section>';
+  };
+
   const howProcessMap = () => {
     const acts = [
       ['01', 'Enter with clarity', 'Choose · Understand', 'The learner sees the objective, what success looks like, and an accessible way into the idea.'],
@@ -270,24 +440,226 @@
       ['Alizay Hassan', 'Co-founder · Product lead', '/assets/team/alizay-hassan-figure.webp', 'Clearly non-human grey 3D editorial figure representing the Alizay Hassan profile', 'placeholder', 'Her role brings product strategy, co-design, programme clarity, and age-respectful experience design into one coherent learner journey.', 'A clear product gives every learner a dignified way to begin, continue, and return.', ['Product strategy', 'Co-design', 'Programme clarity']]
     ];
     const statusLabel = { supplied: 'Supplied portrait', edited: 'Portrait from supplied image', placeholder: 'Non-human placeholder' };
-    const cards = members.map((member, index) => '<article class="team-profile-card' + (index === 0 ? ' is-active' : '') + ' has-' + member[4] + '" data-team-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><figure class="team-profile-portrait"><img src="' + member[2] + '" alt="' + member[3] + '" width="960" height="1200" loading="lazy" decoding="async"><figcaption class="portrait-status is-' + member[4] + '">' + statusLabel[member[4]] + '</figcaption></figure><div class="team-profile-copy"><p class="section-kicker">' + member[1] + '</p><h3>' + member[0] + '</h3><p class="team-profile-statement">“' + member[6] + '”</p><p>' + member[5] + '</p><div class="team-profile-responsibilities">' + member[7].map((item) => '<span>' + item + '</span>').join('') + '</div></div></article>').join('');
+    const cards = members.map((member, index) => '<article class="team-profile-card' + (index === 0 ? ' is-active' : '') + ' has-' + member[4] + '" data-team-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><figure class="team-profile-portrait"><img src="' + member[2] + '" alt="' + member[3] + '" width="960" height="1200" loading="lazy" decoding="async"><figcaption class="portrait-status is-' + member[4] + '">' + statusLabel[member[4]] + '</figcaption></figure><div class="team-profile-copy"><p class="section-kicker">' + member[1] + '</p><h2>' + member[0] + '</h2><p class="team-profile-statement">“' + member[6] + '”</p><p>' + member[5] + '</p><div class="team-profile-responsibilities">' + member[7].map((item) => '<span>' + item + '</span>').join('') + '</div></div></article>').join('');
     return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">The people building Type2Learn</p><h2 id="team-deck-title">Different disciplines. One accountable mission.</h2><p>The founder appears first, followed by the co-founders shaping engineering, research, AI, and product. Edited portraits are identified, and the non-human profile figure is clearly labelled.</p></div><div class="team-deck" data-team-deck data-scroll-stops="' + members.length + '"><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>Scroll or drag</span> to shuffle the team deck</p></div></div></section>';
   };
 
-  const applyOfficialCopy = () => {
+  const identitySection = () => {
+    if (isUrdu) {
+      return '<section class="section identity-section" aria-labelledby="type2learn-identity"><div class="content-wrap identity-layout"><div class="identity-copy"><p class="section-kicker"><span lang="en">Type2Learn Active Learning</span></p><h2 id="type2learn-identity">ٹائپنگ سیکھنے کا عمل ہے — آخری مقصد نہیں۔</h2><p class="identity-lead">Type2Learn ایک تعلیمی اقدام ہے جو غیر منافع بخش مقصد کے ساتھ تیار کیا جا رہا ہے۔ یہ ٹائپنگ کو محض رفتار کی مشق کے بجائے فعال سیکھنے کے طریقے کے طور پر استعمال کرتا ہے۔ سیکھنے والے تعلیمی خیالات کو یاد کرتے، اپنے الفاظ میں واضح کرتے، درست کرتے، استعمال کرتے اور بعد میں دوبارہ دہراتے ہیں۔</p></div><div class="identity-facts"><article><span>01</span><div><h3>بانی ٹیم</h3><p>بانی محمد طٰہٰ بن زعیم ہیں۔ بانی ٹیم میں <span lang="en">Muhammad Hamiz Bin Kashif</span>، <span lang="en">Idrees Babar</span>، <span lang="en">Muhammad Fahad Younus</span> اور <span lang="en">Alizay Hassan</span> شامل ہیں۔</p><a href="/ur/team/">بانی ٹیم کے پروفائلز دیکھیں</a></div></article><article><span>02</span><div><h3>مشترکہ ڈیزائن کی موجودہ حیثیت</h3><p>نیوروڈائیورجینٹ سیکھنے والوں—بشمول ڈسلیکسیا، ADHD اور آٹزم کے حامل افراد—اور متعلقہ پیشہ ور افراد کے ساتھ منظم مشترکہ ڈیزائن اور جانچ کی تیاری کی جا رہی ہے۔ مکمل بیرونی مشترکہ ڈیزائن کے نتائج کا ابھی دعویٰ نہیں کیا جا رہا۔</p><a href="/ur/co-design/">شرکت کی حیثیت اور حفاظتی اصول پڑھیں</a></div></article><article><span>03</span><div><h3>تعلیمی، طبی نہیں</h3><p>Type2Learn کسی حالت کی تشخیص، علاج یا طبی جانچ نہیں کرتا۔ کچھ عوامی تجربات ابتدائی نمونے یا منصوبہ شدہ تصورات ہیں اور انہیں اسی طرح واضح کیا گیا ہے۔</p></div></article><article><span>04</span><div><h3>واضح شناخت</h3><p><span lang="en">Type2Learn Active Learning</span>، <span lang="en">Type to Learn</span> اور اسی نام والی براؤزر ایکسٹینشن سے آزاد اور غیر وابستہ ہے۔</p></div></article></div></div></section>';
+    }
+    return '<section class="section identity-section" aria-labelledby="type2learn-identity"><div class="content-wrap identity-layout"><div class="identity-copy"><p class="section-kicker">Type2Learn Active Learning</p><h2 id="type2learn-identity">Typing is the learning action—not the finish line.</h2><p class="identity-lead">Type2Learn is an education initiative being developed with a nonprofit mission. It uses typing as an active-learning method—not merely as typing practice. Learners recall, explain, correct, apply, and revisit academic ideas to build durable understanding.</p></div><div class="identity-facts"><article><span>01</span><div><h3>Founding team</h3><p>Type2Learn was founded by Muhammad Taha Bin Zaeem. The founding team also includes Muhammad Hamiz Bin Kashif, Idrees Babar, Muhammad Fahad Younus, and Alizay Hassan.</p><a href="/team/">Meet the Type2Learn founding team</a></div></article><article><span>02</span><div><h3>Current co-design status</h3><p>Structured co-design and testing with neurodivergent learners—including people with dyslexia, ADHD, and autism—and relevant professionals are being prepared. Type2Learn does not yet claim completed external co-design findings.</p><a href="/co-design/">Read the participation status and safeguards</a></div></article><article><span>03</span><div><h3>Educational, not clinical</h3><p>Type2Learn does not diagnose, treat, or clinically assess any condition. Some public experiences are prototypes or planned concepts and are labelled accordingly.</p></div></article><article><span>04</span><div><h3>Independent identity</h3><p>Type2Learn Active Learning is independent and is not affiliated with Type to Learn or similarly named browser extensions.</p></div></article></div></div></section>';
+  };
+
+  const applyUrduLandingCopy = () => {
+    if (!isHomeRoute) return;
+    const write = (node, value) => { if (node) node.textContent = value; };
+    const replaceButton = (node, label) => { if (node) node.innerHTML = label + icon('arrow', true); };
+
     const homeHero = document.querySelector('#main-content > .hero');
     if (homeHero) {
       const eyebrow = homeHero.querySelector('.eyebrow');
       const heading = homeHero.querySelector('h1');
       const copy = homeHero.querySelector('.hero-copy');
-      if (eyebrow) eyebrow.innerHTML = '<span class="eyebrow-dot"></span>Nonprofit education technology';
+      if (eyebrow) eyebrow.innerHTML = '<span class="eyebrow-dot"></span>تعلیمی اقدام · غیر منافع بخش مقصد';
+      if (heading) {
+        heading.removeAttribute('data-animate-words');
+        heading.classList.add('hero-stacked-title');
+        heading.setAttribute('aria-label', 'ٹائپ کر کے سیکھیں۔ ایسا علم بنائیں جو ساتھ رہے۔');
+        heading.innerHTML = '<span class="hero-line" aria-hidden="true" style="--line-index:0">ٹائپ کر کے سیکھیں۔</span><span class="hero-line" aria-hidden="true" style="--line-index:1">ایسا علم بنائیں</span><span class="hero-line" aria-hidden="true" style="--line-index:2">جو ساتھ رہے۔</span>';
+      }
+      write(copy, 'Type2Learn ایک تعلیمی اقدام ہے جو غیر منافع بخش مقصد کے ساتھ تیار کیا جا رہا ہے۔ یہ ٹائپنگ کے ذریعے فعال سیکھنے کو یادداشت، درستگی، استعمال اور پائیدار پیش رفت سے جوڑتا ہے۔');
+      const actions = homeHero.querySelectorAll('.hero-actions .button');
+      replaceButton(actions[0], 'اب آزمائیں');
+      replaceButton(actions[1], 'راستے دریافت کریں');
+      const trustItems = homeHero.querySelectorAll('.trust-inline > span');
+      if (trustItems[0]) trustItems[0].innerHTML = icon('check', true) + 'رفتار کی بنیاد پر درجہ بندی نہیں';
+      if (trustItems[1]) trustItems[1].innerHTML = icon('shield', true) + 'کم عمر سیکھنے والوں کے لیے رازداری بطورِ ڈیفالٹ';
+      if (trustItems[2]) trustItems[2].innerHTML = icon('sliders', true) + 'اندازوں سے پہلے اپنے کنٹرولز';
+      const scrollLabel = homeHero.querySelector('.scroll-cue > span:last-child');
+      write(scrollLabel, 'سیکھنے کا طریقہ دیکھیں');
+      const workspace = homeHero.querySelector('.hero-workspace');
+      if (workspace) {
+        write(workspace.querySelector('.workspace-brand > span'), 'رہنمائی والے سبق کا پیش منظر');
+        write(workspace.querySelector('.workspace-controls .status-chip'), 'ابتدائی نمونہ');
+        write(workspace.querySelector('.workspace-heading h2'), 'بتائیں کہ ویری ایبل کیا محفوظ کرتا ہے');
+        write(workspace.querySelector('.workspace-heading p'), 'ایک واضح خیال۔ اگلا ایک واضح قدم۔');
+        const tasks = workspace.querySelectorAll('.task-state');
+        const taskCopy = [
+          ['اب', 'خیال مکمل کریں', 'ویری ایبل ایک ایسی قدر محفوظ کرتا ہے جو…'],
+          ['اگلا', 'اپنے الفاظ جانچیں', 'دیکھیں کہ تعریف کا مطلب کیا ہے۔'],
+          ['مکمل', 'اسے کوڈ میں استعمال کریں', 'اسکور کی ایک قدر بنائیں۔']
+        ];
+        tasks.forEach((task, index) => {
+          const item = taskCopy[index];
+          if (!item) return;
+          write(task.querySelector('.state-name'), item[0]);
+          write(task.querySelector('strong'), item[1]);
+          write(task.querySelector('span:last-child'), item[2]);
+        });
+        const progress = workspace.querySelectorAll('.workspace-progress > span');
+        write(progress[0], 'سیکھنے کا راستہ');
+        write(progress[1], '3 میں سے 1');
+      }
+    }
+
+    const demo = document.getElementById('demo');
+    if (demo) {
+      const headingCopy = demo.querySelector('.section-heading-copy');
+      const badge = demo.querySelector('.section-heading > .status-chip');
+      if (headingCopy) {
+        write(headingCopy.querySelector('.section-kicker'), 'فعال یادداشت آزمائیں');
+        write(headingCopy.querySelector('h2'), 'ایک مختصر عمل۔ سیکھنے کا حقیقی لمحہ۔');
+        write(headingCopy.querySelector('p:last-child'), 'یہ مختصر نمونہ آپ کے براؤزر میں ہی چلتا ہے؛ یہ اکاؤنٹ نہیں بناتا اور آپ کا جواب محفوظ نہیں کرتا۔ اس سے Type2Learn کے چکر کا پہلا حصہ سمجھیں۔');
+      }
+      write(badge, 'اسی صفحے پر');
+      write(demo.querySelector('.card-label'), '7 میں سے مرحلہ 3 · ٹائپ کریں / بنائیں');
+      write(demo.querySelector('.demo-top h2'), 'دیکھے بغیر خیال مکمل کریں۔');
+      write(demo.querySelector('.demo-prompt strong'), 'یادداشت کا اشارہ');
+      write(demo.querySelector('.demo-prompt p'), 'ویری ایبل ایک ایسی قدر محفوظ کرتا ہے جو…');
+      write(demo.querySelector('.demo-top .status-chip'), 'ٹائمر نہیں');
+      const input = demo.querySelector('#demo-answer');
+      if (input) {
+        input.placeholder = 'اپنا جواب یہاں لکھیں';
+        input.setAttribute('dir', 'rtl');
+        input.setAttribute('lang', 'ur');
+      }
+      replaceButton(demo.querySelector('.demo-form .button'), 'جواب جانچیں');
+      write(demo.querySelector('#demo-feedback'), 'آپ یہ نمونہ کسی بھی وقت چھوڑ سکتے ہیں۔');
+      write(demo.querySelector('.demo-footer > span'), 'جہاں مقصد اجازت دے، مختلف مگر درست جوابات قبول کیے جاتے ہیں۔');
+      write(demo.querySelector('#skip-demo'), 'یہ سرگرمی دوبارہ شروع کریں');
+      const controls = demo.querySelectorAll('.control-preview');
+      const controlCopy = ['کم حرکت کے لیے تیار', 'آواز بند ہے', 'لفظی ہدایات دستیاب ہیں', 'کی بورڈ پہلے'];
+      controls.forEach((control, index) => {
+        if (controlCopy[index]) control.innerHTML = icon(['pause', 'headphones', 'message', 'keyboard'][index], true) + controlCopy[index];
+      });
+    }
+
+    const moduleData = [
+      ['لفظ سازی', 'ڈھالا گیا', 'آواز، املا، معنی، درستگی اور واپسی کے ذریعے منظم خواندگی اور تعلیمی الفاظ سیکھنے کا راستہ۔', ['جائزہ شدہ لفظی اجزاء', 'بامعنی تعمیرِ نو', 'دیر سے بازیافت']],
+      ['توجہ کا مرحلہ', 'ڈھالا گیا', 'واضح منصوبے، ایک موجودہ کام اور پرسکون واپسی کے ساتھ جماعتی درجے کے کام کے لیے محدود مرحلہ۔', ['اب → اگلا → مکمل', 'خودکار محفوظ کاری اور واپسی', 'فوکس اسکور کے بغیر مدد']],
+      ['واضح راستہ', 'ڈھالا گیا', 'مستحکم سبق کی ساخت، تبدیلی کی واضح معلومات اور سیکھنے والے کے اختیار میں حسی کنٹرولز۔', ['پیش منظر کارڈ', 'لفظی ہدایات کے اختیارات', 'حسی واقعات کی وضاحت']]
+    ];
+    const moduleSection = document.querySelector('.module-grid')?.closest('section');
+    if (moduleSection) moduleSection.id = 'pathways';
+    if (moduleSection) {
+      write(moduleSection.querySelector('.section-kicker'), 'تین مربوط تجربات');
+      write(moduleSection.querySelector('.section-heading h2'), 'کام کو سہارا دیں — کسی لیبل کو نہیں۔');
+      write(moduleSection.querySelector('.section-heading p:not(.section-kicker)'), 'ہر تجربہ تعلیمی مقصد کو سامنے رکھتا ہے اور بامعنی سیکھنے میں داخل ہونے، اسے جاری رکھنے اور مکمل کرنے کے لیے نجی، قابلِ ترتیب راستے دیتا ہے۔');
+    }
+    document.querySelectorAll('.module-grid .module-card').forEach((card, index) => {
+      const item = moduleData[index];
+      if (!item) return;
+      write(card.querySelector('.status-chip'), item[1]);
+      write(card.querySelector('h3'), item[0]);
+      write(card.querySelector('p'), item[2]);
+      card.querySelectorAll('li').forEach((node, listIndex) => write(node, item[3][listIndex]));
+    });
+
+    const supportPanel = document.querySelector('.support-panel');
+    const supportSection = supportPanel?.closest('section');
+    if (supportSection) supportSection.id = 'controls';
+    if (supportPanel) {
+      write(supportPanel.querySelector('.section-kicker'), 'نجی تعلیمی کنٹرولز');
+      write(supportPanel.querySelector('h2'), 'ہر ذہن کو مناسب کنٹرولز درکار ہیں — کم تر توقعات نہیں۔');
+      write(supportPanel.querySelector(':scope > p:not(.section-kicker)'), 'ہر سیکھنے والا منتخب کر سکتا ہے کہ شرکت میں کیا مدد دیتا ہے۔ ترتیبات بطورِ ڈیفالٹ نجی ہیں اور کسی تشخیص کا نام نہیں۔');
+      const supportItems = [
+        ['حرکت اور آواز', 'کم حرکت، غیر متوقع اینیمیشن نہیں، اور خودکار آواز نہیں۔'],
+        ['پڑھنا اور جواب دینا', 'متن کا حجم، وقفہ، بلند آواز سے پڑھنا، کیپشن، ٹائپنگ، آواز اور مزید۔'],
+        ['منصوبہ اور رفتار', 'واضح مراحل، ٹائمر کا اختیار، توقف، واپسی، اور ایک اگلا قدم۔'],
+        ['مدد اور وضاحت', 'لفظی ہدایات، مثالیں، ماخذ کی جھلکیاں اور متبادل راستے۔']
+      ];
+      supportPanel.querySelectorAll('.support-item').forEach((item, index) => {
+        if (!supportItems[index]) return;
+        write(item.querySelector('strong'), supportItems[index][0]);
+        write(item.querySelector('span'), supportItems[index][1]);
+      });
+    }
+
+    const audienceSection = document.querySelector('.audience-grid')?.closest('section');
+    if (audienceSection) {
+      audienceSection.id = 'audiences';
+      write(audienceSection.querySelector('.section-kicker'), 'سیکھنے سے وابستہ حقیقی لوگوں کے لیے');
+      write(audienceSection.querySelector('.section-heading h2'), 'ایک سیکھنے کا آلہ۔ ہر مخاطب کے لیے واضح راستے۔');
+    }
+    const audienceData = [
+      ['سیکھنے والے', 'اب کیا کرنا ہے دیکھیں، اپنا کام محفوظ رکھیں، اپنے کنٹرولز منتخب کریں، اور جو کر سکتے ہیں اس کا ثبوت بنائیں۔', 'سیکھنے والے کے کنٹرولز دیکھیں'],
+      ['خاندان', 'ہر لمحہ نگرانی کے بغیر سیکھنے کی روٹین اور رازداری کی بنیادی ترتیب سمجھیں۔', 'خاندانی استعمال دیکھیں'],
+      ['اسکول اور ماہرین', 'بامعنی سیکھنے کا ثبوت، مدد کا تناظر اور واضح حدود دیکھیں — نگرانی کا اسکور کبھی نہیں۔', 'اسکول کا طریقہ دیکھیں']
+    ];
+    document.querySelectorAll('.audience-grid .audience-card').forEach((card, index) => {
+      const item = audienceData[index];
+      if (!item) return;
+      write(card.querySelector('h3'), item[0]);
+      write(card.querySelector('p'), item[1]);
+      replaceButton(card.querySelector('.card-footer'), item[2]);
+    });
+
+    const evidenceGrid = document.querySelector('.evidence-grid');
+    const evidenceSection = evidenceGrid?.closest('section');
+    if (evidenceSection) evidenceSection.id = 'evidence';
+    const evidenceData = [
+      ['تحقیق سے معاونت', 'فعال مشق', 'یاد کرنا، رائے اور واپسی تعامل کے طریقے کو تشکیل دیتے ہیں۔'],
+      ['ڈھالا گیا', 'مصنوعاتی ترجمہ', 'انٹرفیس کے طریقے آزمائے جانے والے مفروضے ہیں، خودبخود ثبوت نہیں۔'],
+      ['زیرِ تیاری', 'مشترکہ ڈیزائن کا عمل', 'شرکت کے معیار اور حفاظتی اصول تیار کیے جا رہے ہیں؛ مکمل بیرونی نتائج کا دعویٰ نہیں۔'],
+      ['منصوبہ شدہ', 'آزمائش اور پیمائش', 'تعلیمی دعوے واضح مطالعے، رضامندی اور نتائج کے ثبوت کے بعد آئیں گے۔']
+    ];
+    document.querySelectorAll('.evidence-grid .evidence-card').forEach((card, index) => {
+      const item = evidenceData[index];
+      if (!item) return;
+      write(card.querySelector('.status-chip'), item[0]);
+      write(card.querySelector('h3'), item[1]);
+      write(card.querySelector('p'), item[2]);
+    });
+
+    const faqSection = document.querySelector('.faq-list')?.closest('section');
+    if (faqSection) {
+      faqSection.id = 'questions';
+      write(faqSection.querySelector('.section-kicker'), 'عام سوالات');
+      write(faqSection.querySelector('.section-heading h2'), 'Type2Learn کیا ہے — اور کیا نہیں — اس کے بارے میں واضح رہیں۔');
+      replaceButton(faqSection.querySelector('.section-heading .button'), 'سپورٹ حاصل کریں');
+    }
+    const faqs = [
+      ['کیا Type2Learn ٹائپنگ ٹیوٹر ہے؟', 'ٹائپنگ فعال تعامل کی سطح ہے۔ مقصد صرف رفتار نہیں بلکہ یادداشت، رائے، درستگی، منتقلی اور جائزے کے ذریعے مضمون اور مہارت سیکھنا ہے۔'],
+      ['کیا یہ ڈسلیکسیا، ADHD یا آٹزم کی تشخیص یا علاج کرتا ہے؟', 'نہیں۔ Type2Learn سیکھنے والے کے اختیار میں مدد اور شواہد سے آگاہ مصنوعات کے خیالات پیش کرتا ہے۔ یہ تعلیمی پلیٹ فارم ہے، طبی، تشخیصی یا علاجی خدمت نہیں۔'],
+      ['پلیٹ فارم کیا جمع کرتا ہے؟', 'مصنوعات کی سمت کم سے کم معلومات کی ہے: نجی سیکھنے کا کام اور ترتیبات، ہدفی اشتہارات نہیں، سیکھنے والے کے ڈیٹا کی فروخت نہیں، اور واضح عمر کے مطابق اجازت کے بغیر عوامی ماڈل کی تربیت نہیں۔'],
+      ['کیا یہ تمام تجربات جاری ہو چکے ہیں؟', 'نہیں۔ یہ عوامی پیش منظر تصورات کی حیثیت دیانت داری سے دکھاتا ہے۔ پہلی تعمیر ایک مکمل خواندگی پر مبنی سیکھنے کے راستے اور دوبارہ استعمال ہونے والے فعال سیکھنے کے انجن پر مرکوز ہے۔']
+    ];
+    document.querySelectorAll('.faq-list details').forEach((faq, index) => {
+      const item = faqs[index];
+      if (!item) return;
+      write(faq.querySelector('summary'), item[0]);
+      write(faq.querySelector('p'), item[1]);
+    });
+
+    const quote = document.querySelector('.quote-block');
+    if (quote) {
+      write(quote.querySelector('p'), 'شرکت کے لیے ڈیزائن کیا گیا۔ جواب دہی کے ساتھ رہنمائی۔');
+      write(quote.querySelector(':scope > span'), 'ٹیم سے ملیں، ثبوت کے طریقے کو دیکھیں، یا سیکھنے کے راستے دریافت کریں۔');
+      const actions = quote.querySelectorAll('.inline-actions .button');
+      replaceButton(actions[0], 'ٹیم سے ملیں');
+      replaceButton(actions[1], 'راستے دریافت کریں');
+    }
+  };
+
+  const applyOfficialCopy = () => {
+    if (isUrdu) {
+      applyUrduLandingCopy();
+      return;
+    }
+    const homeHero = document.querySelector('#main-content > .hero');
+    if (homeHero) {
+      const eyebrow = homeHero.querySelector('.eyebrow');
+      const heading = homeHero.querySelector('h1');
+      const copy = homeHero.querySelector('.hero-copy');
+      if (eyebrow) eyebrow.innerHTML = '<span class="eyebrow-dot"></span>Education initiative · nonprofit mission';
       if (heading) {
         heading.removeAttribute('data-animate-words');
         heading.classList.add('hero-stacked-title');
         heading.setAttribute('aria-label', 'Learn by typing. Build knowledge that stays.');
         heading.innerHTML = '<span class="hero-line" aria-hidden="true" style="--line-index:0">Learn by typing.</span><span class="hero-line" aria-hidden="true" style="--line-index:1">Build knowledge</span><span class="hero-line" aria-hidden="true" style="--line-index:2">that stays.</span>';
       }
-      if (copy) copy.textContent = 'Type2Learn is a nonprofit building active, typing-based learning that turns ideas into recall, correction, application, and durable progress.';
+      if (copy) copy.textContent = 'Type2Learn is an education initiative being developed with a nonprofit mission, using typing as an active-learning method through recall, correction, application, and return.';
       const actions = homeHero.querySelectorAll('.hero-actions .button');
       if (actions[0]) actions[0].innerHTML = 'Try it now' + icon('arrow', true);
     }
@@ -318,12 +690,17 @@
       const ctaAction = document.querySelector('.site-cta-actions .button');
       if (ctaCopy) ctaCopy.textContent = 'Explore the learning pathways or begin a guided recall activity designed around one clear next step.';
       if (ctaAction) ctaAction.innerHTML = 'Try it now' + icon('arrow', true);
+      const quote = document.querySelector('.quote-block');
+      if (quote) {
+        const quoteHeading = quote.querySelector('p');
+        if (quoteHeading) quoteHeading.textContent = 'Designed for participation. Led with accountability.';
+      }
     }
 
     const footerLabel = document.querySelector('.footer-preview-label');
     const footerBottom = document.querySelectorAll('.footer-bottom > span');
-    if (footerLabel) footerLabel.textContent = 'Official nonprofit website';
-    if (footerBottom[0]) footerBottom[0].textContent = '© 2026 Type2Learn. A nonprofit for active, accessible learning.';
+    if (footerLabel) footerLabel.textContent = 'Official Type2Learn website';
+    if (footerBottom[0]) footerBottom[0].textContent = '© 2026 Type2Learn. An education initiative being developed with a nonprofit mission.';
     if (footerBottom[1]) footerBottom[1].innerHTML = '<i></i>Learning made active, accessible, and accountable.';
 
     document.querySelectorAll('a[href="/#demo"]').forEach((link) => {
@@ -342,21 +719,59 @@
 
   const enhancePage = () => {
     document.body.classList.add('route-' + route);
+    document.body.classList.add('route-' + routeKey);
+    if (isHomeRoute) document.body.classList.add('route-home');
+    if (isUrdu) document.body.classList.add('is-urdu');
     applyOfficialCopy();
+
+    if (routeKey === 'team') {
+      const teamHero = document.querySelector('#main-content > .page-hero');
+      const teamIntro = document.querySelector('.team-deck-intro');
+      if (teamHero) {
+        const eyebrow = teamHero.querySelector('.eyebrow');
+        const heading = teamHero.querySelector('h1');
+        const copy = teamHero.querySelector('.page-hero-copy > p:not(.eyebrow)');
+        if (isUrdu) {
+          if (eyebrow) eyebrow.innerHTML = '<span class="eyebrow-dot"></span>بانی ٹیم';
+          if (heading) heading.textContent = 'Type2Learn کی بانی ٹیم سے ملیں';
+          if (copy) copy.textContent = 'Type2Learn کے بانی محمد طٰہٰ بن زعیم ہیں۔ ایک کثیر شعبہ جاتی بانی ٹیم سیکھنے کے ڈیزائن، انجینئرنگ، مصنوعی ذہانت، تحقیق، مصنوعات، رسائی اور ذمہ دار تعلیمی ٹیکنالوجی پر کام کر رہی ہے۔';
+          if (teamIntro) {
+            const introHeading = teamIntro.querySelector('h2');
+            const introCopy = teamIntro.querySelector('p:last-child');
+            if (introHeading) introHeading.textContent = 'پانچ افراد پر مشتمل بانی ٹیم سے ملیں۔';
+            if (introCopy) introCopy.textContent = 'بانی پہلے ہیں، پھر انجینئرنگ، تحقیق، AI اور مصنوعات کی رہنمائی کرنے والے شریک بانی۔ ہر پروفائل اپنی موجودہ ذمہ داری واضح کرتا ہے۔';
+          }
+        } else {
+          if (eyebrow) eyebrow.innerHTML = '<span class="eyebrow-dot"></span>Founding team';
+          if (heading) heading.textContent = 'Meet the Type2Learn Founding Team';
+          if (copy) copy.textContent = 'Type2Learn was founded by Muhammad Taha Bin Zaeem and is being developed by a multidisciplinary founding team working across learning design, engineering, artificial intelligence, research, product development, accessibility, and responsible educational technology.';
+          if (teamIntro) {
+            const introHeading = teamIntro.querySelector('h2');
+            const introCopy = teamIntro.querySelector('p:last-child');
+            if (introHeading) introHeading.textContent = 'Meet the five-person founding team.';
+            if (introCopy) introCopy.textContent = 'The founder appears first, followed by the co-founders leading engineering, research, AI, and product. Each profile states its current responsibility clearly.';
+          }
+        }
+      }
+    }
 
     if (document.querySelector('.legal-document, .auth-page')) return;
 
-    if (route === 'home') {
+    if (isHomeRoute) {
       const hero = document.querySelector('#main-content > .hero');
-      if (hero) hero.insertAdjacentHTML('afterend', scrollStory());
+      if (hero) {
+        hero.insertAdjacentHTML('afterend', identitySection());
+        const identity = document.querySelector('.identity-section');
+        if (identity) identity.insertAdjacentHTML('afterend', isUrdu ? urduScrollStory() : scrollStory());
+      }
 
       const legacyLoop = document.querySelector('.learning-loop');
       const legacyLoopSection = legacyLoop && legacyLoop.closest('section');
-      if (legacyLoopSection) legacyLoopSection.outerHTML = homeLearningShuffle();
+      if (legacyLoopSection) legacyLoopSection.outerHTML = isUrdu ? urduHomeLearningShuffle() : homeLearningShuffle();
 
       const supportPanel = document.querySelector('.support-panel');
       const supportHeading = supportPanel && supportPanel.querySelector('h2');
-      if (supportPanel && supportHeading) {
+      if (supportPanel && supportHeading && !isUrdu) {
         supportPanel.classList.add('anaphora-panel');
         const anaphoraSection = supportPanel.closest('section');
         anaphoraSection.classList.add('anaphora-section');
@@ -364,6 +779,10 @@
         supportHeading.className = 'anaphora-heading';
         supportHeading.setAttribute('aria-label', 'Different minds need different controls — not different expectations of dignity.');
         supportHeading.innerHTML = '<span class="anaphora-drop" aria-hidden="true">D</span><span class="anaphora-lines" aria-hidden="true"><span>ifferent minds need</span><span>ifferent controls — not</span><span>ifferent expectations of dignity.</span></span>';
+      } else if (supportPanel && isUrdu) {
+        const controlsSection = supportPanel.closest('section');
+        controlsSection?.classList.add('urdu-controls-section');
+        if (controlsSection) controlsSection.dataset.scrollStops = '4';
       }
 
       const evidenceGrid = document.querySelector('.evidence-grid');
@@ -371,7 +790,7 @@
       const evidenceWrap = evidenceSection && evidenceSection.querySelector(':scope > .content-wrap');
       if (evidenceSection && evidenceWrap) {
         evidenceSection.classList.add('evidence-scene');
-        evidenceWrap.insertAdjacentHTML('afterbegin', '<div class="evidence-scene-heading"><div><p class="section-kicker">Evidence with its status visible</p><h2>Four inputs. One honest standard.</h2></div><p>Research, product translation, lived experience, and planned measurement each have a distinct role. None is presented as proof it has not yet earned.</p></div><div class="evidence-signal" aria-hidden="true"><i></i><i></i><i></i><i></i></div>');
+        evidenceWrap.insertAdjacentHTML('afterbegin', isUrdu ? '<div class="evidence-scene-heading"><div><p class="section-kicker">واضح حیثیت کے ساتھ بنیاد</p><h2>چار زاویے۔ ایک دیانت دار معیار۔</h2></div><p>تحقیق، مصنوعات کا ترجمہ، زندہ تجربہ اور منصوبہ شدہ پیمائش — ہر ایک کا الگ کردار ہے۔ کسی چیز کو اس سے زیادہ ثبوت نہیں کہا جاتا جو اس نے ابھی تک کمایا نہیں۔</p></div><div class="evidence-signal" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' : '<div class="evidence-scene-heading"><div><p class="section-kicker">Evidence with its status visible</p><h2>Four inputs. One honest standard.</h2></div><p>Research, product translation, lived experience, and planned measurement each have a distinct role. None is presented as proof it has not yet earned.</p></div><div class="evidence-signal" aria-hidden="true"><i></i><i></i><i></i><i></i></div>');
       }
     }
 
@@ -465,12 +884,15 @@
     const toggle = document.getElementById('motion-toggle');
     if (toggle) {
       toggle.setAttribute('aria-pressed', String(off));
-      toggle.setAttribute('aria-label', off ? 'Motion Off — turn on decorative motion' : 'Motion On — turn off decorative motion');
-      toggle.innerHTML = icon(off ? 'spark' : 'pause', true) + '<span class="motion-switch-label">Motion</span><span class="motion-switch-state">' + (off ? 'Off' : 'On') + '</span>';
+      const state = off ? (isUrdu ? 'بند' : 'Off') : (isUrdu ? 'آن' : 'On');
+      const label = isUrdu ? 'حرکت' : 'Motion';
+      toggle.setAttribute('aria-label', isUrdu ? ('حرکت ' + state) : (off ? 'Motion Off — turn on decorative motion' : 'Motion On — turn off decorative motion'));
+      toggle.innerHTML = icon(off ? 'spark' : 'pause', true) + '<span class="motion-switch-label">' + label + '</span><span class="motion-switch-state">' + state + '</span>';
     }
     if (off) {
       document.querySelectorAll('.reveal').forEach((node) => node.classList.add('is-visible'));
       document.querySelectorAll('[data-animate-words]').forEach((node) => node.classList.add('is-inview'));
+      document.querySelectorAll('[data-team-card], [data-learning-chit]').forEach((node) => node.setAttribute('aria-hidden', 'false'));
     }
     if (persist) {
       try { window.localStorage.setItem('type2learn-motion', off ? 'off' : 'on'); } catch (error) { /* Settings remain available for this page. */ }
@@ -608,7 +1030,7 @@
 
     const handleHorizontalStep = (delta) => {
       if (!enabled() || !delta) return false;
-      const direction = Math.sign(delta);
+      const direction = Math.sign(delta) * (isUrdu ? -1 : 1);
       if (Date.now() < lockedUntil) return true;
       if (nextStop(direction) === null) return true;
 
@@ -743,8 +1165,8 @@
 
     window.addEventListener('keydown', (event) => {
       if (!enabled() || !canHandleKey(event)) return;
-      const forward = event.key === 'ArrowDown' || event.key === 'ArrowRight' || event.key === 'PageDown' || (event.key === ' ' && !event.shiftKey);
-      const backward = event.key === 'ArrowUp' || event.key === 'ArrowLeft' || event.key === 'PageUp' || (event.key === ' ' && event.shiftKey);
+      const forward = event.key === 'ArrowDown' || (isUrdu ? event.key === 'ArrowLeft' : event.key === 'ArrowRight') || event.key === 'PageDown' || (event.key === ' ' && !event.shiftKey);
+      const backward = event.key === 'ArrowUp' || (isUrdu ? event.key === 'ArrowRight' : event.key === 'ArrowLeft') || event.key === 'PageUp' || (event.key === ' ' && event.shiftKey);
       if (!forward && !backward) return;
       if (scrollToStop(forward ? 1 : -1)) event.preventDefault();
     });
@@ -764,7 +1186,7 @@
       scene.addEventListener('pointermove', (event) => {
         if (document.body.classList.contains('motion-off')) return;
         const rect = scene.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+        const x = (((event.clientX - rect.left) / rect.width - 0.5) * 2) * (isUrdu ? -1 : 1);
         const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
         scene.style.setProperty('--pointer-x', x.toFixed(3));
         scene.style.setProperty('--pointer-y', y.toFixed(3));
@@ -782,6 +1204,7 @@
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         const destination = new URL(link.href, window.location.href);
         if (destination.origin !== window.location.origin) return;
+        if (destination.pathname === window.location.pathname && destination.hash) return;
         event.preventDefault();
         link.classList.add('is-pending');
         document.body.classList.add('is-navigating');
@@ -818,7 +1241,7 @@
     try {
       await loadScript('/vendor/gsap.min.js');
       await loadScript('/vendor/ScrollTrigger.min.js');
-      await import('/experience.js?v=20260722-1');
+      await import('/experience.js?v=20260724-rtl1');
     } catch (error) {
       document.body.classList.add('experience-fallback');
     }
@@ -871,7 +1294,7 @@
       menu.addEventListener('click', () => {
         const open = menu.getAttribute('aria-expanded') === 'true';
         menu.setAttribute('aria-expanded', String(!open));
-        menu.setAttribute('aria-label', open ? 'Open menu' : 'Close menu');
+        menu.setAttribute('aria-label', isUrdu ? (open ? 'مینو کھولیں' : 'مینو بند کریں') : (open ? 'Open menu' : 'Close menu'));
         mobileNav.classList.toggle('is-open', !open);
       });
     }
@@ -899,15 +1322,16 @@
         const input = document.getElementById('demo-answer');
         const answer = input.value.trim().toLowerCase().replace(/[.!?]/g, '');
         const accepted = ['a value that can change', 'a value that changes', 'value that changes', 'a changing value'];
-        if (accepted.includes(answer) || (answer.includes('value') && answer.includes('chang'))) {
+        const isAcceptedUrdu = answer.includes('تبدیل') && (answer.includes('ہو') || answer.includes('ہوت'));
+        if ((isUrdu && isAcceptedUrdu) || (!isUrdu && (accepted.includes(answer) || (answer.includes('value') && answer.includes('chang'))))) {
           feedback.className = 'demo-feedback is-correct';
-          feedback.textContent = 'Good correction-ready response. Next, the lesson would ask you to apply the idea in code.';
+          feedback.textContent = isUrdu ? 'بہت اچھا — یہ جواب درستگی کے اگلے مرحلے کے لیے تیار ہے۔ اب سبق آپ سے خیال کو کوڈ میں استعمال کرنے کو کہے گا۔' : 'Good correction-ready response. Next, the lesson would ask you to apply the idea in code.';
         } else if (!answer) {
           feedback.className = 'demo-feedback is-needs-work';
-          feedback.textContent = 'Try one short phrase. The cue is: “A variable stores a value that can ...”';
+          feedback.textContent = isUrdu ? 'ایک مختصر فقرہ آزمائیں۔ اشارہ یہ ہے: ”ویری ایبل ایک ایسی قدر محفوظ کرتا ہے جو…“' : 'Try one short phrase. The cue is: “A variable stores a value that can ...”';
         } else {
           feedback.className = 'demo-feedback is-needs-work';
-          feedback.textContent = 'You have started the idea. Revisit the cue and explain what can happen to the stored value.';
+          feedback.textContent = isUrdu ? 'آپ نے خیال شروع کر دیا ہے۔ اشارے کی طرف واپس جائیں اور بتائیں کہ محفوظ قدر کے ساتھ کیا ہو سکتا ہے۔' : 'You have started the idea. Revisit the cue and explain what can happen to the stored value.';
         }
       });
       const skip = document.getElementById('skip-demo');
@@ -915,7 +1339,7 @@
         const input = document.getElementById('demo-answer');
         if (input) input.value = '';
         feedback.className = 'demo-feedback';
-        feedback.textContent = 'The activity is reset. Start again whenever you are ready.';
+        feedback.textContent = isUrdu ? 'سرگرمی دوبارہ شروع ہو گئی ہے۔ جب چاہیں پھر سے آغاز کریں۔' : 'The activity is reset. Start again whenever you are ready.';
       });
     }
   };

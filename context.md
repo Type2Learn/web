@@ -61,7 +61,7 @@ Suggested routes:
 - / - landing page and a deterministic 60-second typing demonstration
 - /how-it-works - active-learning loop
 - /pathways - released learning routes and prerequisites
-- /learners, /families, /schools, /research, /team, and /community
+- /learners, /families, /schools, /research, /team, /co-design, and /community
 - /privacy, /terms, /accessibility, /security, and /support
 - authentication plus protected learner and educator application routes
 
@@ -114,7 +114,9 @@ Public team mapping, pending each person's approval of their displayed informati
 | Muhammad Fahad Younus | Co-founder & AI Lead |
 | Idrees Babar | Co-founder & Research Lead |
 | Alizay Hassan | Co-founder & Product Lead |
-| Muhammad Hamiz Bin Kahsif | Co-founder & Engineering Lead |
+| Muhammad Hamiz Bin Kashif | Co-founder & Engineering Lead |
+
+Public co-design status: structured participation and testing with neurodivergent learners and relevant education and accessibility professionals is planned and the participation model is in preparation. Until completed participation is documented, public copy must not say the product has already been shaped, reviewed, tested, advised, or validated by those groups. General feedback must not be described as clinical validation, research evidence, endorsement, or a formal advisory relationship.
 
 Use support@type21earn.tech as the proposed general support route only after it is configured and monitored.
 

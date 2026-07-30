@@ -1,6 +1,6 @@
 # Type2Learn website
 
-Official static, multi-page website for the Type2Learn nonprofit. It uses page-specific photography, module identity marks, Manrope and Cormorant Garamond fonts, GSAP ScrollTrigger, and Three.js. Cloudflare Web Analytics and Google Analytics (`G-9ER1QJLGCW`) are loaded on every HTML page.
+Official static, multi-page website for Type2Learn Active Learning, an education initiative being developed with a nonprofit mission. It uses page-specific photography, module identity marks, Manrope and Cormorant Garamond fonts, GSAP ScrollTrigger, and Three.js. Cloudflare Web Analytics and Google Analytics (`G-9ER1QJLGCW`) are loaded on every HTML page.
 
 The supplied Type2Learn logo is used unchanged in the header and as the browser favicon. The founder's supplied portrait appears first. Co-founder portraits edited from supplied images are labelled as such, and profiles without an approved portrait use a clearly labelled non-human editorial figure.
 
@@ -20,6 +20,8 @@ The root-level `render.yaml` defines a Render static site with `staticPublishPat
 
 Every primary public route has its own directory and `index.html`, so no single-page-app rewrite is needed. Privacy and Terms are full, standalone, indexable documents at `/privacy/` and `/terms/`, with downloadable copies of the supplied source PDFs. Render redirects the former Research page into How it works, Support into Community, and the legacy Accessibility and Security routes into the relevant Trust-center sections.
 
+Every primary marketing page has a dedicated Urdu counterpart under `/ur/`, including How it works, Pathways, Learners, Families, Schools, Team, Co-design, Community, and Trust. Each route is an independently indexable right-to-left experience with self-hosted Urdu fonts, mirrored photography and visual direction, route-to-route language switching, and reciprocal `hreflang` metadata. Browser Urdu preferences route visitors to the matching Urdu page; exact Pakistan-IP routing is available through the privacy-preserving Cloudflare Worker in [`cloudflare/`](cloudflare/), after the domain is proxied through Cloudflare.
+
 The centered account experience is available at `/login/`. All marketing CTA buttons lead into that route; there is no separate header sign-in link. Its seven-scene learner slideshow progressively loads compressed images instead of fetching every photograph at startup. Firebase Authentication powers email/password sign-in, registration, remembered local or session persistence, Google popup/redirect sign-in, password-reset email delivery, authenticated account state, and sign-out. Successful sign-in routes into the protected `/learn/` after-login home. The project must keep Email/Password and Google enabled in Firebase Authentication, with `type2learn.tech` in its authorized-domain list.
 
 The `/learn/` route is a temporary authenticated learning home for the next import phase, with `/afterlogin/` kept as a literal alias during development. It includes a desktop auto-hide sidebar inspired by the `newwebsite` workspace behavior, mobile-friendly static navigation, and the Type2Learn companion mascot from the working preview. Unauthenticated visitors are sent back to `/login/?next=%2Flearn%2F`.
@@ -33,6 +35,8 @@ Images are compressed WebP assets where source fidelity allows it, and below-the
 ## Search indexing
 
 Every primary route has a unique title, description, canonical URL, Open Graph and Twitter metadata, index directives, and Schema.org structured data. Duplicate legacy routes are excluded from indexing and canonicalized to their consolidated pages.
+
+The homepage and founding-team routes include their core identity, named team, active-development status, and co-design status directly in the initial HTML for non-JavaScript crawlers. `/co-design/` and `/ur/co-design/` publish the intended contributor groups, decisions, feedback process, consent/privacy/safeguarding requirements, compensation-status requirement, and a truthful status ledger. The site does not claim completed external neurodivergent co-design or clinical validation while that work remains in preparation.
 
 - Sitemap: `https://type2learn.tech/sitemap.xml`
 - Crawler rules: `https://type2learn.tech/robots.txt`

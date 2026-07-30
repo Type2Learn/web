@@ -8,6 +8,7 @@ const startExperience = async () => {
   gsap.registerPlugin(ScrollTrigger);
 
   const motionIsOff = () => document.body.classList.contains('motion-off') || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const horizontalDirection = document.documentElement.dir === 'rtl' ? -1 : 1;
   const activeScrollTriggers = [];
   let storyTimeline = null;
   let renderPath = null;
@@ -193,7 +194,7 @@ const startExperience = async () => {
       return;
     }
 
-    gsap.set(cards, { autoAlpha: 0, xPercent: 112, rotation: 2.5 });
+    gsap.set(cards, { autoAlpha: 0, xPercent: 112 * horizontalDirection, rotation: 2.5 * horizontalDirection });
     gsap.set(cards[0], { autoAlpha: 1, xPercent: 0, rotation: 0 });
     const timeline = gsap.timeline({
       defaults: { ease: 'none' },
@@ -213,7 +214,7 @@ const startExperience = async () => {
     for (let index = 1; index < cards.length; index += 1) {
       const changeAt = index - .28;
       timeline
-        .to(cards[index - 1], { autoAlpha: 0, xPercent: -112, rotation: -2.5, duration: .16 }, changeAt)
+        .to(cards[index - 1], { autoAlpha: 0, xPercent: -112 * horizontalDirection, rotation: -2.5 * horizontalDirection, duration: .16 }, changeAt)
         .set(cards[index], { visibility: 'visible' }, changeAt + .12)
         .to(cards[index], { autoAlpha: 1, xPercent: 0, rotation: 0, duration: .16 }, changeAt + .12);
     }
@@ -252,7 +253,7 @@ const startExperience = async () => {
         window.requestAnimationFrame(() => {
           const first = cards[0].getBoundingClientRect();
           const gap = parseFloat(window.getComputedStyle(stack).columnGap || 0);
-          const index = Math.round(stack.scrollLeft / Math.max(first.width + gap, 1));
+          const index = Math.round(Math.abs(stack.scrollLeft) / Math.max(first.width + gap, 1));
           setState(index, false);
           framePending = false;
         });
@@ -460,6 +461,7 @@ const startExperience = async () => {
     if (canvas) canvas.hidden = off;
     if (off) {
       gsap.set('.story-scene, .story-step, .section-heading, .anaphora-panel, .anaphora-drop, .anaphora-lines > span, .support-item, [data-team-feature], [data-team-feature] img, .founder-copy, .loop-chit, .team-profile-card, .team-profile-portrait, .team-profile-portrait img, .team-profile-copy > *, .evidence-scene-heading, .evidence-signal i, .evidence-card', { clearProps: 'all' });
+      document.querySelectorAll('[data-chit-card], [data-team-card]').forEach((card) => card.setAttribute('aria-hidden', 'false'));
       setStoryState(0);
     }
     ScrollTrigger.refresh();

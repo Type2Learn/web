@@ -8,6 +8,9 @@ services:
       - path: /app.js
         name: Cache-Control
         value: public, max-age=0, must-revalidate
+      - path: /locale-routing.js
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
       - path: /experience.js
         name: Cache-Control
         value: public, max-age=0, must-revalidate
@@ -27,6 +30,9 @@ services:
         name: Cache-Control
         value: public, max-age=0, must-revalidate
       - path: /styles.css
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /urdu.css
         name: Cache-Control
         value: public, max-age=0, must-revalidate
       - path: /*
