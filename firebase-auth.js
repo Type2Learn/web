@@ -13,7 +13,6 @@ import {
   signOut,
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
-import { hasCompletedLearnerSetup } from '/learner-settings.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAvzBlOjnU42ePOhE7X2i_iHbkD6kOQyX0',
@@ -23,47 +22,6 @@ const firebaseConfig = {
   messagingSenderId: '383070749572',
   appId: '1:383070749572:web:c62898e35210bce59c13d1',
   measurementId: 'G-W0MFX5E8EL'
-};
-
-export const getType2LearnAuth = () => {
-  const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  return getAuth(firebaseApp);
-};
-
-export const waitForType2LearnUser = () => new Promise((resolve) => {
-  const auth = getType2LearnAuth();
-  let settled = false;
-  let unsubscribe = null;
-  let timeout = 0;
-  const finish = (user) => {
-    if (settled) return;
-    settled = true;
-    window.clearTimeout(timeout);
-    if (unsubscribe) unsubscribe();
-    resolve(user || null);
-  };
-  timeout = window.setTimeout(() => finish(null), 6000);
-  unsubscribe = onAuthStateChanged(auth, (user) => finish(user), () => finish(null));
-  if (settled && unsubscribe) unsubscribe();
-});
-
-const safeReturnPath = () => {
-  const requested = new URLSearchParams(window.location.search).get('next');
-  if (!requested) return '';
-  try {
-    const destination = new URL(requested, window.location.origin);
-    const allowed = new Set(['/course/', '/learn/', '/profile/', '/settings/']);
-    return destination.origin === window.location.origin && allowed.has(destination.pathname) ? destination.pathname : '';
-  } catch (_) {
-    return '';
-  }
-};
-
-const learnerIdFor = (user) => user?.uid || user?.email || 'learner';
-const learnerDestination = (user, requestedPath) => {
-  const destination = requestedPath || '/learn/';
-  if (hasCompletedLearnerSetup(learnerIdFor(user))) return destination;
-  return '/learn/?next=' + encodeURIComponent(destination);
 };
 
 const errorMessages = {
@@ -84,6 +42,27 @@ const errorMessages = {
 
 const messageFor = (error) => errorMessages[error?.code] || 'Authentication could not be completed. Please try again.';
 
+export const getType2LearnAuth = () => {
+  const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  const auth = getAuth(firebaseApp);
+  auth.useDeviceLanguage();
+  return auth;
+};
+
+export const waitForType2LearnUser = () => new Promise((resolve) => {
+  const auth = getType2LearnAuth();
+  let unsubscribe = () => {};
+  unsubscribe = onAuthStateChanged(auth, (user) => {
+    unsubscribe();
+    resolve(user);
+  }, () => {
+    unsubscribe();
+    resolve(null);
+  });
+});
+
+export const signOutType2LearnUser = () => signOut(getType2LearnAuth());
+
 export const setupFirebaseAuth = ({ setStatus }) => {
   const auth = getType2LearnAuth();
   const provider = new GoogleAuthProvider();
@@ -103,7 +82,22 @@ export const setupFirebaseAuth = ({ setStatus }) => {
   const loginEmail = document.getElementById('login-email');
   const rememberEmail = document.getElementById('remember-email');
 
-  auth.useDeviceLanguage();
+  const safeAuthDestination = () => {
+    const fallback = '/learn/';
+    const next = new URLSearchParams(window.location.search).get('next') || fallback;
+    try {
+      const destination = new URL(next, window.location.origin);
+      if (destination.origin !== window.location.origin) return fallback;
+      if (destination.pathname === '/login/') return fallback;
+      return destination.pathname + destination.search + destination.hash;
+    } catch (error) {
+      return fallback;
+    }
+  };
+
+  const redirectAfterAuth = () => {
+    window.location.assign(safeAuthDestination());
+  };
 
   const setBusy = (form, busy) => {
     dialog?.setAttribute('aria-busy', String(busy));
@@ -147,19 +141,9 @@ export const setupFirebaseAuth = ({ setStatus }) => {
     }
   };
 
-  let returningToLearning = false;
   onAuthStateChanged(auth, (user) => {
-    if (user) {
-      const next = safeReturnPath();
-      if (!returningToLearning) {
-        returningToLearning = true;
-        window.location.replace(learnerDestination(user, next));
-        return;
-      }
-      showAuthenticatedUser(user);
-    } else {
-      showSignedOutState();
-    }
+    if (user) showAuthenticatedUser(user);
+    else showSignedOutState();
   });
 
   loginForm?.addEventListener('submit', async (event) => {
@@ -175,6 +159,7 @@ export const setupFirebaseAuth = ({ setStatus }) => {
         if (rememberEmail?.checked) window.localStorage.setItem('type2learn-remember-email', loginEmail.value.trim());
         else window.localStorage.removeItem('type2learn-remember-email');
       } catch (error) { /* Authentication remains available if storage is restricted. */ }
+      redirectAfterAuth();
     } catch (error) {
       setStatus(loginForm, messageFor(error), 'error');
     } finally {
@@ -188,16 +173,17 @@ export const setupFirebaseAuth = ({ setStatus }) => {
       setBusy(form, true);
       setStatus(form, 'Opening secure Google sign-in…', 'working');
       try {
-      const persistence = rememberEmail?.checked ? browserLocalPersistence : browserSessionPersistence;
-      provider.setCustomParameters({ prompt: 'select_account' });
-        await setPersistence(auth, persistence);
+        const persistence = rememberEmail?.checked ? browserLocalPersistence : browserSessionPersistence;
+        provider.setCustomParameters({ prompt: 'select_account' });
         await signInWithPopup(auth, provider);
+        await setPersistence(auth, persistence);
+        redirectAfterAuth();
       } catch (error) {
         setStatus(form, messageFor(error), 'error');
       } finally {
         setBusy(form, false);
       }
-  });
+    });
   });
 
   registerForm?.addEventListener('submit', async (event) => {
@@ -214,6 +200,7 @@ export const setupFirebaseAuth = ({ setStatus }) => {
       const displayName = document.getElementById('register-name').value.trim();
       if (displayName) await updateProfile(credential.user, { displayName });
       showAuthenticatedUser(credential.user);
+      redirectAfterAuth();
     } catch (error) {
       setStatus(registerForm, messageFor(error), 'error');
     } finally {
@@ -250,5 +237,3 @@ export const setupFirebaseAuth = ({ setStatus }) => {
 
   return auth;
 };
-
-export const signOutType2LearnUser = () => signOut(getType2LearnAuth());

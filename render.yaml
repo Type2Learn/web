@@ -17,9 +17,6 @@ services:
       - path: /firebase-auth.js
         name: Cache-Control
         value: public, max-age=0, must-revalidate
-      - path: /learner-settings.js
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
       - path: /learn/learn.js
         name: Cache-Control
         value: public, max-age=0, must-revalidate
@@ -36,24 +33,6 @@ services:
         name: Cache-Control
         value: public, max-age=0, must-revalidate
       - path: /urdu.css
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-      - path: /course/*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-      - path: /courses/*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-      - path: /learn/*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-      - path: /learner/*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-      - path: /profile/*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-      - path: /settings/*
         name: Cache-Control
         value: public, max-age=0, must-revalidate
       - path: /*

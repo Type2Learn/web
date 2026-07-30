@@ -11,16 +11,27 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learning Home | Type2Learn</title>
+    <meta name="description" content="Your Type2Learn learning home, with a clear next action, private support reminders, and a temporary auto-hide sidebar.">
     <meta name="robots" content="noindex, nofollow">
+    <meta name="author" content="Type2Learn">
+    <meta name="application-name" content="Type2Learn">
     <meta name="theme-color" content="#F5FAFF">
-    <title>Your learning | Type2Learn</title>
+    <link rel="canonical" href="https://type2learn.tech/learn/">
     <link rel="icon" type="image/png" href="/assets/type2learn-favicon.png">
-    <link rel="stylesheet" href="/learner/learner.css?v=20260730-import">
+    <link rel="apple-touch-icon" href="/assets/type2learn-favicon.png">
+    <link rel="preload" href="/assets/type2learn-logo-nav.webp" as="image" type="image/webp" fetchpriority="high">
+    <link rel="stylesheet" href="/learn/learn.css?v=20260722-1">
+    <link rel="stylesheet" href="/mascot.css?v=20260722-1">
   </head>
-  <body data-learner-view="dashboard">
-    <a class="learner-skip" href="#learner-main">Skip to learning content</a>
-    <div id="learner-app"></div>
-    <script type="module" src="/learn/learn.js?v=20260730-import"></script>
-    <!-- Cloudflare Web Analytics --><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"dc0ad786ed4e4a2c93f125b847e013c7"}'></script><!-- End Cloudflare Web Analytics -->
+  <body data-app-route="learn">
+    <a class="learner-skip" href="#learn-main">Skip to learning home</a>
+    <div id="learn-app">
+      <main class="learn-loading" id="learn-main" aria-live="polite">Opening your Type2Learn space...</main>
+    </div>
+    <noscript><main class="learn-noscript"><h1>Type2Learn learning home</h1><p>JavaScript is required for account access. <a href="/login/">Return to sign in.</a></p></main></noscript>
+    <script type="module" src="/learn/learn.js?v=20260722-1"></script>
+    <script src="/mascot.js?v=20260722-1" defer></script>
+    <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "dc0ad786ed4e4a2c93f125b847e013c7"}'></script><!-- End Cloudflare Web Analytics -->
   </body>
 </html>
