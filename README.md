@@ -24,7 +24,9 @@ Every primary marketing page has a dedicated Urdu counterpart under `/ur/`, incl
 
 The centered account experience is available at `/login/`. All marketing CTA buttons lead into that route; there is no separate header sign-in link. Its seven-scene learner slideshow progressively loads compressed images instead of fetching every photograph at startup. Firebase Authentication powers email/password sign-in, registration, remembered local or session persistence, Google popup/redirect sign-in, password-reset email delivery, authenticated account state, and sign-out. Successful sign-in routes into the protected `/learn/` after-login home. The project must keep Email/Password and Google enabled in Firebase Authentication, with `type2learn.tech` in its authorized-domain list.
 
-The `/learn/` route is a temporary authenticated learning home for the next import phase, with `/afterlogin/` kept as a literal alias during development. It includes a desktop auto-hide sidebar inspired by the `newwebsite` workspace behavior, mobile-friendly static navigation, and the Type2Learn companion mascot from the working preview. Unauthenticated visitors are sent back to `/login/?next=%2Flearn%2F`.
+The authenticated learning application is available through `/learn/`, `/course/`, `/profile/`, and `/settings/`, with `/afterlogin/` retained as an alias. New learners choose private, changeable support settings before entering an 11-module active-learning course. The course supports written and narrated content, focused steps, local autosave/resume, correction, application, final review, profile controls, and the Type2Learn 3D companion mascot. Unauthenticated visitors are sent back to `/login/`.
+
+Support choices and course progress currently use browser-local prototype storage scoped to the signed-in learner. This is not a production learner-data backend and must not be represented as one.
 
 ## LinkedIn campaign
 
