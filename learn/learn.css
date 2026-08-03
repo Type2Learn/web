@@ -478,73 +478,86 @@ a:focus-visible {
 
 .learning-open-row:last-child { border-bottom: 1px solid var(--learn-line-strong); }
 
-  color: var(--learn-soft);
-  font-size: clamp(1.02rem, 2vw, 1.3rem);
-  line-height: 1.6;
-}
-
-.learn-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 30px;
-}
-
-.learn-action {
-  min-height: 50px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 1px solid var(--learn-blue);
-  border-radius: 10px;
-  padding: 0 18px;
-  color: var(--learn-blue);
-  background: #fff;
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.learn-action.is-primary {
-  border-color: var(--learn-green);
-  color: #062213;
-  background: var(--learn-green);
-  box-shadow: 0 16px 35px rgba(25, 200, 90, .18);
-}
-
-.learn-action:hover {
-  transform: translateY(-2px);
-}
-
-.welcome-visual {
-  position: relative;
-  min-height: 500px;
-}
-
-.learning-card-stack {
-  position: absolute;
-  inset: 0;
+.learning-open-row > .learning-control {
   display: grid;
-  place-items: center;
+  grid-template-columns: minmax(220px, .8fr) minmax(300px, 1.2fr);
+  align-items: center;
+  column-gap: clamp(28px, 5vw, 96px);
+  row-gap: 4px;
 }
 
-.learning-card {
-  position: absolute;
-  width: min(100%, 420px);
-  min-height: 520px;
-  border: 1px solid var(--learn-line-strong);
-  border-radius: 8px;
-  padding: 28px;
-  background: rgba(255, 255, 255, .9);
-  box-shadow: 0 28px 75px rgba(10, 22, 48, .15);
-  transform: rotate(var(--tilt, 0deg)) translate3d(var(--shift, 0), var(--rise, 0), 0);
+.learning-open-row > .learning-control h2 { grid-column: 1; grid-row: 1; }
+.learning-open-row > .learning-control p { grid-column: 1; grid-row: 2; min-height: 0; margin-bottom: 0; font-size: 13px; }
+.learning-open-row > .learning-control .preference-options { grid-column: 2; grid-row: 1 / span 2; }
+
+.learning-open-row .learning-noise-details {
+  max-width: min(100%, 720px);
+  margin: 24px 0 0 auto;
 }
 
-.learning-card:nth-child(1) { --tilt: -7deg; --shift: -36px; --rise: 16px; }
-.learning-card:nth-child(2) { --tilt: 4deg; --shift: 26px; --rise: 4px; }
-.learning-card:nth-child(3) { --tilt: 0deg; --shift: 0; --rise: -12px; }
+.learning-open-row .learning-mascot-details {
+  margin-top: 24px;
+  border-top: 1px solid var(--learn-line);
+  padding-top: 24px;
+}
 
-.learning-card strong,
+@media (min-width: 1181px) {
+  .learn-main--with-mascot {
+    position: relative;
+    /* Reserve the speech-bubble gutter as well as the companion itself so
+       it never covers a preference label or option. */
+    padding-right: clamp(620px, 52vw, 860px);
+  }
+
+  .learn-main--with-mascot .learning-settings {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .learn-main--with-mascot .learning-focused-settings {
+    width: min(100%, 820px);
+    margin: 0;
+  }
+
+  .learning-setup-mascot-rail {
+    position: fixed;
+    z-index: 8;
+    top: 50%;
+    right: clamp(28px, 3.5vw, 74px);
+    /* Match the desktop course companion: a large right rail, vertically
+       centered in the available screen rather than boxed into the setup. */
+    width: clamp(390px, 34vw, 620px);
+    height: calc(100dvh - 73px);
+    display: block;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  .learning-mascot-stage {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .learning-mascot-dialogue {
+    position: absolute;
+    z-index: 2;
+    top: 35%;
+    right: 76%;
+    width: min(310px, 66%);
+    margin: 0;
+    border: 1px solid color-mix(in srgb, var(--learn-line-strong) 82%, transparent);
+    border-radius: 14px;
+    padding: 12px 14px;
+    color: var(--learn-ink);
+    background: color-mix(in srgb, var(--learn-paper) 92%, transparent);
+    box-shadow: 0 10px 28px rgba(18, 52, 83, .08);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
 .learning-card span,
 .learning-card small {
   display: block;

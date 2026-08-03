@@ -402,29 +402,74 @@ const balancedStageMarkup = (choices) => {
   return [
   '<main class="learn-main' + mascotMainClass(choices) + '" id="learn-main"' + setupLanguageAttributes(choices) + '>',
   '<section class="learning-settings" aria-labelledby="learning-settings-title">',
-  };
-  const scheduleReveal = () => {
-    if (!enabled() || !hidden || pointerDown || revealTimer) return;
-    revealTimer = window.setTimeout(show, 240);
-  };
+  '<header class="learning-settings-header">',
+  '<p>' + copy.preferences + '</p>',
+  '<h1 id="learning-settings-title">' + copy.title + '</h1>',
+  '<span>' + copy.balancedIntro + '</span>',
+  '<small class="learning-settings-later">' + copy.laterSettings + '</small>',
+  '</header>',
+  '<div class="learning-control-list" aria-label="' + copy.preferences + '">',
+  preferenceControls.map((control) => controlMarkup(control, choices[control.id], setupLanguage(choices)) + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '') + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')).join(''),
+  '</div>',
+  '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="language">' + (setupLanguage(choices) === 'urdu' ? 'زبان پر واپس' : 'Back to language') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
+  '</section>',
+  mascotRailMarkup(choices),
+  '</main>'
+].join('');
+};
 
-  toggle.addEventListener('click', () => {
-    autoHide = !autoHide;
-    writeAutoHide(autoHide);
-    hidden = false;
-    clearHide();
-    clearReveal();
-    clearOutside();
-    apply();
-    scheduleHide();
-  });
+const openControlRowMarkup = (control, choices) => '<article class="learning-open-row">'
+  + controlMarkup(control, choices[control.id], setupLanguage(choices))
+  + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '')
+  + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')
+  + '</article>';
 
-  reveal.addEventListener('pointerenter', scheduleReveal, { passive: true });
-  reveal.addEventListener('pointerleave', clearReveal, { passive: true });
-  reveal.addEventListener('focus', scheduleReveal);
-  reveal.addEventListener('blur', clearReveal);
-  reveal.addEventListener('click', show);
+const openStageMarkup = (choices) => {
+  const copy = setupCopy(choices);
+  return [
+    '<main class="learn-main learn-main--open' + mascotMainClass(choices) + '" id="learn-main"' + setupLanguageAttributes(choices) + '>',
+    '<section class="learning-settings learning-settings--open" aria-labelledby="learning-settings-title">',
+    '<header class="learning-settings-header">',
+    '<p>' + copy.preferences + '</p>',
+    '<h1 id="learning-settings-title">' + copy.title + '</h1>',
+    '<span>' + copy.openIntro + '</span>',
+    '<small class="learning-settings-later">' + copy.laterSettings + '</small>',
+    '</header>',
+    '<div class="learning-control-list learning-control-list--open" aria-label="' + copy.preferences + '">',
+    preferenceControls.map((control) => openControlRowMarkup(control, choices)).join(''),
+    '</div>',
+    '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="language">' + (setupLanguage(choices) === 'urdu' ? 'زبان پر واپس' : 'Back to language') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
+    '</section>',
+    mascotRailMarkup(choices),
+    '</main>'
+  ].join('');
+};
 
+const mainContent = (choices) => {
+  if (setupStage === 'language') return languageStageMarkup(choices);
+  if (setupStage === 'focused') return focusedStageMarkup(choices);
+  if (choices.layout === 'open') return openStageMarkup(choices);
+  return balancedStageMarkup(choices);
+};
+
+const syncMascotPreview = (choices) => {
+  const stage = app.querySelector('[data-learning-mascot-stage]');
+  if (choices.mascot !== 'on' || !stage || !mascotScreenIsSupported()) {
+    mascotPreview?.unmount?.();
+    return;
+  }
+  if (!mascotPreviewLoad) {
+    mascotPreviewLoad = import('/course/mascot-3d.js?v=20260801-settingsmenu6')
+      .then(({ createCourseMascot }) => {
+        mascotPreview = createCourseMascot();
+        return mascotPreview;
+      })
+      .catch(() => null);
+  }
+  mascotPreviewLoad.then((mascot) => {
+    if (!mascot || !stage.isConnected || stage !== app.querySelector('[data-learning-mascot-stage]') || choices.mascot !== 'on') return;
+    mascot.mount(stage, {
+      encouragement: choices.encouragement,
   sidebarElement.addEventListener('pointerenter', () => {
     insideSidebar = true;
     clearHide();
