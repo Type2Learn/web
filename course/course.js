@@ -3361,3 +3361,73 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     render();
     showCurrentTaskFromStart();
   };
+
+  const finishCheck = () => {
+    const check = currentStep().check;
+    const selectedIndex = Number(state.progress.attempt.selectedAnswer);
+    if (state.progress.attempt.submitted || state.progress.attempt.selectedAnswer === '' || !Number.isInteger(selectedIndex) || !check.options[selectedIndex]) return;
+    state.progress.attempt.submitted = true;
+    const kind = check.options[selectedIndex][1] ? 'answer-correct' : 'answer-incorrect';
+    state.progress.attempt.feedback = recordSupportMoment(kind, { result: 'quick-check' });
+    save();
+    render();
+    window.requestAnimationFrame(() => app.querySelector('.course-task-actions button')?.focus?.({ preventScroll: true }));
+  };
+
+  const continueCheck = () => {
+    const check = currentStep().check;
+    const selectedIndex = Number(state.progress.attempt.selectedAnswer);
+    if (!state.progress.attempt.submitted || !Number.isInteger(selectedIndex) || !check.options[selectedIndex]?.[1]) return;
+    state.progress.phase = 'apply';
+    state.progress.attempt = blankAttempt();
+    recordSupportMoment('task-entry', { result: 'applied-practice' });
+    save();
+    render();
+    showCurrentTaskFromStart('.course-question-card');
+    announce(check.explanation);
+  };
+
+  const finishApply = () => {
+    const selectedIndex = Number(state.progress.attempt.selectedAnswer);
+    if (state.progress.attempt.submitted || state.progress.attempt.selectedAnswer === '' || !Number.isInteger(selectedIndex)) return;
+    state.progress.attempt.submitted = true;
+    state.progress.attempt.feedback = recordSupportMoment(selectedIndex === 0 ? 'answer-correct' : 'answer-incorrect', { result: 'applied-practice' });
+    save();
+    render();
+    window.requestAnimationFrame(() => app.querySelector('.course-task-actions button')?.focus?.({ preventScroll: true }));
+  };
+
+  const continueApply = () => {
+    const selectedIndex = Number(state.progress.attempt.selectedAnswer);
+    if (!state.progress.attempt.submitted || selectedIndex !== 0) return;
+    if (!state.progress.completedSteps.includes(state.progress.lessonIndex)) state.progress.completedSteps.push(state.progress.lessonIndex);
+    state.progress.phase = 'complete';
+    state.progress.attempt = blankAttempt();
+    recordSupportMoment('module-complete', { result: 'module' });
+    save();
+    render();
+  };
+
+  const checkTyping = () => {
+    const typing = currentStep().typing;
+    const sectionTyping = usesLessonSectionTyping();
+    const activeSection = sectionTyping ? activeLessonTypingSection() : null;
+    const response = normaliseText(state.progress.attempt.response);
+    if (!response) {
+      state.progress.attempt.feedback = recordSupportMoment('response-needed', { result: 'typing' });
+      save();
+      render();
+      return;
+    }
+    if (typing.level === 'Recall typing') {
+      if (response.length < 24) {
+        state.progress.attempt.feedback = recordSupportMoment('typing-incomplete', { result: 'recall' });
+        save();
+        render();
+        return;
+      }
+      state.progress.phase = 'check';
+      state.progress.attempt.feedback = '';
+      recordSupportMoment('section-complete', { result: 'lesson-complete', phase: 'check' });
+      save();
+      render();
