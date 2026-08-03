@@ -341,3 +341,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     showSimple: false,
     readingSectionIndex: 0,
     reviewModuleIndex: null,
+    settingsMenu: false,
+    storageAvailable: true
+  });
+
+  const normaliseState = (saved, sharedSettings) => {
+    const fresh = defaultState();
+    if (!saved || typeof saved !== 'object') return fresh;
+    // Shared learner settings are the only live settings source. Historical
+    // course preference snapshots are handled once, before normalisation, so a
+    // full old resolved object cannot become a permanent set of user overrides.
+    fresh.settings = createSettingsState(sharedSettings);
+    // Preferences are completed before this route opens. Historical setup
+    // screens are intentionally not part of the course flow.
+    const savedView = ['dashboard', 'course', 'browse', 'saved'].includes(saved.view) ? saved.view : 'dashboard';
+    fresh.view = savedView;
+    fresh.previousView = ['dashboard', 'course', 'browse', 'saved'].includes(saved.previousView) ? saved.previousView : 'dashboard';
+    fresh.preferences = { ...fresh.preferences, ...resolveSettings(fresh.settings) };
+    fresh.preferences.automaticSaving = true;
+    if (!['standard', 'large', 'extra-large'].includes(fresh.preferences.textSize)) fresh.preferences.textSize = 'standard';
+    if (!['standard', 'relaxed'].includes(fresh.preferences.spacing)) fresh.preferences.spacing = 'standard';
+    const savedProgress = saved.progress || {};
+    fresh.progress.lessonIndex = Math.min(Math.max(Number(savedProgress.lessonIndex) || 0, 0), COURSE.steps.length - 1);
+    fresh.progress.phase = ['preview', 'read', 'type', 'check', 'apply', 'complete', 'exam-intro', 'exam', 'exam-results'].includes(savedProgress.phase) ? savedProgress.phase : 'preview';
+    fresh.progress.completedSteps = Array.isArray(savedProgress.completedSteps)
+      ? savedProgress.completedSteps.filter((index) => Number.isInteger(index) && index >= 0 && index < COURSE.steps.length)
+      : [];
+    const savedAttempt = savedProgress.attempt || {};
+    fresh.progress.attempt = { ...blankAttempt(), ...savedAttempt };
+    // A former one-line typing response cannot represent the new complete
+    // section-by-section lesson flow. Start that changed task at section one
+    // rather than resuming halfway through a mismatched activity.
+    if (fresh.progress.phase === 'type' && savedAttempt.lessonTypingVersion !== 2) {
+      fresh.progress.attempt = blankAttempt();
+    }
+    // The former input-method chooser is no longer part of the interface.
+    // Preserve the response itself, but do not leave a legacy mode silently
+    // allowing pasted or dropped text after a learner returns.
+    fresh.progress.attempt.inputMethod = 'keyboard';
+    fresh.progress.attempt.alternativeInput = false;
+    const savedExam = savedProgress.finalExam || {};
+    const questionCount = finalExamQuestionCount();
+    const answers = Array.isArray(savedExam.answers) ? savedExam.answers : [];
+    fresh.progress.finalExam = {
+      questionIndex: Math.min(Math.max(Number(savedExam.questionIndex) || 0, 0), Math.max(questionCount - 1, 0)),
+      answers: Array.from({ length: questionCount }, (_, index) => {
+        const answer = answers[index];
+        return Number.isInteger(answer) && answer >= 0 && answer < 4 ? answer : null;
+      }),
+      submitted: Boolean(savedExam.submitted),
+      completed: Boolean(savedExam.completed)
+    };
+    if (fresh.progress.finalExam.completed && fresh.progress.phase === 'exam') fresh.progress.phase = 'exam-results';
+    if (fresh.progress.phase === 'exam-results') fresh.progress.finalExam.completed = true;
+    if (fresh.progress.finalExam.submitted && fresh.progress.finalExam.answers[fresh.progress.finalExam.questionIndex] === null) fresh.progress.finalExam.submitted = false;
+    // Older builds used `showExample` for both a learner's disclosure choice
+    // and examples automatically opened by the global setting. Those sources
+    // cannot be distinguished safely, so only the new explicit manual value is
+    // restored. The resolved global setting is evaluated independently below.
+    fresh.manualExampleVisible = Boolean(saved.manualExampleVisible);
+    fresh.showSimple = Boolean(saved.showSimple);
+    fresh.readingSectionIndex = Math.max(0, Number(saved.readingSectionIndex) || 0);
+    return fresh;
+  };
+
+  const LEGACY_COURSE_SETTINGS_MIGRATION_VERSION = 1;
+  const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
+
+  const migrateLegacyCoursePreferences = (sharedSettings, legacyPreferences) => {
