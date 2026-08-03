@@ -3111,7 +3111,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!mascotCanAppear()) return Promise.resolve(null);
     if (courseMascot) return Promise.resolve(courseMascot);
     if (!mascotControllerLoad) {
-      mascotControllerLoad = import('./mascot-3d.js?v=20260802-motion8')
+      // 3D rollback reference: the complete Three.js implementation remains
+      // untouched in mascot-3d.js and can be restored with this loader.
+      // mascotControllerLoad = import('./mascot-3d.js?v=20260802-motion8')
+      //   .then(({ createCourseMascot }) => {
+      //     courseMascot = createCourseMascot();
+      //     return courseMascot;
+      //   })
+      //   .catch(() => null);
+      mascotControllerLoad = import('./mascot-2d.js?v=20260803-2d1')
         .then(({ createCourseMascot }) => {
           courseMascot = createCourseMascot();
           return courseMascot;
@@ -3133,7 +3141,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const supportMoment = activeSupportMoment;
     loadCourseMascot().then((mascot) => {
       // A render may have replaced the target while the controller was being
-      // fetched. Never attach a late 3D canvas to a detached page fragment.
+      // fetched. Never attach the companion to a detached page fragment.
       if (!mascot || !stage.isConnected || stage !== app.querySelector('[data-course-mascot-stage]') || !mascotCanAppear()) return;
       mascot.mount(stage, { ...mascotPresentation, reducedMotion, scene, location: state.view });
       if (supportMoment && activeSupportMoment?.id === supportMoment.id && supportMoment.id !== lastMascotSupportEventId) {

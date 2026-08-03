@@ -11,7 +11,10 @@ const backgroundNoiseSources = {
   brown: '/assets/audio/background-noise/brown-noise-loop.mp3'
 };
 const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0.15, playing: false, fadeFrame: null, playRequest: 0 };
-const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';
+const mascotImageUrl = '/assets/2D%20Mascot/blinking.webp';
+// 3D rollback reference: preserve the original model URL alongside the
+// untouched course/mascot-3d.js implementation.
+// const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';
 let mascotAssetsWarmed = false;
 let mascotPreview = null;
 let mascotPreviewLoad = null;
@@ -78,26 +81,18 @@ const warmMascotAssets = () => {
   if (mascotAssetsWarmed || !mascotScreenIsSupported()) return;
   mascotAssetsWarmed = true;
   [
-    ['modulepreload', '/vendor/three.module.min.js'],
-    ['modulepreload', '/vendor/GLTFLoader.js'],
-    ['modulepreload', '/vendor/BufferGeometryUtils.js'],
-    ['modulepreload', '/vendor/SkeletonUtils.js'],
-    ['preload', mascotModelUrl]
+    ['preload', mascotImageUrl]
   ].forEach(([rel, href]) => {
     const link = document.createElement('link');
     link.rel = rel;
     link.href = href;
     if (rel === 'preload') {
-      link.as = 'fetch';
-      link.type = 'model/gltf-binary';
-      link.crossOrigin = 'anonymous';
+      link.as = 'image';
+      link.type = 'image/webp';
     }
     document.head.append(link);
   });
-  // The model keeps every animation in one local GLB. Warming this opt-in
-  // request before Continue means no individual animation needs to buffer in
-  // the course.
-  window.fetch?.(mascotModelUrl, { cache: 'force-cache' }).catch(() => {});
+  window.fetch?.(mascotImageUrl, { cache: 'force-cache' }).catch(() => {});
 };
 
 const setupLanguage = (choices) => choices['learning-language'] === 'urdu' ? 'urdu' : 'english';
@@ -459,7 +454,15 @@ const syncMascotPreview = (choices) => {
     return;
   }
   if (!mascotPreviewLoad) {
-    mascotPreviewLoad = import('/course/mascot-3d.js?v=20260801-settingsmenu6')
+    // 3D rollback reference: restore this former loader to reinstate the
+    // preserved 3D preview implementation.
+    // mascotPreviewLoad = import('/course/mascot-3d.js?v=20260801-settingsmenu6')
+    //   .then(({ createCourseMascot }) => {
+    //     mascotPreview = createCourseMascot();
+    //     return mascotPreview;
+    //   })
+    //   .catch(() => null);
+    mascotPreviewLoad = import('/course/mascot-2d.js?v=20260803-2d1')
       .then(({ createCourseMascot }) => {
         mascotPreview = createCourseMascot();
         return mascotPreview;
