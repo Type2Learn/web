@@ -3498,3 +3498,73 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       announce('Unable to sign out right now. Please try again.');
     }
   };
+
+  const openCoursePreferences = () => {
+    const destination = new URL('/afterlogin/', window.location.origin);
+    destination.searchParams.set('course', COURSE.id);
+    window.location.assign(destination.pathname + destination.search);
+  };
+
+  const saveCourseLearningChoice = (key, value) => {
+    const choices = learningChoices();
+    choices[key] = value;
+    // The companion follows the course language until the learner explicitly
+    // gives it a different language in the same menu.
+    if (key === 'learning-language' && !choices['mascot-language-explicit']) choices['mascot-language'] = value;
+    if (key === 'mascot-language') choices['mascot-language-explicit'] = true;
+    saveLearningChoices(choices);
+
+    if (key === 'colours' && colorModes.includes(value)) window.Type2LearnColorMode?.set(value, false);
+    if (key === 'text-to-speech') setCourseSetting('readAloud', value === 'on');
+
+    const shouldPreviewSupportMode = state.view === 'course'
+      && ['encouragement', 'animations'].includes(key);
+    syncBackgroundNoisePreferences();
+    // A settings change can rerender the companion but cannot replay the most
+    // recent learning acknowledgement.
+    if (activeSupportMoment) lastMascotSupportEventId = activeSupportMoment.id;
+    syncMascotPreferences();
+    if (key === 'background-noise' || key === 'background-noise-type') {
+      if (backgroundNoise.enabled) playBackgroundNoise({ announceChange: false });
+      else pauseBackgroundNoise();
+    }
+    if (shouldPreviewSupportMode) recordSupportMoment('preference-preview', { result: key });
+    save();
+    render();
+
+    if (key === 'urdu-mode') {
+      announce(value === 'on'
+        ? 'Urdu mode is marked on. This course’s Urdu lesson text is still being prepared.'
+        : 'Urdu mode is marked off.');
+    } else {
+      announce('Learning setting updated.');
+    }
+  };
+
+  const handleAction = (action, element) => {
+    switch (action) {
+      case 'dashboard': goTo('dashboard'); break;
+      case 'browse': goTo('browse'); break;
+      case 'saved': goTo('saved'); break;
+      case 'course-preferences':
+        if (coursePreferencesAreSaved()) goTo('course', 'Your course choices are ready.');
+        else openCoursePreferences();
+        break;
+      case 'continue-course': goTo('course', 'You are back at your saved small step.'); break;
+      case 'toggle-settings-menu':
+        state.settingsMenu = !state.settingsMenu;
+        render();
+        if (state.settingsMenu) window.requestAnimationFrame(() => app.querySelector('.course-settings-close')?.focus?.({ preventScroll: true }));
+        break;
+      case 'close-settings-menu':
+        state.settingsMenu = false;
+        render();
+        window.requestAnimationFrame(() => app.querySelector('[data-action="toggle-settings-menu"]')?.focus?.({ preventScroll: true }));
+        break;
+      case 'review-module': {
+        const moduleIndex = Number(element.dataset.moduleIndex);
+        if (!Number.isInteger(moduleIndex) || !state.progress.completedSteps.includes(moduleIndex) || moduleIndex === state.progress.lessonIndex) break;
+        state.reviewModuleIndex = moduleIndex;
+        save('Reviewing a completed module. Your current task is still saved.');
+        render();
+        focusCurrentTask();
