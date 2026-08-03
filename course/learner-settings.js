@@ -798,3 +798,60 @@ export const recommendSupportProfiles = (selectedAnswerIds) => {
       equallyStrongProfileIds: [],
       dimensionScores: scoredAnswers.dimensionScores,
       selectedOptionIds: scoredAnswers.selectedOptionIds,
+      reasonLabels: scoredAnswers.reasonLabels.slice(0, 3),
+      scores,
+      isBalanced: true,
+      confidence: 'starting-point'
+    };
+  }
+
+  const primary = eligible[0];
+  const equallyStrongProfileIds = eligible
+    .filter((item) => primary.score - item.score <= 0.25)
+    .map((item) => item.id);
+  const chosenProfiles = [presetById.get(primary.id)].filter(Boolean);
+  const secondaryProfileIds = [];
+  eligible.slice(1).forEach((item) => {
+    if (secondaryProfileIds.length >= PRESET_SELECTION_LIMIT - 1 || item.score < primary.score * 0.65) return;
+    const candidate = presetById.get(item.id);
+    if (!candidate || !chosenProfiles.every((profile) => profilePairIsCompatible(profile, candidate))) return;
+    chosenProfiles.push(candidate);
+    secondaryProfileIds.push(candidate.id);
+  });
+
+  return {
+    primaryProfileId: primary.id,
+    secondaryProfileIds,
+    equallyStrongProfileIds,
+    dimensionScores: scoredAnswers.dimensionScores,
+    selectedOptionIds: scoredAnswers.selectedOptionIds,
+    reasonLabels: scoredAnswers.reasonLabels.slice(0, 3),
+    scores,
+    isBalanced: false,
+    confidence: 'starting-point'
+  };
+};
+
+export const resolveSettings = (input) => {
+  const state = createSettingsState(input);
+  const resolved = { ...PLATFORM_DEFAULTS };
+  state.selectedPresetIds.forEach((id) => Object.assign(resolved, presetById.get(id)?.settings || {}));
+  Object.assign(resolved, state.userOverrides, state.temporaryOverrides);
+  // These structural protections are the highest-priority layer. They cannot
+  // be disabled by a profile, learner choice, lesson override, or old record.
+  Object.assign(resolved, PROTECTION_VALUES);
+  return resolved;
+};
+
+/* Return only editable keys for a control list or profile preview. A profile's
+   preview is intentionally based on its real overlay rather than every setting
+   available elsewhere on the Settings page. */
+export const getLearnerVisibleSettingKeys = (input) => {
+  let candidates = EDITABLE_SETTING_KEYS;
+  if (Array.isArray(input) || input instanceof Set) candidates = [...input];
+  else if (safeObject(input).settings && typeof input.settings === 'object') candidates = Object.keys(safeObject(input.settings));
+  return unique(candidates.map(canonicalSettingKey)).filter((key) => editableKeySet.has(key));
+};
+
+export const getSettingProvenance = (input, key) => {
+  const state = createSettingsState(input);
