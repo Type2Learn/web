@@ -567,3 +567,289 @@ export class NarrationService {
     this.audioLastBoundaryKey = '';
     this.emitAudioPosition(track, { force: true });
   }
+
+  handleAudioFailure(audio, activeSession, track, fallbackIndex) {
+    if (activeSession !== this.session || this.audio !== audio) return;
+    const selectedIndex = nonNegativeInteger(this.currentIndex) ?? this.firstTrackChunkIndex(track, fallbackIndex);
+    this.disposeAudio({ clearSource: true });
+    if (!this.speechSupported) {
+      this.setStatus('error');
+      return;
+    }
+    // A failed local recording should never remove the existing browser-speech
+    // accessibility route. Continue from the currently highlighted chunk.
+    this.currentIndex = Math.min(Math.max(selectedIndex, 0), Math.max(0, this.chunks.length - 1));
+    try { this.synth.cancel(); } catch (_) { /* Browser cancellation is best-effort. */ }
+    this.resumeFromRestart = false;
+    this.setStatus('playing');
+    this.setActiveChunk(this.currentIndex);
+    this.speakCurrent(activeSession);
+  }
+
+  playAudioTrack(trackIndex, activeSession, sourceChar = 0) {
+    const track = this.audioPlaylist[trackIndex];
+    if (!track || !this.AudioConstructor || activeSession !== this.session) {
+      this.startSpeech(this.currentIndex, activeSession);
+      return false;
+    }
+    let audio;
+    try {
+      audio = new this.AudioConstructor();
+    } catch (_) {
+      this.startSpeech(this.currentIndex, activeSession);
+      return false;
+    }
+    this.disposeAudio({ clearSource: true });
+    this.audio = audio;
+    this.audioSession = activeSession;
+    this.audioTrackIndex = trackIndex;
+    this.audioLastChunkIndex = -1;
+    this.audioLastBoundaryKey = '';
+    this.audioPendingSeekSourceChar = Math.max(0, Number(sourceChar) || 0);
+    this.audioPendingSeekRatio = this.playbackRatioForSourcePosition(track, sourceChar, Number(audio.duration));
+    try { audio.preload = 'auto'; } catch (_) { /* Optional media hint. */ }
+    try { audio.playbackRate = this.rate; } catch (_) { /* Media rate support is best-effort. */ }
+    try { audio.volume = this.volume; } catch (_) { /* Media volume support is best-effort. */ }
+    audio.onloadedmetadata = () => this.applyPendingAudioSeek(audio, track, activeSession);
+    audio.oncanplay = () => this.applyPendingAudioSeek(audio, track, activeSession);
+    audio.ontimeupdate = () => {
+      if (activeSession !== this.session || this.audio !== audio || this.status !== 'playing') return;
+      this.applyPendingAudioSeek(audio, track, activeSession);
+      this.emitAudioPosition(track);
+    };
+    audio.onended = () => {
+      if (activeSession !== this.session || this.audio !== audio || this.status !== 'playing') return;
+      this.stopAudioPositionLoop();
+      this.emitAudioPosition(track, { force: true });
+      // A whole-module recording may have been intentionally bounded to the
+      // visible small section. Do not let natural media completion advance to
+      // an add-on or another track that the learner has not chosen to hear.
+      if (Number.isFinite(track.stopAtSourceChar)) {
+        this.disposeAudio({ clearSource: true });
+        this.setStatus('finished');
+        return;
+      }
+      if (this.status !== 'playing' || this.audio !== audio) return;
+      const nextTrackIndex = trackIndex + 1;
+      if (nextTrackIndex >= this.audioPlaylist.length) {
+        this.setStatus('finished');
+        return;
+      }
+      const nextTrack = this.audioPlaylist[nextTrackIndex];
+      this.currentIndex = this.firstTrackChunkIndex(nextTrack, this.currentIndex);
+      this.setActiveChunk(this.currentIndex);
+      this.playAudioTrack(nextTrackIndex, activeSession, 0);
+    };
+    audio.onerror = () => this.handleAudioFailure(audio, activeSession, track, this.currentIndex);
+    try { audio.src = track.src; } catch (_) {
+      this.handleAudioFailure(audio, activeSession, track, this.currentIndex);
+      return false;
+    }
+    // Cached local media may already know its duration before an event fires.
+    this.applyPendingAudioSeek(audio, track, activeSession);
+    this.emitAudioPosition(track, { force: true });
+    try {
+      const playResult = audio.play();
+      this.startAudioPositionLoop(audio, track, activeSession);
+      if (playResult && typeof playResult.catch === 'function') {
+        playResult.catch(() => this.handleAudioFailure(audio, activeSession, track, this.currentIndex));
+      }
+      return true;
+    } catch (_) {
+      this.handleAudioFailure(audio, activeSession, track, this.currentIndex);
+      return false;
+    }
+  }
+
+  startAudio(index) {
+    const selection = this.trackForChunk(index);
+    if (this.status === 'paused'
+      && this.usingAudio()
+      && selection.trackIndex === this.audioTrackIndex
+      && selection.visibleIndex === this.currentIndex) {
+      try {
+        const playResult = this.audio.play();
+        this.setStatus('playing');
+        this.startAudioPositionLoop(this.audio, this.audioPlaylist[this.audioTrackIndex], this.session);
+        if (playResult && typeof playResult.catch === 'function') {
+          const track = this.audioPlaylist[this.audioTrackIndex];
+          playResult.catch(() => this.handleAudioFailure(this.audio, this.session, track, this.currentIndex));
+        }
+        return true;
+      } catch (_) {
+        const track = this.audioPlaylist[this.audioTrackIndex];
+        this.handleAudioFailure(this.audio, this.session, track, this.currentIndex);
+        return false;
+      }
+    }
+
+    this.session += 1;
+    const activeSession = this.session;
+    try { this.synth?.cancel(); } catch (_) { /* Browser cancellation is best-effort. */ }
+    this.resumeFromRestart = false;
+    this.currentIndex = selection.visibleIndex;
+    this.setStatus('playing');
+    this.setActiveChunk(this.currentIndex);
+    return this.playAudioTrack(selection.trackIndex, activeSession, selection.sourceChar);
+  }
+
+  startSpeech(index = this.currentIndex, existingSession = null) {
+    if (!this.speechSupported) {
+      this.setStatus(this.hasAudioPlaylist() ? 'error' : 'unsupported');
+      return false;
+    }
+    const requestedIndex = Math.min(Math.max(Number(index) || 0, 0), this.chunks.length - 1);
+    if (this.status === 'paused' && requestedIndex === this.currentIndex && !this.resumeFromRestart) {
+      try {
+        this.synth.resume();
+        this.setStatus('playing');
+        return true;
+      } catch (_) {
+        // Some engines cannot resume an interrupted utterance. Restart the
+        // current chunk rather than leaving the learner in an unclear state.
+      }
+    }
+
+    const activeSession = existingSession === null ? this.session + 1 : existingSession;
+    this.session = activeSession;
+    this.disposeAudio({ clearSource: true });
+    try { this.synth.cancel(); } catch (_) { /* Browser cancellation is best-effort. */ }
+    this.resumeFromRestart = false;
+    this.currentIndex = requestedIndex;
+    this.setStatus('playing');
+    this.setActiveChunk(this.currentIndex);
+    this.speakCurrent(activeSession);
+    return true;
+  }
+
+  start(index = this.currentIndex) {
+    if (!this.chunks.length) {
+      this.setStatus('error');
+      return false;
+    }
+    const requestedIndex = Math.min(Math.max(Number(index) || 0, 0), this.chunks.length - 1);
+    if (this.hasAudioPlaylist()) return this.startAudio(requestedIndex);
+    if (!this.speechSupported) {
+      this.setStatus('unsupported');
+      return false;
+    }
+    return this.startSpeech(requestedIndex);
+  }
+
+  speakCurrent(activeSession) {
+    if (!this.speechSupported || activeSession !== this.session || this.status !== 'playing') return;
+    if (this.currentIndex >= this.chunks.length) {
+      this.currentIndex = Math.max(0, this.chunks.length - 1);
+      this.setStatus('finished');
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(this.chunks[this.currentIndex].text);
+    utterance.rate = this.rate;
+    utterance.volume = this.volume;
+    const voice = this.selectedVoice();
+    if (voice) utterance.voice = voice;
+
+    utterance.onboundary = (event) => {
+      if (activeSession !== this.session || this.status !== 'playing') return;
+      const text = this.chunks[this.currentIndex]?.text || '';
+      const charIndex = Math.min(Math.max(Number(event?.charIndex) || 0, 0), text.length);
+      const charEnd = boundaryEnd(text, charIndex, event?.charLength);
+      this.onBoundary({
+        index: this.currentIndex,
+        charIndex,
+        charLength: Math.max(0, charEnd - charIndex),
+        startOffset: this.chunks[this.currentIndex]?.startOffset || 0
+      });
+    };
+
+    utterance.onend = () => {
+      if (activeSession !== this.session || this.status !== 'playing') return;
+      this.currentIndex += 1;
+      if (this.currentIndex >= this.chunks.length) {
+        this.currentIndex = Math.max(0, this.chunks.length - 1);
+        this.setStatus('finished');
+        return;
+      }
+      this.setActiveChunk(this.currentIndex);
+      this.speakCurrent(activeSession);
+    };
+
+    utterance.onerror = (event) => {
+      if (activeSession !== this.session || event?.error === 'canceled' || event?.error === 'interrupted') return;
+      this.setStatus('error');
+    };
+
+    try {
+      this.synth.speak(utterance);
+    } catch (_) {
+      if (activeSession === this.session) this.setStatus('error');
+    }
+  }
+
+  pause() {
+    if (this.status !== 'playing') return false;
+    if (this.usingAudio()) {
+      try {
+        this.audio.pause();
+        this.stopAudioPositionLoop();
+        this.setStatus('paused');
+        return true;
+      } catch (_) {
+        this.setStatus('error');
+        return false;
+      }
+    }
+    if (!this.speechSupported) return false;
+    try {
+      this.synth.pause();
+      this.setStatus('paused');
+      return true;
+    } catch (_) {
+      this.setStatus('error');
+      return false;
+    }
+  }
+
+  stop({ silent = false, resetIndex = true } = {}) {
+    this.session += 1;
+    this.disposeAudio({ resetTime: resetIndex, clearSource: true });
+    if (this.synth) {
+      try { this.synth.cancel(); } catch (_) { /* Browser cancellation is best-effort. */ }
+    }
+    if (resetIndex) this.currentIndex = 0;
+    this.resumeFromRestart = false;
+    this.audioLastChunkIndex = -1;
+    this.audioLastBoundaryKey = '';
+    this.setActiveChunk(-1);
+    if (!silent && this.supported) this.setStatus('idle');
+  }
+
+  restart() {
+    return this.start(0);
+  }
+
+  changePlayback({ rate, voiceURI, volume } = {}) {
+    const wasPlaying = this.status === 'playing';
+    const wasPaused = this.status === 'paused';
+    const index = this.currentIndex;
+    this.configure({ rate, voiceURI, volume });
+    // Audio elements change speed in-place. That retains exact currentTime for
+    // both playing and paused local MP3 narration.
+    if (this.usingAudio()) return true;
+    if (wasPlaying) return this.start(index);
+    if (wasPaused) {
+      this.session += 1;
+      try { this.synth?.cancel(); } catch (_) { /* Best-effort browser cleanup. */ }
+      this.resumeFromRestart = true;
+      this.setStatus('paused');
+      this.setActiveChunk(index);
+    }
+    return true;
+  }
+
+  destroy() {
+    this.stop({ silent: true });
+    if (this.synth && typeof this.synth.removeEventListener === 'function') this.synth.removeEventListener('voiceschanged', this.handleVoicesChanged);
+  }
+}
