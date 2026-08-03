@@ -1645,3 +1645,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     // than a false claim that it has been completed. This keeps the estimate
     // encouraging and honest without tracking keystrokes for scoring.
     const completedWords = typed.endsWith(' ') ? typed.split(/\s+/).filter(Boolean).length : Math.max(0, typed.split(/\s+/).filter(Boolean).length - 1);
+    return Math.max(0, referenceWords.length - completedWords);
+  };
+
+  const typingMomentumCopy = (response = state.progress.attempt.response || '') => {
+    const level = selectedEncouragementLevel();
+    if (level === 'subtle') return '';
+    const urdu = supportLanguage() === 'urdu';
+    const referenceLength = Math.max(1, Array.from(activeTypingReference() || '').length);
+    const ratio = Math.min(1, Array.from(response).length / referenceLength);
+    const wordsLeft = remainingTypingWords(response);
+    const messages = urdu ? {
+      start: level === 'expressive' ? 'آپ یہ کر سکتے ہیں۔ پہلے لفظ سے شروع کریں۔' : 'آپ یہ کر سکتے ہیں۔ ایک لفظ سے شروع کریں۔',
+      early: level === 'expressive' ? 'بہت خوب — آپ آگے بڑھ رہے ہیں۔' : 'اچھی شروعات۔',
+      middle: level === 'expressive' ? 'آپ بہت اچھا کر رہے ہیں۔ ایک وقت میں ایک لفظ۔' : 'آپ اچھا کر رہے ہیں۔',
+      near: level === 'expressive'
+        ? 'بس ' + Math.max(1, wordsLeft) + ' لفظ باقی ہیں — آپ یہ حصہ مکمل کرنے والے ہیں۔'
+        : 'بس ' + Math.max(1, wordsLeft) + ' لفظ باقی ہیں۔'
+    } : {
+      start: level === 'expressive' ? 'You can do this. Start with the first word.' : 'You can do this. Start with one word.',
+      early: level === 'expressive' ? 'Nice work — you are already moving forward.' : 'Nice start.',
+      middle: level === 'expressive' ? 'You are doing amazing. One word at a time.' : 'You are doing well.',
+      near: level === 'expressive'
+        ? 'Just ' + Math.max(1, wordsLeft) + ' word' + (wordsLeft === 1 ? '' : 's') + ' to go — you are about to clear this section.'
+        : 'Just ' + Math.max(1, wordsLeft) + ' word' + (wordsLeft === 1 ? '' : 's') + ' to go.'
+    };
+    if (!response) return messages.start;
+    if (ratio >= .78) return messages.near;
+    if (ratio >= .38) return messages.middle;
+    return messages.early;
+  };
+
+  const typingMomentumStage = (response = state.progress.attempt.response || '') => {
+    const referenceLength = Math.max(1, Array.from(activeTypingReference() || '').length);
+    const ratio = Math.min(1, Array.from(response).length / referenceLength);
+    if (!response) return 'start';
+    if (ratio >= .78) return 'near';
+    if (ratio >= .38) return 'middle';
+    return 'early';
+  };
+
+  const typingMomentumMarkup = () => {
+    const copy = typingMomentumCopy();
+    return copy
+      ? '<p class="course-typing-momentum" data-typing-momentum data-momentum-stage="' + typingMomentumStage() + '" aria-live="off">' + escapeHtml(copy) + '</p>'
+      : '';
+  };
+
+  const typingTask = () => {
+    const typing = currentStep().typing;
+    const attempt = state.progress.attempt;
+    const sectionTyping = usesLessonSectionTyping();
+    const activeSection = sectionTyping ? activeLessonTypingSection() : null;
+    const voiceInputAvailable = typingAllowsVoiceInput();
+    const responseLabel = voiceInputAvailable ? 'Type or speak your response' : 'Type your response';
+    const inputHelp = voiceInputAvailable
+      ? 'Use the microphone beside the response field to speak, or type your response. Speech input starts only when you choose the microphone.'
+      : typing.level === 'Recall typing'
+        ? 'Use your own words. Your response is not ranked or scored for speed.'
+        : 'Paste is blocked in keyboard practice. Press Enter to check this response. Use Shift+Enter for a new line.';
+    const feedback = attempt.feedback ? '<p class="typing-feedback" role="alert">' + escapeHtml(attempt.feedback) + '</p>' : '';
+    const integrity = attempt.integrityNotice ? '<p class="integrity-note">A large amount of text appeared at once. That is okay—this course will use a short understanding check rather than a speed score.</p>' : '';
+    const label = sectionTyping ? 'Lesson typing · section ' + (activeSection.index + 1) + ' of ' + activeSection.total : typing.level;
+    const title = sectionTyping ? activeSection.section.heading : 'Make one idea visible';
+    const prompt = sectionTyping ? 'Type the complete section below. Take the time you need.' : typing.prompt;
+    const note = sectionTyping ? 'This is one complete part of the lesson. It is not ranked or scored for speed.' : 'Use this space to show your thinking. It is not ranked or scored for speed.';
+    const nextAction = sectionTyping && activeSection.index < activeSection.total - 1
+      ? 'Check this section'
+      : sectionTyping
+        ? 'Continue to quick check'
