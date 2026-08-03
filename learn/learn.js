@@ -470,30 +470,73 @@ const syncMascotPreview = (choices) => {
     if (!mascot || !stage.isConnected || stage !== app.querySelector('[data-learning-mascot-stage]') || choices.mascot !== 'on') return;
     mascot.mount(stage, {
       encouragement: choices.encouragement,
-  sidebarElement.addEventListener('pointerenter', () => {
-    insideSidebar = true;
-    clearHide();
-    clearOutside();
-  }, { passive: true });
-  sidebarElement.addEventListener('pointerleave', () => {
-    insideSidebar = false;
-    scheduleHide();
-  }, { passive: true });
-  sidebarElement.addEventListener('focusin', () => {
-    insideSidebar = true;
-    clearHide();
+      animations: choices.animations,
+      scene: 'dashboard',
+      location: 'dashboard'
+    });
+    mascot.present('dashboard');
   });
-  sidebarElement.addEventListener('focusout', () => {
-    insideSidebar = false;
-    scheduleHide();
-  });
+};
 
-  window.addEventListener('pointermove', (event) => {
-    const previous = pointer;
-    const dx = event.clientX - previous.x;
-    const dy = Math.abs(event.clientY - previous.y);
-    pointer = { x: event.clientX, y: event.clientY };
-    if (!enabled() || !hidden || pointerDown) {
+const effectiveSetupAnimation = (choices) => {
+  if (choices.animations === 'still' || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return 'still';
+  if (window.matchMedia?.('(max-width: 767px)')?.matches) return 'gentle';
+  return choices.animations === 'lively' ? 'lively' : 'gentle';
+};
+
+const applySetupPresentation = (choices) => {
+  document.body.dataset.setupAnimations = effectiveSetupAnimation(choices);
+  document.body.dataset.setupEncouragement = ['subtle', 'balanced', 'expressive'].includes(choices.encouragement)
+    ? choices.encouragement
+    : 'subtle';
+};
+
+const launchSetupControlMotion = (control, event, choices, routeChange = false) => {
+  const level = effectiveSetupAnimation(choices);
+  if (!control || level === 'still' || control.matches(':disabled, [aria-disabled="true"]')) return;
+  const rect = control.getBoundingClientRect();
+  const x = Number(event?.clientX) > 0 ? event.clientX : rect.left + rect.width / 2;
+  const y = Number(event?.clientY) > 0 ? event.clientY : rect.top + rect.height / 2;
+  const echo = document.createElement('span');
+  echo.className = 'learning-action-echo learning-action-echo--' + level;
+  echo.dataset.setupMotion = String(++setupMotionSequence);
+  echo.setAttribute('aria-hidden', 'true');
+  echo.style.setProperty('--setup-action-x', x + 'px');
+  echo.style.setProperty('--setup-action-y', y + 'px');
+  echo.innerHTML = level === 'lively' ? '<i></i><i></i><i></i>' : '<i></i>';
+  document.body.append(echo);
+  window.setTimeout(() => echo.remove(), level === 'lively' ? 720 : 380);
+  if (level !== 'lively' || !routeChange) return;
+  const sweep = document.createElement('span');
+  sweep.className = 'learning-stage-sweep';
+  sweep.setAttribute('aria-hidden', 'true');
+  document.body.append(sweep);
+  window.setTimeout(() => sweep.remove(), 700);
+};
+
+const showSetupFeedback = (kind, choices) => {
+  document.querySelectorAll('.learning-encouragement-popup').forEach((node) => node.remove());
+  window.clearTimeout(setupFeedbackTimer);
+  const encouragement = choices.encouragement || 'subtle';
+  if (encouragement === 'subtle') return;
+  const urdu = setupLanguage(choices) === 'urdu';
+  const copy = kind === 'animations'
+    ? (urdu
+      ? (choices.animations === 'lively' ? ['چلیں، آگے بڑھتے ہیں!', 'اگلے انتخاب واضح اور پُرجوش حرکت کے ساتھ سامنے آئیں گے۔'] : ['آرام سے آگے بڑھیں', 'اگلا انتخاب نرم حرکت کے ساتھ سامنے آئے گا۔'])
+      : (choices.animations === 'lively' ? ["Let's keep moving!", 'Your next choices will respond with clear, energetic motion.'] : ['Take the next step smoothly', 'Your next choice will arrive with a gentle transition.']))
+    : (urdu
+      ? (encouragement === 'expressive' ? ['آپ بہت اچھا کر رہے ہیں!', 'ہر کامیاب قدم کو واضح طور پر سراہا جائے گا۔'] : ['آپ اچھا کر رہے ہیں', 'ایک وقت میں ایک واضح قدم۔'])
+      : (encouragement === 'expressive' ? ['You are doing amazing!', 'Every successful step will be celebrated clearly.'] : ['You are doing well', 'One clear step at a time.']));
+  const popup = document.createElement('section');
+  popup.className = 'learning-encouragement-popup learning-encouragement-popup--' + encouragement;
+  popup.setAttribute('role', 'status');
+  popup.setAttribute('aria-live', 'polite');
+  if (urdu) {
+    popup.lang = 'ur';
+    popup.dir = 'rtl';
+  }
+  const symbol = document.createElement('span');
+  symbol.setAttribute('aria-hidden', 'true');
       clearReveal();
       return;
     }
