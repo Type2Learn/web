@@ -3637,3 +3637,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'submit-check': finishCheck(); break;
       case 'continue-check': continueCheck(); break;
       case 'submit-apply': finishApply(); break;
+      case 'continue-apply': continueApply(); break;
+      case 'start-final-exam': startFinalExam(); break;
+      case 'submit-exam-answer': submitFinalExamAnswer(); break;
+      case 'next-exam-question': nextFinalExamQuestion(); break;
+      case 'return-course': goTo('dashboard', 'Your final exam results are saved locally.'); break;
+      case 'return-to-read':
+        state.progress.phase = 'read';
+        state.progress.attempt = blankAttempt();
+        state.readingSectionIndex = 0;
+        recordSupportMoment('task-entry', { result: 'reread' });
+        save();
+        render();
+        showCurrentTaskFromStart();
+        break;
+      case 'simple-read':
+        state.progress.phase = 'read';
+        state.progress.attempt = blankAttempt();
+        state.showSimple = true;
+        state.readingSectionIndex = 0;
+        recordSupportMoment('task-entry', { result: 'simple-reading' });
+        save();
+        render();
+        showCurrentTaskFromStart();
+        break;
+      case 'retry-question': retryQuestion(); break;
+      case 'next-step': startNextStep(); break;
+      case 'help':
+        state.helpOption = element.dataset.helpOption || '';
+        render();
+        break;
+      default: break;
+    }
+  };
+
+  app.addEventListener('click', (event) => {
+    const motionControl = event.target.closest('button, summary, .course-check-option, .exam-option');
+    if (motionControl) launchCourseControlMotion(motionControl, event);
+    const settingsMenuToggle = event.target.closest('[data-action="toggle-settings-menu"]');
+    const clickedInsideSettings = Boolean(event.target.closest('.course-settings-menu'));
+    if (state.settingsMenu && !clickedInsideSettings && !settingsMenuToggle) {
+      // Settings are a compact popover: an outside click should always put the
+      // learner back on the page, while still allowing that same click to use
+      // another control such as Pause & save.
+      state.settingsMenu = false;
+      if (!event.target.closest('[data-action]')) {
+        render();
+        return;
+      }
+    }
+
+    const settingsChoice = event.target.closest('[data-settings-choice]');
+    if (settingsChoice) {
+      saveCourseLearningChoice(settingsChoice.dataset.settingsChoice, settingsChoice.dataset.value);
+      return;
+    }
+    const settingsToggle = event.target.closest('[data-settings-toggle]');
+    if (settingsToggle && !settingsToggle.disabled) {
+      const key = settingsToggle.dataset.settingsToggle;
+      const current = learningChoices()[key] === 'on';
+      saveCourseLearningChoice(key, current ? 'off' : 'on');
+      return;
+    }
+    const control = event.target.closest('[data-action]');
+    const narrationText = event.target.closest('[data-narration-text][data-narration-index]');
+    const selectedText = window.getSelection?.().toString().trim();
+    if (!control && narrationText) {
+      if (!state.preferences.readAloud || selectedText || event.target.closest('a, input, textarea, select, label')) return;
+      event.preventDefault();
