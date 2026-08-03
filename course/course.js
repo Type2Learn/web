@@ -3431,3 +3431,70 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       recordSupportMoment('section-complete', { result: 'lesson-complete', phase: 'check' });
       save();
       render();
+      showCurrentTaskFromStart();
+      return;
+    }
+    const target = sectionTyping
+      ? activeSection.section.text
+      : typing.level === 'Guided typing'
+        ? typing.phrases[Math.min(state.progress.attempt.guidedIndex, typing.phrases.length - 1)]
+        : typing.target;
+    if (normaliseTypingMatch(target) !== normaliseTypingMatch(response)) {
+      state.progress.attempt.feedback = recordSupportMoment('typing-incomplete', { result: 'typing' });
+      save();
+      render();
+      return;
+    }
+    const hasNextSection = sectionTyping
+      ? activeSection.index < activeSection.total - 1
+      : typing.level === 'Guided typing' && state.progress.attempt.guidedIndex < typing.phrases.length - 1;
+    if (hasNextSection) {
+      state.progress.attempt.guidedIndex += 1;
+      state.progress.attempt.response = '';
+      state.progress.attempt.feedback = sectionTyping
+        ? recordSupportMoment('section-complete', { result: 'typing-section' })
+        : recordSupportMoment('section-complete', { result: 'guided-phrase' });
+      save();
+      render();
+      showCurrentTaskFromStart('#course-typing-input');
+      return;
+    }
+    state.progress.phase = 'check';
+    state.progress.attempt.feedback = '';
+    recordSupportMoment('section-complete', { result: 'lesson-complete', phase: 'check' });
+    save();
+    render();
+    showCurrentTaskFromStart();
+  };
+
+  const speakCurrentTask = () => {
+    const speechText = [currentStep().title, ...currentStep().read, state.showSimple ? currentStep().simple : ''].filter(Boolean).join(' ');
+    if (!('speechSynthesis' in window)) {
+      announce('Read-aloud is not available in this browser. You can use your device’s usual assistive reading tool.');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(speechText);
+    utterance.rate = 0.92;
+    window.speechSynthesis.speak(utterance);
+    announce('Read-aloud has started.');
+  };
+
+  const narrateCurrentTask = () => startNarration();
+
+  const signOut = async (button) => {
+    if (button) button.disabled = true;
+    if (authenticatedUser?.isGuest) {
+      clearType2LearnGuest();
+      window.location.assign('/login/');
+      return;
+    }
+    try {
+      const { signOutType2LearnUser } = await import('/firebase-auth.js?v=20260801-courseflow1');
+      await signOutType2LearnUser();
+      window.location.assign('/');
+    } catch (_) {
+      if (button) button.disabled = false;
+      announce('Unable to sign out right now. Please try again.');
+    }
+  };
