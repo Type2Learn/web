@@ -3019,3 +3019,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       hint: ['A gentle hint', step.hint],
       retry: ['Try again', 'This restarts only the current small activity. Your completed course steps stay saved.'],
       break: ['Take a short break', 'Your work is saved. You can close this page or return to the learning overview whenever you are ready.']
+    }[option];
+    return '<div class="help-detail"><strong>' + escapeHtml(content[0]) + '</strong><p>' + escapeHtml(content[1]) + '</p>' + (option === 'break' ? '<button class="course-primary-button" type="button" data-action="save-exit">Save and exit</button>' : '') + '</div>';
+  };
+
+  const explainStepDetails = () => {
+    const step = currentStep();
+    const phase = state.progress.phase;
+    const simple = step.simple || 'This course uses one clear idea at a time.';
+    const hint = step.hint || 'Look for the key idea before choosing your next action.';
+    if (isReviewingModule()) return {
+      purpose: 'This is a review copy of a module you completed earlier. Your current learning position is unchanged.',
+      steps: ['Read only the part you want to revisit.', 'Use the simple explanation or example if one would help.', 'Choose “Return to current task” when you are ready.'],
+      support: simple
+    };
+    if (phase === 'preview') return {
+      purpose: 'This is a map of the small learning sequence ahead. It is here to remove surprises, not to test you.',
+      steps: ['Notice the order: read, type one lesson section, check understanding, then use the idea.', 'You do not need to remember everything from this screen.', 'Choose “Begin this small step” only when the path feels clear enough.'],
+      support: 'There is no speed score or countdown. You can pause at any point.'
+    };
+    if (phase === 'read') return {
+      purpose: 'This is the learning part. The goal is to understand one respectful idea about ' + step.title + '.',
+      steps: ['Read one heading and its text at a time.', 'Look for the main point instead of trying to memorize every word.', 'Use text to speech, a simpler explanation, or smaller sections if that helps.'],
+      support: simple
+    };
+    if (phase === 'type') {
+      const section = usesLessonSectionTyping() ? activeLessonTypingSection() : null;
+      return {
+        purpose: section
+          ? 'This typing activity makes the current lesson section visible. The section is “' + section.section.heading + '.”'
+          : 'This typing activity helps make one key idea visible.',
+        steps: ['Follow the text shown in the typing area, one character at a time.', 'The blue caret stays at the next character. Green text matches; red text means that character needs a correction.', 'Use Backspace to correct the latest character, then continue when the text is complete.'],
+        support: section ? 'You are working on section ' + (section.index + 1) + ' of ' + section.total + '. You only need to work on this section now.' : hint
+      };
+    }
+    if (phase === 'check') return {
+      purpose: 'This quick check asks whether the key idea makes sense. It does not measure speed or worth.',
+      steps: ['Read the question once.', 'Compare each option with the explanation you just read.', 'Choose the answer that fits best. If it is not right, use the explanation and try again.'],
+      support: hint
+    };
+    if (phase === 'apply') return {
+      purpose: 'This practice step asks how the idea could help in a real learning situation.',
+      steps: ['Look for the response that is respectful and flexible.', 'Choose the option that makes participation easier without assumptions.', 'Use the lesson’s support ideas as your guide.'],
+      support: step.example || hint
+    };
+    if (phase === 'complete') return {
+      purpose: 'This small step is finished. Completion means you worked through it, not that you did it quickly.',
+      steps: ['Take a moment if you need one.', 'Choose the next step only when you want to continue.', 'Your course position remains available when you return.'],
+      support: simple
+    };
+    if (phase === 'exam-intro') return {
+      purpose: 'This is a calm review of the course. Each question is handled separately.',
+      steps: ['Read one question and its options.', 'Choose the answer that best fits the course material.', 'Pause whenever needed; there is no countdown.'],
+      support: 'The review is about understanding, not typing speed or competition.'
+    };
+    if (phase === 'exam') return {
+      purpose: 'This question checks one course idea at a time.',
+      steps: ['Read the full question before choosing.', 'Use what you learned in the relevant module.', 'Submit when your selected answer feels right.'],
+      support: 'You can change your choice before you submit it.'
+    };
+    return {
+      purpose: 'This page shows the learning record for the course.',
+      steps: ['Review the information you want to keep.', 'Notice what you would like to revisit.', 'Return to the learning overview when you are ready.'],
+      support: 'This record is not a ranking of you.'
+    };
+  };
+
+  const explainStepMarkup = () => {
+    const details = explainStepDetails();
