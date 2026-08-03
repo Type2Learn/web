@@ -333,3 +333,37 @@ export const COURSE_CONTENT = {
         strengths: 'Strengths may include practical skills, creativity, memory for familiar routines, music, art, sports, kindness, or strong relationships.',
         challengesHeading: 'What challenges might they experience?',
         challenges: ['Understanding abstract ideas', 'Following long instructions', 'Making quick decisions', 'Managing unfamiliar routines', 'Explaining what support they need', 'Being rushed or spoken over'],
+        supportsHeading: 'What support can help?',
+        supports: ['Clear and simple language', 'Pictures and demonstrations', 'Small, manageable steps', 'Repetition and practice', 'Extra response time', 'Allowing the person to try independently']
+      },
+      simple: 'A helpful support can make the task clearer while still allowing someone to try independently.',
+      example: 'One support idea from this module is to use clear language, small steps, and extra response time.',
+      hint: 'Look for the response that respects the person\'s choices and chance to participate.',
+      typing: { level: 'Recall typing', prompt: 'In your own words, describe what is better than taking over a task immediately. The prompt stays inside the field while you type.', reference: 'Ask what support the person wants and allow them to try first.' },
+      check: {
+        question: 'What is better than taking over a task immediately?',
+        options: [['Ask what support the person wants and allow them to try first.', true], ['Assume the person cannot take part.', false], ['Speak over the person so the task ends quickly.', false], ['Make all choices for the person without asking.', false]],
+        explanation: 'Right. The module recommends asking what support the person wants and allowing an independent try.'
+      }
+    },
+    {
+      module: 'Module 10',
+      title: 'Physical / Motor Disabilities',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'Physical or motor disabilities can affect movement, strength, balance, hand control, endurance, or the ability to use standard tools. They may be present from birth or result from illness, injury, pain, or another health condition.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'A person may need more time, accessible equipment, alternative ways to write or type, or accessible routes through buildings and digital spaces.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'A person may have strong knowledge, creativity, communication, persistence, or problem-solving skills. Physical ability does not determine intelligence.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Handwriting, typing, clicking, or drawing', 'Tremors, pain, stiffness, weakness, or fatigue', 'Opening items or managing small objects', 'Stairs, crowds, uneven ground, or narrow spaces', 'Using standard desks, keyboards, or mice', 'Having different abilities on different days'],
+        supportsHeading: 'What support can help?',
+        supports: ['Voice input and keyboard shortcuts', 'Trackballs, styluses, or predictive text', 'Larger buttons and one-handed typing', 'Templates and saved phrases', 'Rest breaks and flexible deadlines', 'Accessible routes and alternative tasks', 'Asking before touching someone\'s body or mobility equipment']
+      },
+      simple: 'Accessible tools and routes can help someone take part without making assumptions about their knowledge or ability.',
+      example: 'One support idea from this module is to offer voice input, keyboard shortcuts, or larger buttons.',
+      hint: 'Think about personal space, safety, and asking before offering hands-on help.',
+      typing: { level: 'Key idea typing', prompt: 'Type the respectful support idea in the field.', target: 'Ask before helping with a mobility device because it is part of a person\'s personal space.' },
+      check: {
