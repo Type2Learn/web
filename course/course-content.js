@@ -65,3 +65,36 @@ export const COURSE_CONTENT = {
         ]
       },
       {
+        question: 'Dyspraxia, also called Developmental Coordination Disorder, mainly affects:',
+        options: [
+          ['Movement, coordination, balance, and motor planning.', true],
+          ['A person\'s intelligence.', false],
+          ['The ability to see all objects.', false],
+          ['The ability to understand emotions.', false]
+        ]
+      },
+      {
+        question: 'Dyscalculia is mainly associated with difficulty understanding:',
+        options: [
+          ['Numbers, quantities, calculations, or mathematical concepts.', true],
+          ['Written letters only.', false],
+          ['Physical movement only.', false],
+          ['Sounds and volume only.', false]
+        ]
+      },
+      {
+        question: 'Auditory Processing Disorder may make it difficult to:',
+        options: [
+          ['Process and understand spoken sounds, especially in noisy environments.', true],
+          ['See small text clearly.', false],
+          ['Control hand movements.', false],
+          ['Recognize numbers visually.', false]
+        ]
+      },
+      {
+        question: 'Which support may help a learner with visual impairment or low vision?',
+        options: [
+          ['Smaller text and lower contrast.', false],
+          ['Larger text, zoom, strong contrast, or screen-reader support.', true],
+          ['Removing all written instructions.', false],
+          ['Using color as the only form of feedback.', false]
