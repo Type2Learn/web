@@ -3980,3 +3980,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   }, true);
 
   window.addEventListener('resize', () => {
+    const popup = app.querySelector('.course-support-popup');
+    if (!popup) return;
+    window.requestAnimationFrame(() => positionSupportPopupInTask(popup));
+  }, { passive: true });
+
+  const beginAuthenticatedCourse = async () => {
+    app.innerHTML = renderAuthChecking();
+    let user = getType2LearnGuest();
+    if (!user) {
+      user = await import('/firebase-auth.js?v=20260801-courseflow1')
+        .then(({ waitForType2LearnUser }) => waitForType2LearnUser())
+        .catch(() => null);
+    }
+    if (!user) {
+      window.location.replace('/login/?next=%2Fcourse%2F');
+      return;
+    }
+    authenticatedUser = user;
+    const rawLearnerId = user.uid || user.email || 'learner';
+    const learnerId = encodeURIComponent(rawLearnerId);
+    storageKeys = {
+      preferences: 'type2learn-learner-preferences-v1:' + learnerId,
+      course: STORAGE_NAMESPACE + ':' + learnerId + ':' + COURSE.id,
+      learnerId: rawLearnerId
+    };
+    state = loadState();
+    const entry = new URL(window.location.href).searchParams;
+    const startSelectedCourse = entry.get('course') === COURSE.id && entry.get('start') === 'course';
+    if (startSelectedCourse) {
+      // The course-specific preferences page always leads to a clear preview
+      // before the learner begins or resumes a learning task.
+      state.view = 'course';
+      state.previousView = 'dashboard';
+      state.progress.phase = 'preview';
+      state.reviewModuleIndex = null;
+      state.manualExampleVisible = false;
+      state.showSimple = false;
+      state.readingSectionIndex = 0;
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('course');
+      cleanUrl.searchParams.delete('start');
+      window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+      recordSupportMoment('task-entry', { result: 'course-entry' });
+      save();
+    }
+    syncBackgroundNoisePreferences();
+    syncMascotPreferences();
+    if (upgradeLegacyNarrationVoice()) save();
+    render();
+    // Preferences are saved immediately before the learner enters the course.
+    // The preview audio belongs to that previous document, so rebuild and
+    // resume the selected loop here instead of leaving a silent handoff.
+    // A browser that blocks cross-page autoplay still leaves the visible
+    // Start control available without producing an unnecessary alert.
+    if (backgroundNoise.enabled) {
+      window.requestAnimationFrame(() => playBackgroundNoise({ announceChange: false }));
+    }
+  };
+
+  window.addEventListener('pagehide', () => {
+    cancelNarrationAutoScroll();
+    narration.service?.destroy();
+    stopVoiceInput();
+    pauseBackgroundNoise();
+    courseMascot?.destroy();
+  });
+  beginAuthenticatedCourse();
+})();
