@@ -2743,3 +2743,73 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (moment.kind === 'preference-preview') return 'preference';
     return 'entry';
   };
+
+  const successCelebrationMarkup = (moment, isNew) => {
+    if (!shouldCelebrateSupportMoment(moment, isNew)) return '';
+    const visual = supportVisualKind(moment);
+    const moduleReward = ['module', 'course'].includes(visual);
+    const medalSource = moduleReward
+      ? '/assets/rewards/type2learn-module-medal.webp'
+      : '/assets/rewards/type2learn-section-medal.webp';
+    const medalCount = ['section', 'lesson'].includes(visual) ? 3 : visual === 'course' ? 3 : 1;
+    const medals = Array.from({ length: medalCount }, (_, index) => {
+      const source = visual === 'course' && index > 0 ? '/assets/rewards/type2learn-section-medal.webp' : medalSource;
+      return '<img class="course-success-medal course-success-medal--' + (index + 1) + '" src="' + source + '" alt="">';
+    }).join('');
+    const petalCount = visual === 'correct' ? 6 : visual === 'section' ? 10 : 14;
+    const petals = Array.from({ length: petalCount }, (_, index) => '<span class="course-success-petal course-success-petal--' + (index + 1) + '" aria-hidden="true"></span>').join('');
+    const rays = Array.from({ length: visual === 'course' ? 8 : 5 }, (_, index) => '<span class="course-success-ray course-success-ray--' + (index + 1) + '" aria-hidden="true"></span>').join('');
+    return '<div class="course-success-celebration course-success-celebration--' + visual + '" aria-hidden="true"><span class="course-success-halo"></span><div class="course-success-celebration-rays">' + rays + '</div><div class="course-success-celebration-medals">' + medals + '</div><div class="course-success-celebration-petals">' + petals + '</div></div>';
+  };
+
+  const supportMomentMarkup = (isNew) => {
+    const moment = activeSupportMoment;
+    const copy = supportCopy(moment);
+    if (!moment || !copy) return '';
+    const [title, detail] = copy;
+    const [symbol, metaLabel, nextStep] = supportMomentMeta(moment);
+    const layout = ['focused', 'balanced', 'open'].includes(moment.layout) ? moment.layout : selectedCourseLayout();
+    const isPopup = moment.encouragementLevel !== 'subtle';
+    const isOpenPopup = isPopup && layout === 'open';
+    const isFocusedPopup = isPopup && layout === 'focused';
+    const isBalancedPopup = isPopup && layout === 'balanced';
+    const isUrdu = moment.language === 'urdu';
+    const label = isUrdu
+      ? (moment.kind === 'preference-preview' ? 'آپ کے لیے' : moment.encouragementLevel === 'expressive' ? 'شاباش!' : 'حوصلہ افزائی')
+      : (moment.kind === 'preference-preview' ? 'For you' : moment.encouragementLevel === 'expressive' ? 'Great work!' : 'Encouragement');
+    const nextMarkup = isOpenPopup || !isPopup
+      ? (metaLabel && nextStep ? '<p class="course-support-next"><span>' + escapeHtml(metaLabel) + '</span>' + escapeHtml(nextStep) + '</p>' : '')
+      : (isBalancedPopup || isFocusedPopup ? '<p class="course-support-next course-support-next--line" aria-hidden="true"></p>' : '');
+    const symbolMarkup = (!isPopup || isOpenPopup)
+      ? '<span class="course-support-symbol" aria-hidden="true">' + escapeHtml(symbol) + '</span>'
+      : '';
+    const labelMarkup = isFocusedPopup ? '' : '<span class="course-support-label">' + escapeHtml(label) + '</span>';
+    const detailMarkup = (!isFocusedPopup && detail) ? '<p>' + escapeHtml(detail) + '</p>' : '';
+    return '<section id="course-support-feedback" class="course-support-moment course-support-moment--' + escapeHtml(moment.kind) + ' course-support-moment--' + escapeHtml(moment.encouragementLevel) + (isPopup ? ' course-support-popup course-support-popup--' + layout : '') + (isNew ? ' is-new-support-moment' : '') + '" data-support-moment="' + moment.id + '" data-support-kind="' + escapeHtml(moment.kind) + '" data-support-layout="' + layout + '" data-support-visual="' + supportVisualKind(moment) + '" tabindex="-1" ' + (isNew ? 'role="status" aria-live="polite"' : 'role="note" aria-live="off"') + (isUrdu ? ' lang="ur" dir="rtl"' : '') + '>' + symbolMarkup + '<div class="course-support-copy">' + labelMarkup + '<strong>' + escapeHtml(title) + '</strong>' + detailMarkup + nextMarkup + '</div><span class="course-support-progress" aria-hidden="true"></span></section>';
+  };
+
+  const insertInlineSupportMoment = (card, markup) => {
+    if (!card || !markup) return;
+    let anchor = null;
+    if (state.progress.phase === 'type') anchor = card.querySelector('.course-input-label, .typing-tester');
+    else if (['check', 'apply', 'exam'].includes(state.progress.phase)) anchor = card.querySelector('.course-check-options');
+    else if (state.progress.phase === 'read') anchor = card.querySelector('.course-reading-copy');
+    if (anchor) anchor.insertAdjacentHTML('beforebegin', markup);
+    else {
+      const actions = card.querySelector('.course-task-actions');
+      if (actions) actions.insertAdjacentHTML('beforebegin', markup);
+      else card.insertAdjacentHTML('beforeend', markup);
+    }
+  };
+
+  // Support moments should belong to the task that earned them.  A mascot
+  // narrows the usable work column, so centring against the viewport put the
+  // acknowledgement between the work and the mascot instead of over the
+  // activity.  Keep its vertical screen position calm and predictable, but
+  // calculate its horizontal centre and available width from the live task.
+  const positionSupportPopupInTask = (popup, card = app.querySelector('.course-task-card')) => {
+    if (!popup || !card || !popup.isConnected || !card.isConnected) return;
+    const cardRect = card.getBoundingClientRect();
+    const viewportInset = 18;
+    const availableLeft = Math.max(viewportInset, cardRect.left);
+    const availableRight = Math.min(window.innerWidth - viewportInset, cardRect.right);
