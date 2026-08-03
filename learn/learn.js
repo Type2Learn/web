@@ -672,26 +672,70 @@ const boot = async () => {
       if (preference === 'encouragement' || preference === 'animations') showSetupFeedback(preference, choices);
       return;
     }
-const boot = async () => {
-  let user = null;
-  try {
-    user = await waitForType2LearnUser();
-  } catch (_) {
-    user = null;
-  }
 
-  if (!user) {
-    window.location.replace('/login/?next=%2Flearn%2F');
-    return;
-  }
+    const noiseTypeButton = event.target.closest('[data-background-noise-type]');
+    if (noiseTypeButton) {
+      choices['background-noise-type'] = noiseTypeButton.dataset.backgroundNoiseType;
+      document.querySelectorAll('[data-background-noise-type]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button === noiseTypeButton));
+      });
+      if (choices['background-noise'] === 'on') startBackgroundNoisePreview(choices);
+      return;
+    }
 
-  render(user);
-  setupSidebarAutoHide();
-  document.querySelector('[data-signout]')?.addEventListener('click', async () => {
-    await signOutType2LearnUser();
-    window.location.assign('/login/');
+    if (event.target.closest('[data-save-preferences]')) {
+      savePreferences(user, selectedCourseId, choices);
+      window.location.assign('/course/?course=' + encodeURIComponent(selectedCourseId) + '&start=course');
+    }
+
+    const back = event.target.closest('[data-go-back]');
+    if (back) {
+      if (back.dataset.goBack === 'language') {
+        setupStage = 'language';
+      } else if (back.dataset.goBack === 'focused') {
+        if (focusedStepIndex > 0) focusedStepIndex -= 1;
+        else {
+          choices.layout = layoutBeforeFocused;
+          setupStage = 'language';
+        }
+      }
+      render(choices);
+      return;
+    }
+
+    const advance = event.target.closest('[data-advance-setup]');
+    if (advance) {
+      const stage = advance.dataset.advanceSetup;
+      if (stage === 'language') {
+        setupStage = 'balanced';
+        render(choices);
+        return;
+      }
+      if (stage === 'focused') {
+        const steps = focusedSteps(choices);
+        if (focusedStepIndex >= steps.length - 1) {
+          savePreferences(user, selectedCourseId, choices);
+          window.location.assign('/course/?course=' + encodeURIComponent(selectedCourseId) + '&start=course');
+          return;
+        }
+        focusedStepIndex += 1;
+        render(choices);
+      }
+    }
   });
-  window.dispatchEvent(new CustomEvent('type2learn:companion-message', { detail: { event: 'learn-home' } }));
+
+  app.addEventListener('input', (event) => {
+    if (!event.target.matches('[data-background-noise-volume]')) return;
+    choices['background-noise-volume'] = String(noiseVolume(event.target.value));
+    updateNoiseVolumeUi(choices['background-noise-volume']);
+    backgroundNoisePreview.volume = Math.min(.35, noiseVolume(choices['background-noise-volume']) / 100);
+    if (backgroundNoisePreview.audio) backgroundNoisePreview.audio.volume = backgroundNoisePreview.volume;
+  });
+
+  window.addEventListener('pagehide', () => {
+    stopBackgroundNoisePreview();
+    mascotPreview?.destroy?.();
+  }, { once: true });
 };
 
 boot();

@@ -798,69 +798,83 @@ html[data-color-mode="vivid"] .learning-encouragement-popup {
   box-shadow: 0 25px 66px rgb(0 89 184 / .27);
 }
 
-    background: rgba(255, 255, 255, .86);
-    color: var(--learn-soft);
-    box-shadow: 0 12px 28px rgba(10, 22, 48, .08);
-  }
+body[data-setup-animations="gentle"] .learning-encouragement-popup { animation: learning-popup-gentle-in 230ms ease-out both; }
+body[data-setup-animations="lively"] .learning-encouragement-popup { animation: learning-popup-lively-in 500ms cubic-bezier(.16, 1.16, .3, 1) both; }
+body[data-setup-animations="lively"] .learning-encouragement-popup > span { animation: learning-popup-symbol 540ms cubic-bezier(.16, 1.2, .3, 1) both; }
+body[data-setup-animations="gentle"] .learning-encouragement-popup > i,
+body[data-setup-animations="lively"] .learning-encouragement-popup > i { animation: learning-popup-progress 4.7s linear both; }
+body[data-setup-animations="gentle"] .learning-encouragement-popup.is-leaving { animation: learning-popup-out 230ms ease-in both; }
+body[data-setup-animations="lively"] .learning-encouragement-popup.is-leaving { animation: learning-popup-out 310ms ease-in both; }
 
-  .inline-companion .mascot-illustration {
-    flex: 0 0 auto;
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-  }
-
-  .inline-companion p {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 850;
-    line-height: 1.35;
-  }
+@keyframes learning-popup-gentle-in { from { opacity: 0; transform: translate(-50%, 9px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes learning-popup-lively-in {
+  0% { opacity: 0; transform: translate(-50%, 42px) scale(.88) rotate(-1deg); }
+  65% { opacity: 1; transform: translate(-50%, -4px) scale(1.02) rotate(.2deg); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
+@keyframes learning-popup-symbol {
+  0% { opacity: 0; transform: scale(.45) rotate(-24deg); }
+  68% { opacity: 1; transform: scale(1.14) rotate(5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes learning-popup-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes learning-popup-out { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 18px) scale(.96); } }
 
-@media (max-width: 520px) {
-  .learn-nav {
-    grid-template-columns: 1fr;
-  }
+body[data-setup-animations="still"] *,
+body[data-setup-animations="still"] *::before,
+body[data-setup-animations="still"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+body[data-setup-animations="still"] .learning-action-echo,
+body[data-setup-animations="still"] .learning-stage-sweep,
+body[data-setup-animations="still"] .learning-encouragement-popup > i { display: none !important; }
 
-  .welcome-copy h1 {
-    font-size: clamp(3.2rem, 18vw, 4.4rem);
-  }
-
-  .welcome-copy > p {
-    font-size: 1rem;
-  }
-
-  .learn-actions {
-    display: grid;
-  }
-
-  .welcome-visual {
-    min-height: 310px;
-  }
-
-  .learning-card {
-    width: 88%;
-    min-height: 290px;
-    padding: 22px;
-  }
-
-  .learning-card strong {
-    font-size: 2.25rem;
-  }
+@media (max-width: 767px) {
+  .learning-encouragement-popup { bottom: 12px; width: calc(100vw - 24px); }
+  .learning-stage-sweep { display: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
-  }
+  .learning-action-echo,
+  .learning-stage-sweep,
+  .learning-encouragement-popup > i { display: none !important; }
+  .learning-encouragement-popup,
+  .learning-encouragement-popup * { animation: none !important; transition: none !important; }
+}
 
-  .learn-action:hover {
-    transform: none;
+/* Match the course: meaningful encouragement appears in the visual centre,
+   rather than resembling a browser notification at the bottom edge. */
+.learning-encouragement-popup {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
+body[data-setup-animations="gentle"] .learning-encouragement-popup { animation-name: learning-popup-centre-gentle-in; }
+body[data-setup-animations="lively"] .learning-encouragement-popup { animation-name: learning-popup-centre-lively-in; }
+body[data-setup-animations="gentle"] .learning-encouragement-popup.is-leaving,
+body[data-setup-animations="lively"] .learning-encouragement-popup.is-leaving { animation-name: learning-popup-centre-out; }
+
+@keyframes learning-popup-centre-gentle-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)) scale(.985); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes learning-popup-centre-lively-in {
+  0% { opacity: 0; transform: translate(-50%, -42%) scale(.86) rotate(-1deg); }
+  64% { opacity: 1; transform: translate(-50%, -52%) scale(1.025) rotate(.2deg); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+}
+@keyframes learning-popup-centre-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -56%) scale(.94); }
+}
+
+@media (max-width: 767px) {
+  .learning-encouragement-popup {
+    top: 50%;
+    bottom: auto;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
   }
 }
