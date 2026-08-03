@@ -135,3 +135,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       return {};
     }
   };
+
+  const defaultLearningChoices = () => ({
+    'learning-language': 'english',
+    colours: 'balanced',
+    layout: 'balanced',
+    encouragement: 'subtle',
+    animations: 'gentle',
+    'background-noise': 'off',
+    'background-noise-type': 'pink',
+    'background-noise-volume': '15',
+    'text-to-speech': 'off',
+    mascot: 'off',
+    'mascot-language': 'english',
+    'mascot-language-explicit': false,
+    'mascot-voice': 'text',
+    'mascot-behaviour': 'calm',
+    'urdu-mode': 'off'
+  });
+
+  const learningChoices = () => ({ ...defaultLearningChoices(), ...readLearningChoices() });
+
+  const coursePreferencesAreSaved = () => {
+    try {
+      const stored = safeJson(localStorage.getItem(learningPreferenceKey()), {}) || {};
+      return Boolean(stored.complete && stored.choices && typeof stored.choices === 'object');
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const saveLearningChoices = (choices) => {
+    try {
+      localStorage.setItem(learningPreferenceKey(), JSON.stringify({
+        version: 1,
+        courseId: COURSE.id,
+        complete: true,
+        choices
+      }));
+    } catch (_) {
+      // The course remains usable when this browser blocks local storage.
+    }
+  };
+
+  const readBackgroundNoisePreferences = () => {
+    const choices = readLearningChoices();
+    const selectedType = ['pink', 'white', 'brown'].includes(choices['background-noise-type'])
+      ? choices['background-noise-type']
+      : 'pink';
+    // Preserve a previously saved White noise choice during the wording change.
+    const enabled = choices['background-noise'] === 'on'
+      || (choices['background-noise'] === undefined && choices['white-noise'] === 'on');
+    return {
+      enabled,
+      type: selectedType,
+      volume: clampBackgroundNoiseVolume(choices['background-noise-volume'])
+    };
+  };
+
+  const syncMascotPreferences = () => {
+    const choices = learningChoices();
+    mascotPresentation = {
+      enabled: choices.mascot === 'on',
+      encouragement: ['subtle', 'balanced', 'expressive'].includes(choices.encouragement)
+        ? choices.encouragement
+        : 'subtle',
+      animations: effectiveAnimationLevel(),
+      language: choices['mascot-language'] === 'urdu'
+        ? 'urdu'
