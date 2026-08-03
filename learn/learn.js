@@ -132,29 +132,74 @@ const setupCopy = (choices) => setupLanguage(choices) === 'urdu' ? {
   startingIntro: 'Your mascot will begin in this language. You can choose a different mascot language later.',
   startingLabel: 'Starting language',
   startingDescription: 'Choose the language your mascot will use by default.',
-  '<a href="#supports"><i aria-hidden="true"></i><span>Supports</span></a>',
-  '<a href="#progress"><i aria-hidden="true"></i><span>Progress</span></a>',
-  '<button class="sidebar-toggle" type="button" data-auto-hide-toggle><span>Auto-hide sidebar</span><span>On</span></button>',
-  '</nav>',
-  '<section class="sidebar-card" aria-label="Preview status"><small>Temporary app shell</small><strong>Course screens will connect here as the learner engine is imported.</strong></section>',
-  '<button class="learn-signout" type="button" data-signout>Sign out</button>',
-  '</div>',
-  '</aside>',
-  '<button class="sidebar-reveal-zone" type="button" data-sidebar-reveal aria-label="Show learning sidebar"><span aria-hidden="true"></span></button>'
-].join('');
+  useLanguage: 'Use this language',
+  preferences: 'Learning preferences',
+  focused: 'Focused setup',
+  title: 'Set up your learning space.',
+  balancedIntro: 'Choose the options that feel useful today. You can revisit them later.',
+  openIntro: 'Each choice has its own full space so you can look through it at your own pace.',
+  focusedIntro: 'One clear choice at a time. You can revisit these settings later.',
+  laterSettings: 'You can change these course preferences later from your profile picture in the top-right corner.',
+  continue: 'Continue',
+  keep: 'Keep this choice',
+  course: 'Continue to course',
+  noiseType: 'Noise type',
+  noiseDescription: 'Choose the steady sound that feels least distracting. It starts quietly when you choose On.',
+  volume: 'Volume',
+  quietStart: 'Starts quietly. Maximum output is limited.',
+  playing: 'Playing',
+  selectNoise: 'Select a noise type to start it at',
+  mascotUnavailable: 'Mascot is available on larger screens. This screen is too small, so it will stay off.'
+};
 
-const mainContent = (user) => [
-  '<main class="learn-main" id="learn-main">',
-  '<div class="learn-topline">',
-  '<span class="learn-pill"><i aria-hidden="true"></i> Private learning space</span>',
-  '<span class="learn-user-chip"><span class="learn-avatar" aria-hidden="true">' + escapeHtml(initialsFor(user)) + '</span><span>' + escapeHtml(user?.email || 'Signed in to Type2Learn') + '</span></span>',
+const localizedControls = {
+  urdu: {
+    layout: { label: 'صفحے کی ترتیب', description: 'ایک سرگرمی کے گرد جگہ کی مقدار۔', choices: [['focused', 'توجہ کے ساتھ'], ['balanced', 'متوازن'], ['open', 'کھلی']] },
+    colours: { label: 'رنگوں کا انداز', description: 'سرگرمی کے گرد رنگ کی مقدار۔', choices: [['flat', 'سادہ'], ['balanced', 'متوازن'], ['vivid', 'نمایاں']] },
+    encouragement: { label: 'حوصلہ افزائی', description: 'مددگار لمحات کتنے نمایاں محسوس ہوں۔', choices: [['subtle', 'ہلکی'], ['balanced', 'متوازن'], ['expressive', 'نمایاں']] },
+    animations: { label: 'حرکت', description: 'مددگار حرکت کی مقدار جو آپ دیکھنا چاہیں۔', choices: [['still', 'بغیر حرکت'], ['gentle', 'نرم'], ['lively', 'زیادہ']] },
+    'background-noise': { label: 'پس منظر کی آواز', description: 'اختیاری مسلسل آواز، شروع میں ہمیشہ بند۔', choices: [['off', 'بند'], ['on', 'چالو']] },
+    'text-to-speech': { label: 'متن سے آواز', description: 'اختیاری پڑھ کر سنانے کی مدد۔', choices: [['off', 'بند'], ['on', 'چالو']] },
+    mascot: { label: 'میسکاٹ', description: 'جب آپ چاہیں ایک سیکھنے والا ساتھی۔', choices: [['off', 'بند'], ['on', 'چالو']] },
+    'mascot-language': { label: 'میسکاٹ کی زبان', description: 'یہ آپ کی ابتدائی زبان کے ساتھ شروع ہوتی ہے۔ آپ میسکاٹ کے لیے الگ زبان منتخب کر سکتے ہیں۔', choices: [['english', 'انگریزی'], ['urdu', 'اردو']] },
+    'mascot-voice': { label: 'میسکاٹ کی آواز', description: 'جب آواز کے اختیارات منسلک ہوں تو میسکاٹ کا رابطہ منتخب کریں۔', choices: [['text', 'متن'], ['speech', 'آواز'], ['both', 'دونوں']] },
+    'mascot-behaviour': { label: 'میسکاٹ کا انداز', description: 'وہ موجودگی منتخب کریں جو آرام دہ محسوس ہو۔', choices: [['low-key', 'پُرسکون'], ['calm', 'نرم'], ['energetic', 'پرجوش']] }
+  }
+};
+
+const localizedControl = (control, language) => localizedControls[language]?.[control.id]
+  ? { ...control, ...localizedControls[language][control.id] }
+  : control;
+
+const controlMarkup = (originalControl, selected, language = 'english') => {
+  const { id, label, description, choices } = localizedControl(originalControl, language);
+  const mascotUnavailable = id === 'mascot' && !mascotScreenIsSupported();
+  const copy = setupCopy({ 'learning-language': language });
+  return [
+  '<section class="learning-control" aria-labelledby="' + id + '-label">',
+  '<h2 id="' + id + '-label">' + label + '</h2>',
+  '<p>' + description + '</p>',
+  '<div class="preference-options" style="--option-count:' + choices.length + '" role="group" aria-label="' + label + '">',
+  choices.map(([value, choiceLabel]) => '<button type="button" data-preference="' + id + '" data-value="' + value + '" aria-pressed="' + String(selected === value) + '"' + (mascotUnavailable ? ' disabled' : '') + '>' + choiceLabel + '</button>').join(''),
   '</div>',
-  '<section class="welcome-stage" aria-labelledby="welcome-title">',
-  '<div class="welcome-hero">',
-  '<div class="welcome-copy">',
-  '<aside class="inline-companion" aria-label="Type2Learn companion"><span class="mascot-illustration" aria-hidden="true"></span><p>Welcome back. Your learning space is ready.</p></aside>',
-  '<h1 id="welcome-title">Welcome back, ' + escapeHtml(nameFor(user).split(/\s+/)[0]) + '.</h1>',
-  '<p>Your next learning space is being built around one clear action, calm support controls, and saved progress. For now, this page gives us the after-login home that the course engine can plug into.</p>',
+  mascotUnavailable ? '<small class="learning-control-unavailable" role="status">' + copy.mascotUnavailable + '</small>' : '',
+  '</section>'
+].join('');
+};
+
+const noiseVolume = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(35, Math.max(0, Math.round(number))) : 15;
+};
+
+const noiseType = (value) => ['pink', 'white', 'brown'].includes(value) ? value : 'pink';
+const noiseTypeLabel = (value) => noiseType(value)[0].toUpperCase() + noiseType(value).slice(1);
+
+const setBackgroundNoisePreviewStatus = (message) => {
+  const status = document.querySelector('[data-background-noise-preview-status]');
+  if (status) status.textContent = message;
+};
+
   '<div class="learn-actions">',
   '<a class="learn-action is-primary" href="#next-step"><i aria-hidden="true"></i> See the next step</a>',
   '<a class="learn-action" href="/pathways/"><i aria-hidden="true"></i> Explore pathways</a>',
