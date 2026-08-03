@@ -959,3 +959,70 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const renderShell = (content) => authenticatedUser
     ? '<div class="course-app-shell">' + courseTopbar() + '<div class="course-page-content">' + content + '</div></div>'
     : content;
+
+  const announce = (message) => {
+    if (liveRegion) liveRegion.textContent = message;
+  };
+
+  const save = (message) => {
+    try {
+      if (!storageKeys.preferences || !storageKeys.course) throw new Error('Learner storage is not ready.');
+      localStorage.setItem(storageKeys.preferences, JSON.stringify({
+        version: 2,
+        settingsMigrationVersion: LEGACY_COURSE_SETTINGS_MIGRATION_VERSION
+      }));
+      localStorage.setItem(storageKeys.course, JSON.stringify({
+        version: 1,
+        view: state.view,
+        previousView: state.previousView,
+        progress: state.progress,
+        manualExampleVisible: state.manualExampleVisible,
+        showSimple: state.showSimple,
+        readingSectionIndex: state.readingSectionIndex
+      }));
+      state.settings = saveLearnerSettings(storageKeys.learnerId, state.settings);
+      state.storageAvailable = true;
+      const saveStatus = document.querySelector('[data-save-status]');
+      if (saveStatus) saveStatus.textContent = message || 'Saved locally';
+      if (message) announce(message);
+    } catch (_) {
+      state.storageAvailable = false;
+      if (state.view === 'course') recordSupportMoment('system-error', { result: 'saving' });
+      const saveStatus = document.querySelector('[data-save-status]');
+      if (saveStatus) saveStatus.textContent = 'Saving is unavailable in this browser session.';
+      announce('Saving is unavailable in this browser session.');
+    }
+  };
+
+  const isReviewingModule = () => Number.isInteger(state.reviewModuleIndex)
+    && state.reviewModuleIndex >= 0
+    && state.reviewModuleIndex < COURSE.steps.length;
+  const displayedModuleIndex = () => isReviewingModule() ? state.reviewModuleIndex : state.progress.lessonIndex;
+  const currentStep = () => COURSE.steps[displayedModuleIndex()];
+  const isLastStep = () => state.progress.lessonIndex === COURSE.steps.length - 1;
+  const courseProgress = () => Math.round((state.progress.completedSteps.length / COURSE.steps.length) * 100);
+  const isFinalExamPhase = () => ['exam-intro', 'exam', 'exam-results'].includes(state.progress.phase);
+  const currentFinalExamQuestion = () => finalExam().questions[state.progress.finalExam.questionIndex];
+  const phaseNumber = () => ({ preview: 1, read: 2, type: 3, check: 4, apply: 5, complete: 5 }[state.progress.phase] || 1);
+
+  // The typing work mirrors the lesson the learner has just read. Each
+  // content section remains whole—rather than reducing the lesson to a single
+  // slogan—so it can be typed and checked one clear piece at a time.
+  const lessonTypingSections = (step = currentStep()) => {
+    const content = step?.content || {};
+    const listText = (items) => Array.isArray(items) ? items.join('\n') : '';
+    return [
+      { heading: content.definitionHeading, text: content.definition },
+      { heading: content.dailyLifeHeading, text: content.dailyLife },
+      { heading: content.strengthsHeading, text: content.strengths },
+      { heading: content.challengesHeading, text: listText(content.challenges) },
+      { heading: content.supportsHeading, text: listText(content.supports) }
+    ].filter((section) => String(section.heading || '').trim() && String(section.text || '').trim());
+  };
+
+  const usesLessonSectionTyping = () => Boolean(
+    state.view === 'course'
+      && state.progress.phase === 'type'
+      && !isReviewingModule()
+      && lessonTypingSections().length
+  );
