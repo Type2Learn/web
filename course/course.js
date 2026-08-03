@@ -2401,3 +2401,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     if (state.view === 'course') {
       const moduleCopy = app.querySelector('.course-module-strip-heading > span');
+      if (moduleCopy) moduleCopy.textContent = COURSE.steps.length + ' small modules · one final exam';
+    }
+  };
+
+  const syncNarrationVoiceOptions = () => {
+    const select = app.querySelector('[data-narration-voice]');
+    if (!select) return;
+    select.innerHTML = narrationVoiceOptions();
+    select.value = state.preferences.narrationVoice === SYSTEM_NARRATION_VOICE_URI
+      ? SYSTEM_NARRATION_VOICE_URI
+      : effectiveNarrationVoice();
+    select.disabled = narration.status === 'unsupported' || (!hasLocalAvaNarration() && narration.voices.length === 0);
+  };
+
+  const cancelNarrationAutoScroll = () => {
+    if (narration.scrollFrame !== null && typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(narration.scrollFrame);
+    narration.scrollFrame = null;
+  };
+
+  const narrationScrollUsesReducedMotion = () => {
+    const systemPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    return Boolean(state.preferences.reducedMotion || state.preferences.quietDisplay || systemPreference?.matches);
+  };
+
+  const narrationScrollTopClearance = () => 24;
+
+  const smoothNarrationScrollTo = (targetTop) => {
+    const startTop = Math.max(0, Number(window.scrollY ?? window.pageYOffset) || 0);
+    const destination = Math.max(0, Number(targetTop) || 0);
+    const distance = destination - startTop;
+    if (Math.abs(distance) < 2) return;
+    cancelNarrationAutoScroll();
+    if (narrationScrollUsesReducedMotion() || typeof window.requestAnimationFrame !== 'function') {
+      window.scrollTo?.({ left: 0, top: destination, behavior: 'auto' });
+      return;
+    }
+    const duration = Math.min(460, Math.max(220, 170 + Math.abs(distance) * 0.18));
+    let startedAt = null;
+    const step = (timestamp) => {
+      if (startedAt === null) startedAt = timestamp;
+      const progress = Math.min(1, (timestamp - startedAt) / duration);
+      // A gentle ease-out keeps the current section readable without a sudden jump.
+      const eased = 1 - Math.pow(1 - progress, 3);
+      window.scrollTo?.({ left: 0, top: startTop + (distance * eased), behavior: 'auto' });
+      if (progress < 1) narration.scrollFrame = window.requestAnimationFrame(step);
+      else narration.scrollFrame = null;
+    };
+    narration.scrollFrame = window.requestAnimationFrame(step);
+  };
+
+  const scrollActiveNarrationChunk = () => {
+    if (!state.preferences.narrationAutoScroll || narration.activeIndex < 0) return;
+    const activeChunk = app.querySelector('[data-narration-text][data-narration-index="' + narration.activeIndex + '"]');
+    if (!activeChunk) return;
+    const rect = activeChunk.getBoundingClientRect?.();
+    if (!rect || !Number.isFinite(rect.top) || !Number.isFinite(rect.bottom)) return;
+    const upperBoundary = narrationScrollTopClearance();
+    const lowerBoundary = Math.max(upperBoundary + 72, (window.innerHeight || 0) - 36);
+    let delta = 0;
+    if (rect.top < upperBoundary || rect.height > lowerBoundary - upperBoundary) delta = rect.top - upperBoundary;
+    else if (rect.bottom > lowerBoundary) delta = rect.bottom - lowerBoundary;
+    else return;
+    const currentTop = Math.max(0, Number(window.scrollY ?? window.pageYOffset) || 0);
+    const maximumTop = Math.max(0, (document.documentElement?.scrollHeight || 0) - (window.innerHeight || 0));
+    smoothNarrationScrollTo(Math.min(maximumTop, Math.max(0, currentTop + delta)));
+  };
+
+  window.addEventListener('wheel', cancelNarrationAutoScroll, { passive: true });
