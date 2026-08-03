@@ -1336,3 +1336,672 @@ a:focus-visible {
     top: 26%;
     right: 76%;
     width: min(290px, 66%);
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1181px) and (max-width: 1500px) {
+  /* Keep the speech bubble inside the mascot rail on laptop widths, rather
+     than letting it cover the learning copy in the left column. */
+  .course-mascot-rail--dashboard .course-mascot-dialogue {
+    right: auto;
+    left: -5%;
+    width: min(270px, 65%);
+  }
+
+  .course-mascot-rail--browse .course-mascot-dialogue,
+  .course-mascot-rail--saved .course-mascot-dialogue {
+    right: auto;
+    left: -37%;
+    width: min(270px, 65%);
+  }
+
+  .course-mascot-rail--lesson .course-mascot-dialogue {
+    right: auto;
+    /* The lesson poses use wider arm and head movement than the home view.
+       Keep the dialogue in the deliberate gap between lesson copy and the
+       companion so it never sits across the character's face. */
+    left: -48%;
+    width: min(270px, 65%);
+  }
+}
+
+.course-module-strip {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid var(--course-line);
+  border-bottom: 1px solid var(--course-line);
+}
+
+.course-module-strip-heading .course-eyebrow { margin-bottom: 5px; }
+.course-module-strip-heading > span { color: var(--course-muted); font-size: 12px; line-height: 1.4; }
+
+.course-module-list {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(152px, 1fr);
+  gap: 7px;
+  margin: 0;
+  padding: 0 2px 4px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: var(--course-line-strong) transparent;
+  scrollbar-width: thin;
+  list-style: none;
+}
+
+.course-module-list li {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  min-height: 62px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 8px;
+  color: var(--course-muted);
+  scroll-snap-align: start;
+}
+
+.course-module-list li > div,
+.course-module-list li > button {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.course-module-list li.is-reviewable { cursor: pointer; }
+.course-module-list li.is-reviewable > button { width: 100%; cursor: pointer; }
+.course-module-list li.is-reviewable:hover { border-color: var(--course-blue); color: var(--course-ink); background: var(--course-blue-pale); }
+.course-module-list li.is-reviewable:hover small { color: var(--course-ink-soft); }
+.course-module-list li.is-reviewable > button:focus-visible { outline: 3px solid var(--course-blue); outline-offset: 3px; border-radius: 5px; }
+
+.course-module-list li > span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 50%;
+  color: var(--course-muted);
+  background: var(--course-paper);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.course-module-list strong,
+.course-module-list small { display: block; }
+.course-module-list strong { overflow: hidden; color: inherit; font-size: 12px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.course-module-list small { overflow: hidden; margin-top: 2px; color: var(--course-muted); font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.course-module-list li.is-active { border-color: var(--course-green); color: var(--course-ink); background: var(--course-green-pale); }
+.course-module-list li.is-active > span,
+.course-module-list li.is-complete > span { border-color: var(--course-green); color: var(--course-ink); background: var(--course-green); }
+
+.course-review-card { border-color: var(--course-teal); }
+.course-review-footer { justify-content: flex-end; }
+
+.course-workspace { width: min(100%, 1080px); min-width: 0; justify-self: center; }
+.course-workspace > .course-back-button { margin-bottom: 20px; }
+
+/* Balanced and Open use the same stable, edge-to-edge course canvas. The
+   outer inset scales predictably on 16:9, 16:10 and standard laptop widths. */
+body[data-course-layout="balanced"] .course-learning-shell:not(.has-course-mascot),
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) {
+  width: min(calc(100% - clamp(56px, 7vw, 148px)), 1780px);
+}
+
+body[data-course-layout="focused"] .course-learning-shell:not(.has-course-mascot) {
+  width: min(calc(100% - clamp(40px, 7vw, 148px)), 1080px);
+  min-height: calc(100dvh - 73px);
+  align-content: center;
+}
+
+body[data-course-layout="focused"] .course-workspace { width: min(100%, 1080px); }
+/* In Balanced, orientation spans the page while the actual learning card
+   keeps its calm, readable measure. Open intentionally uses the whole
+   workspace for the task itself. */
+body[data-course-layout="balanced"] .course-workspace { width: min(100%, 1080px); }
+body[data-course-layout="open"] .course-workspace { width: 100%; }
+
+body[data-course-layout="focused"] .course-workspace--focused .course-task-card { margin-top: 0; }
+
+@media (min-width: 1181px) {
+  .course-learning-shell.has-course-mascot .course-workspace { width: 100%; }
+
+  body[data-course-layout="focused"] .course-learning-shell--focused.has-course-mascot {
+    grid-template-columns: minmax(0, 1fr) clamp(390px, 34vw, 620px);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: calc(100dvh - 73px);
+    align-items: center;
+  }
+
+  body[data-course-layout="focused"] .course-learning-shell--focused.has-course-mascot .course-workspace {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  body[data-course-layout="focused"] .course-learning-shell--focused.has-course-mascot .course-mascot-rail--lesson {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    height: calc(100dvh - 114px);
+  }
+}
+
+.course-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.course-step-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 13px 0 0;
+  color: var(--course-ink-soft);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.course-step-meta i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--course-green);
+}
+
+.course-saved-status { flex: 0 0 auto; border-color: var(--course-green); color: #087d34; background: var(--course-green-pale); }
+
+.course-now-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 26px;
+  border: 1px solid var(--course-line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--course-paper);
+}
+
+.course-now-panel > div { min-height: 93px; padding: 16px; border-right: 1px solid var(--course-line); }
+.course-now-panel > div:last-child { border-right: 0; }
+.course-now-panel.course-no-next-step { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.course-now-panel span,
+.course-now-panel strong { display: block; }
+.course-now-panel span { color: var(--course-muted); font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.course-now-panel strong { margin-top: 6px; color: var(--course-ink); font-size: 13px; line-height: 1.4; }
+
+.course-task-card {
+  margin-top: 18px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 18px;
+  padding: clamp(21px, 4vw, 34px);
+  background: var(--course-paper);
+}
+
+/* Open is a genuinely spacious working surface, not the balanced card simply
+   stretched wider. The task copy, response area and reading width grow with
+   the canvas so the right side never becomes accidental empty space. */
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-task-card {
+  padding: clamp(28px, 4vw, 54px);
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-task-top h2 {
+  font-size: clamp(2rem, 3.15vw, 3.1rem);
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-task-top p:not(.course-task-label) {
+  max-width: 980px;
+  font-size: clamp(1rem, 1.25vw, 1.18rem);
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-reading-copy,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .typing-practice,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-recap,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-written-access-note,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-transition-notice,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-literal-instruction,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-reading-section-progress,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-input-access-note,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-extra-hint {
+  max-width: min(100%, 1120px);
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-reading-section h3 {
+  font-size: clamp(1rem, 1.28vw, 1.16rem);
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-reading-section p {
+  font-size: clamp(1rem, 1.24vw, 1.15rem);
+  line-height: 1.72;
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .typing-target { font-size: clamp(1rem, 1.24vw, 1.14rem); }
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .typing-practice textarea { min-height: 154px; font-size: clamp(1rem, 1.28vw, 1.16rem); }
+
+/* The Open typing task uses the working surface itself. Without this override
+   it inherited Balanced's 780px typing column inside a much wider card. */
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-typing-task {
+  min-height: clamp(500px, 53vh, 600px);
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-typing-body {
+  width: min(100%, 1280px);
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-typing-task .course-task-top > div {
+  max-width: 880px;
+}
+
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-typing-task .typing-practice,
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-typing-task .typing-tester {
+  max-width: none;
+}
+
+.course-task-top {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.course-task-top h2,
+.course-complete-card h2 {
+  margin: 0;
+  color: var(--course-ink);
+  font-size: var(--course-task-heading-size);
+  font-weight: 800;
+  letter-spacing: -.025em;
+  line-height: 1.1;
+}
+
+.course-task-top h2:focus { outline: none; }
+.course-task-top h2:focus-visible { outline: 3px solid var(--course-blue); outline-offset: 4px; }
+.course-task-top p:not(.course-task-label) { max-width: 660px; margin: 10px 0 0; color: var(--course-ink-soft); font-size: var(--course-task-copy-font-size); }
+
+.course-reading-copy { max-width: var(--course-reading-max-width); margin-top: 24px; }
+.course-reading-copy > p { margin: 0; color: var(--course-ink-soft); font-size: var(--course-reading-font-size); line-height: var(--course-line-height); }
+.course-reading-copy > p + p { margin-top: var(--course-paragraph-gap); }
+
+.course-simple-copy,
+.course-example {
+  margin-top: 18px;
+  border: 1px solid var(--course-blue);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--course-blue-pale);
+}
+
+.course-recap,
+.course-written-access-note,
+.course-transition-notice,
+.course-literal-instruction {
+  max-width: 780px;
+  margin: 14px 0 0;
+  border-left: 4px solid var(--course-teal);
+  padding: 10px 13px;
+  color: var(--course-ink-soft);
+  background: var(--course-teal-pale);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.course-recap { border-left-color: var(--course-green); background: var(--course-green-pale); }
+.course-written-access-note { border-left-color: var(--course-blue); background: var(--course-blue-pale); }
+.course-transition-notice { margin: 14px 0 0; }
+.course-literal-instruction { margin: 12px 0 0; }
+.course-literal-instruction strong { color: var(--course-ink); }
+
+.course-example { border-color: var(--course-teal); background: var(--course-teal-pale); }
+.course-simple-copy strong,
+.course-example strong { color: var(--course-ink); font-size: 13px; }
+.course-simple-copy p,
+.course-example p { margin: 6px 0 0; color: var(--course-ink-soft); font-size: 14px; }
+
+.course-reading-section-progress,
+.course-input-access-note,
+.course-extra-hint {
+  max-width: 780px;
+  margin: 14px 0 0;
+  border: 1px solid var(--course-line);
+  border-left: 3px solid var(--course-teal);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--course-ink-soft);
+  background: var(--course-blue-pale);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.course-reading-section-progress { border-left-color: var(--course-green); background: var(--course-green-pale); }
+.course-input-access-note { border-left-color: var(--course-blue); }
+.course-extra-hint { background: var(--course-paper); }
+.course-extra-hint summary { cursor: pointer; color: var(--course-ink); font-weight: 800; }
+.course-extra-hint p { margin: 9px 0 0; }
+
+.course-reading-copy > .course-simple-copy:first-child {
+  margin-top: 0;
+  border-color: var(--course-teal);
+  background: var(--course-teal-pale);
+}
+
+.course-simple-copy + .course-reading-section { margin-top: 20px; }
+
+.course-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.course-typing-task {
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(510px, 58vh, 650px);
+}
+
+/* Typing needs one calm visual column. Keep the heading, prompt, target and
+   response field together in the centre of the task card, while the action
+   remains in its familiar lower-right position. */
+.course-typing-body {
+  width: min(100%, 780px);
+  margin: auto;
+}
+
+.course-typing-task .course-task-top {
+  position: relative;
+  display: block;
+}
+
+.course-typing-task .course-task-top > div { max-width: 600px; }
+.course-typing-task .course-task-header-controls { position: absolute; top: 0; right: 0; }
+.course-typing-task .typing-practice { max-width: none; }
+
+.typing-practice { max-width: 780px; margin-top: 23px; }
+.typing-note { margin: 0; color: var(--course-muted); font-size: 13px; }
+.course-input-method-select {
+  display: grid;
+  max-width: 470px;
+  gap: 6px;
+  margin-top: 16px;
+  color: var(--course-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+.course-input-method-select select {
+  min-height: 42px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  font: inherit;
+}
+.course-input-method-select small { color: var(--course-muted); font-size: 12px; font-weight: 500; line-height: 1.45; }
+
+.typing-target {
+  margin: 16px 0 0;
+  border-left: 4px solid var(--course-green);
+  padding: 13px 16px;
+  color: var(--course-ink);
+  background: var(--course-green-pale);
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.guided-typing { margin-top: 16px; }
+.guided-typing > span { color: #087d34; font-size: 12px; font-weight: 850; }
+.guided-typing .typing-target { margin-top: 6px; }
+.lesson-section-typing .typing-target { white-space: pre-line; }
+
+.course-input-label { display: block; margin-top: 20px; color: var(--course-ink); font-size: 14px; font-weight: 800; }
+
+.typing-practice textarea {
+  width: 100%;
+  display: block;
+  resize: vertical;
+  min-height: 112px;
+  margin-top: 8px;
+  border: 2px solid var(--course-line-strong);
+  border-radius: 12px;
+  padding: 14px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  font-size: 16px;
+  line-height: var(--course-line-height);
+}
+
+.typing-practice textarea:focus { border-color: var(--course-blue); }
+.course-input-help { margin: 8px 0 0; color: var(--course-muted); font-size: 12px; line-height: 1.5; }
+.typing-feedback,
+.check-feedback,
+.integrity-note {
+  margin: 15px 0 0;
+  border-left: 4px solid var(--course-blue);
+  padding: 10px 12px;
+  color: var(--course-ink-soft);
+  background: var(--course-blue-pale);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.integrity-note { border-left-color: var(--course-amber); background: var(--course-amber-pale); }
+
+.course-check-options {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.course-check-options legend { max-width: 720px; padding: 0; color: var(--course-ink); font-size: 17px; font-weight: 800; line-height: 1.45; }
+
+.course-check-option {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 12px;
+  padding: 14px;
+  color: var(--course-ink-soft);
+  background: var(--course-paper);
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.course-check-option:hover { border-color: var(--course-blue); }
+.course-check-option.is-selected { border-color: var(--course-blue); background: var(--course-blue-pale); color: var(--course-ink); }
+.course-check-option input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--course-blue); }
+
+.course-complete-card { border-color: var(--course-green); background: var(--course-green-pale); }
+.course-complete-card > p:not(.course-task-label) { max-width: 650px; margin: 14px 0 0; color: var(--course-ink-soft); }
+.completion-mark { width: 42px; height: 42px; display: grid; place-items: center; margin-bottom: 16px; border: 1px solid var(--course-green); border-radius: 50%; color: var(--course-ink); background: var(--course-green); font-size: 22px; font-weight: 900; }
+
+.course-progress-panel {
+  display: grid;
+  grid-template-columns: minmax(160px, .6fr) minmax(260px, 1fr);
+  gap: 26px;
+  align-items: end;
+  margin-top: 18px;
+  border: 1px solid var(--course-line);
+  border-radius: 14px;
+  padding: 18px;
+  background: var(--course-paper);
+}
+
+.course-progress-panel p,
+.course-progress-panel strong,
+.course-progress-panel span { display: block; }
+.course-progress-panel p { margin: 0; color: var(--course-muted); font-size: 11px; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+.course-progress-panel strong { margin-top: 4px; font-size: 15px; }
+.course-progress-panel > div:first-child > span { margin-top: 4px; color: #087d34; font-size: 12px; font-weight: 750; }
+.course-progress-bars { display: grid; gap: 13px; }
+.course-progress-bars span { margin-bottom: 5px; color: var(--course-muted); font-size: 12px; }
+.course-progress-bars progress { width: 100%; height: 10px; accent-color: var(--course-green); }
+
+.course-lesson-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 4px 0;
+}
+
+.course-lesson-footer > span { color: var(--course-muted); font-size: 12px; text-align: center; }
+.course-lesson-footer > span strong { color: var(--course-ink-soft); }
+
+.course-modal-backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 24px;
+  background: #0a1630cc;
+}
+
+.course-modal {
+  position: relative;
+  width: min(100%, 600px);
+  border: 2px solid var(--course-ink);
+  border-radius: 18px;
+  padding: clamp(22px, 5vw, 36px);
+  background: var(--course-paper);
+}
+
+.course-modal h2 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); letter-spacing: -.025em; line-height: 1.12; }
+.course-modal h2:focus { outline: none; }
+.course-modal h2:focus-visible { outline: 3px solid var(--course-blue); outline-offset: 5px; }
+.course-modal > p:not(.course-eyebrow) { margin: 12px 0 0; color: var(--course-ink-soft); font-size: 15px; }
+.course-modal-close { position: absolute; top: 13px; right: 13px; width: 38px; height: 38px; border: 1px solid var(--course-line-strong); border-radius: 8px; color: var(--course-ink); background: var(--course-paper); font-size: 26px; line-height: 1; }
+.course-modal-close:hover { border-color: var(--course-blue); color: var(--course-blue); }
+.course-modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+.course-explain-modal {
+  width: min(100%, 760px);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.course-explain-intro { max-width: 600px; }
+
+.course-explain-sections {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.course-explain-sections > section {
+  border: 1px solid var(--course-line);
+  border-radius: 12px;
+  padding: 15px;
+  background: var(--course-paper);
+}
+
+.course-explain-sections h3 {
+  margin: 0;
+  color: var(--course-ink);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.course-explain-sections p {
+  margin: 7px 0 0;
+  color: var(--course-ink-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.course-explain-sections ol {
+  display: grid;
+  gap: 7px;
+  margin: 11px 0 0;
+  padding-left: 22px;
+  color: var(--course-ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.course-explain-support { border-left: 4px solid var(--course-teal) !important; background: var(--course-teal-pale) !important; }
+
+.course-ai-chat-locked {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 18px;
+  border-color: var(--course-line-strong) !important;
+  background: color-mix(in srgb, var(--course-paper) 74%, var(--course-blue-pale)) !important;
+}
+
+.course-ai-chat-locked .course-eyebrow { margin: 0 0 4px; }
+.course-ai-chat-locked h3 span,
+.course-ai-chat-locked button span {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--course-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.course-ai-chat-locked > p { grid-column: 1 / -1; }
+
+.course-ai-chat-locked button {
+  align-self: start;
+  min-height: 36px;
+  border: 1px dashed var(--course-line-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--course-muted);
+  background: var(--course-paper);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: not-allowed;
+  opacity: .84;
+}
+
+.help-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.help-choice-grid button {
+  min-height: 51px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 10px;
+  padding: 9px 11px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.help-choice-grid button:hover { border-color: var(--course-blue); background: var(--course-blue-pale); }
