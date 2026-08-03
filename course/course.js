@@ -2332,3 +2332,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const sections = [
       [content.definitionHeading, content.definition],
       [content.dailyLifeHeading, content.dailyLife],
+      [content.strengthsHeading, content.strengths],
+      [content.challengesHeading, content.challenges],
+      [content.supportsHeading, content.supports]
+    ];
+    const fragment = document.createDocumentFragment();
+    sections.forEach(([heading, value]) => {
+      if (!heading || !value) return;
+      const section = document.createElement('section');
+      section.className = 'course-reading-section';
+      const title = document.createElement('h3');
+      title.textContent = heading;
+      section.append(title);
+      if (Array.isArray(value)) {
+        const list = document.createElement('ul');
+        list.className = 'course-reading-list';
+        value.forEach((item) => {
+          const listItem = document.createElement('li');
+          listItem.textContent = item;
+          list.append(listItem);
+        });
+        section.append(list);
+      } else {
+        const paragraph = document.createElement('p');
+        paragraph.textContent = value;
+        section.append(paragraph);
+      }
+      fragment.append(section);
+    });
+    reading.prepend(fragment);
+    reading.dataset.structured = 'true';
+  };
+
+  const addSourceNotice = () => {
+    if (state.view !== 'course' || state.progress.phase !== 'read' || state.progress.lessonIndex !== 0) return;
+    const reading = app.querySelector('.course-reading-copy');
+    if (!reading || reading.querySelector('[data-course-content-notice]')) return;
+    const notice = document.createElement('aside');
+    notice.className = 'course-content-notice';
+    notice.dataset.courseContentNotice = '';
+    notice.textContent = COURSE.contentNotice;
+    reading.prepend(notice);
+  };
+
+  const addCourseConclusion = () => {
+    if (state.view !== 'course' || state.progress.phase !== 'complete' || !isLastStep() || !COURSE.conclusion) return;
+    const card = app.querySelector('.course-complete-card');
+    const actions = card?.querySelector('.course-task-actions');
+    if (!card || !actions || card.querySelector('[data-course-conclusion]')) return;
+    const conclusion = document.createElement('section');
+    conclusion.className = 'course-conclusion';
+    conclusion.dataset.courseConclusion = '';
+    const title = document.createElement('h3');
+    title.textContent = COURSE.conclusion.title;
+    conclusion.append(title);
+    COURSE.conclusion.paragraphs.forEach((paragraph) => {
+      const copy = document.createElement('p');
+      copy.textContent = paragraph;
+      conclusion.append(copy);
+    });
+    actions.insertAdjacentElement('beforebegin', conclusion);
+  };
+
+  const updateCourseCopy = () => {
+    if (state.view === 'browse') {
+      const listingCopy = app.querySelector('.course-listing p');
+      if (listingCopy) listingCopy.textContent = COURSE.steps.length + ' short, non-diagnostic modules plus a calm final exam about general experiences, respectful language, and accessible participation.';
+    }
+    if (state.view === 'course') {
+      const moduleCopy = app.querySelector('.course-module-strip-heading > span');
