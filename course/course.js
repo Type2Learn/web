@@ -1714,3 +1714,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       ? 'Check this section'
       : sectionTyping
         ? 'Continue to quick check'
+        : typing.level === 'Guided typing' && attempt.guidedIndex < typing.phrases.length - 1
+          ? 'Check this phrase'
+          : typing.level === 'Recall typing' ? 'Review my explanation' : 'Check my sentence';
+    return '<article class="course-task-card course-typing-task"><div class="course-typing-body"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(label) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(title) + '</h2><p>' + escapeHtml(prompt) + '</p></div>' + taskHeaderControls() + '</div><div class="typing-practice"><p class="typing-note">' + escapeHtml(note) + '</p>' + typingMomentumMarkup() + typingTarget() + '<label class="course-input-label" for="course-typing-input">' + responseLabel + '</label><textarea id="course-typing-input" data-typing-input rows="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="' + escapeHtml(typing.placeholder || 'Type the visible section here…') + '" aria-describedby="typing-help">' + escapeHtml(attempt.response) + '</textarea><p id="typing-help" class="course-input-help">' + inputHelp + '</p>' + integrity + feedback + '</div></div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="check-typing">' + nextAction + ' <span aria-hidden="true">→</span></button></div></article>';
+  };
+
+  const checkTask = () => {
+    const check = currentStep().check;
+    const selected = state.progress.attempt.selectedAnswer;
+    const feedback = state.progress.attempt.feedback;
+    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Quick check</p><h2 id="course-task-heading" tabindex="-1">Check understanding</h2><p>Choose the answer that best matches the short explanation.</p></div>' + taskHeaderControls() + '</div>' + (state.progress.attempt.integrityNotice ? '<p class="integrity-note">This quick check keeps the focus on understanding, not on how text entered the box.</p>' : '') + '<fieldset class="course-check-options"><legend>' + escapeHtml(check.question) + '</legend>' + check.options.map(([label, correct], index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="course-check" value="' + index + '" data-check-answer' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(label) + '</span></label>').join('') + '</fieldset>' + (feedback ? '<p class="check-feedback" role="alert">' + escapeHtml(feedback) + '</p>' : '') + '<div class="course-task-actions">' + (feedback && selected && !check.options[Number(selected)][1] ? '<button class="course-secondary-button" type="button" data-action="return-to-read">Read this step again</button><button class="course-secondary-button" type="button" data-action="simple-read">Explain more simply</button>' : '') + '<button class="course-primary-button" type="button" data-action="submit-check"' + (selected === '' ? ' disabled' : '') + '>Check understanding <span aria-hidden="true">→</span></button></div></article>';
+  };
+
+  const practiceSupport = () => currentStep().content?.supports?.[0] || currentStep().example || 'Ask the learner what would help with the task.';
+  const applyTask = () => {
+    const selected = state.progress.attempt.selectedAnswer;
+    const choices = [[practiceSupport(), true], ['Assume one support will work for everyone.', false], ['Make the learner explain or prove a diagnosis before offering support.', false], ['Withhold support until the learner finishes the task alone.', false]];
+    const feedback = state.progress.attempt.feedback;
+    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Adapted practice</p><h2 id="course-task-heading" tabindex="-1">Use the idea in a small situation</h2><p>A learner is working on a similar task. Which response best uses the idea from this module?</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options"><legend>Choose one practical response.</legend>' + choices.map(([label], index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="course-apply" value="' + index + '" data-apply-answer' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(label) + '</span></label>').join('') + '</fieldset>' + (feedback ? '<p class="check-feedback" role="alert">' + escapeHtml(feedback) + '</p>' : '') + '<div class="course-task-actions"><button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === '' ? ' disabled' : '') + '>Finish this step <span aria-hidden="true">→</span></button></div></article>';
+  };
+
+  const taskOptionState = (index, selected, correctIndex, submitted) => {
+    if (!submitted) return index === selected ? ' is-selected' : '';
+    if (index === correctIndex) return ' is-correct' + (index === selected ? ' is-selected' : '');
+    return index === selected ? ' is-incorrect is-selected' : '';
+  };
+
+  const taskOptionFeedback = (index, selected, correctIndex, submitted) => {
+    if (!submitted) return '';
+    if (index === correctIndex && index === selected) return '<span class="course-answer-state">✓ Correct</span>';
+    if (index === correctIndex) return '<span class="course-answer-state">✓ Correct answer</span>';
+    if (index === selected) return '<span class="course-answer-state">Not correct</span>';
+    return '';
+  };
+
+  const renderedTaskOptions = (options, name, dataAttribute) => {
+    const selected = state.progress.attempt.selectedAnswer === '' ? null : Number(state.progress.attempt.selectedAnswer);
+    const correctIndex = options.findIndex(([, correct]) => correct);
+    const submitted = Boolean(state.progress.attempt.submitted);
+    return options.map(([label], index) => '<label class="course-check-option' + taskOptionState(index, selected, correctIndex, submitted) + '"><input type="radio" name="' + name + '" value="' + index + '" ' + dataAttribute + (index === selected ? ' checked' : '') + (submitted ? ' disabled' : '') + '><span>' + escapeHtml(label) + '</span>' + taskOptionFeedback(index, selected, correctIndex, submitted) + '</label>').join('');
+  };
+
+  const checkTaskWithFeedback = () => {
+    const check = currentStep().check;
+    const selected = state.progress.attempt.selectedAnswer === '' ? null : Number(state.progress.attempt.selectedAnswer);
+    const correctIndex = check.options.findIndex(([, correct]) => correct);
+    const submitted = Boolean(state.progress.attempt.submitted);
+    const correct = submitted && selected === correctIndex;
+    const feedback = submitted ? savedSupportMarkup(correct ? 'answer-correct' : 'answer-incorrect', { result: 'quick-check' }) : '';
+    const actions = !submitted
+      ? '<button class="course-primary-button" type="button" data-action="submit-check"' + (selected === null ? ' disabled' : '') + '>Submit answer <span aria-hidden="true">→</span></button>'
+      : correct
+        ? '<button class="course-primary-button" type="button" data-action="continue-check">Continue <span aria-hidden="true">→</span></button>'
+        : '<button class="course-secondary-button" type="button" data-action="retry-question">Choose another answer</button><button class="course-secondary-button" type="button" data-action="return-to-read">Read this step again</button><button class="course-secondary-button" type="button" data-action="simple-read">Explain more simply</button>';
+    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Quick check</p><h2 id="course-task-heading" tabindex="-1">Check understanding</h2><p>Choose the answer that best matches the short explanation.</p></div>' + taskHeaderControls() + '</div>' + (state.progress.attempt.integrityNotice ? '<p class="integrity-note">This quick check keeps the focus on understanding, not on how text entered the box.</p>' : '') + '<fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + escapeHtml(check.question) + '</legend>' + renderedTaskOptions(check.options, 'course-check', 'data-check-answer') + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
+  };
+
+  const applyTaskWithFeedback = () => {
+    const choices = [[practiceSupport(), true], ['Assume one support will work for everyone.', false], ['Make the learner explain or prove a diagnosis before offering support.', false], ['Withhold support until the learner finishes the task alone.', false]];
+    const selected = state.progress.attempt.selectedAnswer === '' ? null : Number(state.progress.attempt.selectedAnswer);
+    const correctIndex = choices.findIndex(([, correct]) => correct);
+    const submitted = Boolean(state.progress.attempt.submitted);
+    const correct = submitted && selected === correctIndex;
+    const feedback = submitted ? savedSupportMarkup(correct ? 'answer-correct' : 'answer-incorrect', { result: 'applied-practice' }) : '';
+    const actions = !submitted
+      ? '<button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === null ? ' disabled' : '') + '>Submit answer <span aria-hidden="true">→</span></button>'
+      : correct
+        ? '<button class="course-primary-button" type="button" data-action="continue-apply">Complete this step <span aria-hidden="true">→</span></button>'
+        : '<button class="course-secondary-button" type="button" data-action="retry-question">Choose another answer</button>';
