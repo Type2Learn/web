@@ -55,3 +55,60 @@ export const SUPPORT_QUESTIONNAIRE = deepFreeze([
   },
   {
     id: 'reading-access',
+    prompt: 'Which options could make written content easier to access?',
+    allowMultiple: true,
+    options: [
+      { id: 'read_aloud', label: 'Read-aloud support', effects: { reading_access: 3, auditory_support: 1 } },
+      { id: 'larger_spacing', label: 'Larger text or more spacing', effects: { reading_access: 2, visual_access: 2 } },
+      { id: 'shorter_lines', label: 'Shorter lines and less visual clutter', effects: { reading_access: 3, sensory_comfort: 1 } },
+      { id: 'clearer_wording', label: 'Clearer or simpler wording', effects: { step_by_step: 2, reading_access: 1 } },
+      { id: 'written_with_audio', label: 'Written content alongside audio', effects: { auditory_support: 3, reading_access: 1 } },
+      { id: 'q2_unsure', label: "I'm not sure", effects: {} }
+    ]
+  },
+  {
+    id: 'instruction-preferences',
+    prompt: 'How do you prefer instructions to be presented?',
+    allowMultiple: true,
+    options: [
+      { id: 'instruction_one_at_time', label: 'One instruction at a time', effects: { step_by_step: 3, focus: 1 } },
+      { id: 'written_instructions', label: 'Written instructions I can reread', effects: { auditory_support: 2, step_by_step: 1 } },
+      { id: 'visual_examples', label: 'Visual examples or demonstrations', effects: { step_by_step: 2, predictability: 1 } },
+      { id: 'predictable_layout', label: 'A predictable layout that stays the same', effects: { predictability: 3, sensory_comfort: 1 } },
+      { id: 'extra_response_time', label: 'Extra time to think before responding', effects: { fatigue_support: 1, step_by_step: 2 } },
+      { id: 'q3_unsure', label: "I'm not sure", effects: {} }
+    ]
+  },
+  {
+    id: 'input-preferences',
+    prompt: 'Which ways of responding would feel more comfortable?',
+    allowMultiple: true,
+    options: [
+      { id: 'voice_input', label: 'Voice input or speaking an answer', effects: { flexible_expression: 3, flexible_input: 2 } },
+      { id: 'alternative_expression', label: 'Choices instead of always writing a long answer', effects: { flexible_expression: 3, step_by_step: 1 } },
+      { id: 'larger_targets', label: 'Larger buttons and click targets', effects: { motor_support: 3, flexible_input: 1 } },
+      { id: 'keyboard_alternatives', label: 'Keyboard shortcuts or one-handed options', effects: { motor_support: 2, flexible_input: 3 } },
+      { id: 'no_speed_pressure', label: 'No speed pressure while entering an answer', effects: { fatigue_support: 2, motor_support: 1, focus: 1 } },
+      { id: 'q4_unsure', label: "I'm not sure", effects: {} }
+    ]
+  },
+  {
+    id: 'sensory-comfort',
+    prompt: 'What would make the page more comfortable to use?',
+    allowMultiple: true,
+    options: [
+      { id: 'reduced_animation', label: 'Fewer animations and visual effects', effects: { sensory_comfort: 3, predictability: 1 } },
+      { id: 'no_unexpected_sound', label: 'No unexpected sounds or autoplay', effects: { sensory_comfort: 3, auditory_support: 1 } },
+      { id: 'quiet_page', label: 'A quiet, uncluttered page', effects: { sensory_comfort: 3, focus: 1 } },
+      { id: 'stable_layout_notice', label: 'A stable layout with advance notice before changes', effects: { predictability: 3, sensory_comfort: 1 } },
+      { id: 'display_control', label: 'Control over brightness, contrast, or display settings', effects: { visual_access: 2, sensory_comfort: 1 } },
+      { id: 'q5_unsure', label: "I'm not sure", effects: {} }
+    ]
+  },
+  {
+    id: 'progress-preferences',
+    prompt: 'How would you prefer to see your progress?',
+    allowMultiple: true,
+    options: [
+      { id: 'visual_progress', label: 'A visual progress path', effects: { progress_access: 3, predictability: 1 } },
+      { id: 'small_progress_steps', label: 'Small completion steps instead of one large goal', effects: { progress_access: 2, step_by_step: 2 } },
