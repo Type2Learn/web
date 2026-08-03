@@ -1577,3 +1577,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const narrationState = interactive ? { index: 0 } : null;
     const sections = visibleReadingSections().map(({ heading, value }) => {
       const title = readingTextMarkup('h3', heading || 'Key idea', narrationState);
+      const content = Array.isArray(value)
+        ? '<ul class="course-reading-list">' + value.map((item) => readingTextMarkup('li', item, narrationState)).join('') + '</ul>'
+        : readingTextMarkup('p', value, narrationState);
+      return '<section class="course-reading-section">' + title + content + '</section>';
+    });
+    if (shouldShowSimple()) {
+      // Put the authored plain-language version first so enabling this support
+      // changes what the learner encounters immediately instead of placing the
+      // simpler wording after a long detailed explanation.
+      sections.unshift('<section class="course-simple-copy">' + readingTextMarkup('strong', 'A simpler way to say it', narrationState) + readingTextMarkup('p', currentStep().simple, narrationState) + '</section>');
+    }
+    if (shouldShowExample()) {
+      sections.push(exampleCardsMarkup(narrationState));
+    }
+    if (state.preferences.recap && currentStep().simple && !shouldShowSimple()) {
+      sections.push('<aside class="course-recap"><strong>Quick recap</strong><p>' + escapeHtml(currentStep().simple) + '</p></aside>');
+    }
+    return sections.join('');
+  };
+
+  const previewTask = () => '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Preview</p><h2 id="course-task-heading" tabindex="-1">See the path before you begin</h2><p>This step contains reading, one complete lesson section at a time to type, a quick check, and one adapted practice activity.</p></div>' + taskHeaderControls() + '</div><div class="course-reading-copy"><section class="course-reading-section"><h3>Objective</h3><p>Understand one respectful idea from “' + escapeHtml(currentStep().title) + '” and use it in a small situation.</p></section><section class="course-reading-section"><h3>What stays in your control</h3><p>You can pause, use support controls, use your usual compatible input tools, or ask for help. There are no countdown timers, speed scores, or autoplay audio.</p></section><section class="course-reading-section"><h3>Completion</h3><p>Read, type each lesson section one at a time, check understanding, and choose a practical response.</p></section></div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="preview-complete">Begin this small step <span aria-hidden="true">→</span></button></div></article>';
+
+  const readTask = () => '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Learn</p><h2 id="course-task-heading" tabindex="-1">Read this short explanation</h2><p>' + (smallerSectionsAreActive() ? 'Read one small section at a time. You decide when to move to the next part.' : 'Read at your own pace. Move on when the explanation feels clear enough.') + '</p></div>' + taskHeaderControls() + '</div>' + readingSectionProgress() + '<div class="course-reading-copy" data-structured="true">' + readingContentMarkup(false) + '</div><div class="course-task-actions">' + readingTaskActions() + '</div></article>';
+
+  const readTaskWithTextToSpeech = () => '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Learn</p><h2 id="course-task-heading" tabindex="-1">Read this short explanation</h2><p>Text to speech mode is on. Click or tap inside the text where you want it to begin, or focus a text part and press Enter or Space. The current word is highlighted as it is read.</p></div>' + taskHeaderControls() + '</div>' + readingSectionProgress() + '<div class="course-reading-copy course-tts-reading" data-narration-content data-structured="true">' + readingContentMarkup(true) + '</div><div class="course-task-actions">' + readingTaskActions() + '</div></article>';
+
+  const reviewModuleTask = () => {
+    const interactive = Boolean(state.preferences.readAloud);
+    return '<article class="course-task-card course-review-card"><div class="course-task-top"><div><p class="course-task-label">Completed module review</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(currentStep().title) + '</h2><p>You are reviewing a completed module. Your current task is still saved and will be ready when you return.</p></div>' + taskHeaderControls() + '</div><div class="course-reading-copy' + (interactive ? ' course-tts-reading' : '') + '"' + (interactive ? ' data-narration-content' : '') + ' data-structured="true">' + readingContentMarkup(interactive) + '</div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="return-from-module-review">Return to current task <span aria-hidden="true">→</span></button></div></article>';
+  };
+
+  const inputMethodLabels = {
+    keyboard: 'Keyboard typing',
+    voice: 'Voice input',
+    alternative: 'Alternative response when available',
+    switch: 'Switch-friendly keyboard controls',
+    'one-handed': 'One-handed keyboard layout'
+  };
+  const inputMethodSelector = () => {
+    if (!typingIsConceptResponse()) return '';
+    const methods = availableInputMethods();
+    if (methods.length < 2) return '';
+    const active = activeInputMethod();
+    return '<label class="course-input-method-select"><span>Active input method</span><select data-active-input-method aria-describedby="course-input-method-help">' + methods.map((method) => '<option value="' + escapeHtml(method) + '"' + (method === active ? ' selected' : '') + '>' + escapeHtml(inputMethodLabels[method] || method) + '</option>').join('') + '</select><small id="course-input-method-help">One method is active at a time. Other selected methods stay available when a task supports them.</small></label>';
+  };
+  const typingTarget = () => {
+    const typing = currentStep().typing;
+    if (usesLessonSectionTyping()) {
+      const { section, index, total } = activeLessonTypingSection();
+      return inputMethodSelector() + '<div class="guided-typing lesson-section-typing"><span>Section ' + (index + 1) + ' of ' + total + '</span><p class="typing-target">' + escapeHtml(section.text) + '</p></div>';
+    }
+    if (typing.level !== 'Guided typing') return inputMethodSelector() + '<p class="typing-target">' + escapeHtml(typing.target || '') + '</p>';
+    const phraseIndex = Math.min(state.progress.attempt.guidedIndex, typing.phrases.length - 1);
+    return inputMethodSelector() + '<div class="guided-typing"><span>Phrase ' + (phraseIndex + 1) + ' of ' + typing.phrases.length + '</span><p class="typing-target">' + escapeHtml(typing.phrases[phraseIndex]) + '</p></div>';
+  };
+
+  // This is deliberately visual rather than an aria-live announcement: it can
+  // change as someone types without repeatedly interrupting a screen reader.
+  // It gives the encouraging, in-the-moment reassurance selected by the
+  // learner while leaving the typing mechanism itself calm and predictable.
+  const remainingTypingWords = (response = state.progress.attempt.response || '') => {
+    const referenceWords = (activeTypingReference() || '').trim().split(/\s+/).filter(Boolean);
+    const typed = response.trim();
+    if (!referenceWords.length || !typed) return referenceWords.length;
+    // A partly typed final word is still the learner's current word, rather
+    // than a false claim that it has been completed. This keeps the estimate
+    // encouraging and honest without tracking keystrokes for scoring.
+    const completedWords = typed.endsWith(' ') ? typed.split(/\s+/).filter(Boolean).length : Math.max(0, typed.split(/\s+/).filter(Boolean).length - 1);
