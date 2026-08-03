@@ -13,6 +13,7 @@ import {
   signOut,
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
+import { clearType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAvzBlOjnU42ePOhE7X2i_iHbkD6kOQyX0',
@@ -83,12 +84,13 @@ export const setupFirebaseAuth = ({ setStatus }) => {
   const rememberEmail = document.getElementById('remember-email');
 
   const safeAuthDestination = () => {
-    const fallback = '/learn/';
+    const fallback = '/course/';
     const next = new URLSearchParams(window.location.search).get('next') || fallback;
     try {
       const destination = new URL(next, window.location.origin);
       if (destination.origin !== window.location.origin) return fallback;
-      if (destination.pathname === '/login/') return fallback;
+      if (['/login/', '/learn/', '/settings/'].includes(destination.pathname)) return fallback;
+      if (destination.pathname === '/afterlogin/' && !destination.searchParams.get('course')) return fallback;
       return destination.pathname + destination.search + destination.hash;
     } catch (error) {
       return fallback;
@@ -118,6 +120,8 @@ export const setupFirebaseAuth = ({ setStatus }) => {
     });
     account.hidden = false;
     account.setAttribute('aria-hidden', 'false');
+    if (accountName) accountName.textContent = name;
+    if (accountEmail) accountEmail.textContent = user.email || 'Authenticated with Google';
     if (accountName) accountName.textContent = name;
     if (accountEmail) accountEmail.textContent = user.email || 'Authenticated with Google';
     if (accountAvatar) accountAvatar.textContent = initials || 'T2';
