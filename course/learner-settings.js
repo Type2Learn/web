@@ -1141,3 +1141,59 @@ export const selectSupportProfiles = (input, profileIds, metadata = {}) => {
     secondaryProfileIds: selectedPresetIds.slice(1),
     selectedAnswers: metadata.selectedAnswers ?? metadata.selectedOptionIds,
     completed
+  });
+  return {
+    ...state,
+    setupComplete: completed,
+    primaryPresetId: primary,
+    selectedPresetIds,
+    conflictResolutions: metadata.conflictResolutions
+      ? cleanConflictResolutions(metadata.conflictResolutions)
+      : state.conflictResolutions,
+    onboarding,
+    updatedAt: timestamp()
+  };
+};
+
+export const applyRecommendation = (input, recommendation, method = 'questionnaire') => {
+  const result = safeObject(recommendation);
+  const primary = isRecommendationProfileId(result.primaryProfileId)
+    ? result.primaryProfileId
+    : BALANCED_START_PRESET_ID;
+  const secondaries = orderProfileIds(result.secondaryProfileIds).filter((id) => id !== primary).slice(0, 2);
+  return selectSupportProfiles(input, primary === BALANCED_START_PRESET_ID ? [] : [primary, ...secondaries], {
+    method: method === 'manual' ? 'manual' : 'questionnaire',
+    primaryProfileId: primary,
+    selectedAnswers: result.selectedOptionIds,
+    completed: true
+  });
+};
+
+export const useBalancedStartingSetup = (input, method = 'standard') => {
+  const state = createSettingsState(input);
+  return selectSupportProfiles(state, [], {
+    method: validOnboardingMethods.has(method) ? method : 'standard',
+    primaryProfileId: BALANCED_START_PRESET_ID,
+    selectedAnswers: [],
+    completed: true
+  });
+};
+
+export const resetRecommendation = (input, { reopen = false } = {}) => {
+  const state = createSettingsState(input);
+  const completed = reopen ? false : state.setupComplete;
+  return {
+    ...state,
+    setupComplete: completed,
+    primaryPresetId: completed ? BALANCED_START_PRESET_ID : '',
+    selectedPresetIds: [],
+    onboarding: onboardingMetadata(state, {
+      method: completed ? 'standard' : '',
+      primaryProfileId: completed ? BALANCED_START_PRESET_ID : '',
+      secondaryProfileIds: [],
+      selectedAnswers: [],
+      completed
+    }),
+    updatedAt: timestamp()
+  };
+};
