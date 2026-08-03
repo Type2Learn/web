@@ -122,8 +122,6 @@ export const setupFirebaseAuth = ({ setStatus }) => {
     account.setAttribute('aria-hidden', 'false');
     if (accountName) accountName.textContent = name;
     if (accountEmail) accountEmail.textContent = user.email || 'Authenticated with Google';
-    if (accountName) accountName.textContent = name;
-    if (accountEmail) accountEmail.textContent = user.email || 'Authenticated with Google';
     if (accountAvatar) accountAvatar.textContent = initials || 'T2';
     if (title) title.textContent = 'You are signed in.';
     if (description) description.textContent = 'Your Type2Learn account is ready for the next learning step.';
@@ -146,7 +144,10 @@ export const setupFirebaseAuth = ({ setStatus }) => {
   };
 
   onAuthStateChanged(auth, (user) => {
-    if (user) showAuthenticatedUser(user);
+    if (user) {
+      clearType2LearnGuest();
+      showAuthenticatedUser(user);
+    }
     else showSignedOutState();
   });
 
@@ -159,6 +160,7 @@ export const setupFirebaseAuth = ({ setStatus }) => {
       const persistence = rememberEmail?.checked ? browserLocalPersistence : browserSessionPersistence;
       await setPersistence(auth, persistence);
       await signInWithEmailAndPassword(auth, loginEmail.value.trim(), document.getElementById('login-password').value);
+      clearType2LearnGuest();
       try {
         if (rememberEmail?.checked) window.localStorage.setItem('type2learn-remember-email', loginEmail.value.trim());
         else window.localStorage.removeItem('type2learn-remember-email');
@@ -181,6 +183,7 @@ export const setupFirebaseAuth = ({ setStatus }) => {
         provider.setCustomParameters({ prompt: 'select_account' });
         await signInWithPopup(auth, provider);
         await setPersistence(auth, persistence);
+        clearType2LearnGuest();
         redirectAfterAuth();
       } catch (error) {
         setStatus(form, messageFor(error), 'error');
@@ -203,6 +206,7 @@ export const setupFirebaseAuth = ({ setStatus }) => {
       const credential = await createUserWithEmailAndPassword(auth, document.getElementById('register-email').value.trim(), password.value);
       const displayName = document.getElementById('register-name').value.trim();
       if (displayName) await updateProfile(credential.user, { displayName });
+      clearType2LearnGuest();
       showAuthenticatedUser(credential.user);
       redirectAfterAuth();
     } catch (error) {
