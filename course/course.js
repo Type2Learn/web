@@ -2469,3 +2469,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   window.addEventListener('wheel', cancelNarrationAutoScroll, { passive: true });
+  window.addEventListener('touchstart', cancelNarrationAutoScroll, { passive: true });
+
+  const restoreNarrationText = (element) => {
+    const source = element.dataset.narrationSource;
+    if (!source) return;
+    element.textContent = source;
+    delete element.dataset.narrationSource;
+  };
+
+  const renderNarrationProgress = (element, range) => {
+    const source = element.dataset.narrationSource || element.textContent || '';
+    if (!element.dataset.narrationSource) element.dataset.narrationSource = source;
+    const start = Math.min(Math.max(Number(range?.start) || 0, 0), source.length);
+    const end = Math.min(Math.max(Number(range?.end) || start, start), source.length);
+    if (!end || end <= start) {
+      restoreNarrationText(element);
+      return;
+    }
+    const spoken = source.slice(0, start);
+    const current = source.slice(start, end);
+    const remaining = source.slice(end);
+    element.innerHTML = (spoken ? '<span class="course-tts-spoken" data-tts-spoken>' + escapeHtml(spoken) + '</span>' : '')
+      + '<mark class="course-tts-highlight" data-tts-highlight>' + escapeHtml(current) + '</mark>'
+      + escapeHtml(remaining);
+  };
+
+  const syncNarrationUi = () => {
+    const hasActiveChunk = narration.activeIndex >= 0 && ['playing', 'paused'].includes(narration.status);
+    const highlighting = state.preferences.narrationHighlight !== false;
+    app.querySelectorAll('[data-narration-text][data-narration-index]').forEach((chunk) => {
+      const active = hasActiveChunk && Number(chunk.dataset.narrationIndex) === narration.activeIndex;
+      chunk.classList.toggle('is-narration-active', active && highlighting);
+      chunk.classList.toggle('is-speaking', active && highlighting);
+      if (active && highlighting) chunk.setAttribute('data-current-speech', 'true');
+      else chunk.removeAttribute('data-current-speech');
+      const range = active && narration.activeRange?.index === narration.activeIndex ? narration.activeRange : null;
+      if (active && range && highlighting) renderNarrationProgress(chunk, range);
+      else restoreNarrationText(chunk);
+    });
+
+    const status = app.querySelector('[data-narration-status]');
+    if (status) status.textContent = textToSpeechStatusCopy();
+
+    const listen = app.querySelector('[data-narration-listen]');
+    if (listen) {
+      listen.disabled = narration.status === 'playing' || narration.status === 'unsupported';
+      listen.textContent = narration.status === 'paused' ? 'Resume' : narration.status === 'finished' ? 'Listen again' : 'Listen';
+    }
+    const pause = app.querySelector('[data-narration-pause]');
+    if (pause) pause.hidden = narration.status !== 'playing';
+    const stop = app.querySelector('[data-narration-stop]');
+    if (stop) stop.hidden = !['playing', 'paused'].includes(narration.status);
+    syncNarrationVoiceOptions();
+  };
+
+  const ensureNarrationService = () => {
+    if (narration.service) return narration.service;
+    narration.service = new NarrationService({
+      onStateChange: (status) => {
+        narration.status = status;
+        if (status !== 'playing') cancelNarrationAutoScroll();
+        syncNarrationUi();
+        if (status === 'playing') announce('Text to speech started from the selected section.');
+        else if (status === 'paused') announce('Text to speech paused.');
+        else if (status === 'finished') announce('Text to speech finished.');
+        else if (status === 'unsupported') announce('Text to speech is not available in this browser. You can use your device’s usual reading support.');
+        else if (status === 'error') announce('Text to speech could not continue. The lesson text is still available to read.');
+      },
+      onChunkChange: (index) => {
