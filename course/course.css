@@ -2674,3 +2674,671 @@ body.course-reduced-motion *::after { scroll-behavior: auto !important; transiti
   padding: 17px;
   color: var(--course-ink);
   background: var(--course-blue-pale);
+  animation: course-question-arrive .24s ease-out both;
+}
+
+.course-check-options .course-question-card { width: min(100%, 780px); padding: 17px; }
+.course-question-card:focus { outline: 3px solid var(--course-blue); outline-offset: 3px; }
+
+.course-question-label { color: #075fcb; font-size: 11px; font-weight: 900; letter-spacing: .1em; line-height: 1.2; text-transform: uppercase; }
+.course-question-text { max-width: 690px; color: var(--course-ink); font-size: var(--course-question-font-size); font-weight: 850; line-height: 1.35; }
+.course-question-helper { color: var(--course-ink-soft); font-size: 13px; font-weight: 650; line-height: 1.5; }
+
+.course-check-options { gap: 12px; }
+.course-check-option {
+  position: relative;
+  min-height: 62px;
+  align-items: center;
+  padding: 15px 16px;
+  transition: border-color .17s ease, background-color .17s ease, color .17s ease, transform .17s ease;
+  animation: course-option-arrive .22s ease-out both;
+  animation-delay: calc(var(--option-index, 0) * 45ms);
+}
+
+.course-check-option > span { flex: 1; }
+.course-check-option:hover { transform: translateY(-1px); }
+.course-check-option:active { transform: translateY(0); }
+.course-check-option:focus-within { border-color: var(--course-blue); outline: 3px solid var(--course-blue); outline-offset: 2px; background: var(--course-blue-pale); }
+.course-check-option.is-selected { border-width: 2px; background: var(--course-blue-pale); }
+.course-check-option.is-selected::after { flex: 0 0 auto; border: 1px solid var(--course-blue); border-radius: 999px; padding: 3px 7px; color: var(--course-ink); background: var(--course-paper); content: "Selected"; font-size: 10px; font-weight: 850; letter-spacing: .04em; line-height: 1.2; text-transform: uppercase; }
+
+@keyframes narration-control-arrive {
+  from { opacity: .72; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes narration-highlight-arrive {
+  from { opacity: .82; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes course-question-arrive {
+  from { opacity: .7; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes course-option-arrive {
+  from { opacity: .78; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 620px) {
+  .course-narration-panel-header,
+  .course-narration-content { padding: 13px; }
+  .course-narration-content .course-reading-section,
+  .course-narration-content .course-simple-copy,
+  .course-narration-content .course-example { padding: 13px; }
+  .course-narration-actions .course-secondary-button { flex: 1 1 auto; }
+  .course-narration-preferences { align-items: stretch; flex-direction: column; }
+  .narration-select,
+  .narration-toggle { justify-content: space-between; }
+  .course-narration-chunk-heading { align-items: stretch; flex-direction: column; }
+  .narration-chunk-button { align-self: flex-start; }
+  .course-question-card { padding: 15px; }
+  .course-check-option.is-selected { align-items: flex-start; }
+}
+
+/* Final exam: one calm, clearly-labelled question at a time. */
+.course-final-exam {
+  width: 100%;
+  max-width: var(--course-reading-max-width);
+}
+
+.course-final-exam.course-task-card,
+.course-final-exam .course-task-card {
+  border-width: 2px;
+}
+
+.exam-intro-card,
+.exam-results-card {
+  border-color: var(--course-line-strong);
+  background: var(--course-paper);
+}
+
+.exam-intro-card > p:not(.course-task-label),
+.exam-results-card > p:not(.course-task-label) {
+  max-width: 700px;
+  color: var(--course-ink-soft);
+  font-size: var(--course-task-copy-font-size);
+  line-height: var(--course-line-height);
+}
+
+.course-final-exam > p + p,
+.exam-results-card section > p + p { margin-top: var(--course-paragraph-gap); }
+
+.exam-intro-card .course-task-actions,
+.exam-results-card .course-task-actions {
+  margin-top: 24px;
+}
+
+.exam-question-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  width: fit-content;
+  margin: 0 0 16px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 999px;
+  padding: 6px 11px;
+  color: var(--course-ink-soft);
+  background: var(--course-paper);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.exam-question-card {
+  width: min(100%, var(--course-reading-max-width));
+  display: grid;
+  gap: 8px;
+  margin: 0 0 4px;
+  border: 2px solid var(--course-blue);
+  border-radius: 14px;
+  padding: clamp(17px, 3vw, 24px);
+  color: var(--course-ink);
+  background: var(--course-blue-pale);
+}
+
+.exam-question-card h2,
+.exam-question-card h3,
+.exam-question-card strong {
+  max-width: 700px;
+  margin: 0;
+  color: var(--course-ink);
+  font-size: var(--course-question-font-size);
+  font-weight: 850;
+  letter-spacing: -.02em;
+  line-height: var(--course-question-line-height);
+}
+
+.exam-question-card p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--course-ink-soft);
+  font-size: var(--course-task-copy-font-size);
+  font-weight: 650;
+  line-height: var(--course-line-height);
+}
+
+.exam-question-card:focus,
+.exam-question-card:focus-visible {
+  outline: 3px solid var(--course-blue);
+  outline-offset: 3px;
+}
+
+.course-final-exam .course-check-options {
+  width: min(100%, var(--course-reading-max-width));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.exam-option {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 12px;
+  padding: 15px 16px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  cursor: pointer;
+  transition: border-color .16s ease, background-color .16s ease, color .16s ease, transform .16s ease;
+}
+
+.exam-option:hover:not(.is-correct):not(.is-incorrect) {
+  border-color: var(--course-blue);
+  background: var(--course-cloud);
+  transform: translateY(-1px);
+}
+
+.exam-option:active:not(.is-correct):not(.is-incorrect) { transform: translateY(0); }
+
+.exam-option:focus-within {
+  border-color: var(--course-blue);
+  outline: 3px solid var(--course-blue);
+  outline-offset: 2px;
+  background: var(--course-blue-pale);
+}
+
+.exam-option input {
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  accent-color: var(--course-blue);
+}
+
+.exam-option input:disabled { cursor: default; }
+
+.exam-option > span:not(.exam-answer-state),
+.exam-option-copy {
+  min-width: 0;
+  color: inherit;
+  font-size: var(--course-option-font-size);
+  font-weight: 700;
+  line-height: var(--course-line-height);
+}
+
+.exam-option.is-selected {
+  border-width: 2px;
+  border-color: var(--course-blue);
+  background: var(--course-blue-pale);
+}
+
+.exam-option.is-selected:not(.is-correct):not(.is-incorrect)::after {
+  justify-self: end;
+  border: 1px solid var(--course-blue);
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  content: "Selected";
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.exam-option.is-correct {
+  border-color: var(--course-green);
+  background: var(--course-green-pale);
+}
+
+.exam-option.is-correct input { accent-color: #087d34; }
+
+.exam-option.is-incorrect {
+  border-color: var(--course-red);
+  background: #fff1f3;
+}
+
+.exam-option.is-incorrect input { accent-color: var(--course-red); }
+
+.exam-answer-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  max-width: 170px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--course-muted);
+  background: var(--course-paper);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.exam-option.is-correct .exam-answer-state { color: #087d34; }
+.exam-option.is-incorrect .exam-answer-state { color: #9d2536; }
+.exam-option.is-correct .exam-answer-state:empty::before { content: "Correct answer"; }
+.exam-option.is-incorrect .exam-answer-state:empty::before { content: "Your answer"; }
+
+.exam-feedback {
+  max-width: var(--course-reading-max-width);
+  margin: 20px 0 0;
+  border: 1px solid var(--course-line-strong);
+  border-left: 4px solid var(--course-blue);
+  border-radius: 10px;
+  padding: 13px 15px;
+  color: var(--course-ink-soft);
+  background: var(--course-cloud);
+  font-size: var(--course-task-copy-font-size);
+  font-weight: 700;
+  line-height: var(--course-line-height);
+}
+
+.exam-feedback.is-correct {
+  border-color: var(--course-green);
+  border-left-color: #087d34;
+  background: var(--course-green-pale);
+}
+
+.exam-feedback.is-incorrect {
+  border-color: var(--course-red);
+  border-left-color: var(--course-red);
+  background: #fff1f3;
+}
+
+.exam-feedback strong { color: var(--course-ink); }
+
+.exam-results-card { border-width: 2px; }
+
+.exam-score {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  max-width: 680px;
+  margin: 22px 0;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 14px;
+  padding: 18px;
+  background: var(--course-cloud);
+}
+
+.exam-score > strong,
+.exam-score-value {
+  min-width: 90px;
+  color: var(--course-ink);
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: -.06em;
+  line-height: 1;
+}
+
+.exam-score p,
+.exam-score span {
+  margin: 0;
+  color: var(--course-ink-soft);
+  font-size: var(--course-task-copy-font-size);
+  font-weight: 700;
+  line-height: var(--course-line-height);
+}
+
+.exam-review-list {
+  display: grid;
+  gap: var(--course-paragraph-gap);
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: exam-review;
+}
+
+.exam-review-list > li {
+  position: relative;
+  counter-increment: exam-review;
+  border: 1px solid var(--course-line-strong);
+  border-left: 4px solid var(--course-line-strong);
+  border-radius: 12px;
+  padding: 16px 16px 16px 52px;
+  background: var(--course-paper);
+}
+
+.exam-review-list > li::before {
+  position: absolute;
+  top: 16px;
+  left: 15px;
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 50%;
+  color: var(--course-ink-soft);
+  background: var(--course-cloud);
+  content: counter(exam-review);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.exam-review-list > li.is-correct { border-left-color: #087d34; }
+.exam-review-list > li.is-incorrect { border-left-color: var(--course-red); }
+
+.exam-review-list h3,
+.exam-review-list strong {
+  margin: 0;
+  color: var(--course-ink);
+  font-size: var(--course-task-copy-font-size);
+  font-weight: 850;
+  line-height: var(--course-question-line-height);
+}
+
+.exam-review-list p {
+  margin: var(--course-copy-start-gap) 0 0;
+  color: var(--course-ink-soft);
+  font-size: var(--course-task-copy-font-size);
+  line-height: var(--course-line-height);
+}
+
+.exam-review-list .exam-answer-state {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+@media (max-width: 620px) {
+  .exam-question-card { padding: 16px; }
+  .exam-question-card h2,
+  .exam-question-card h3,
+  .exam-question-card strong { font-size: 1.18rem; }
+  .exam-option { grid-template-columns: 22px minmax(0, 1fr); align-items: start; padding: 14px; }
+  .exam-option input { margin-top: 3px; }
+  .exam-answer-state,
+  .exam-option.is-selected:not(.is-correct):not(.is-incorrect)::after { grid-column: 2; justify-self: start; }
+  .exam-score { grid-template-columns: 1fr; gap: 10px; }
+  .exam-score > strong,
+  .exam-score-value { min-width: 0; }
+  .exam-review-list > li { padding-left: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exam-option { transition: none; }
+}
+
+body.course-reduced-motion .exam-option { transition: none; }
+
+/* Course controls use small, predictable movement to confirm an action. The
+   transitions intentionally use only flat colour, border, and position
+   changes so they do not compete with the lesson. */
+.course-control,
+.course-help-button,
+.course-primary-button,
+.course-secondary-button,
+.course-text-button,
+.course-quiet-button,
+.course-back-button,
+.course-back-control,
+.course-tts-transport button,
+.course-tts-transport summary,
+.course-tts-transport-menu button,
+.course-tts-transport-menu summary {
+  transition: border-color .16s ease, color .16s ease, background-color .16s ease, transform .16s ease;
+}
+
+@media (hover: hover) {
+  .course-control:hover:not(:disabled),
+  .course-help-button:hover:not(:disabled),
+  .course-primary-button:hover:not(:disabled),
+  .course-secondary-button:hover:not(:disabled),
+  .course-text-button:hover:not(:disabled),
+  .course-quiet-button:hover:not(:disabled),
+  .course-back-button:hover:not(:disabled),
+  .course-back-control:hover:not(:disabled),
+  .course-tts-transport button:hover:not(:disabled),
+  .course-tts-transport summary:hover,
+  .course-tts-transport-menu button:hover:not(:disabled),
+  .course-tts-transport-menu summary:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.course-control:active:not(:disabled),
+.course-help-button:active:not(:disabled),
+.course-primary-button:active:not(:disabled),
+.course-secondary-button:active:not(:disabled),
+.course-text-button:active:not(:disabled),
+.course-quiet-button:active:not(:disabled),
+.course-back-button:active:not(:disabled),
+.course-back-control:active:not(:disabled),
+.course-tts-transport button:active:not(:disabled),
+.course-tts-transport summary:active,
+.course-tts-transport-menu button:active:not(:disabled),
+.course-tts-transport-menu summary:active {
+  transform: translateY(1px);
+}
+
+/* The top-left control is a simple arrow in a clear, boxed touch target. The
+   visible label is deliberately omitted: the button keeps its accessible name
+   through aria-label, while the space before the brand keeps both landmarks
+   easy to distinguish. */
+.course-back-control {
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 9px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  appearance: none;
+  text-decoration: none;
+}
+
+.course-back-icon { display: block; width: 20px; height: 20px; }
+
+.course-back-control:hover:not(:disabled) {
+  color: var(--course-blue);
+  background: var(--course-blue-pale);
+}
+
+.course-back-control:focus-visible { outline: 3px solid var(--course-blue); outline-offset: 3px; }
+
+.course-topbar-brand-area {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* A state chip makes Focus Mode unambiguous in the always-visible support
+   bar. `aria-pressed` continues to expose the same state to assistive tech. */
+.course-control[data-action="toggle-focus"][aria-pressed]:not(:has(.course-control-state))::after,
+.course-control[data-action="toggle-tts"][aria-pressed]:not(:has(.course-control-state))::after,
+.course-control[data-action="toggle-text-to-speech"][aria-pressed]:not(:has(.course-control-state))::after {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--course-muted);
+  background: var(--course-paper);
+  content: "Off";
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.course-control[data-action="toggle-focus"][aria-pressed="true"],
+body.course-focus-mode .course-control[data-action="toggle-focus"],
+.course-control[data-action="toggle-tts"][aria-pressed="true"],
+.course-control[data-action="toggle-text-to-speech"][aria-pressed="true"],
+.course-control.course-tts-mode-active {
+  border-color: var(--course-green);
+  color: var(--course-ink);
+  background: var(--course-green-pale);
+}
+
+.course-control[data-action="toggle-focus"][aria-pressed="true"]:not(:has(.course-control-state))::after,
+.course-control[data-action="toggle-tts"][aria-pressed="true"]:not(:has(.course-control-state))::after,
+.course-control[data-action="toggle-text-to-speech"][aria-pressed="true"]:not(:has(.course-control-state))::after,
+.course-control.course-tts-mode-active::after {
+  border-color: var(--course-green);
+  color: #087d34;
+  content: "On";
+}
+
+.course-control-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--course-muted);
+  background: var(--course-paper);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.course-control[aria-pressed="true"] .course-control-state {
+  border-color: var(--course-green);
+  color: #087d34;
+}
+
+/* Text size is deliberately controlled in Learning settings, rather than as
+   a second, competing control inside the task toolbar. */
+.course-control[data-action="cycle-text"] { display: none !important; }
+
+/* Changing line spacing reflows the reading surface. Keep the browser from
+   selecting an internal text node as a scroll anchor, which would otherwise
+   nudge the learner down the page during that local preference update. */
+#course-app { overflow-anchor: none; }
+
+@media (hover: hover) {
+  .course-support-bar .course-control:hover:not(:disabled) { transform: none; }
+}
+
+.course-support-bar .course-control:active:not(:disabled) { transform: none; }
+
+.support-option,
+.course-preset-option,
+.course-settings-control {
+  transition: border-color .16s ease, color .16s ease, background-color .16s ease, transform .16s ease;
+}
+
+@media (hover: hover) {
+  .support-option:hover,
+  .course-preset-option:hover,
+  .course-settings-control:hover { transform: translateY(-1px); }
+}
+
+.support-option:active,
+.course-preset-option:active,
+.course-settings-control:active { transform: translateY(0); }
+
+.support-option:focus-within,
+.course-preset-option:focus-within,
+.course-settings-control:focus-within {
+  border-color: var(--course-blue);
+  outline: 3px solid var(--course-blue);
+  outline-offset: 2px;
+}
+
+/* Compact transport lives in the sticky support bar whenever Text-to-speech
+   Mode is enabled. It keeps Pause, Stop, and Restart within the learner's
+   current viewport rather than below the reading task. */
+.course-tts-transport {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  margin-left: 2px;
+  border-left: 1px solid var(--course-line);
+  padding-left: 10px;
+}
+
+.course-tts-transport[hidden],
+.course-tts-transport-menu[hidden] { display: none !important; }
+
+.course-tts-transport-label {
+  color: var(--course-muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .045em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.course-tts-transport-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.course-tts-transport-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.course-tts-transport button,
+.course-tts-transport summary,
+.course-tts-transport-menu button,
+.course-tts-transport-menu summary {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 9px;
+  padding: 7px 10px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.15;
+  list-style: none;
+}
+
+.course-tts-transport summary::-webkit-details-marker,
+.course-tts-transport-menu summary::-webkit-details-marker { display: none; }
+
+.course-tts-transport button:hover:not(:disabled),
+.course-tts-transport summary:hover,
+.course-tts-transport-menu button:hover:not(:disabled),
+.course-tts-transport-menu summary:hover {
+  border-color: var(--course-blue);
+  color: var(--course-blue);
+  background: var(--course-blue-pale);
+}
