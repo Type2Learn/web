@@ -12,6 +12,7 @@ export const createCourseMascot = () => {
   let image = null;
   let presentation = { scene: '' };
   let currentAnimation = BLINKING_IMAGE_URL;
+  let waveTimer = null;
 
   const animationForScene = (sceneName) => [
     'dashboard',
@@ -26,6 +27,28 @@ export const createCourseMascot = () => {
     if (!image || image.dataset.mascotAnimation === nextAnimation) return;
     image.dataset.mascotAnimation = nextAnimation;
     image.src = nextAnimation;
+  };
+
+  const clearWaveTimer = () => {
+    if (!waveTimer) return;
+    window.clearTimeout(waveTimer);
+    waveTimer = null;
+  };
+
+  const showBlinking = () => {
+    clearWaveTimer();
+    setAnimation(BLINKING_IMAGE_URL);
+  };
+
+  const playWave = () => {
+    clearWaveTimer();
+    setAnimation(WAVING_IMAGE_URL);
+    // A wave is a brief greeting or acknowledgement, never a persistent
+    // distraction. The already-preloaded blink loop resumes immediately.
+    waveTimer = window.setTimeout(() => {
+      waveTimer = null;
+      setAnimation(BLINKING_IMAGE_URL);
+    }, 333);
   };
 
   const ensureImage = () => {
@@ -51,26 +74,31 @@ export const createCourseMascot = () => {
       presentation = { ...presentation, ...nextPresentation };
       currentAnimation = animationForScene(presentation.scene);
       ensureImage();
+      if (currentAnimation === WAVING_IMAGE_URL) playWave();
+      else showBlinking();
     },
     // The animated WebPs supply the visual response while the existing course
     // event and dialogue system continues to determine when a greeting fits.
-    celebrate() { setAnimation(WAVING_IMAGE_URL); },
-    wave() { setAnimation(WAVING_IMAGE_URL); },
+    celebrate() { playWave(); },
+    wave() { playWave(); },
     present(sceneName) {
       presentation.scene = sceneName;
-      setAnimation(animationForScene(sceneName));
+      if (animationForScene(sceneName) === WAVING_IMAGE_URL) playWave();
+      else showBlinking();
     },
     react(event) {
       if (['task-entry', 'section-complete', 'module-complete', 'course-complete', 'answer-correct'].includes(event?.kind)) {
         this.celebrate();
         return;
       }
-      setAnimation(BLINKING_IMAGE_URL);
+      showBlinking();
     },
     unmount() {
+      clearWaveTimer();
       target = null;
     },
     destroy() {
+      clearWaveTimer();
       target = null;
       image?.remove();
       image = null;

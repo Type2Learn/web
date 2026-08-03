@@ -15,7 +15,7 @@ const mascotAnimationUrls = [
   '/assets/2D%20Mascot/blinking.webp?v=20260803-2',
   '/assets/2D%20Mascot/waving.webp?v=20260803-1'
 ];
-const mascotModuleUrl = '/course/mascot-2d.js?v=20260803-2d3';
+const mascotModuleUrl = '/course/mascot-2d.js?v=20260803-2d4';
 // 3D rollback reference: preserve the original model URL alongside the
 // untouched course/mascot-3d.js implementation.
 // const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';

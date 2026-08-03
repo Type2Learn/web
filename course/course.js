@@ -897,7 +897,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         ? 'یہیں رہیں۔ ہم ایک وقت میں صرف اگلا واضح قدم دیکھتے ہیں۔'
         : 'Stay here with me. We only need the next clear step.';
     }
-    if (!moment) return '';
+    if (!moment) {
+      return urdu
+        ? 'میں آپ کے ساتھ ہوں۔ ایک وقت میں ایک واضح قدم۔'
+        : 'I am here with you. One clear step at a time.';
+    }
     const level = moment.encouragementLevel;
     const subtleDialogue = ['module-complete', 'course-complete', 'system-error'].includes(moment.kind)
       || (moment.kind === 'task-entry' && ['course-entry', 'module-entry'].includes(moment.result));
@@ -3121,7 +3125,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       //     return courseMascot;
       //   })
       //   .catch(() => null);
-      mascotControllerLoad = import('./mascot-2d.js?v=20260803-2d3')
+      mascotControllerLoad = import('./mascot-2d.js?v=20260803-2d4')
         .then(({ createCourseMascot }) => {
           courseMascot = createCourseMascot();
           return courseMascot;
