@@ -1920,3 +1920,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const textarea = practice?.querySelector('[data-typing-input]');
     const label = practice?.querySelector('.course-input-label');
     if (!practice || !textarea || !label || practice.querySelector('.typing-tester')) return;
+
+    practice.querySelector('.guided-typing')?.remove();
+    practice.querySelector('.typing-target')?.remove();
+
+    const typing = currentStep().typing;
+    const sectionTyping = usesLessonSectionTyping();
+    const activeSection = sectionTyping ? activeLessonTypingSection() : null;
+    const voiceInputAvailable = typingAllowsVoiceInput();
+    const freeResponse = !sectionTyping && typing.level === 'Recall typing';
+    const voiceTaskKey = [state.progress.lessonIndex, typing.level, activeSection?.index ?? state.progress.attempt.guidedIndex].join(':');
+    if (voiceInput.taskKey !== voiceTaskKey) {
+      if (voiceInput.statusTimer) window.clearTimeout(voiceInput.statusTimer);
+      voiceInput.statusTimer = null;
+      voiceInput.taskKey = voiceTaskKey;
+      voiceInput.status = 'ready';
+    }
+    const reference = activeTypingReference();
+    const field = document.createElement('div');
+    field.className = 'typing-tester' + (freeResponse ? ' is-free-response' : '') + (sectionTyping ? ' is-lesson-section' : '');
+    if (sectionTyping) {
+      const explicitLines = reference.split('\n').length;
+      const wrappedLines = Math.ceil(Array.from(reference).length / 64);
+      const visibleLines = Math.min(10, Math.max(5, explicitLines, wrappedLines));
+      field.style.setProperty('--lesson-typing-height', (visibleLines * 25 + 34) + 'px');
+    }
+
+    const readableReference = document.createElement('span');
+    readableReference.id = 'typing-reference';
+    readableReference.className = 'course-live-region';
+    readableReference.textContent = freeResponse
+      ? 'Prompt: ' + (typing.reference || typing.prompt)
+      : 'Text to type: ' + reference;
+    field.append(readableReference);
+
+    if (freeResponse) {
+      const prompt = document.createElement('p');
+      prompt.className = 'typing-tester-prompt';
+      prompt.textContent = typing.reference || typing.prompt;
+      field.append(prompt);
+    } else {
+      const overlay = document.createElement('div');
+      overlay.className = 'typing-tester-overlay';
+      overlay.dataset.typingOverlay = '';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.innerHTML = renderTypingCharacters(reference, textarea.value);
+      field.append(overlay);
+    }
+
+    const phraseLabel = sectionTyping
+      ? 'Section ' + (activeSection.index + 1) + ' of ' + activeSection.total + ' — type the complete visible section'
+      : typing.level === 'Guided typing'
+        ? 'Phrase ' + (state.progress.attempt.guidedIndex + 1) + ' of ' + typing.phrases.length + ' — type the visible phrase'
+      : (freeResponse ? 'Write your response in the field' : 'Type the visible text in the field');
+    label.textContent = voiceInputAvailable ? 'Type or speak your response' : phraseLabel;
+    textarea.classList.add('typing-tester-input');
+    textarea.removeAttribute('rows');
+    textarea.removeAttribute('placeholder');
+    textarea.setAttribute('aria-label', label.textContent);
+    textarea.setAttribute('aria-describedby', 'typing-reference typing-help');
+    const typingHelp = practice.querySelector('#typing-help');
+    if (typingHelp && !typingHelp.textContent.includes('Press Enter to check this response.')) typingHelp.textContent += ' Press Enter to check this response. Use Shift+Enter for a new line.';
+    label.insertAdjacentElement('afterend', field);
+    field.append(textarea);
+    if (voiceInputAvailable) {
+      const controls = document.createElement('div');
+      controls.className = 'typing-tester-controls';
+      controls.dataset.voiceInputControls = '';
+      const supported = Boolean(voiceRecognitionConstructor());
+      controls.innerHTML = '<button class="course-secondary-button typing-mic-button" type="button" data-action="start-voice-input" aria-label="Use microphone to speak your response" aria-describedby="course-voice-input-status"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-5-3v.5a5 5 0 0 0 10 0v-.5M12 17v4M8.5 21h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span data-voice-input-button-label>Speak</span></button><button class="course-secondary-button typing-mic-stop" type="button" data-action="stop-voice-input" aria-describedby="course-voice-input-status" hidden>Stop</button>';
