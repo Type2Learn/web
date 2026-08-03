@@ -2813,3 +2813,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const viewportInset = 18;
     const availableLeft = Math.max(viewportInset, cardRect.left);
     const availableRight = Math.min(window.innerWidth - viewportInset, cardRect.right);
+    const availableWidth = Math.max(0, availableRight - availableLeft);
+    if (availableWidth < 1) return;
+    // A moment should read like a considered acknowledgement, not a wide
+    // announcement banner.  These caps also keep it comfortably inside the
+    // work column beside the mascot.
+    const preferredMaximum = popup.closest('body')?.dataset.courseEncouragement === 'expressive' ? 660 : 580;
+    const popupWidth = Math.max(0, Math.min(preferredMaximum, availableWidth - 40));
+    popup.style.setProperty('--course-support-popup-x', (availableLeft + (availableWidth / 2)) + 'px');
+    popup.style.setProperty('--course-support-popup-width', Math.max(0, popupWidth) + 'px');
+  };
+
+  // A support moment is a transient acknowledgement, never a control a
+  // learner has to manage.  The next real interaction clears it immediately
+  // while leaving the task itself and any earned visual moment intact.
+  const dismissActiveSupportPopup = () => {
+    const popup = app.querySelector('.course-support-popup');
+    if (!popup) return;
+    window.clearTimeout(supportPopupTimer);
+    popup.remove();
+  };
+
+  const scheduleSupportPopupDismissal = (moment) => {
+    window.clearTimeout(supportPopupTimer);
+    if (!moment || moment.encouragementLevel === 'subtle') return;
+    const visibleFor = ['module-complete', 'course-complete'].includes(moment.kind) ? 7200 : 5200;
+    supportPopupTimer = window.setTimeout(() => {
+      const popup = app.querySelector('[data-support-moment="' + moment.id + '"]');
+      if (!popup) return;
+      if (effectiveAnimationLevel() === 'still') {
+        popup.remove();
+        return;
+      }
+      popup.classList.add('is-support-popup-leaving');
+      window.setTimeout(() => popup.remove(), effectiveAnimationLevel() === 'lively' ? 420 : 240);
+    }, visibleFor);
+  };
+
+  const enhanceSupportMomentPresentation = () => {
+    if (!supportMomentBelongsToCurrentTask()) return;
+    const moment = activeSupportMoment;
+    const isNew = moment.id !== lastRenderedSupportEventId;
+    const card = app.querySelector('.course-task-card');
+    if (!card) return;
+    const markup = supportMomentMarkup(isNew);
+    const celebrationMarkup = successCelebrationMarkup(moment, isNew);
+    if (celebrationMarkup) app.insertAdjacentHTML('beforeend', celebrationMarkup);
+    const popupPresentation = moment.encouragementLevel !== 'subtle';
+    if (markup && (!popupPresentation || isNew)) {
+      // The central support moment replaces older one-off feedback strings for
+      // the action that just occurred. Saved feedback still appears after a
+      // reload, when no ephemeral support event exists.
+      card.querySelectorAll('.typing-feedback, .check-feedback, .exam-feedback').forEach((node) => node.remove());
+      if (popupPresentation) {
+        app.insertAdjacentHTML('beforeend', markup);
+        const popup = app.querySelector('[data-support-moment="' + moment.id + '"]');
+        window.requestAnimationFrame(() => positionSupportPopupInTask(popup, card));
+      }
+      else insertInlineSupportMoment(card, markup);
+    }
+    if (isNew) {
+      card.dataset.supportTransition = moment.kind;
+      const movesTask = ['task-entry', 'section-complete', 'module-complete', 'course-complete', 'preference-preview'].includes(moment.kind);
+      const movesFeedback = !['answer-incorrect', 'typing-incomplete', 'response-needed', 'system-error'].includes(moment.kind);
+      if (movesTask) card.classList.add('is-support-task-entering');
+      if (movesFeedback) app.querySelector('[data-support-moment]')?.classList.add('is-support-entering');
+      if (movesTask && ['check', 'apply', 'exam'].includes(state.progress.phase)) card.classList.add('is-question-sequence-entering');
+      if (movesTask) app.querySelector('.course-module-strip, .course-progress-panel')?.classList.add('is-support-progressing');
+      scheduleSupportPopupDismissal(moment);
