@@ -3774,3 +3774,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       return;
     }
     if (event.target.matches('[data-narration-volume]')) {
+      setCourseSetting('narrationVolume', event.target.value);
+      ensureNarrationService().changePlayback({
+        rate: state.preferences.narrationSpeed,
+        voiceURI: effectiveNarrationVoice(),
+        volume: Number(event.target.value)
+      });
+      save('Narration volume saved.');
+      syncNarrationUi();
+      return;
+    }
+    if (event.target.matches('[data-narration-autoscroll]')) {
+      if (event.target.checked && (state.preferences.reducedMotion || state.preferences.quietDisplay)) {
+        event.target.checked = false;
+        announce(state.preferences.reducedMotion
+          ? 'Auto-scroll stays off while Reduce motion is on. Use manual scrolling or change that preference in Settings.'
+          : 'Auto-scroll stays off while Low Stimulation is active. Use manual scrolling or choose a different preference in Settings.');
+        return;
+      }
+      setCourseSetting('narrationAutoScroll', event.target.checked);
+      if (!event.target.checked) cancelNarrationAutoScroll();
+      save(event.target.checked ? 'Auto-scroll while listening is on.' : 'Auto-scroll while listening is off.');
+      syncNarrationUi();
+      return;
+    }
+    const preference = event.target.dataset.preference;
+    if (preference) {
+      if (['automaticSaving', 'noTimers', 'oneTask'].includes(preference)) return;
+      if (preference === 'textSizeLarge') setCourseSetting('textSize', event.target.checked ? 'large' : 'standard');
+      else if (preference === 'spacingRelaxed') setCourseSetting('spacing', event.target.checked ? 'relaxed' : 'standard');
+      else setCourseSetting(preference, event.target.checked);
+      if (preference === 'alternativeInput' && !event.target.checked && !state.preferences.alternativeResponses) {
+        state.progress.attempt.inputMethod = 'keyboard';
+        state.progress.attempt.alternativeInput = false;
+      }
+      save('Support setting updated.');
+      render();
+      return;
+    }
+    if (event.target.matches('[data-exam-answer]')) {
+      if (state.progress.phase !== 'exam' || state.progress.finalExam.submitted) return;
+      const answer = Number(event.target.value);
+      if (!Number.isInteger(answer) || answer < 0 || answer > 3) return;
+      state.progress.finalExam.answers[state.progress.finalExam.questionIndex] = answer;
+      clearSupportMoment();
+      save('Answer selected. Submit when you are ready.');
+      render();
+      window.requestAnimationFrame(() => app.querySelector('[data-exam-answer][value="' + answer + '"]')?.focus?.());
+      return;
+    }
+    if (event.target.matches('[data-check-answer], [data-apply-answer]')) {
+      if (state.progress.attempt.submitted) return;
+      state.progress.attempt.selectedAnswer = event.target.value;
+      state.progress.attempt.submitted = false;
+      state.progress.attempt.feedback = '';
+      clearSupportMoment();
+      save();
+      render();
+      const answerSelector = event.target.matches('[data-check-answer]') ? '[data-check-answer]' : '[data-apply-answer]';
+      window.requestAnimationFrame(() => app.querySelector(answerSelector + '[value="' + state.progress.attempt.selectedAnswer + '"]')?.focus?.());
+    }
+  });
+
+  app.addEventListener('input', (event) => {
+    if (event.target.matches('[data-settings-noise-volume]')) {
+      const value = String(Math.min(35, Math.max(0, Number(event.target.value) || 0)));
+      const choices = learningChoices();
+      choices['background-noise-volume'] = value;
+      saveLearningChoices(choices);
+      backgroundNoise.volume = clampBackgroundNoiseVolume(value);
