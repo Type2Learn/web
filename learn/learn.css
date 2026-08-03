@@ -718,72 +718,86 @@ body[data-setup-animations="lively"] .preference-options button[aria-pressed="tr
   box-shadow: 0 0 22px color-mix(in srgb, var(--learn-teal) 50%, transparent);
   animation: learning-stage-sweep 660ms cubic-bezier(.16, .8, .2, 1) both;
 }
-  .learn-panel-grid {
-    grid-template-columns: 1fr;
-  }
+.learning-stage-sweep::after { top: calc(50% + 16px); animation-delay: 70ms; opacity: .62; }
+
+@keyframes learning-action-ring-gentle {
+  from { opacity: .7; transform: translate(-50%, -50%) scale(.4); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(2.5); }
+}
+@keyframes learning-action-ring-lively {
+  0% { opacity: .88; transform: translate(-50%, -50%) scale(.35); }
+  56% { opacity: .5; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(4.2); }
+}
+@keyframes learning-stage-sweep {
+  0% { opacity: 0; transform: translateX(0) scaleX(.55); }
+  28% { opacity: .9; }
+  100% { opacity: 0; transform: translateX(138vw) scaleX(1.2); }
 }
 
-@media (max-width: 820px) {
-  .learn-app,
-  .learn-app.is-sidebar-hidden {
-    display: block;
-  }
+.learning-encouragement-popup {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  bottom: clamp(18px, 3vw, 34px);
+  width: min(calc(100vw - 36px), 760px);
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  transform: translateX(-50%);
+  border: 1px solid var(--learn-line-strong);
+  border-left: 5px solid var(--learn-teal);
+  border-radius: 14px;
+  padding: 15px 17px;
+  color: var(--learn-ink);
+  background: linear-gradient(112deg, #effcf6, #f1f8ff 64%, #fff);
+  box-shadow: 0 22px 56px rgb(8 61 93 / .22);
+  pointer-events: none;
+}
 
-  .learn-sidebar {
-    position: relative;
-    width: 100%;
-    height: auto;
-    overflow: visible;
-    border-right: 0;
-    border-bottom: 1px solid var(--learn-line);
-    box-shadow: 0 14px 30px rgba(10, 22, 48, .06);
-  }
+.learning-encouragement-popup[dir="rtl"] {
+  grid-template-columns: minmax(0, 1fr) 46px;
+  border-right: 5px solid var(--learn-teal);
+  border-left-width: 1px;
+  text-align: right;
+}
+.learning-encouragement-popup[dir="rtl"] > span { grid-column: 2; grid-row: 1; }
+.learning-encouragement-popup[dir="rtl"] > div { grid-column: 1; grid-row: 1; }
 
-  .learn-app.is-sidebar-hidden .learn-sidebar {
-    transform: none;
-    opacity: 1;
-    pointer-events: auto;
-  }
+.learning-encouragement-popup > span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--learn-green), var(--learn-cyan), var(--learn-blue));
+  font-size: 20px;
+  font-weight: 950;
+}
+.learning-encouragement-popup strong { display: block; font-size: 1.05rem; line-height: 1.25; }
+.learning-encouragement-popup p { margin: 3px 0 0; color: var(--learn-soft); font-size: .86rem; line-height: 1.45; }
+.learning-encouragement-popup > i {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--learn-green), var(--learn-teal), var(--learn-blue));
+}
 
-  .learn-sidebar-inner {
-    min-height: 0;
-    gap: 14px;
-    padding: 16px;
-  }
+html[data-color-mode="flat"] .learning-encouragement-popup { border-color: #929998; background: #fffefb; box-shadow: 0 16px 40px rgb(38 49 59 / .16); }
+html[data-color-mode="flat"] .learning-encouragement-popup > span,
+html[data-color-mode="flat"] .learning-encouragement-popup > i { background: #647b70; }
+html[data-color-mode="vivid"] .learning-encouragement-popup {
+  border-color: #00c3b6 #68b8ff #68b8ff #006bff;
+  background: linear-gradient(112deg, #d7ffe8, #dff7ff 48%, #edf1ff);
+  box-shadow: 0 25px 66px rgb(0 89 184 / .27);
+}
 
-  .learn-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .sidebar-card,
-  .learn-nav .sidebar-toggle,
-  .sidebar-reveal-zone {
-    display: none;
-  }
-
-  .learn-signout {
-    margin-top: 0;
-  }
-
-  .learn-main {
-    padding: 28px 16px 86px;
-  }
-
-  .learn-topline {
-    align-items: flex-start;
-    flex-direction: column;
-    margin-bottom: 24px;
-  }
-
-  .inline-companion {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: min(100%, 330px);
-    margin: 0 0 22px;
-    border: 1px solid var(--learn-line);
-    border-radius: 14px;
-    padding: 10px 12px;
     background: rgba(255, 255, 255, .86);
     color: var(--learn-soft);
     box-shadow: 0 12px 28px rgba(10, 22, 48, .08);

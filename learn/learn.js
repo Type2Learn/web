@@ -605,29 +605,73 @@ const boot = async () => {
   if (!mascotScreenIsSupported()) choices.mascot = 'off';
   window.Type2LearnColorMode?.set(choices.colours, false);
   render(choices);
-      clearOutside();
-      clearHide();
-      apply();
+
+  const mascotScreenQuery = window.matchMedia?.('(min-width: 1181px)');
+  mascotScreenQuery?.addEventListener?.('change', (event) => {
+    if (!event.matches && choices.mascot === 'on') choices.mascot = 'off';
+    render(choices);
+  });
+
+  app.addEventListener('click', (event) => {
+    const motionControl = event.target.closest('button, .preference-options button');
+    if (motionControl) {
+      const routeChange = Boolean(motionControl.matches('[data-advance-setup], [data-go-back], [data-save-preferences]'));
+      launchSetupControlMotion(motionControl, event, choices, routeChange);
+    }
+    const preferenceButton = event.target.closest('[data-preference]');
+    if (preferenceButton) {
+      const { preference, value } = preferenceButton.dataset;
+      const previousValue = choices[preference];
+      choices[preference] = value;
+      applySetupPresentation(choices);
+      if (preference === 'learning-language' && !mascotLanguageExplicitlyChosen) choices['mascot-language'] = value;
+      if (preference === 'mascot-language') {
+        mascotLanguageExplicitlyChosen = true;
+        choices['mascot-language-explicit'] = true;
+      }
+      if (preference === 'colours') window.Type2LearnColorMode?.set(value);
+      if (preference === 'learning-language') {
+        // Language is the first choice, so its direction and copy update on
+        // this same screen rather than only after the learner continues.
+        render(choices);
+        return;
+      }
+      if (preference === 'layout') {
+        if (setupStage === 'balanced') {
+          if (value === 'focused') {
+            layoutBeforeFocused = ['balanced', 'open'].includes(previousValue) ? previousValue : 'balanced';
+            setupStage = 'focused';
+            focusedStepIndex = 0;
+          }
+          render(choices);
+          return;
+        }
+        if (setupStage === 'focused' && value !== 'focused') {
+          setupStage = 'balanced';
+          render(choices);
+          return;
+        }
+      }
+      if (preference === 'background-noise') {
+        if (value === 'on') startBackgroundNoisePreview(choices);
+        else stopBackgroundNoisePreview();
+        render(choices);
+        return;
+      }
+      if (preference === 'mascot' && value === 'on') {
+        warmMascotAssets();
+        render(choices);
+        return;
+      }
+      if (preference === 'mascot' || (preference === 'animations' && choices.mascot === 'on') || (preference === 'mascot-language' && choices.mascot === 'on')) {
+        render(choices);
+        if (preference === 'animations') showSetupFeedback('animations', choices);
+        return;
+      }
+      updateChoiceUi(preference, value);
+      if (preference === 'encouragement' || preference === 'animations') showSetupFeedback(preference, choices);
       return;
     }
-    window.clearTimeout(outsideTimer);
-    outsideTimer = window.setTimeout(clearOutside, 2600);
-  }, { passive: true });
-
-  window.addEventListener('pointerup', () => {
-    window.setTimeout(() => { pointerDown = false; }, 120);
-  }, { passive: true });
-
-  window.addEventListener('resize', () => {
-    if (!desktopQuery.matches) hidden = false;
-    apply();
-    scheduleHide();
-  }, { passive: true });
-
-  apply();
-  scheduleHide();
-};
-
 const boot = async () => {
   let user = null;
   try {
