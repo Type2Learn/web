@@ -569,3 +569,60 @@ const cleanOverrides = (value, allowedKeys = editableKeySet) => {
 
 const cleanConflictResolutions = (value) => {
   const source = safeObject(value);
+  const clean = {};
+  Object.entries(source).forEach(([id, resolution]) => {
+    const entry = safeObject(resolution);
+    const key = canonicalSettingKey(entry.key);
+    const choice = typeof entry.choice === 'string' ? entry.choice : '';
+    const safeValue = cleanOverrides({ [key]: entry.value });
+    if (!id || id.length > 180 || !validConflictChoices.has(choice) || !Object.hasOwn(safeValue, key)) return;
+    clean[id] = { key, choice, value: safeValue[key] };
+  });
+  return clean;
+};
+
+const cleanActiveInputMethod = (value) => validInputMethods.has(value) ? value : 'keyboard';
+
+/*
+ * Older course builds stored a complete resolved settings snapshot under
+ * `preferences`. Those values were not all choices made by the learner, so
+ * copying that object into `userOverrides` would freeze platform defaults and
+ * profile recommendations as if the learner had selected every value.
+ *
+ * Sparse legacy preference objects were used for explicit choices in earlier
+ * shared-settings versions, so those remain migratable. A large object, or an
+ * object carrying the old platform-protection signature, is a resolved
+ * snapshot and is not promoted. Explicit `overrides`/`userOverrides`
+ * envelopes still migrate even when their parent object is a snapshot.
+ *
+ * The old course snapshot itself is intentionally left to the course's
+ * separate bounded migration, which knows which controls that build exposed.
+ */
+const directLegacyOverrides = (record) => {
+  if (looksLikeResolvedSettingsSnapshot(record)) return {};
+  const direct = {};
+  Object.entries(safeObject(record)).forEach(([key, value]) => {
+    if (editableKeySet.has(canonicalSettingKey(key))) direct[key] = value;
+  });
+  return cleanOverrides(direct);
+};
+
+const looksLikeResolvedSettingsSnapshot = (value) => {
+  const source = safeObject(value);
+  const settingKeyCount = Object.keys(source)
+    .filter((key) => validKeys.has(canonicalSettingKey(key)))
+    .length;
+  const platformSignature = [
+    'automaticSaving',
+    'noTimers',
+    'pauseResume',
+    'easyReturn',
+    'writtenInstructions',
+    'captionsTranscripts',
+    'noAutoplay',
+    'noUnexpectedSound'
+  ];
+  const signatureCount = platformSignature.filter((key) => Object.hasOwn(source, key)).length;
+  // A learner could reasonably have made a dozen individual changes in an
+  // older build. Only treat a preferences object as a broad resolved snapshot
+  // when it contains most of today's editable surface, or carries the old
