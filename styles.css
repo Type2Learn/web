@@ -43,6 +43,52 @@
   --display: "Cormorant Garamond Local", Georgia, "Times New Roman", serif;
 }
 
+/* Balanced is the original Type2Learn palette. The alternate modes retain the
+   same light, high-legibility interface instead of introducing a dark theme. */
+html[data-color-mode="flat"] {
+  --ink: #26313B;
+  --ink-soft: #4F5F6C;
+  --muted: #707A80;
+  --cloud: #F5F4F0;
+  --paper: #FFFEFB;
+  --pale-blue: #EEF0EE;
+  --pale-green: #EEF2EB;
+  --pale-teal: #EDF1EF;
+  --pale-cyan: #EEF2F1;
+  --pale-violet: #F1F0ED;
+  --line: #DDDCD5;
+  --line-strong: #C5C6BE;
+  --green: #6F8876;
+  --teal: #6F8580;
+  --cyan: #718490;
+  --blue: #516F7B;
+  --amber: #947748;
+  --red: #A65D61;
+  --shadow-card: 0 10px 22px rgba(38, 49, 59, .045);
+}
+
+html[data-color-mode="vivid"] {
+  --ink: #061A38;
+  --ink-soft: #164B78;
+  --muted: #416D94;
+  --cloud: #E6F6FF;
+  --paper: #FFFFFF;
+  --pale-blue: #D7EEFF;
+  --pale-green: #D9FBE7;
+  --pale-teal: #D4FCF5;
+  --pale-cyan: #D9F6FF;
+  --pale-violet: #E8E5FF;
+  --line: #B9DDF7;
+  --line-strong: #88C5F2;
+  --green: #05C967;
+  --teal: #00C3B6;
+  --cyan: #00B7F0;
+  --blue: #006BFF;
+  --amber: #ED9400;
+  --red: #DB3E5A;
+  --shadow-card: 0 24px 65px rgba(0, 107, 255, .19);
+}
+
 * { box-sizing: border-box; }
 
 html {
@@ -307,6 +353,7 @@ input:focus-visible {
 }
 
 .motion-switch,
+.color-mode-switch,
 .icon-button,
 .menu-toggle {
   display: inline-flex;
@@ -329,6 +376,43 @@ input:focus-visible {
   font-size: 13px;
   font-weight: 850;
   letter-spacing: .01em;
+}
+
+.color-mode-switch {
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.color-mode-swatch {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(10, 22, 48, .18);
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--green), var(--cyan) 56%, var(--blue));
+}
+
+.color-mode-label { color: var(--ink-soft); }
+
+.color-mode-state {
+  border-radius: 999px;
+  padding: 4px 6px;
+  color: var(--blue);
+  background: var(--pale-blue);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.color-mode-switch:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--pale-blue);
 }
 
 .motion-switch .icon { color: var(--blue); }
@@ -2859,6 +2943,15 @@ body {
 .how-act h3 { max-width: 310px; margin: 0; font-size: clamp(2.4rem, 3.5vw, 4.2rem); letter-spacing: -.045em; line-height: .9; }
 .how-act > p:last-of-type { max-width: 360px; margin: 22px 0 0; color: var(--ink-soft); line-height: 1.72; }
 .how-act i { position: absolute; right: 0; bottom: 0; left: 0; height: 6px; background: linear-gradient(90deg, var(--green), var(--teal), var(--blue)); transform: scaleX(0); transform-origin: left; transition: transform .8s var(--ease-out); }
+.how-act.is-visible i { transform: scaleX(1); }
+
+.team-deck-section { overflow: clip; }
+.team-deck-intro { max-width: 980px; margin-bottom: 48px; }
+.team-deck-intro h2 { margin: 0; font-size: clamp(3.5rem, 5.6vw, 6.8rem); letter-spacing: -.05em; line-height: .88; }
+.team-deck-intro > p:last-child { max-width: 760px; color: var(--ink-soft); font-size: 17px; line-height: 1.75; }
+
+.team-deck {
+  position: relative;
 .how-act.is-visible i { transform: scaleX(1); }
 
 .team-deck-section { overflow: clip; }
