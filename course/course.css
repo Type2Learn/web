@@ -49,6 +49,66 @@ html[lang="ur"] body,
   margin-bottom: .4rem;
 }
 
+/* Keep Flat intentionally quiet. Balanced gives Urdu translations a soft
+   reading band; Vivid uses a clearer, still low-saturation blue/teal system.
+   These are interior treatments only, so course layout and motion geometry
+   remain the same as the English path. */
+html[data-color-mode="balanced"][lang="ur"] .course-reading-section .course-bilingual-reading > .course-english-copy,
+html[data-color-mode="balanced"][lang="ur"] .course-check-option .course-english-copy {
+  padding-bottom: .3rem;
+  border-bottom: 1px solid rgba(23, 105, 245, .18);
+}
+
+html[data-color-mode="balanced"][lang="ur"] .course-reading-section .course-urdu-copy,
+html[data-color-mode="balanced"][lang="ur"] .course-simple-copy .course-urdu-copy,
+html[data-color-mode="balanced"][lang="ur"] .course-example .course-urdu-copy,
+html[data-color-mode="balanced"][lang="ur"] .course-content-notice .course-urdu-copy,
+html[data-color-mode="balanced"][lang="ur"] .course-check-option .course-urdu-copy {
+  border-inline-start: 3px solid #79afd8;
+  border-radius: 0 9px 9px 0;
+  padding: .42rem .74rem;
+  background: linear-gradient(90deg, rgba(224, 242, 255, .92), rgba(246, 251, 255, .82));
+  box-shadow: 0 3px 10px rgba(35, 91, 137, .07);
+}
+
+html[data-color-mode="balanced"][lang="ur"] .course-reading-section .course-bilingual-reading,
+html[data-color-mode="balanced"][lang="ur"] .course-check-option:has(.course-bilingual-copy) {
+  box-shadow: inset 0 0 0 1px rgba(130, 176, 214, .16);
+  border-radius: 10px;
+}
+
+html[data-color-mode="vivid"][lang="ur"] .course-reading-section .course-bilingual-reading > .course-english-copy,
+html[data-color-mode="vivid"][lang="ur"] .course-check-option .course-english-copy {
+  padding-bottom: .34rem;
+  border-bottom: 2px solid rgba(0, 183, 240, .32);
+}
+
+html[data-color-mode="vivid"][lang="ur"] .course-reading-section .course-urdu-copy,
+html[data-color-mode="vivid"][lang="ur"] .course-simple-copy .course-urdu-copy,
+html[data-color-mode="vivid"][lang="ur"] .course-example .course-urdu-copy,
+html[data-color-mode="vivid"][lang="ur"] .course-content-notice .course-urdu-copy,
+html[data-color-mode="vivid"][lang="ur"] .course-check-option .course-urdu-copy {
+  border-inline-start: 4px solid #159fc7;
+  border-radius: 0 10px 10px 0;
+  padding: .48rem .82rem;
+  color: #104b70;
+  background: linear-gradient(90deg, #dff5ff, #edfaff 65%, #effcf7);
+  box-shadow: 0 4px 12px rgba(0, 137, 184, .1);
+}
+
+html[data-color-mode="vivid"][lang="ur"] .course-reading-section .course-bilingual-reading,
+html[data-color-mode="vivid"][lang="ur"] .course-check-option:has(.course-bilingual-copy) {
+  box-shadow: inset 0 0 0 1px rgba(0, 167, 211, .26);
+  border-radius: 11px;
+}
+
+/* The English course heading naturally occupies two lines at the desktop
+   lesson width. Give the Urdu title the same calm two-line rhythm rather than
+   letting the card jump upward merely because Urdu is more compact here. */
+html[lang="ur"] .course-heading h1 {
+  max-width: 700px;
+}
+
 html[lang="ur"] .course-typing-task,
 html[lang="ur"] .course-typing-task * {
   direction: ltr;
