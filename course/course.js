@@ -1026,3 +1026,73 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       && !isReviewingModule()
       && lessonTypingSections().length
   );
+
+  const activeLessonTypingSection = () => {
+    const sections = lessonTypingSections();
+    const index = Math.max(0, Math.min(Number(state.progress.attempt.guidedIndex) || 0, Math.max(0, sections.length - 1)));
+    return { section: sections[index] || { heading: 'Typing practice', text: '' }, index, total: sections.length };
+  };
+
+  const lessonTypingDuration = () => {
+    const length = Array.from(activeLessonTypingSection().section.text || '').length;
+    return length > 220 ? 'About 2 minutes' : 'About 1 minute';
+  };
+
+  const savedTaskLabel = () => ({
+    preview: 'Preview this small step',
+    read: 'Read this short explanation',
+    type: 'Type the current lesson section',
+    check: 'Check understanding',
+    apply: 'Use the idea in a small situation',
+    complete: 'One small step complete',
+    'exam-intro': 'Get ready for the final exam',
+    exam: 'Answer one final exam question',
+    'exam-results': 'Review your final exam results'
+  }[state.progress.phase] || 'Continue learning');
+
+  const taskLabel = () => isReviewingModule() ? 'Review a completed module' : savedTaskLabel();
+
+  const taskTime = () => {
+    const estimate = isReviewingModule()
+      ? (currentStep().duration || 'Ready when you are')
+      : ({ preview: 'You can skip this step', read: 'You can skip this step', type: lessonTypingDuration(), check: 'About 1 minute', apply: 'About 1 minute', complete: 'Ready when you are', 'exam-intro': 'You can skip this step', exam: 'One question at a time', 'exam-results': 'Ready when you are' }[state.progress.phase] || 'Ready when you are');
+    return estimate;
+  };
+
+  // Open layout deliberately keeps a lightweight pace cue. The other layouts
+  // keep that area for support instead, so no duration is presented as a
+  // requirement or expectation.
+  const taskHeaderControls = (paceCopy = taskTime()) => {
+    const explain = '<button class="course-task-explain" type="button" data-action="explain-step">Explain this step</button>';
+    if (learningChoices().layout === 'open') {
+      return '<span class="course-task-header-controls"><span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' + explain + '</span>';
+    }
+    return '<span class="course-task-header-controls">' + explain + '</span>';
+  };
+
+  const applyPreferences = () => {
+    const courseChoices = learningChoices();
+    // Apply the course's colour choice before feedback and motion are painted.
+    // This prevents an older site-wide mode from styling a course popup after
+    // the learner has deliberately selected a different colour treatment.
+    if (colorModes.includes(courseChoices.colours) && currentColorMode() !== courseChoices.colours) {
+      window.Type2LearnColorMode?.set(courseChoices.colours, false);
+    }
+    document.body.dataset.courseLayout = ['focused', 'balanced', 'open'].includes(courseChoices.layout) ? courseChoices.layout : 'focused';
+    document.body.dataset.courseAnimations = effectiveAnimationLevel();
+    document.body.dataset.courseAnimationPreference = savedAnimationLevel();
+    document.body.dataset.courseEncouragement = selectedEncouragementLevel();
+    document.body.dataset.courseDirection = courseChoices['learning-language'] === 'urdu' ? 'rtl' : 'ltr';
+    document.body.dataset.courseUrduMode = courseChoices['urdu-mode'] === 'on' ? 'on' : 'off';
+    if (effectiveAnimationLevel() === 'lively' && selectedEncouragementLevel() === 'expressive') warmRewardAssets();
+    document.body.classList.toggle('course-fewer-distractions', Boolean(state.preferences.fewerDistractions));
+    document.body.classList.toggle('course-quiet-display', Boolean(state.preferences.quietDisplay));
+    document.body.classList.toggle('course-stable-layout', Boolean(state.preferences.stableLayout));
+    document.body.classList.toggle('course-smaller-sections', Boolean(state.preferences.smallerSections));
+    document.body.classList.toggle('course-progress-hidden', !state.preferences.visibleProgress);
+    document.body.classList.toggle('course-assistive-input', Boolean(state.preferences.oneHandedInput || state.preferences.switchInput));
+    document.body.classList.toggle('course-one-handed-input', Boolean(state.preferences.oneHandedInput));
+    document.body.classList.toggle('course-switch-input', Boolean(state.preferences.switchInput));
+    document.body.classList.toggle('course-keyboard-shortcuts', Boolean(state.preferences.keyboardShortcuts));
+    document.body.classList.toggle('course-reduced-movement', Boolean(state.preferences.reducedRepeatedMovement));
+    document.body.dataset.courseTextSize = state.preferences.textSize;
