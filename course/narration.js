@@ -283,3 +283,287 @@ export class NarrationService {
     this.audioPendingSeekSourceChar = null;
     this.audioTimelineCache = new WeakMap();
     this.audioAnimationFrame = null;
+    this.audioAnimationSession = 0;
+    this.handleVoicesChanged = this.refreshVoices.bind(this);
+
+    if (this.synth) {
+      if (typeof this.synth.addEventListener === 'function') this.synth.addEventListener('voiceschanged', this.handleVoicesChanged);
+      else this.synth.onvoiceschanged = this.handleVoicesChanged;
+      this.refreshVoices();
+    }
+  }
+
+  refreshVoices() {
+    if (!this.synth) return [];
+    this.voices = this.synth.getVoices().slice().sort((first, second) => first.name.localeCompare(second.name));
+    this.onVoicesChange(this.voices.slice());
+    return this.voices;
+  }
+
+  setChunks(chunks) {
+    this.stop({ silent: true, resetIndex: true });
+    this.chunks = normaliseChunks(chunks);
+    // A caller can set its playlist before it knows the final visible chunk
+    // list. Rebuild fallback maps now that those chunks are available.
+    this.audioPlaylist = normaliseAudioPlaylist(this.rawAudioPlaylist, this.chunks);
+    this.currentIndex = 0;
+    if (this.supported) this.setStatus('idle');
+  }
+
+  /*
+   * Playlist item shape:
+   * { src, text, chunkIndexes, chunkMap }
+   *
+   * chunkMap accepts [{ sourceStart, sourceEnd, index, startOffset }] or
+   * [[sourceStart, sourceEnd, index, startOffset]]. An object keyed by
+   * "start-end" is accepted too. index is the visible narration chunk index.
+   */
+  setAudioPlaylist(playlist) {
+    this.stop({ silent: true, resetIndex: true });
+    this.rawAudioPlaylist = Array.isArray(playlist) ? playlist.slice() : [];
+    this.audioPlaylist = normaliseAudioPlaylist(this.rawAudioPlaylist, this.chunks);
+    if (this.supported) this.setStatus('idle');
+    else this.setStatus('unsupported');
+    return this.audioPlaylist.slice();
+  }
+
+  configure({ rate, voiceURI, volume } = {}) {
+    if (Number.isFinite(Number(rate))) this.rate = Math.min(1.5, Math.max(0.75, Number(rate)));
+    if (Number.isFinite(Number(volume))) this.volume = Math.min(1, Math.max(0, Number(volume)));
+    if (typeof voiceURI === 'string') this.voiceURI = voiceURI;
+    if (this.audio) {
+      try { this.audio.playbackRate = this.rate; } catch (_) { /* Media rate support is best-effort. */ }
+      try { this.audio.volume = this.volume; } catch (_) { /* Media volume support is best-effort. */ }
+    }
+  }
+
+  setStatus(status) {
+    this.status = status;
+    this.onStateChange(status);
+  }
+
+  setActiveChunk(index) {
+    this.onChunkChange(index);
+  }
+
+  selectedVoice() {
+    return this.voices.find((voice) => voice.voiceURI === this.voiceURI) || null;
+  }
+
+  hasAudioPlaylist() {
+    return this.audioSupported && this.audioPlaylist.some((track) => track.src);
+  }
+
+  usingAudio() {
+    return Boolean(this.audio && this.audioSession === this.session);
+  }
+
+  firstTrackChunkIndex(track, fallback = 0) {
+    const mapped = track?.chunkMap?.[0]?.index;
+    const indexed = track?.chunkIndexes?.[0];
+    return nonNegativeInteger(mapped ?? indexed ?? fallback) ?? 0;
+  }
+
+  trackForChunk(index) {
+    const requested = Math.max(0, Number(index) || 0);
+    for (let trackIndex = 0; trackIndex < this.audioPlaylist.length; trackIndex += 1) {
+      const track = this.audioPlaylist[trackIndex];
+      const map = track.chunkMap.find((entry) => entry.index === requested);
+      if (map) return { trackIndex, sourceChar: map.sourceStart, visibleIndex: requested };
+      if (track.chunkIndexes.includes(requested) && track.chunkMap.length) {
+        const nearest = track.chunkMap.find((entry) => entry.sourceStart >= 0) || track.chunkMap[0];
+        return { trackIndex, sourceChar: nearest.sourceStart, visibleIndex: nearest.index };
+      }
+    }
+    const firstTrack = this.audioPlaylist[0];
+    return {
+      trackIndex: 0,
+      sourceChar: 0,
+      visibleIndex: this.firstTrackChunkIndex(firstTrack, requested)
+    };
+  }
+
+  mapForSourcePosition(track, position) {
+    if (!track?.chunkMap?.length) return null;
+    const sourcePosition = Math.max(0, Number(position) || 0);
+    return track.chunkMap.find((entry) => sourcePosition >= entry.sourceStart && sourcePosition < entry.sourceEnd)
+      || null;
+  }
+
+  audioTimelineFor(track) {
+    if (!track || typeof track !== 'object') return [];
+    const cached = this.audioTimelineCache.get(track);
+    if (cached) return cached;
+    const timeline = track.wordCues?.length ? track.wordCues : weightedWordCues(track.text);
+    this.audioTimelineCache.set(track, timeline);
+    return timeline;
+  }
+
+  cueRange(cue, duration) {
+    const hasDuration = Number.isFinite(duration) && duration > 0;
+    const start = cue?.startTime !== null && cue?.startTime !== undefined && hasDuration
+      ? cue.startTime / duration
+      : cue?.startRatio;
+    const end = cue?.endTime !== null && cue?.endTime !== undefined && hasDuration
+      ? cue.endTime / duration
+      : cue?.endRatio;
+    const safeStart = ratioValue(start);
+    const safeEnd = ratioValue(end);
+    if (safeStart === null || safeEnd === null || safeEnd <= safeStart) return null;
+    return { start: safeStart, end: safeEnd };
+  }
+
+  cueForPlaybackRatio(track, ratio, duration) {
+    const position = Math.min(1, Math.max(0, Number(ratio) || 0));
+    const timeline = this.audioTimelineFor(track);
+    let lastCue = null;
+    for (const cue of timeline) {
+      const range = this.cueRange(cue, duration);
+      if (!range) continue;
+      if (position < range.start) return null;
+      if (position < range.end) return { cue, range };
+      lastCue = { cue, range };
+    }
+    return lastCue && position >= lastCue.range.end ? lastCue : null;
+  }
+
+  playbackRatioForSourcePosition(track, sourcePosition, duration) {
+    const source = Math.max(0, Number(sourcePosition) || 0);
+    const timeline = this.audioTimelineFor(track);
+    let nextCue = null;
+    for (const cue of timeline) {
+      const range = this.cueRange(cue, duration);
+      if (!range) continue;
+      if (source >= cue.sourceStart && source < cue.sourceEnd) return range.start;
+      if (source < cue.sourceStart && !nextCue) nextCue = range;
+    }
+    return nextCue?.start ?? 0;
+  }
+
+  clearAudioHighlight({ force = false } = {}) {
+    if (!force && this.audioLastChunkIndex === -1 && !this.audioLastBoundaryKey) return;
+    this.audioLastChunkIndex = -1;
+    this.audioLastBoundaryKey = '';
+    this.setActiveChunk(-1);
+  }
+
+  stopAudioPositionLoop() {
+    const cancel = typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function'
+      ? window.cancelAnimationFrame.bind(window)
+      : null;
+    if (this.audioAnimationFrame !== null && cancel) cancel(this.audioAnimationFrame);
+    this.audioAnimationFrame = null;
+    this.audioAnimationSession = 0;
+  }
+
+  startAudioPositionLoop(audio, track, activeSession) {
+    const request = typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame.bind(window)
+      : null;
+    if (!request) return;
+    this.stopAudioPositionLoop();
+    this.audioAnimationSession = activeSession;
+    const tick = () => {
+      if (activeSession !== this.session || this.audio !== audio || this.status !== 'playing') {
+        this.stopAudioPositionLoop();
+        return;
+      }
+      this.applyPendingAudioSeek(audio, track, activeSession);
+      this.emitAudioPosition(track);
+      this.audioAnimationFrame = request(tick);
+    };
+    this.audioAnimationFrame = request(tick);
+  }
+
+  disposeAudio({ resetTime = false, clearSource = false } = {}) {
+    this.stopAudioPositionLoop();
+    const audio = this.audio;
+    this.audio = null;
+    this.audioSession = 0;
+    this.audioTrackIndex = -1;
+    this.audioPendingSeekRatio = null;
+    this.audioPendingSeekSourceChar = null;
+    if (!audio) return;
+    audio.onloadedmetadata = null;
+    audio.oncanplay = null;
+    audio.ontimeupdate = null;
+    audio.onended = null;
+    audio.onerror = null;
+    try { audio.pause(); } catch (_) { /* Media cleanup is best-effort. */ }
+    if (resetTime) {
+      try { audio.currentTime = 0; } catch (_) { /* Not all media states are seekable. */ }
+    }
+    if (clearSource) {
+      try { audio.removeAttribute?.('src'); } catch (_) { /* Best-effort source cleanup. */ }
+      try { audio.src = ''; } catch (_) { /* Best-effort source cleanup. */ }
+      try { audio.load?.(); } catch (_) { /* Best-effort source cleanup. */ }
+    }
+  }
+
+  emitAudioPosition(track, { force = false } = {}) {
+    const audio = this.audio;
+    if (!audio || !track || this.status !== 'playing') return;
+    const duration = Number(audio.duration);
+    const hasPendingSeek = Number.isFinite(this.audioPendingSeekRatio);
+    const ratio = hasPendingSeek
+      // Before the requested seek is applied, use that requested position
+      // rather than briefly highlighting the beginning of the recording.
+      ? Math.min(1, Math.max(0, Number(this.audioPendingSeekRatio) || 0))
+      : (Number.isFinite(duration) && duration > 0
+        ? Math.min(1, Math.max(0, Number(audio.currentTime) || 0) / duration)
+        : 0);
+    const timing = this.cueForPlaybackRatio(track, ratio, duration);
+    if (!timing) {
+      this.clearAudioHighlight({ force });
+      return;
+    }
+    const { cue } = timing;
+    if (Number.isFinite(track.stopAtSourceChar) && cue.sourceStart >= track.stopAtSourceChar) {
+      // The current screen intentionally exposes only part of a full lesson
+      // recording. Stop cleanly at its final visible word rather than moving
+      // into later, unopened content.
+      this.disposeAudio({ clearSource: true });
+      this.setStatus('finished');
+      return;
+    }
+    const map = this.mapForSourcePosition(track, cue.sourceStart);
+    if (!map) {
+      // The recording can include an unrendered title or transition. Do not
+      // mislead the learner by marking an unrelated visible paragraph.
+      this.clearAudioHighlight({ force });
+      return;
+    }
+    const visibleIndex = map.index;
+    if (visibleIndex !== this.audioLastChunkIndex || force) {
+      this.audioLastChunkIndex = visibleIndex;
+      this.currentIndex = visibleIndex;
+      this.setActiveChunk(visibleIndex);
+    }
+    const clippedStart = Math.max(cue.sourceStart, map.sourceStart);
+    const clippedEnd = Math.min(cue.sourceEnd, map.sourceEnd);
+    if (clippedEnd <= clippedStart) return;
+    const key = `${map.index}:${map.sourceStart}:${clippedStart}:${clippedEnd}`;
+    if (!force && key === this.audioLastBoundaryKey) return;
+    this.audioLastBoundaryKey = key;
+    this.onBoundary({
+      index: map.index,
+      charIndex: Math.max(0, clippedStart - map.sourceStart),
+      charLength: Math.max(1, clippedEnd - clippedStart),
+      startOffset: map.startOffset || 0
+    });
+  }
+
+  applyPendingAudioSeek(audio, track, activeSession) {
+    if (activeSession !== this.session || this.audio !== audio || this.audioPendingSeekRatio === null) return;
+    const duration = Number(audio.duration);
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const ratio = Math.min(1, Math.max(0, this.audioPendingSeekSourceChar === null
+      ? this.audioPendingSeekRatio
+      : this.playbackRatioForSourcePosition(track, this.audioPendingSeekSourceChar, duration)));
+    const targetTime = Math.min(Math.max(0, ratio * duration), Math.max(0, duration - 0.01));
+    try { audio.currentTime = targetTime; } catch (_) { /* Playback can begin at zero if a source is not seekable. */ }
+    this.audioPendingSeekRatio = null;
+    this.audioPendingSeekSourceChar = null;
+    this.audioLastBoundaryKey = '';
+    this.emitAudioPosition(track, { force: true });
+  }
