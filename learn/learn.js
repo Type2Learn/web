@@ -200,30 +200,73 @@ const setBackgroundNoisePreviewStatus = (message) => {
   if (status) status.textContent = message;
 };
 
-  '<div class="learn-actions">',
-  '<a class="learn-action is-primary" href="#next-step"><i aria-hidden="true"></i> See the next step</a>',
-  '<a class="learn-action" href="/pathways/"><i aria-hidden="true"></i> Explore pathways</a>',
-  '</div>',
-  '</div>',
-  '<div class="welcome-visual" aria-hidden="true">',
-  '<div class="learning-card-stack">',
-  '<article class="learning-card"><strong>Read or hear.</strong><span>Meet one bounded idea with the objective visible.</span><small>01 Encounter</small></article>',
-  '<article class="learning-card"><strong>Recall and type.</strong><span>Make thinking visible before the model answer appears.</span><small>02 Produce</small></article>',
-  '<article class="learning-card"><strong>Correct, apply, return.</strong><span>Keep progress through useful evidence, not speed.</span><small>03 Keep</small></article>',
-  '</div>',
-  '</div>',
-  '</div>',
-  '</section>',
-  '<section class="learn-panel-grid" aria-label="Learning home summary">',
-  '<article class="learn-panel" id="next-step"><span class="metric-dot" aria-hidden="true"></span><h2>Start with one task.</h2><p>The first imported course screen will appear here. It should show one active action, a completion condition, and an accessible way to pause.</p></article>',
-  '<article class="learn-panel" id="supports"><span class="metric-dot" aria-hidden="true"></span><h2>Keep supports private.</h2><p>Motion, spacing, audio, literal help, and pacing controls belong to the learner. They are not a diagnosis or a public score.</p></article>',
-  '<article class="learn-panel" id="progress"><span class="metric-dot" aria-hidden="true"></span><h2>Save useful evidence.</h2><p>This shell is ready for resume state, corrections, application work, and return review once the lesson engine is connected.</p></article>',
-  '</section>',
-  '</main>'
-].join('');
+const stopBackgroundNoisePreview = () => {
+  backgroundNoisePreview.playRequest += 1;
+  if (backgroundNoisePreview.fadeFrame) window.cancelAnimationFrame(backgroundNoisePreview.fadeFrame);
+  backgroundNoisePreview.fadeFrame = null;
+  if (backgroundNoisePreview.audio) backgroundNoisePreview.audio.pause();
+  backgroundNoisePreview.playing = false;
+};
 
-const render = (user) => {
-  app.innerHTML = '<div class="learn-app" data-learn-app>' + sidebar(user) + mainContent(user) + '</div>';
+const prepareBackgroundNoisePreview = (type, volume) => {
+  const safeType = noiseType(type);
+  const source = backgroundNoiseSources[safeType];
+  const targetVolume = Math.min(.35, Math.max(0, noiseVolume(volume) / 100));
+  if (backgroundNoisePreview.audio?.src?.endsWith(source)) {
+    backgroundNoisePreview.type = safeType;
+    backgroundNoisePreview.volume = targetVolume;
+    return backgroundNoisePreview.audio;
+  }
+  stopBackgroundNoisePreview();
+  const audio = new Audio(source);
+  audio.loop = true;
+  audio.preload = 'auto';
+  audio.playsInline = true;
+  audio.volume = 0;
+  audio.load();
+  backgroundNoisePreview.audio = audio;
+  backgroundNoisePreview.type = safeType;
+  backgroundNoisePreview.volume = targetVolume;
+  return audio;
+};
+
+const startBackgroundNoisePreview = (choices) => {
+  const type = noiseType(choices['background-noise-type']);
+  const volume = noiseVolume(choices['background-noise-volume']);
+  const audio = prepareBackgroundNoisePreview(type, volume);
+  if (!audio) return;
+  const request = ++backgroundNoisePreview.playRequest;
+  if (backgroundNoisePreview.fadeFrame) window.cancelAnimationFrame(backgroundNoisePreview.fadeFrame);
+  backgroundNoisePreview.fadeFrame = null;
+  audio.volume = 0;
+  audio.muted = false;
+  setBackgroundNoisePreviewStatus('Starting ' + noiseTypeLabel(type) + ' noise at ' + volume + '% volume.');
+  audio.play().then(() => {
+    if (request !== backgroundNoisePreview.playRequest || audio !== backgroundNoisePreview.audio) {
+      audio.pause();
+      return;
+    }
+    backgroundNoisePreview.playing = true;
+    const startedAt = window.performance.now();
+    const fadeIn = (timestamp) => {
+      if (!backgroundNoisePreview.playing || request !== backgroundNoisePreview.playRequest || audio !== backgroundNoisePreview.audio) return;
+      const progress = Math.min(1, (timestamp - startedAt) / 420);
+      audio.volume = backgroundNoisePreview.volume * progress;
+      if (progress < 1) backgroundNoisePreview.fadeFrame = window.requestAnimationFrame(fadeIn);
+      else backgroundNoisePreview.fadeFrame = null;
+    };
+    backgroundNoisePreview.fadeFrame = window.requestAnimationFrame(fadeIn);
+    setBackgroundNoisePreviewStatus('Playing ' + noiseTypeLabel(type) + ' noise at ' + volume + '% volume. Choose Off to pause it.');
+  }).catch(() => {
+    if (request !== backgroundNoisePreview.playRequest || audio !== backgroundNoisePreview.audio) return;
+    backgroundNoisePreview.playing = false;
+    setBackgroundNoisePreviewStatus('Unable to start ' + noiseTypeLabel(type) + ' noise. Select the sound once more to retry.');
+  });
+};
+
+const backgroundNoiseMarkup = (choices) => {
+  if (choices['background-noise'] !== 'on') return '';
+  const copy = setupCopy(choices);
 };
 
 const setupSidebarAutoHide = () => {
