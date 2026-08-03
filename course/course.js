@@ -2057,3 +2057,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.initialResponse = '';
     voiceInput.finalTranscript = '';
     voiceInput.finalResultIndexes = new Set();
+    voiceInput.restartCount = 0;
+    voiceInput.lastError = '';
+    if (recognition) {
+      try { recognition.stop(); } catch (_) { /* Stopping is best-effort. */ }
+    }
+    renderVoiceInputState(nextStatus, message);
+  };
+
+  const scheduleVoiceRecognitionRestart = (sessionId, message, delay = 350) => {
+    if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
+    if (voiceInput.restartTimer) window.clearTimeout(voiceInput.restartTimer);
+    if (voiceInput.restartCount >= 10) {
+      stopVoiceInput('Speech recognition could not stay connected. Your response is still here; type or choose Try again.', 'error');
+      return;
+    }
+    voiceInput.restartCount += 1;
+    renderVoiceInputState('listening', message);
+    voiceInput.restartTimer = window.setTimeout(() => {
+      voiceInput.restartTimer = null;
+      beginVoiceRecognitionCycle(sessionId);
+    }, delay);
+  };
+
+  const beginVoiceRecognitionCycle = (sessionId) => {
+    if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
+    const Recognition = voiceRecognitionConstructor();
+    let recognition;
+    try {
+      recognition = new Recognition();
+    } catch (_) {
+      scheduleVoiceRecognitionRestart(sessionId, 'The microphone is reconnecting. You can keep your place and try speaking again.', 500);
+      return;
+    }
+    voiceInput.recognition = recognition;
+    voiceInput.finalResultIndexes = new Set();
+    voiceInput.lastError = '';
+    recognition.lang = document.documentElement.lang || 'en-US';
+    // Browsers can end a recognition object after a short pause even in
+    // continuous mode. A fresh object is created for each retry because some
+    // implementations will not reliably restart an object that has ended.
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      if (sessionId !== voiceInput.sessionId || voiceInput.recognition !== recognition || voiceInput.stopRequested) return;
+      voiceInput.listening = true;
+      voiceInput.finalResultIndexes = new Set();
+      voiceInput.lastError = '';
+      state.progress.attempt.inputMethod = 'voice';
+      state.progress.attempt.alternativeInput = true;
+      renderVoiceInputState('listening');
+      announce('Microphone input is listening.');
+    };
+    recognition.onresult = (event) => {
+      if (sessionId !== voiceInput.sessionId || voiceInput.recognition !== recognition || voiceInput.stopRequested) return;
+      renderVoiceInputState('recognising');
+      if (voiceInput.statusTimer) window.clearTimeout(voiceInput.statusTimer);
+      voiceInput.statusTimer = window.setTimeout(() => {
+        voiceInput.statusTimer = null;
+        if (sessionId === voiceInput.sessionId && voiceInput.recognition === recognition && !voiceInput.stopRequested) renderVoiceInputState('listening');
+      }, 700);
+      let finalTranscript = voiceInput.finalTranscript;
+      let interimTranscript = '';
+      const resultStart = Math.max(0, Number(event.resultIndex) || 0);
+      Array.from(event.results || []).slice(resultStart).forEach((result, offset) => {
+        const resultIndex = resultStart + offset;
+        const transcript = result[0]?.transcript || '';
+        if (result.isFinal) {
+          if (!voiceInput.finalResultIndexes.has(resultIndex)) {
