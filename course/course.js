@@ -1301,3 +1301,73 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         : 'Ready when you are';
     return '<section class="course-progress-panel" aria-label="Learning progress"><div><p>Course progress</p><strong>Final exam</strong><span>One calm question at a time</span></div><div class="course-progress-bars"><div><span>Final exam · ' + escapeHtml(status) + '</span><progress value="' + progress + '" max="' + total + '">' + progress + ' of ' + total + '</progress></div><div><span>Course modules · ' + state.progress.completedSteps.length + ' lessons completed</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + state.progress.completedSteps.length + ' of ' + COURSE.steps.length + '</progress></div><div><span>Answers saved · ' + answered + ' of ' + total + '</span><progress value="' + answered + '" max="' + total + '">' + answered + ' of ' + total + '</progress></div></div></section>';
   };
+
+  const selectedCourseLayout = () => {
+    const layout = learningChoices().layout;
+    return ['focused', 'balanced', 'open'].includes(layout) ? layout : 'balanced';
+  };
+
+  const courseHeaderMarkup = (layout) => {
+    const isBalanced = layout === 'balanced';
+    return '<button class="course-back-button" type="button" data-action="dashboard">&larr; Back to learning overview</button><header class="course-heading"><div><p class="course-eyebrow">' + escapeHtml(isReviewingModule() ? COURSE.label : isFinalExamPhase() ? 'Course final exam' : COURSE.label) + '</p><h1 id="course-course-title" tabindex="-1">' + escapeHtml(COURSE.title) + '</h1>' + (isBalanced ? '' : '<p class="course-step-meta">' + currentStepSummary() + '</p>') + '</div>' + (isBalanced ? '' : '<span class="course-saved-status" data-save-status>' + (state.storageAvailable ? 'Saved locally' : 'Saving unavailable') + '</span>') + '</header>';
+  };
+
+  const courseNowPanelMarkup = () => '<section class="course-now-panel"><div><span>What am I doing?</span><strong>' + escapeHtml(taskLabel()) + '</strong></div><div><span>What is next?</span><strong>' + escapeHtml(courseNextStepCopy()) + '</strong></div><div><span>Can I pause?</span><strong>Use Pause &amp; save in the top bar.</strong></div></section>';
+
+  const renderCourseWithFinalExam = () => {
+    const layout = selectedCourseLayout();
+    const focused = layout === 'focused';
+    const balanced = layout === 'balanced';
+    const shellClass = 'course-learning-shell course-learning-shell--' + layout + (mascotCanAppear() ? ' has-course-mascot' : '');
+    const context = focused ? '' : courseHeaderMarkup(layout) + (balanced ? '' : courseNowPanelMarkup());
+    const taskProgress = focused || balanced ? '' : courseProgressWithFinalExam();
+    return '<main class="course-learning" id="course-main"><div class="' + shellClass + '">' + (focused ? '' : courseModuleStripWithFinalExam()) + '<section class="course-workspace course-workspace--' + layout + '">' + context + renderTask() + taskProgress + '</section>' + courseMascotMarkup('lesson') + '</div></main>' + renderModal();
+  };
+
+  const renderSavedWithFinalExam = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<div class="course-panel-page"><button class="course-back-button" type="button" data-action="dashboard">&larr; Back to learning overview</button><p class="course-eyebrow">Saved lessons</p><h1>Your learning is waiting in one clear place.</h1><p class="course-lead">The course returns to the current small task, along with your response and support choices in this browser.</p><article class="saved-card"><span class="course-status">Saved locally</span><h2>' + escapeHtml(COURSE.title) + '</h2><p>' + escapeHtml(courseReturnLocation()) + '</p><div><button class="course-primary-button" type="button" data-action="continue-course">Return to this step <span aria-hidden="true">→</span></button></div></article></div>', 'saved') + '</main>';
+
+  const readingSections = () => {
+    const content = currentStep().content;
+    if (!content) return (currentStep().read || []).map((value, index) => ({ heading: index === 0 ? 'Key idea' : '', value }));
+    return [
+      { heading: content.definitionHeading, value: content.definition },
+      { heading: content.dailyLifeHeading, value: content.dailyLife },
+      { heading: content.strengthsHeading, value: content.strengths },
+      { heading: content.challengesHeading, value: content.challenges },
+      { heading: content.supportsHeading, value: content.supports }
+    ].filter(({ heading, value }) => Boolean(heading && value));
+  };
+
+  const smallerSectionsAreActive = () => Boolean(
+    state.preferences.smallerSections
+      && state.progress.phase === 'read'
+      && !isReviewingModule()
+  );
+
+  const currentReadingSectionIndex = () => {
+    const total = readingSections().length;
+    if (!total) return 0;
+    return Math.min(Math.max(0, Number(state.readingSectionIndex) || 0), total - 1);
+  };
+
+  const visibleReadingSections = () => {
+    const sections = readingSections();
+    if (!smallerSectionsAreActive()) return sections;
+    return sections.slice(currentReadingSectionIndex(), currentReadingSectionIndex() + 1);
+  };
+
+  const contentTransitionsAreEnabled = () => effectiveAnimationLevel() !== 'still';
+
+  const authoredAdditionalExamples = () => {
+    const step = currentStep() || {};
+    const values = [];
+    const add = (candidate) => {
+      if (Array.isArray(candidate)) candidate.forEach(add);
+      else if (typeof candidate === 'string' && candidate.trim()) values.push(candidate.trim());
+    };
+    // These are explicit curriculum fields that a future reviewed lesson may
+    // provide. A support bullet is not silently repurposed as a second example.
+    add(step.additionalExample);
+    add(step.additionalExamples);
+    add(step.examples);
+    add(step.content?.additionalExample);
