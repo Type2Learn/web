@@ -1851,3 +1851,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const renderTypingCharacters = (reference, response, animatedIndex = -1) => {
     const referenceCharacters = Array.from(reference);
+    const responseCharacters = Array.from(response);
+    const visualCaret = '<span class="typing-caret" aria-hidden="true"></span>';
+    const referenceMarkup = referenceCharacters.map((character, index) => {
+      const caret = index === responseCharacters.length ? visualCaret : '';
+      if (index >= responseCharacters.length) return caret + '<span class="typing-character is-pending">' + escapeHtml(character) + '</span>';
+      const stateClass = responseCharacters[index] === character ? 'is-correct' : 'is-incorrect';
+      const justTyped = index === animatedIndex ? ' is-just-typed' : '';
+      return caret + '<span class="typing-character ' + stateClass + justTyped + '">' + escapeHtml(responseCharacters[index]) + '</span>';
+    }).join('');
+    const extraMarkup = responseCharacters.slice(referenceCharacters.length)
+      .map((character, index) => '<span class="typing-character is-extra' + (referenceCharacters.length + index === animatedIndex ? ' is-just-typed' : '') + '">' + escapeHtml(character) + '</span>')
+      .join('');
+    return referenceMarkup + extraMarkup + (responseCharacters.length >= referenceCharacters.length ? visualCaret : '');
+  };
+
+  const syncTypingTester = (input, animateNewestCharacter = false) => {
+    const field = input.closest('.typing-tester');
+    const overlay = field?.querySelector('[data-typing-overlay]');
+    if (!overlay) return;
+    const previousValue = input.dataset.typingPreviousValue ?? input.value;
+    const addedOneCharacter = animateNewestCharacter
+      && input.value.length === previousValue.length + 1;
+    overlay.innerHTML = renderTypingCharacters(activeTypingReference(), input.value, addedOneCharacter ? input.value.length - 1 : -1);
+    input.dataset.typingPreviousValue = input.value;
+    overlay.scrollTop = input.scrollTop;
+    overlay.scrollLeft = input.scrollLeft;
+    const referenceCharacters = Array.from(activeTypingReference() || '');
+    const responseCharacters = Array.from(input.value || '');
+    const newestIndex = responseCharacters.length - 1;
+    const correctlyTypedCharacter = addedOneCharacter
+      && !field.classList.contains('is-free-response')
+      && newestIndex >= 0
+      && responseCharacters[newestIndex] === referenceCharacters[newestIndex];
+    if (correctlyTypedCharacter && effectiveAnimationLevel() === 'lively') {
+      // One compact, local acknowledgement of a correct keystroke. Wrong
+      // characters stay visibly red, but never receive a punitive movement.
+      window.clearTimeout(typingPulseTimer);
+      field.classList.remove('is-correct-keystroke');
+      void field.offsetWidth;
+      field.classList.add('is-correct-keystroke');
+      typingPulseTimer = window.setTimeout(() => field.classList.remove('is-correct-keystroke'), 310);
+    }
+    const momentum = input.closest('.typing-practice')?.querySelector('[data-typing-momentum]');
+    if (momentum) {
+      const nextCopy = typingMomentumCopy(input.value);
+      if (nextCopy && momentum.textContent !== nextCopy) {
+        momentum.textContent = nextCopy;
+        momentum.dataset.momentumStage = typingMomentumStage(input.value);
+        momentum.classList.remove('is-momentum-changing');
+        // Restart only the learner-triggered message change in Lively mode.
+        void momentum.offsetWidth;
+        momentum.classList.add('is-momentum-changing');
+      }
+    }
+  };
+
+  const keepGuidedTypingCursorAtEnd = (input) => {
+    const field = input?.closest('.typing-tester');
+    if (!input || !field || field.classList.contains('is-free-response')) return;
+    const end = input.value.length;
+    if (input.selectionStart !== end || input.selectionEnd !== end) input.setSelectionRange(end, end);
+  };
+
+  const buildTypingTester = () => {
+    if (state.view !== 'course' || state.progress.phase !== 'type') return;
+    const practice = app.querySelector('.typing-practice');
+    const textarea = practice?.querySelector('[data-typing-input]');
+    const label = practice?.querySelector('.course-input-label');
+    if (!practice || !textarea || !label || practice.querySelector('.typing-tester')) return;
