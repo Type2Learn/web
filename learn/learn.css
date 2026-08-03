@@ -653,11 +653,14 @@ body[data-setup-animations="lively"] button:not(:disabled) {
 
 body[data-setup-animations="lively"] button:not(:disabled):active { transform: translateY(1px) scale(.96); }
 
-body[data-setup-animations="gentle"] .is-learning-stage-entering > * {
+/* The fixed mascot rail has its own centering transform. Excluding it from
+   the setup-entry animation prevents the animation's final transform from
+   replacing that centering and pushing the companion below the viewport. */
+body[data-setup-animations="gentle"] .is-learning-stage-entering > :not(.learning-setup-mascot-rail) {
   animation: learning-stage-gentle-in 230ms ease-out both;
 }
 
-body[data-setup-animations="lively"] .is-learning-stage-entering > * {
+body[data-setup-animations="lively"] .is-learning-stage-entering > :not(.learning-setup-mascot-rail) {
   animation: learning-stage-lively-in 470ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
