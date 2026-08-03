@@ -199,3 +199,37 @@ export const COURSE_CONTENT = {
         definition: 'Dysgraphia is a learning difference that can affect handwriting, spelling, written expression, organisation, and the physical process of writing.',
         dailyLifeHeading: 'How might it affect learning or daily life?',
         dailyLife: 'A learner may understand an idea but struggle to write it down quickly, neatly, or in the same way they can explain it verbally.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'They may have strong ideas, verbal communication, creativity, problem-solving, or understanding of a topic that is not visible in their written work.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Writing slowly', 'Hand pain or fatigue', 'Organising paragraphs', 'Copying notes', 'Spelling and punctuation', 'Producing readable handwriting'],
+        supportsHeading: 'What support can help?',
+        supports: ['Typing or speech-to-text', 'Graphic organisers', 'Bullet points and sentence starters', 'Handwriting breaks', 'Less unnecessary copying', 'Grading ideas separately from handwriting']
+      },
+      simple: 'A person can understand an idea while finding the physical process of writing difficult.',
+      example: 'One support idea from this module is to use typing or speech-to-text.',
+      hint: 'Think about alternatives that let someone show an idea without relying only on handwriting.',
+      typing: { level: 'Recall typing', prompt: 'Use your own words to name one alternative to handwriting. The prompt stays inside the field while you type.', reference: 'For example: typing, speech-to-text, voice recording, or an oral explanation.' },
+      check: {
+        question: 'What is one alternative to handwriting?',
+        options: [['Typing, speech-to-text, voice recording, or an oral explanation', true], ['Removing the learner\'s ideas from the task', false], ['Requiring more unnecessary copying', false], ['Only increasing the amount of handwriting required.', false]],
+        explanation: 'Correct. The module lists typing, speech-to-text, voice recording, and oral explanation as alternatives.'
+      }
+    },
+    {
+      module: 'Module 5',
+      title: 'Dyspraxia / Developmental Coordination Disorder',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'Developmental Coordination Disorder, also called dyspraxia, affects movement planning, coordination, balance, and spatial awareness.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'Tasks such as writing, dressing, using tools, playing sports, or moving through busy spaces may require extra time and energy.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'People with DCD may develop persistence, creative problem-solving, and strong awareness of how to adapt tasks to suit their bodies.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Dropping or spilling objects', 'Learning physical skills', 'Handwriting and drawing', 'Balance and coordination', 'Moving quickly between tasks', 'Feeling tired after physical activities'],
+        supportsHeading: 'What support can help?',
+        supports: ['Demonstrate tasks step by step', 'Keep workspaces organised', 'Use adapted tools or pencil grips', 'Allow extra time', 'Provide typing options', 'Avoid teasing or rushing']
+      },
+      simple: 'DCD mainly affects movement planning and coordination. It does not determine intelligence.',
