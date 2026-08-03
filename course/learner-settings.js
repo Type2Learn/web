@@ -969,3 +969,61 @@ export const getPresetSelectionAnalysis = (input, profileIds) => {
     const resolution = conflictResolutionFor(state, conflict);
     conflicts.push({ ...conflict, blocking: !resolution.resolved, resolution });
   });
+
+  const base = { ...PLATFORM_DEFAULTS };
+  profiles.forEach((profile) => Object.assign(base, profile.settings || {}));
+  Object.assign(base, state.userOverrides);
+  const activeLowStimulation = selectedPresetIds.includes('low-stimulation') || Boolean(base.quietDisplay);
+  const addSafetyPreferenceConflict = ({ type, key, firstValue, secondValue, message }) => {
+    const conflict = {
+      id: conflictIdFor(type, selectedPresetIds, key),
+      type,
+      key,
+      profileIds: selectedPresetIds,
+      firstValue,
+      secondValue,
+      message
+    };
+    const resolution = conflictResolutionFor(state, conflict);
+    conflicts.push({ ...conflict, blocking: !resolution.resolved, resolution });
+  };
+  if (base.narrationAutoScroll && base.reducedMotion) {
+    addSafetyPreferenceConflict({
+      type: 'auto-scroll-reduce-motion',
+      key: 'narrationAutoScroll',
+      firstValue: true,
+      secondValue: false,
+      message: 'Auto-scroll while listening conflicts with Reduce motion. Choose manual scrolling or turn off Reduce motion before using auto-scroll.'
+    });
+  }
+  if (base.narrationAutoScroll && activeLowStimulation) {
+    addSafetyPreferenceConflict({
+      type: 'auto-scroll-low-stimulation',
+      key: 'narrationAutoScroll',
+      firstValue: true,
+      secondValue: false,
+      message: 'Auto-scroll while listening conflicts with the calmer presentation requested by Low Stimulation. Choose manual scrolling or keep auto-scroll as your custom preference.'
+    });
+  }
+  if (base.highContrast && activeLowStimulation) {
+    addSafetyPreferenceConflict({
+      type: 'high-contrast-low-stimulation',
+      key: 'highContrast',
+      firstValue: true,
+      secondValue: false,
+      message: 'High contrast can add visual intensity that conflicts with the calmer presentation requested by Low Stimulation. Choose the display preference that helps you most.'
+    });
+  }
+  if (Object.hasOwn(state.userOverrides, 'numericProgress')
+    && state.userOverrides.numericProgress === 'full'
+    && profiles.some((profile) => profile.id === 'clear-progress')) {
+    const conflict = {
+      id: conflictIdFor('numeric-progress-low-pressure', selectedPresetIds, 'numericProgress'),
+      type: 'numeric-progress-low-pressure',
+      key: 'numericProgress',
+      profileIds: selectedPresetIds,
+      firstValue: 'full',
+      secondValue: 'reduced',
+      message: 'Clear Progress uses a low-pressure progress view, while your current setting asks for full numeric progress. Choose the version you prefer.'
+    };
+    const resolution = conflictResolutionFor(state, conflict);
