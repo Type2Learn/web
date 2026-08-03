@@ -2950,3 +2950,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     echo.style.setProperty('--action-x', x + 'px');
     echo.style.setProperty('--action-y', y + 'px');
     echo.innerHTML = animationLevel === 'lively'
+      ? '<i></i><i></i><i></i><b>›</b><b>›</b><b>›</b>'
+      : '<i></i>';
+    document.body.append(echo);
+    window.setTimeout(() => echo.remove(), animationLevel === 'lively' ? 780 : 420);
+
+    const action = control.dataset?.action || '';
+    if (animationLevel !== 'lively' || !routeMotionActions.has(action)) return;
+    document.querySelectorAll('[data-course-route-motion]').forEach((node) => node.remove());
+    const route = document.createElement('div');
+    route.className = 'course-route-motion';
+    route.dataset.courseRouteMotion = String(motionId);
+    route.dataset.direction = supportLanguage() === 'urdu' ? 'rtl' : 'ltr';
+    route.dataset.motionKind = routeMotionKind(action);
+    route.setAttribute('aria-hidden', 'true');
+    route.innerHTML = '<span></span><i></i><b></b>';
+    document.body.append(route);
+    window.setTimeout(() => route.remove(), 760);
+  };
+
+  const currentVisualRouteKey = () => [
+    state.view,
+    state.progress.phase,
+    state.progress.lessonIndex,
+    state.progress.finalExam?.questionIndex || 0,
+    Number.isInteger(state.reviewModuleIndex) ? state.reviewModuleIndex : ''
+  ].join(':');
+
+  const enhancePageEntranceMotion = () => {
+    const main = app.querySelector('#course-main');
+    if (!main) return;
+    const routeKey = currentVisualRouteKey();
+    if (routeKey === lastVisualRouteKey) return;
+    lastVisualRouteKey = routeKey;
+    main.classList.add('is-course-page-entering');
+    main.querySelectorAll('.course-module-list > li, .course-catalogue-card, .course-secondary-actions > *').forEach((item, index) => {
+      item.style.setProperty('--course-motion-index', String(index));
+    });
+  };
+
+  const enhanceRenderedCourse = () => {
+    structureReadingContent();
+    addSourceNotice();
+    addCourseConclusion();
+    updateCourseCopy();
+    buildTypingTester();
+    applyRenderedSupportBehavior();
+    prepareNarrationForRenderedTask();
+    enhanceQuizPresentation();
+    enhanceSupportMomentPresentation();
+    enhancePageEntranceMotion();
+  };
+
+  const renderTask = () => isReviewingModule()
+    ? reviewModuleTask()
+    : ({ preview: previewTask, read: state.preferences.readAloud ? readTaskWithTextToSpeech : readTask, type: typingTask, check: checkTaskWithFeedback, apply: applyTaskWithFeedback, complete: completionTask, 'exam-intro': finalExamIntroTask, exam: finalExamQuestionTask, 'exam-results': finalExamResultsTask }[state.progress.phase] || previewTask)();
+
+  const courseProgressBar = () => '<section class="course-progress-panel" aria-label="Learning progress"><div><p>Course progress</p><strong>Step ' + (state.progress.lessonIndex + 1) + ' of ' + COURSE.steps.length + '</strong><span>One small step at a time</span></div><div class="course-progress-bars"><div><span>Current step · Task ' + phaseNumber() + ' of 5</span><progress value="' + phaseNumber() + '" max="5">' + phaseNumber() + ' of 5</progress></div><div><span>Course · ' + state.progress.completedSteps.length + ' lessons completed</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + state.progress.completedSteps.length + ' of ' + COURSE.steps.length + '</progress></div></div></section>';
+
+  const helpDetail = () => {
+    const step = currentStep();
+    const option = state.helpOption;
+    if (!option) return '<p class="help-placeholder">Choose the kind of help that would make the next step clearer. You can change your mind at any time.</p>';
+    const content = {
+      simple: ['A simpler explanation', step.simple],
+      example: ['An example', step.example],
+      smaller: ['Smaller steps', '1. Read one paragraph. 2. Notice the bold idea. 3. Use the button to continue. You only need to do this one task right now.'],
+      hint: ['A gentle hint', step.hint],
+      retry: ['Try again', 'This restarts only the current small activity. Your completed course steps stay saved.'],
+      break: ['Take a short break', 'Your work is saved. You can close this page or return to the learning overview whenever you are ready.']
