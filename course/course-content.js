@@ -132,3 +132,36 @@ export const COURSE_CONTENT = {
       example: 'One support idea from this module is to use visible steps and reminders.',
       hint: 'Look for the support that makes a task more visible and manageable.',
       typing: { level: 'Key idea typing', prompt: 'Type the visible key idea in the field.', target: 'Visible steps and reminders can help make a task easier to begin and follow.' },
+      check: {
+        question: 'Which support may help someone with ADHD?',
+        options: [['Giving one very large task', false], ['Using visible steps and reminders', true], ['Removing all breaks', false], ['Expecting the learner to remember every step without support.', false]],
+        explanation: 'Right. Visible steps and reminders are support ideas named in this module.'
+      }
+    },
+    {
+      module: 'Module 2',
+      title: 'Dyslexia',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'Dyslexia is a learning difference that mainly affects reading, spelling, and connecting written letters with speech sounds. It does not reflect intelligence or effort.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'Reading may take longer or feel tiring. A person may understand information better when it is explained aloud.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'Some people with dyslexia may have strong storytelling, creative, visual, practical, or big-picture thinking skills.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Reading unfamiliar words', 'Spelling consistently', 'Reading aloud', 'Keeping their place on a page', 'Completing long reading tasks'],
+        supportsHeading: 'What support can help?',
+        supports: ['Audiobooks and text-to-speech', 'Larger text and more spacing', 'Extra reading time', 'Shorter reading sections', 'Typing or oral answers when appropriate']
+      },
+      simple: 'Dyslexia affects some reading and spelling processes. It does not measure intelligence or effort.',
+      example: 'One support idea from this module is to use text-to-speech or a shorter reading section.',
+      hint: 'Notice the distinction between a reading process and a person\'s intelligence.',
+      typing: { level: 'Key idea typing', prompt: 'Type the key idea in the field.', target: 'Dyslexia affects certain language and reading processes, not intelligence.' },
+      check: {
+        question: 'Does dyslexia mean someone has low intelligence?',
+        options: [['Yes, because reading can take longer.', false], ['No. It affects certain language and reading processes, not intelligence.', true], ['Only if someone uses read-aloud support.', false], ['Only when a person needs extra reading time.', false]],
+        explanation: 'Correct. The module states that dyslexia does not reflect intelligence or effort.'
+      }
+    },
+    {
