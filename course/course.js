@@ -66,3 +66,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   let modalReturnFocusSelector = '';
 
   const COURSE = COURSE_CONTENT;
+  const LOCAL_AVA_VOICE_URI = 'type2learn-local-edge-ava';
+  const SYSTEM_NARRATION_VOICE_URI = 'type2learn-system-default';
+
+  const hasLocalAvaNarration = () => COURSE_AUDIO_MANIFEST.courseId === COURSE.id
+    && COURSE_AUDIO_MANIFEST.courseVersion === COURSE.version
+    && COURSE_AUDIO_MODULE_KEYS.length === COURSE.steps.length
+    && COURSE_AUDIO_MODULE_KEYS.every((key) => {
+      const assets = COURSE_AUDIO_MANIFEST.modules?.[key];
+      return Boolean(
+        assets?.read
+        && assets?.simpleAddon
+        && Array.isArray(assets.readCues)
+        && assets.readCues.length
+        && Array.isArray(assets.simpleAddonCues)
+        && assets.simpleAddonCues.length
+      );
+    });
+
+  const finalExam = () => COURSE.finalExam || { questions: [] };
+  const finalExamQuestionCount = () => finalExam().questions.length;
+
+  const sourceReadSections = (step) => {
+    const content = step.content;
+    if (!content) return step.read || [];
+    const sentence = (heading, value) => value ? heading + ': ' + value : '';
+    const list = (heading, items) => Array.isArray(items) && items.length ? heading + ': ' + items.join('; ') + '.' : '';
+    return [
+      sentence(content.definitionHeading, content.definition),
+      sentence(content.dailyLifeHeading, content.dailyLife),
+      sentence(content.strengthsHeading, content.strengths),
+      list(content.challengesHeading, content.challenges),
+      list(content.supportsHeading, content.supports)
+    ].filter(Boolean);
+  };
+
+  COURSE.steps.forEach((step) => {
+    step.read = sourceReadSections(step);
+  });
+
+  const safeJson = (value, fallback) => {
+    try { return JSON.parse(value); } catch (_) { return fallback; }
+  };
+
+  const clampBackgroundNoiseVolume = (value) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0.12;
+    return Math.min(BACKGROUND_NOISE_MAX_VOLUME, Math.max(0, numericValue / 100));
+  };
+
+  const learningPreferenceKey = () => COURSE_PREFERENCE_NAMESPACE
+    + encodeURIComponent(storageKeys.learnerId || 'learner')
+    + ':' + encodeURIComponent(COURSE.id);
+
+  const legacyLearningPreferenceKey = () => LEGACY_LEARNING_PREFERENCE_NAMESPACE
+    + encodeURIComponent(storageKeys.learnerId || 'learner');
+
+  const readLearningChoices = () => {
+    try {
+      const stored = safeJson(localStorage.getItem(learningPreferenceKey()), {}) || {};
+      if (stored.choices && typeof stored.choices === 'object') return stored.choices;
+      // Keep existing learners' earlier choices available as a one-time
+      // starting point. The next save writes only this course's preferences.
+      const legacy = safeJson(localStorage.getItem(legacyLearningPreferenceKey()), {}) || {};
+      return legacy.choices && typeof legacy.choices === 'object' ? legacy.choices : {};
+    } catch (_) {
+      // The course still works if this browser does not allow local storage.
+      return {};
+    }
+  };
