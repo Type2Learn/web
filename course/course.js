@@ -3087,3 +3087,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const explainStepMarkup = () => {
     const details = explainStepDetails();
+    return '<div class="course-explain-sections"><section><h3>What this step is for</h3><p>' + escapeHtml(details.purpose) + '</p></section><section><h3>A clear way to do it</h3><ol>' + details.steps.map((step) => '<li>' + escapeHtml(step) + '</li>').join('') + '</ol></section><section class="course-explain-support"><h3>If you need a little more support</h3><p>' + escapeHtml(details.support) + '</p></section><section class="course-ai-chat-locked" aria-labelledby="course-ai-chat-title"><div><p class="course-eyebrow">Planned support</p><h3 id="course-ai-chat-title">Course AI chat <span>Locked</span></h3></div><p>AI chat is not available in this prototype. This keeps the help on this page clear, predictable, and human-reviewed while the course is being built.</p><button type="button" disabled aria-disabled="true">Ask the course helper <span>Locked</span></button></section></div>';
+  };
+
+  const renderModal = () => {
+    if (!state.modal) return '';
+    if (state.modal === 'pause') return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal" role="dialog" aria-modal="true" aria-labelledby="pause-title"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="Close pause dialog">×</button><p class="course-eyebrow">Pause and save</p><h2 id="pause-title" tabindex="-1">Your progress is saved.</h2><p>You can come back whenever you’re ready. You will return to ' + escapeHtml(courseReturnLocation()) + '.</p><div class="course-modal-actions"><button class="course-secondary-button" type="button" data-action="close-modal">Keep learning</button><button class="course-primary-button" type="button" data-action="save-exit">Save and exit</button></div></section></div>';
+    if (state.modal === 'explain') return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal course-explain-modal" role="dialog" aria-modal="true" aria-labelledby="explain-title"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="Close explanation">×</button><p class="course-eyebrow">Step support</p><h2 id="explain-title" tabindex="-1">Explain this step</h2><p class="course-explain-intro">Here is a calm guide for the task in front of you. Your current work stays in place.</p>' + explainStepMarkup() + '<div class="course-modal-actions"><button class="course-primary-button" type="button" data-action="close-modal">Return to this step</button></div></section></div>';
+    return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal course-help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="Close help dialog">×</button><p class="course-eyebrow">Support options</p><h2 id="help-title" tabindex="-1">I’m stuck</h2><p>Choose one way to recover without leaving your lesson.</p><div class="help-choice-grid"><button type="button" data-action="help" data-help-option="simple">Explain more simply</button><button type="button" data-action="help" data-help-option="example">Show an example</button><button type="button" data-action="listen">Read this aloud</button><button type="button" data-action="help" data-help-option="smaller">Break this into smaller steps</button><button type="button" data-action="help" data-help-option="hint">Give me a hint</button><button type="button" data-action="help" data-help-option="retry">Let me try again</button><button type="button" data-action="help" data-help-option="break">Take a short break</button></div>' + helpDetail() + '</section></div>';
+  };
+
+  const prepareModalAccessibility = () => {
+    const backdrop = app.querySelector('.course-modal-backdrop');
+    const dialog = backdrop?.querySelector('[role="dialog"][aria-modal="true"]');
+    if (!backdrop || !dialog) return;
+    window.requestAnimationFrame(() => {
+      if (!state.modal || !dialog.isConnected) return;
+      (dialog.querySelector('h2[tabindex="-1"]') || dialog).focus?.({ preventScroll: true });
+    });
+  };
+
+  const loadCourseMascot = () => {
+    if (!mascotCanAppear()) return Promise.resolve(null);
+    if (courseMascot) return Promise.resolve(courseMascot);
+    if (!mascotControllerLoad) {
+      mascotControllerLoad = import('./mascot-3d.js?v=20260802-motion8')
+        .then(({ createCourseMascot }) => {
+          courseMascot = createCourseMascot();
+          return courseMascot;
+        })
+        .catch(() => null);
+    }
+    return mascotControllerLoad;
+  };
+
+  const syncCourseMascot = () => {
+    const stage = app.querySelector('[data-course-mascot-stage]');
+    const reducedMotion = effectiveAnimationLevel() === 'still';
+    if (!mascotCanAppear() || !stage) {
+      courseMascot?.unmount();
+      lastMascotScene = '';
+      return;
+    }
+    const scene = mascotScene();
+    const supportMoment = activeSupportMoment;
+    loadCourseMascot().then((mascot) => {
+      // A render may have replaced the target while the controller was being
+      // fetched. Never attach a late 3D canvas to a detached page fragment.
+      if (!mascot || !stage.isConnected || stage !== app.querySelector('[data-course-mascot-stage]') || !mascotCanAppear()) return;
+      mascot.mount(stage, { ...mascotPresentation, reducedMotion, scene, location: state.view });
+      if (supportMoment && activeSupportMoment?.id === supportMoment.id && supportMoment.id !== lastMascotSupportEventId) {
+        mascot.react(supportMoment);
+        lastMascotSupportEventId = supportMoment.id;
+        lastMascotScene = scene;
+      }
+    });
+  };
+
+  const render = () => {
+    cancelNarrationAutoScroll();
+    if (state.view !== 'course' || state.progress.phase !== 'type' || isReviewingModule()) stopVoiceInput();
+    applyPreferences();
+    let content = '';
+    if (state.view === 'dashboard') content = renderDashboard();
+    else if (state.view === 'browse') content = renderBrowse();
+    else if (state.view === 'saved') content = renderSavedWithFinalExam();
+    else content = renderCourseWithFinalExam();
+    app.innerHTML = renderShell(content);
+    enhanceRenderedCourse();
+    syncCourseMascot();
