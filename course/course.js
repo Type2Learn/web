@@ -3911,3 +3911,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     save();
     announce(state.progress.attempt.feedback);
   });
+
+  document.addEventListener('keydown', (event) => {
+    if (state.settingsMenu && event.key === 'Escape') {
+      event.preventDefault();
+      state.settingsMenu = false;
+      render();
+      window.requestAnimationFrame(() => app.querySelector('[data-action="toggle-settings-menu"]')?.focus?.({ preventScroll: true }));
+      return;
+    }
+    if (state.modal) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCourseModal();
+        return;
+      }
+      if (event.key === 'Tab') {
+        const dialog = app.querySelector('[role="dialog"][aria-modal="true"]');
+        const focusable = dialog ? Array.from(dialog.querySelectorAll('a[href], button:not([disabled]):not([hidden]), input:not([disabled]):not([hidden]), select:not([disabled]):not([hidden]), textarea:not([disabled]):not([hidden]), summary, [tabindex]:not([tabindex="-1"])')) : [];
+        if (!dialog || !focusable.length) {
+          event.preventDefault();
+          dialog?.focus?.();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (!dialog.contains(document.activeElement) || !focusable.includes(document.activeElement)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        } else if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+      return;
+    }
+    if (state.preferences.keyboardShortcuts && event.altKey && !event.ctrlKey && !event.metaKey) {
+      if (event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        openCourseModal('pause', app.querySelector('[data-action="pause"]'), '[data-action="pause"]');
+        return;
+      }
+      if (event.key.toLowerCase() === 'h') {
+        event.preventDefault();
+        state.helpOption = '';
+        openCourseModal('help', app.querySelector('[data-action="stuck"]'), '[data-action="stuck"]');
+        return;
+      }
+    }
+  });
+
+  // Capture the next genuine learner interaction before task handlers run.
+  // This means a previous acknowledgement never covers the next button,
+  // choice, or typed character, while a newly-created acknowledgement from
+  // that interaction remains visible.
+  document.addEventListener('pointerdown', (event) => {
+    if (!event.isTrusted) return;
+    dismissActiveSupportPopup();
+  }, true);
+
+  document.addEventListener('keydown', (event) => {
+    if (!event.isTrusted) return;
+    dismissActiveSupportPopup();
+  }, true);
+
+  window.addEventListener('resize', () => {
