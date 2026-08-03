@@ -112,3 +112,60 @@ export const SUPPORT_QUESTIONNAIRE = deepFreeze([
     options: [
       { id: 'visual_progress', label: 'A visual progress path', effects: { progress_access: 3, predictability: 1 } },
       { id: 'small_progress_steps', label: 'Small completion steps instead of one large goal', effects: { progress_access: 2, step_by_step: 2 } },
+      { id: 'less_numeric_pressure', label: 'Less emphasis on scores, rankings, or speed', effects: { progress_access: 3, focus: 1 } },
+      { id: 'clear_feedback', label: 'Clear feedback after each activity', effects: { predictability: 2, step_by_step: 1 } },
+      { id: 'numeric_progress_ok', label: 'Numbers and scores are fine for me', effects: {} },
+      { id: 'q6_unsure', label: "I'm not sure", effects: {} }
+    ]
+  },
+  {
+    id: 'environment-and-energy',
+    prompt: 'Which situation can make learning more difficult for you?',
+    helpText: 'This is about optional support preferences, not a diagnosis.',
+    allowMultiple: true,
+    options: [
+      { id: 'variable_energy', label: 'My energy, pain, or stamina can change', effects: { fatigue_support: 3, flexible_input: 1 } },
+      { id: 'noise_affects_listening', label: 'Noise can make spoken instructions difficult to follow', effects: { auditory_support: 3, reading_access: 1 } },
+      { id: 'small_text_difficult', label: 'Small text or low contrast can be difficult to see', effects: { visual_access: 4 } },
+      { id: 'too_many_changes', label: 'Too many choices or changes can be overwhelming', effects: { predictability: 3, sensory_comfort: 1 } },
+      { id: 'physical_input_tiring', label: 'Physical input can become tiring', effects: { motor_support: 3, fatigue_support: 2 } },
+      { id: 'q7_unsure', label: "I'm not sure", effects: {} }
+    ]
+  }
+]);
+
+const optionById = new Map(
+  SUPPORT_QUESTIONNAIRE.flatMap((question) => question.options.map((option) => [option.id, option]))
+);
+
+/*
+ * Only these settings are learner-editable. Keeping this allowlist beside the
+ * shared schema prevents a removed, internal, or safety setting from
+ * reappearing merely because an older record or profile still mentions it.
+ */
+export const EDITABLE_SETTING_KEYS = deepFreeze([
+  'smallerSections',
+  'visibleNextSteps',
+  'visibleProgress',
+  'gentleReminders',
+  'fewerDistractions',
+  'textSize',
+  'spacing',
+  'readingWidth',
+  'extraExamples',
+  'simplerExplanations',
+  'literalInstructions',
+  'recap',
+  'readAloud',
+  'narrationSpeed',
+  'narrationVoice',
+  'narrationVolume',
+  'narrationAutoScroll',
+  'narrationHighlight',
+  'alternativeInput',
+  'speechToText',
+  'alternativeResponses',
+  'oneHandedInput',
+  'switchInput',
+  'keyboardShortcuts',
+  'largerControls',
