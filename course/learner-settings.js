@@ -855,3 +855,60 @@ export const getLearnerVisibleSettingKeys = (input) => {
 
 export const getSettingProvenance = (input, key) => {
   const state = createSettingsState(input);
+  const value = resolveSettings(state)[key];
+  if (!validKeys.has(key)) return { value, source: 'default', profileId: '', profileName: '' };
+  if (protectionKeySet.has(key)) return { value, source: 'safety', profileId: '', profileName: '' };
+  if (Object.hasOwn(state.temporaryOverrides, key)) return { value, source: 'temporary', profileId: '', profileName: '' };
+  if (Object.hasOwn(state.userOverrides, key)) return { value, source: 'user', profileId: '', profileName: '' };
+  const profile = [...state.selectedPresetIds]
+    .reverse()
+    .map((id) => presetById.get(id))
+    .find((item) => Object.hasOwn(item?.settings || {}, key));
+  if (profile) {
+    return {
+      value,
+      source: state.onboarding.method === 'questionnaire' ? 'recommended' : 'preset',
+      profileId: profile.id,
+      profileName: profile.name
+    };
+  }
+  return { value, source: 'default', profileId: '', profileName: '' };
+};
+
+export const settingSource = (input, key) => {
+  const provenance = getSettingProvenance(input, key);
+  if (provenance.source === 'safety') return 'Always on to protect your work';
+  if (provenance.source === 'temporary') return 'Temporary for this lesson';
+  if (provenance.source === 'user') return 'Changed by you';
+  if (provenance.source === 'recommended') return 'Recommended by ' + provenance.profileName;
+  if (provenance.source === 'preset') return 'Provided by ' + provenance.profileName;
+  return 'Platform default';
+};
+
+const conflictIdFor = (type, ids, key = '') => [type, ...[...ids].sort(), key].filter(Boolean).join(':');
+const profilePairIsCompatible = (left, right) => {
+  if (!left || !right || left.id === right.id) return true;
+  return left.compatibleWith.includes(right.id) && right.compatibleWith.includes(left.id);
+};
+const profileValueContributions = (profiles) => {
+  const values = new Map();
+  profiles.forEach((profile) => {
+    Object.entries(profile.settings || {}).forEach(([key, value]) => {
+      if (!values.has(key)) values.set(key, []);
+      values.get(key).push({ profileId: profile.id, profileName: profile.name, value });
+    });
+  });
+  return values;
+};
+const conflictResolutionFor = (state, conflict) => {
+  // A saved value normally is an intentional manual choice. Sensory and
+  // motion conflicts are different: merely having an old value in storage
+  // must not silently re-enable movement or undo a calmer visual mode.
+  const requiresExplicitSafetyChoice = ['auto-scroll-reduce-motion', 'auto-scroll-low-stimulation', 'high-contrast-low-stimulation'].includes(conflict.type);
+  if (!requiresExplicitSafetyChoice && Object.hasOwn(state.userOverrides, conflict.key)) {
+    return { resolved: true, source: 'manual', value: state.userOverrides[conflict.key] };
+  }
+  const saved = state.conflictResolutions?.[conflict.id];
+  if (saved && saved.key === conflict.key) return { resolved: true, source: 'resolution', value: saved.value, choice: saved.choice };
+  return { resolved: false, source: '', value: undefined };
+};
