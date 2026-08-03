@@ -233,3 +233,36 @@ export const COURSE_CONTENT = {
         supports: ['Demonstrate tasks step by step', 'Keep workspaces organised', 'Use adapted tools or pencil grips', 'Allow extra time', 'Provide typing options', 'Avoid teasing or rushing']
       },
       simple: 'DCD mainly affects movement planning and coordination. It does not determine intelligence.',
+      example: 'One support idea from this module is to demonstrate a task step by step.',
+      hint: 'Separate movement planning and coordination from intelligence.',
+      typing: { level: 'Key idea typing', prompt: 'Type the key idea in the field.', target: 'DCD mainly affects movement planning and coordination.' },
+      check: {
+        question: 'Does DCD indicate low intelligence?',
+        options: [['Yes, because it affects handwriting.', false], ['No. It mainly affects movement planning and coordination.', true], ['Only when someone needs extra time.', false], ['Yes, because coordination always determines intelligence.', false]],
+        explanation: 'Right. The module describes DCD as affecting movement planning and coordination.'
+      }
+    },
+    {
+      module: 'Module 6',
+      title: 'Dyscalculia',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'Dyscalculia is a learning difference that affects understanding numbers, quantities, mathematical facts, measurements, and calculation steps.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'A person may find maths, money, time, measurements, schedules, or number-based instructions more difficult.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'They may have strengths in language, creativity, practical tasks, art, communication, or problem-solving outside number-based situations.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Remembering maths facts', 'Understanding place value', 'Choosing the correct operation', 'Telling time', 'Handling money', 'Completing timed maths questions'],
+        supportsHeading: 'What support can help?',
+        supports: ['Number lines and diagrams', 'Worked examples', 'Grid paper', 'Formula sheets', 'Real-life examples', 'Extra time and permitted calculation tools']
+      },
+      simple: 'Dyscalculia can affect number and calculation processes. Diagrams can make steps easier to see and organise.',
+      example: 'One support idea from this module is to use a number line, diagram, or worked example.',
+      hint: 'Look for the support that makes number relationships and steps visible.',
+      typing: { level: 'Guided typing', prompt: 'Type one short phrase at a time in the field.', phrases: ['Diagrams can make numbers easier to see.', 'They can also help organise mathematical steps.'] },
+      check: {
+        question: 'Why can diagrams help with dyscalculia?',
+        options: [['They make numbers and mathematical steps easier to see and organise.', true], ['They remove the need to understand the task.', false], ['They make every maths question timed.', false], ['They mean mathematical ideas never need explaining.', false]],
+        explanation: 'Correct. Diagrams can make number relationships and steps easier to see and organise.'
