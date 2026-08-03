@@ -547,3 +547,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         subtle: ['Module complete', 'Well done.'],
         balanced: ['You completed a whole module', 'You worked through every part. Take the next step when you are ready.'],
         expressive: ['Congratulations — you cleared this module', 'You read, typed, checked, and applied one whole idea.']
+      },
+      'course-complete': {
+        subtle: ['Course complete', 'Well done.'],
+        balanced: ['Congratulations', 'You completed every module and the final review.'],
+        expressive: ['You did something amazing', 'You completed the whole course journey, one thoughtful step at a time.']
+      },
+      'system-error': {
+        subtle: ['Something did not load correctly', 'Your work is still here.'],
+        balanced: ['Something did not load correctly', 'Your work is still here. Try again when you are ready.'],
+        expressive: ['Something did not load correctly', 'Your work is still here. Try again when you are ready.']
+      }
+    },
+    urdu: {
+      'task-entry': {
+        subtle: null,
+        balanced: ['آپ یہ کر سکتے ہیں', 'ایک وقت میں ایک چھوٹا قدم۔ جب تیار ہوں شروع کریں۔'],
+        expressive: ['آپ اس کے لیے تیار ہیں', 'اگلے واضح قدم کے لیے آپ کے پاس سب کچھ موجود ہے۔']
+      },
+      'section-complete': {
+        subtle: ['حصہ مکمل', 'بہت خوب۔'],
+        balanced: ['آپ نے کر لیا', 'یہ حصہ مکمل ہے۔ اگلا چھوٹا حصہ تیار ہے۔'],
+        expressive: ['آپ بہت اچھا کر رہے ہیں', 'آپ نے یہ حصہ مکمل کر لیا۔ ایک وقت میں ایک واضح حصہ۔']
+      },
+      'answer-correct': {
+        subtle: ['درست', 'بہت خوب۔'],
+        balanced: ['آپ نے درست سمجھا', 'یہ جواب سبق سے ملتا ہے۔ آپ اگلے قدم کے لیے تیار ہیں۔'],
+        expressive: ['آپ نے یہ مرحلہ مکمل کر لیا!', 'یہ مضبوط جواب تھا۔ اگلا قدم جب چاہیں تیار ہے۔']
+      },
+      'answer-incorrect': {
+        subtle: ['آپ قریب ہیں', 'جب تیار ہوں دوبارہ کوشش کریں۔'],
+        balanced: ['آپ یہ کر سکتے ہیں', 'نشان زد جواب آپ کی اگلی کوشش میں مدد دے سکتا ہے۔'],
+        expressive: ['آگے بڑھتے رہیں — آپ سیکھ رہے ہیں', 'اس کوشش سے مفید اشارہ ملا ہے۔ نشان زد جواب دیکھیں، پھر دوبارہ منتخب کریں۔']
+      },
+      'response-needed': {
+        subtle: ['آپ کی جگہ تیار ہے', 'جب تیار ہوں شروع کریں۔'],
+        balanced: ['ایک لفظ سے شروع کریں', 'آپ کو سب کچھ ایک ساتھ مکمل نہیں کرنا۔'],
+        expressive: ['آپ کہیں سے بھی شروع کر سکتے ہیں', 'پہلے واضح لفظ سے شروع کریں۔ ہر لفظ پیش رفت ہے۔']
+      },
+      'typing-incomplete': {
+        subtle: ['اچھی شروعات', 'پہلے مختلف حرف سے جاری رکھیں۔'],
+        balanced: ['آپ قریب پہنچ رہے ہیں', 'درست حروف نشان زد رہیں گے۔ پہلے مختلف حرف سے جاری رکھیں۔'],
+        expressive: ['آگے بڑھتے رہیں — آپ یہ کر سکتے ہیں', 'درست حروف پہلے سے موجود ہیں۔ پہلے مختلف حرف سے جاری رکھیں۔']
+      },
+      'module-complete': {
+        subtle: ['ماڈیول مکمل', 'بہت خوب۔'],
+        balanced: ['آپ نے ایک پورا ماڈیول مکمل کر لیا', 'آپ نے ہر حصہ مکمل کیا۔ جب چاہیں اگلا قدم لیں۔'],
+        expressive: ['مبارک ہو — آپ نے یہ ماڈیول مکمل کر لیا', 'آپ نے ایک پورا خیال پڑھا، ٹائپ کیا، جانچا اور استعمال کیا۔']
+      },
+      'course-complete': {
+        subtle: ['کورس مکمل', 'بہت خوب۔'],
+        balanced: ['مبارک ہو', 'آپ نے ہر ماڈیول اور آخری جائزہ مکمل کر لیا۔'],
+        expressive: ['آپ نے بہت اچھا کام کیا', 'آپ نے پورا کورس ایک ایک سوچے سمجھے قدم سے مکمل کیا۔']
+      },
+      'system-error': {
+        subtle: ['کچھ درست طور پر لوڈ نہیں ہوا', 'آپ کا کام محفوظ ہے۔'],
+        balanced: ['کچھ درست طور پر لوڈ نہیں ہوا', 'آپ کا کام یہیں ہے۔ جب تیار ہوں دوبارہ کوشش کریں۔'],
+        expressive: ['کچھ درست طور پر لوڈ نہیں ہوا', 'آپ کا کام یہیں ہے۔ جب تیار ہوں دوبارہ کوشش کریں۔']
+      }
+    }
+  };
+
+  const supportCopy = (moment = activeSupportMoment) => {
+    if (!moment) return null;
+    if (moment.kind === 'preference-preview') {
+      const animationCopy = moment.language === 'urdu' ? {
+        still: ['صفحہ پُرسکون رہے گا', 'آپ کے اگلے انتخاب فوراً اور بغیر حرکت کے ظاہر ہوں گے۔'],
+        gentle: ['آرام سے آگے بڑھیں', 'آپ کا اگلا قدم نرم اور مختصر حرکت کے ساتھ سامنے آئے گا۔'],
+        lively: ['چلیں، اگلا قدم لیتے ہیں!', 'ہر انتخاب، اگلا مرحلہ اور کامیابی واضح اور پُرجوش حرکت کے ساتھ سامنے آئے گی۔']
