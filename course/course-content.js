@@ -165,3 +165,37 @@ export const COURSE_CONTENT = {
       }
     },
     {
+      module: 'Module 3',
+      title: 'Autism Spectrum Disorder',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'Autism is a neurodevelopmental condition that can affect communication, social interaction, routines, interests, attention, and sensory experiences. Autism is a spectrum, so people can have very different strengths and support needs.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'A person may prefer clear instructions, predictable routines, focused interests, or extra time to process information and social situations.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'Some autistic people may have strong attention to detail, deep knowledge of interests, pattern recognition, honesty, creativity, or commitment to routines.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Understanding sarcasm or indirect language', 'Managing unexpected changes', 'Coping with crowds or sensory overload', 'Communicating in unfamiliar situations', 'Recovering after demanding social experiences'],
+        supportsHeading: 'What support can help?',
+        supports: ['Clear, direct language', 'Written steps and visual schedules', 'Warnings before changes', 'Quiet spaces or sensory breaks', 'Connecting activities to personal interests']
+      },
+      simple: 'Autism is a spectrum: people can have different experiences, strengths, and support needs.',
+      example: 'One support idea from this module is to give a warning before a change.',
+      hint: 'The word spectrum describes variation, not one fixed experience.',
+      typing: { level: 'Guided typing', prompt: 'Type one short phrase at a time in the field.', phrases: ['Autistic people can have different combinations of strengths.', 'They can also have different support needs.'] },
+      check: {
+        question: 'What does "autism spectrum" mean?',
+        options: [['Every autistic person has the same strengths and support needs.', false], ['Autistic people can have different combinations of strengths, challenges, and support needs.', true], ['Only one type of support is useful for autistic people.', false], ['It means autistic people cannot have strengths.', false]],
+        explanation: 'Right. The module explains that autistic people can have different strengths, challenges, and support needs.'
+      }
+    },
+    {
+      module: 'Module 4',
+      title: 'Dysgraphia',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'Dysgraphia is a learning difference that can affect handwriting, spelling, written expression, organisation, and the physical process of writing.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'A learner may understand an idea but struggle to write it down quickly, neatly, or in the same way they can explain it verbally.',
