@@ -267,29 +267,74 @@ const startBackgroundNoisePreview = (choices) => {
 const backgroundNoiseMarkup = (choices) => {
   if (choices['background-noise'] !== 'on') return '';
   const copy = setupCopy(choices);
+  const volume = noiseVolume(choices['background-noise-volume']);
+  const selectedType = ['pink', 'white', 'brown'].includes(choices['background-noise-type'])
+    ? choices['background-noise-type']
+    : 'pink';
+  return [
+    '<section class="learning-control learning-noise-details" aria-labelledby="background-noise-options-label">',
+    '<h2 id="background-noise-options-label">' + copy.noiseType + '</h2>',
+    '<p>' + copy.noiseDescription + '</p>',
+    '<div class="preference-options" style="--option-count:3" role="group" aria-label="' + copy.noiseType + '">',
+    ['pink', 'white', 'brown'].map((type) => '<button type="button" data-background-noise-type="' + type + '" aria-pressed="' + String(type === selectedType) + '">' + (setupLanguage(choices) === 'urdu' ? ({ pink: 'گلابی', white: 'سفید', brown: 'بھوری' }[type]) : type[0].toUpperCase() + type.slice(1)) + '</button>').join(''),
+    '</div>',
+    '<label class="noise-volume-control" for="background-noise-volume">',
+    '<span>' + copy.volume + ' <strong data-background-noise-volume-output>' + volume + '%</strong></span>',
+    '<input id="background-noise-volume" type="range" min="0" max="35" step="1" value="' + volume + '" style="--noise-volume-fill:' + ((volume / 35) * 100).toFixed(2) + '%" data-background-noise-volume aria-describedby="background-noise-volume-help">',
+    '</label>',
+    '<small id="background-noise-volume-help">' + copy.quietStart + '</small>',
+    '<span class="noise-preview-status" data-background-noise-preview-status aria-live="polite">' + (backgroundNoisePreview.playing ? copy.playing + ' ' + noiseTypeLabel(selectedType) + ' · ' + volume + '%' : copy.selectNoise + ' ' + volume + '%') + '</span>',
+    '</section>'
+  ].join('');
 };
 
-const setupSidebarAutoHide = () => {
-  const shell = document.querySelector('[data-learn-app]');
-  const sidebarElement = document.querySelector('[data-learn-sidebar]');
-  const reveal = document.querySelector('[data-sidebar-reveal]');
-  const toggle = document.querySelector('[data-auto-hide-toggle]');
-  if (!shell || !sidebarElement || !reveal || !toggle) return;
+const controlById = (id) => preferenceControls.find((control) => control.id === id);
 
-  let autoHide = readAutoHide();
-  let hidden = false;
-  let hideTimer = 0;
-  let revealTimer = 0;
-  let insideSidebar = false;
-  let pointerDown = false;
-  let pointer = { x: 9999, y: 9999 };
-  let outsideClicks = 0;
-  let outsideTimer = 0;
+const mascotDialogue = (choices) => {
+  const language = choices['mascot-language'] || choices['learning-language'];
+  return language === 'urdu'
+    ? 'السلام علیکم! میں آپ کے ساتھ ایک وقت میں ایک انتخاب پر رہوں گا۔'
+    : 'Hi! I can stay with you while you choose one setting at a time.';
+};
 
-  const enabled = () => autoHide && desktopQuery.matches && !reducedMotionQuery.matches;
-  const clearHide = () => window.clearTimeout(hideTimer);
-  const clearReveal = () => window.clearTimeout(revealTimer);
-  const clearOutside = () => {
+const mascotRailMarkup = (choices) => {
+  if (choices.mascot !== 'on') return '';
+  if (!mascotScreenIsSupported()) return '';
+  const language = choices['mascot-language'] || choices['learning-language'];
+  return '<aside class="learning-setup-mascot-rail" data-learning-mascot><div class="learning-mascot-stage" data-learning-mascot-stage aria-hidden="true"></div><p class="learning-mascot-dialogue" lang="' + (language === 'urdu' ? 'ur' : 'en') + '" dir="' + (language === 'urdu' ? 'rtl' : 'ltr') + '">' + mascotDialogue(choices) + '</p></aside>';
+};
+
+const mascotLanguageControl = (choices) => controlMarkup({
+  id: 'mascot-language',
+  label: 'Mascot language',
+  description: 'This starts with your learning language. You can choose a different one for the mascot.',
+  choices: [['english', 'English'], ['urdu', 'اردو']]
+}, choices['mascot-language'] || choices['learning-language'], setupLanguage(choices));
+
+const mascotVoiceControl = (choices) => controlMarkup({
+  id: 'mascot-voice',
+  label: 'Mascot voice',
+  description: 'Choose how the mascot will communicate when voice options are connected.',
+  choices: [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']]
+}, choices['mascot-voice'], setupLanguage(choices));
+
+const mascotBehaviourControl = (choices) => controlMarkup({
+  id: 'mascot-behaviour',
+  label: 'Mascot behaviour',
+  description: 'Choose the kind of presence that feels comfortable.',
+  choices: [['low-key', 'Low-key'], ['calm', 'Calm'], ['energetic', 'Energetic']]
+}, choices['mascot-behaviour'], setupLanguage(choices));
+
+const mascotDetailsMarkup = (choices) => choices.mascot === 'on'
+  ? '<div class="learning-mascot-details">' + mascotLanguageControl(choices) + mascotVoiceControl(choices) + mascotBehaviourControl(choices) + '</div>'
+  : '';
+
+const setupLanguageAttributes = (choices) => setupLanguage(choices) === 'urdu' ? ' lang="ur" dir="rtl"' : '';
+const mascotMainClass = (choices) => choices.mascot === 'on' && mascotScreenIsSupported() ? ' learn-main--with-mascot' : '';
+
+const languageStageMarkup = (choices) => [
+  '<main class="learn-main learn-main--single learn-main--language" id="learn-main"' + setupLanguageAttributes(choices) + '>',
+  '<section class="learning-single-setting learning-language-setting" aria-labelledby="learning-settings-title">',
     outsideClicks = 0;
     window.clearTimeout(outsideTimer);
   };
