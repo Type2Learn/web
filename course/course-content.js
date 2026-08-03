@@ -98,3 +98,37 @@ export const COURSE_CONTENT = {
           ['Larger text, zoom, strong contrast, or screen-reader support.', true],
           ['Removing all written instructions.', false],
           ['Using color as the only form of feedback.', false]
+        ]
+      },
+      {
+        question: 'Which statement best describes intellectual/developmental disabilities, physical or motor disabilities, and sensory processing sensitivities?',
+        options: [
+          ['They affect every person in exactly the same way.', false],
+          ['They may affect communication, learning, movement, endurance, or responses to sensory input, so support should fit the individual.', true],
+          ['They mean a person cannot learn independently.', false],
+          ['Technology is the only useful form of support.', false]
+        ]
+      }
+    ]
+  },
+  steps: [
+    {
+      module: 'Module 1',
+      title: 'ADHD',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'ADHD is a neurodevelopmental condition that can affect attention, planning, memory, time management, energy levels, and impulse control.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'A learner may forget instructions, lose track of time, struggle to start tasks, become distracted, or find it difficult to sit still for long periods.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'Some people with ADHD may be creative, energetic, curious, good at noticing connections, or able to focus deeply on subjects they enjoy. These strengths are not the same for everyone.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Forgetting homework or materials', 'Managing large or boring tasks', 'Waiting or taking turns', 'Organising time', 'Controlling frustration or impulses'],
+        supportsHeading: 'What support can help?',
+        supports: ['Break tasks into smaller steps', 'Use reminders, calendars, and checklists', 'Allow movement breaks', 'Reduce distractions', 'Give written instructions']
+      },
+      simple: 'ADHD can affect how someone starts, plans, and stays with a task. People can have different strengths and support needs.',
+      example: 'One support idea from this module is to use visible steps and reminders.',
+      hint: 'Look for the support that makes a task more visible and manageable.',
+      typing: { level: 'Key idea typing', prompt: 'Type the visible key idea in the field.', target: 'Visible steps and reminders can help make a task easier to begin and follow.' },
