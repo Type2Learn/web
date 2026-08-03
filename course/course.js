@@ -684,3 +684,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       if (moment.kind === 'answer-correct' && moment.result === 'quick-check') return expressive
         ? [`آپ نے ${moduleName} درست سمجھا`, 'زبردست — آپ نے بنیادی خیال پہچان لیا۔ اب اسے عملی صورت میں استعمال کریں۔']
         : ['درست جواب', 'آپ نے سبق کا بنیادی خیال پہچان لیا۔'];
+      if (moment.kind === 'answer-correct' && moment.result === 'applied-practice') return expressive
+        ? ['آپ نے خیال کو درست استعمال کیا', 'یہ مضبوط عملی انتخاب تھا۔ آپ پورا ماڈیول مکمل کرنے والے ہیں۔']
+        : ['اچھا عملی انتخاب', 'یہ جواب سبق کو حقیقی صورتحال سے جوڑتا ہے۔'];
+      if (moment.kind === 'answer-incorrect') return expressive
+        ? ['یہ کوشش بھی سیکھنے کا حصہ ہے', 'نشان زد جواب دیکھیں، پھر نئے اشارے کے ساتھ دوبارہ کوشش کریں۔']
+        : ['آپ دوبارہ کوشش کر سکتے ہیں', 'درست نشان آپ کے اگلے انتخاب کی رہنمائی کرے گا۔'];
+      if (moment.kind === 'module-complete') return expressive
+        ? [`مبارک ہو — ${moduleName} مکمل`, 'آپ نے پڑھا، ٹائپ کیا، سمجھ جانچی اور خیال کو استعمال کیا۔ یہ پورا ماڈیول آپ نے مکمل کیا۔']
+        : [`${moduleName} مکمل`, 'آپ نے اس ماڈیول کے ہر مرحلے کو مکمل کیا۔'];
+      return null;
+    }
+
+    if (moment.kind === 'task-entry') {
+      if (moment.result === 'reading') return expressive
+        ? [`Let’s understand ${moduleName}`, 'Read one idea at a time. You can move forward at your own pace.']
+        : ['Your next idea is ready', 'Read one clear section, then continue when it feels settled.'];
+      if (moment.result === 'typing') return expressive
+        ? ['Your words are ready', 'Begin with the first visible word. Every correct character moves this section forward.']
+        : ['Start with one word', 'The rest can follow one character at a time.'];
+      if (moment.result === 'applied-practice') return expressive
+        ? ['Now make the idea useful', `You have understood ${moduleName}. Choose the response that puts it into practice.`]
+        : ['One practical choice remains', 'Choose the response that uses the lesson idea.'];
+      if (moment.result === 'exam-question') return expressive
+        ? ['You are ready for the next question', 'Bring back what you learned and choose one answer.']
+        : ['Your next question is ready', 'Only this one question needs your attention.'];
+      if (moment.result === 'module-entry') return expressive
+        ? [`A new step begins: ${moduleName}`, 'Take a first look. Nothing needs to be completed all at once.']
+        : [`${moduleName} is ready`, 'Begin with the short preview when you are ready.'];
+    }
+    if (moment.kind === 'section-complete' && moment.result === 'typing-section') return expressive
+      ? [`You completed “${completedHeading}”`, 'Amazing work — the next part is ready and you are keeping the lesson moving.']
+      : [`“${completedHeading}” is complete`, 'You typed one full section. The next part is ready.'];
+    if (moment.kind === 'answer-correct' && moment.result === 'quick-check') return expressive
+      ? [`You understood the key idea in ${moduleName}`, 'Excellent — you recognised what matters. Now you can put it into practice.']
+      : ['That understanding is correct', 'You identified the lesson’s key idea.'];
+    if (moment.kind === 'answer-correct' && moment.result === 'applied-practice') return expressive
+      ? ['You used the idea well', 'That was a strong practical choice. You are about to complete the whole module.']
+      : ['Strong practical choice', 'That response connects the lesson to a real situation.'];
+    if (moment.kind === 'answer-correct' && moment.result === 'exam') return expressive
+      ? ['You brought the learning back', 'That answer is correct. Your careful work is showing.']
+      : ['Correct answer', 'You recalled the idea successfully.'];
+    if (moment.kind === 'answer-incorrect') return expressive
+      ? ['This try is part of learning', 'Use the marked answer as a new clue, then try again with that information.']
+      : ['You can try this again', 'The correct mark can guide your next choice.'];
+    if (moment.kind === 'module-complete') return expressive
+      ? [`Congratulations — ${moduleName} is complete`, 'You read, typed, checked your understanding, and applied the idea. You earned this full-module medal.']
+      : [`You completed ${moduleName}`, 'Every stage in this module is now complete.'];
+    if (moment.kind === 'course-complete') return expressive
+      ? ['You completed the entire learning journey', 'Every module and the final review is complete. These milestones came from your work, one step at a time.']
+      : ['The complete course is finished', 'You worked through every module and the final review.'];
+    return null;
+  };
+
+  // Saved answers can be rendered after a reload, when no new support event
+  // should be announced or animated. They use the same catalogue as live
+  // feedback so wording stays consistent with the learner's current language
+  // and encouragement choice.
+  const supportCopyFor = (kind, detail = {}) => supportCopy({
+    kind,
+    result: detail.result || '',
+    language: supportLanguage(),
+    encouragementLevel: selectedEncouragementLevel()
+  });
+
+  const savedSupportMarkup = (kind, detail = {}, className = 'check-feedback') => {
+    const copy = supportCopyFor(kind, detail);
+    if (!copy) return '';
+    const [title, description] = copy;
+    return '<p class="' + className + ' ' + (kind === 'answer-correct' ? 'is-correct' : 'is-incorrect') + '" role="note" aria-live="off"><strong>' + escapeHtml(title) + '</strong>' + (description ? ' ' + escapeHtml(description) : '') + '</p>';
