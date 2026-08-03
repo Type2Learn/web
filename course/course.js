@@ -1783,3 +1783,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       : correct
         ? '<button class="course-primary-button" type="button" data-action="continue-apply">Complete this step <span aria-hidden="true">→</span></button>'
         : '<button class="course-secondary-button" type="button" data-action="retry-question">Choose another answer</button>';
+    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Adapted practice</p><h2 id="course-task-heading" tabindex="-1">Use the idea in a small situation</h2><p>A learner is working on a similar task. Which response best uses the idea from this module?</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>Which response best uses the idea from this module?</legend>' + renderedTaskOptions(choices, 'course-apply', 'data-apply-answer') + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
+  };
+
+  const completeTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><p class="course-task-label">Progress update</p><h2 id="course-task-heading" tabindex="-1">One small step complete.</h2><p>' + (isLastStep() ? 'You have reached the end of this prototype course. Your completed steps and settings are saved locally.' : 'Your progress is saved. You can come back whenever you are ready, or continue to the next short step.') + '</p><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">Save and exit</button><button class="course-primary-button" type="button" data-action="next-step">' + (isLastStep() ? 'Return to learning overview' : 'Continue to step ' + (state.progress.lessonIndex + 2)) + ' <span aria-hidden="true">→</span></button></div></article>';
+
+  const finalModuleCompleteTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><p class="course-task-label">Course modules complete</p><h2 id="course-task-heading" tabindex="-1">The 11 learning modules are complete.</h2><p>Your completed modules and settings are saved locally. When you are ready, complete the final exam one question at a time. It has ' + finalExamQuestionCount() + ' questions and no timer.</p><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">Save and exit</button><button class="course-primary-button" type="button" data-action="start-final-exam">Start final exam <span aria-hidden="true">→</span></button></div></article>';
+
+  const completionTask = () => isLastStep() ? finalModuleCompleteTask() : completeTask();
+
+  const examOptionState = (index, selected, correctIndex, submitted) => {
+    if (!submitted) return index === selected ? ' is-selected' : '';
+    if (index === correctIndex) return ' is-correct' + (index === selected ? ' is-selected' : '');
+    return index === selected ? ' is-incorrect is-selected' : '';
+  };
+
+  const examOptionFeedback = (index, selected, correctIndex, submitted) => {
+    if (!submitted) return '';
+    if (index === correctIndex && index === selected) return '<span class="exam-answer-state">✓ Correct</span>';
+    if (index === correctIndex) return '<span class="exam-answer-state">✓ Correct answer</span>';
+    if (index === selected) return '<span class="exam-answer-state">Not correct</span>';
+    return '';
+  };
+
+  const finalExamIntroTask = () => '<article class="course-task-card course-final-exam exam-intro-card"><div class="course-task-top"><div><p class="course-task-label">Final exam</p><h2 id="course-task-heading" tabindex="-1">Finish with one question at a time.</h2><p>' + escapeHtml(finalExam().description || 'Use what you learned across the course.') + '</p></div>' + taskHeaderControls() + '</div><p>This is a calm review of the course. There are ' + finalExamQuestionCount() + ' multiple-choice questions, each with four choices. There is no timer, speed score, or ranking.</p><p>Your progress is saved after each choice. You can pause and return to the same question whenever you need.</p><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">Save and exit</button><button class="course-primary-button" type="button" data-action="start-final-exam">Start final exam <span aria-hidden="true">→</span></button></div></article>';
+
+  const finalExamQuestionTask = () => {
+    const exam = state.progress.finalExam;
+    const question = currentFinalExamQuestion();
+    if (!question) return '<article class="course-task-card course-final-exam"><p class="course-task-label">Final exam</p><h2 id="course-task-heading" tabindex="-1">The final exam is not available.</h2><p>Please return to the course overview and try again.</p><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="dashboard">Return to learning overview</button></div></article>';
+    const selected = exam.answers[exam.questionIndex];
+    const correctIndex = question.options.findIndex(([, correct]) => correct);
+    const submitted = Boolean(exam.submitted);
+    const feedback = submitted ? savedSupportMarkup(selected === correctIndex ? 'answer-correct' : 'answer-incorrect', { result: 'exam' }, 'exam-feedback') : '';
+    const action = submitted
+      ? '<button class="course-primary-button" type="button" data-action="next-exam-question">' + (exam.questionIndex === finalExamQuestionCount() - 1 ? 'See final results' : 'Next question') + ' <span aria-hidden="true">→</span></button>'
+      : '<button class="course-primary-button" type="button" data-action="submit-exam-answer"' + (selected === null || typeof selected === 'undefined' ? ' disabled' : '') + '>Submit answer <span aria-hidden="true">→</span></button>';
+    return '<article class="course-task-card course-final-exam"><div class="course-task-top"><div><p class="course-task-label">Final exam</p><h2 id="course-task-heading" tabindex="-1">Answer one question at a time.</h2><p>Choose the answer that best fits what you learned. You can change your choice before you submit it.</p></div>' + taskHeaderControls('One question at a time') + '</div><fieldset class="course-check-options" aria-describedby="exam-question-help' + (submitted ? ' exam-feedback' : '') + '"><legend class="exam-question-card" id="exam-question-card" tabindex="-1"><span class="exam-question-count">Question ' + (exam.questionIndex + 1) + ' of ' + finalExamQuestionCount() + '</span><strong>' + escapeHtml(question.question) + '</strong><span id="exam-question-help">Choose one answer, then submit when you are ready.</span></legend>' + question.options.map(([label], index) => '<label class="course-check-option exam-option' + examOptionState(index, selected, correctIndex, submitted) + '"><input type="radio" name="final-exam-answer" value="' + index + '" data-exam-answer' + (index === selected ? ' checked' : '') + (submitted ? ' disabled' : '') + '><span class="exam-option-copy">' + escapeHtml(label) + '</span>' + examOptionFeedback(index, selected, correctIndex, submitted) + '</label>').join('') + '</fieldset>' + feedback + '<div class="course-task-actions">' + action + '</div></article>';
+  };
+
+  const finalExamScore = () => finalExam().questions.reduce((score, question, index) => score + (state.progress.finalExam.answers[index] === question.options.findIndex(([, correct]) => correct) ? 1 : 0), 0);
+
+  const finalExamResultsTask = () => {
+    const questions = finalExam().questions;
+    const score = finalExamScore();
+    const total = questions.length;
+    const percentage = total ? Math.round((score / total) * 100) : 0;
+    const incorrect = total - score;
+    const review = questions.map((question, index) => {
+      const selected = state.progress.finalExam.answers[index];
+      const correctIndex = question.options.findIndex(([, correct]) => correct);
+      const isCorrect = selected === correctIndex;
+      const selectedLabel = Number.isInteger(selected) && question.options[selected] ? question.options[selected][0] : 'No answer recorded';
+      return '<li class="' + (isCorrect ? 'is-correct' : 'is-incorrect') + '"><h3>Question ' + (index + 1) + ': ' + escapeHtml(question.question) + '</h3><p>Your answer: <span class="exam-answer-state">' + escapeHtml(selectedLabel) + (isCorrect ? ' · Correct' : ' · Not correct') + '</span></p><p>Correct answer: <strong>' + escapeHtml(question.options[correctIndex][0]) + '</strong></p></li>';
+    }).join('');
+    return '<article class="course-task-card course-final-exam exam-results-card"><div class="course-task-top"><div><p class="course-task-label">Final exam results</p><h2 id="course-task-heading" tabindex="-1">Your course review is complete.</h2><p>Your score is based only on the answers you selected. It does not use time, typing speed, or your support settings.</p></div>' + taskHeaderControls('Saved locally') + '</div><section class="exam-score" aria-label="Final exam score"><strong class="exam-score-value">' + score + '/' + total + '</strong><div><p>' + percentage + '% correct</p><span>' + score + ' correct · ' + incorrect + ' incorrect</span></div></section><section aria-labelledby="exam-review-heading"><h3 id="exam-review-heading">Question-by-question review</h3><p>Review what you selected and the correct answer for each question.</p><ol class="exam-review-list">' + review + '</ol></section><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="return-course">Return to learning overview <span aria-hidden="true">→</span></button></div></article>';
+  };
+
+  const activeTypingReference = () => {
+    const typing = currentStep().typing;
+    if (usesLessonSectionTyping()) return activeLessonTypingSection().section.text || '';
+    if (typing.level === 'Guided typing') {
+      return typing.phrases[Math.min(state.progress.attempt.guidedIndex, typing.phrases.length - 1)] || '';
+    }
+    return typing.target || typing.reference || '';
+  };
+
+  const renderTypingCharacters = (reference, response, animatedIndex = -1) => {
+    const referenceCharacters = Array.from(reference);
