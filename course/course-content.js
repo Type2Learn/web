@@ -31,3 +31,37 @@ export const COURSE_CONTENT = {
       {
         question: 'ADHD may affect a person\'s ability to:',
         options: [
+          ['Hear all sounds clearly.', false],
+          ['Understand numbers only.', false],
+          ['Manage attention, organization, impulses, and task completion.', true],
+          ['Move their body at all times.', false]
+        ]
+      },
+      {
+        question: 'Dyslexia most commonly affects:',
+        options: [
+          ['Reading, spelling, and processing written language.', true],
+          ['Physical balance and coordination.', false],
+          ['Vision in every situation.', false],
+          ['A person\'s intelligence.', false]
+        ]
+      },
+      {
+        question: 'Autism Spectrum Disorder may involve differences in:',
+        options: [
+          ['Social communication, interaction, interests, behavior, or sensory experiences.', true],
+          ['Only handwriting ability.', false],
+          ['Only mathematical ability.', false],
+          ['A person\'s ability to hear.', false]
+        ]
+      },
+      {
+        question: 'Dysgraphia can make which task more difficult?',
+        options: [
+          ['Writing, handwriting, spelling, or organizing written ideas.', true],
+          ['Recognizing colors only.', false],
+          ['Understanding spoken language only.', false],
+          ['Walking long distances only.', false]
+        ]
+      },
+      {
