@@ -78,6 +78,28 @@ html[data-color-mode="vivid"] body {
     var(--learn-cloud);
 }
 
+html[data-color-mode="flat"] .learning-continue,
+html[data-color-mode="flat"] .learning-continue:hover {
+  border-color: var(--learn-green);
+  background: var(--learn-green);
+  box-shadow: none;
+}
+
+html[data-color-mode="flat"] .preference-options button[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--learn-green); }
+
+html[data-color-mode="vivid"] .learning-continue {
+  border-color: #0DAD50;
+  background: linear-gradient(135deg, var(--learn-green), var(--learn-cyan));
+  box-shadow: 0 14px 28px rgba(8, 191, 243, .22);
+}
+
+button { font: inherit; -webkit-tap-highlight-color: transparent; }
+
+[lang="ur"] {
+  font-family: "Noto Sans Arabic Local", "Noto Sans Arabic", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0 !important;
+}
 
 button:focus-visible,
 a:focus-visible {
@@ -87,22 +109,21 @@ a:focus-visible {
 
 .learner-skip {
   position: fixed;
-  z-index: 200;
+  z-index: 30;
   top: 10px;
   left: 10px;
-  padding: 9px 13px;
+  transform: translateY(-170%);
   border: 1px solid var(--learn-line);
   border-radius: 8px;
-  background: #fff;
+  padding: 9px 13px;
   color: var(--learn-ink);
+  background: var(--learn-paper);
   font-size: 13px;
   font-weight: 850;
-  transform: translateY(-170%);
+  text-decoration: none;
 }
 
-.learner-skip:focus {
-  transform: translateY(0);
-}
+.learner-skip:focus { transform: translateY(0); }
 
 .learn-loading,
 .learn-noscript {
@@ -114,36 +135,29 @@ a:focus-visible {
   text-align: center;
 }
 
-.learn-app {
+.learn-main {
   min-height: 100dvh;
-  display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  transition: grid-template-columns 220ms cubic-bezier(.2, .8, .2, 1);
+  padding: clamp(32px, 6vw, 96px) clamp(20px, 7vw, 120px);
 }
 
-.learn-app.is-sidebar-hidden {
-  grid-template-columns: 0 minmax(0, 1fr);
+.learning-settings {
+  width: min(100%, 1120px);
+  margin: 0 auto;
 }
 
-.learn-sidebar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  width: var(--sidebar-width);
-  height: 100dvh;
-  overflow: hidden auto;
-  border-right: 1px solid var(--learn-line);
-  background: rgba(255, 255, 255, .92);
-  box-shadow: 18px 0 45px rgba(10, 22, 48, .08);
-  transition: transform 220ms cubic-bezier(.2, .8, .2, 1), opacity 180ms ease;
+.learning-settings-header {
+  max-width: 740px;
+  margin-bottom: 34px;
 }
 
-.learn-app.is-sidebar-hidden .learn-sidebar {
-  transform: translateX(-100%);
-  opacity: 0;
-  pointer-events: none;
+.learning-settings-header p {
+  margin: 0 0 10px;
+  color: var(--learn-blue);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .14em;
+  text-transform: uppercase;
 }
-
 .learn-sidebar-inner {
   min-height: 100%;
   display: flex;

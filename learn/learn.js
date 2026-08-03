@@ -65,29 +65,73 @@ const readPreferences = (user, courseId) => {
     return null;
   }
 };
+
+const savePreferences = (user, courseId, choices) => {
   try {
-    return window.localStorage.getItem(sidebarStorageKey) !== 'false';
+    window.localStorage.setItem(preferenceKey(user, courseId), JSON.stringify({ version: 1, courseId, complete: true, choices }));
   } catch (_) {
-    return true;
+    /* The learner can still continue if this browser blocks local storage. */
   }
 };
 
-const writeAutoHide = (value) => {
-  try {
-    window.localStorage.setItem(sidebarStorageKey, value ? 'true' : 'false');
-  } catch (_) {
-    /* The control still works for this visit if storage is blocked. */
-  }
+const warmMascotAssets = () => {
+  if (mascotAssetsWarmed || !mascotScreenIsSupported()) return;
+  mascotAssetsWarmed = true;
+  [
+    ['modulepreload', '/vendor/three.module.min.js'],
+    ['modulepreload', '/vendor/GLTFLoader.js'],
+    ['modulepreload', '/vendor/BufferGeometryUtils.js'],
+    ['modulepreload', '/vendor/SkeletonUtils.js'],
+    ['preload', mascotModelUrl]
+  ].forEach(([rel, href]) => {
+    const link = document.createElement('link');
+    link.rel = rel;
+    link.href = href;
+    if (rel === 'preload') {
+      link.as = 'fetch';
+      link.type = 'model/gltf-binary';
+      link.crossOrigin = 'anonymous';
+    }
+    document.head.append(link);
+  });
+  // The model keeps every animation in one local GLB. Warming this opt-in
+  // request before Continue means no individual animation needs to buffer in
+  // the course.
+  window.fetch?.(mascotModelUrl, { cache: 'force-cache' }).catch(() => {});
 };
 
-const sidebar = (user) => [
-  '<aside class="learn-sidebar" aria-label="Learning navigation" data-learn-sidebar>',
-  '<div class="learn-sidebar-inner">',
-  '<a class="learn-brand" href="/learn/" aria-label="Type2Learn learning home"><img src="/assets/type2learn-logo-nav.webp" alt=""><span><strong>TYPE2LEARN</strong><span>Learn actively</span></span></a>',
-  '<section class="sidebar-card" aria-label="Account"><small>Signed in</small><strong>' + escapeHtml(nameFor(user)) + '</strong></section>',
-  '<nav class="learn-nav" aria-label="Temporary learning areas">',
-  '<a href="/learn/" aria-current="page"><i aria-hidden="true"></i><span>Learning home</span></a>',
-  '<a href="#next-step"><i aria-hidden="true"></i><span>Next step</span></a>',
+const setupLanguage = (choices) => choices['learning-language'] === 'urdu' ? 'urdu' : 'english';
+
+const setupCopy = (choices) => setupLanguage(choices) === 'urdu' ? {
+  welcome: 'خوش آمدید',
+  startingTitle: 'اپنی ابتدائی زبان منتخب کریں۔',
+  startingIntro: 'میسکاٹ اس زبان میں شروع ہوگا۔ آپ بعد میں میسکاٹ کے لیے دوسری زبان منتخب کر سکتے ہیں۔',
+  startingLabel: 'ابتدائی زبان',
+  startingDescription: 'وہ زبان منتخب کریں جو آپ کے میسکاٹ کے لیے بطور ڈیفالٹ استعمال ہو۔',
+  useLanguage: 'یہ زبان استعمال کریں',
+  preferences: 'سیکھنے کی ترجیحات',
+  focused: 'توجہ کے ساتھ ترتیب',
+  title: 'اپنی سیکھنے کی جگہ ترتیب دیں۔',
+  balancedIntro: 'آج وہ اختیارات منتخب کریں جو آپ کے لیے مفید ہوں۔ آپ انہیں بعد میں بدل سکتے ہیں۔',
+  openIntro: 'ہر انتخاب کے لیے پوری جگہ رکھی گئی ہے تاکہ آپ انہیں اپنی رفتار سے دیکھ سکیں۔',
+  focusedIntro: 'ایک وقت میں ایک واضح انتخاب۔ آپ یہ ترتیبات بعد میں بدل سکتے ہیں۔',
+  laterSettings: 'آپ بعد میں اوپر دائیں کونے میں اپنی پروفائل تصویر کے ذریعے ان ترجیحات کو بدل سکتے ہیں۔',
+  continue: 'جاری رکھیں',
+  keep: 'یہ انتخاب رکھیں',
+  course: 'کورس کی طرف جائیں',
+  noiseType: 'آواز کی قسم',
+  noiseDescription: 'وہ مسلسل آواز منتخب کریں جو آپ کی توجہ کم سے کم ہٹائے۔ آن کرنے پر یہ آہستہ شروع ہوتی ہے۔',
+  volume: 'آواز کی سطح',
+  quietStart: 'آہستہ شروع ہوتی ہے۔ زیادہ سے زیادہ آواز محدود ہے۔',
+  playing: 'بج رہا ہے',
+  selectNoise: 'آہستہ شروع کرنے کے لیے آواز کی قسم منتخب کریں۔',
+  mascotUnavailable: 'میسکاٹ بڑی اسکرینوں پر دستیاب ہے۔ اس اسکرین پر یہ بند رہے گا۔'
+} : {
+  welcome: 'Welcome',
+  startingTitle: 'Choose your starting language.',
+  startingIntro: 'Your mascot will begin in this language. You can choose a different mascot language later.',
+  startingLabel: 'Starting language',
+  startingDescription: 'Choose the language your mascot will use by default.',
   '<a href="#supports"><i aria-hidden="true"></i><span>Supports</span></a>',
   '<a href="#progress"><i aria-hidden="true"></i><span>Progress</span></a>',
   '<button class="sidebar-toggle" type="button" data-auto-hide-toggle><span>Auto-hide sidebar</span><span>On</span></button>',
