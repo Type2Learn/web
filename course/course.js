@@ -1232,3 +1232,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const renderBrowse = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<div class="course-panel-page"><button class="course-back-button" type="button" data-action="dashboard">← Back to learning overview</button><p class="course-eyebrow">Browse courses</p><h1>One course is ready for this prototype.</h1><p class="course-lead">Keeping the next choice small helps this experience stay task-focused. More courses can appear here once their content is reviewed.</p><article class="course-listing"><div><span class="course-status">Prototype course</span><h2>' + escapeHtml(COURSE.title) + '</h2><p>' + COURSE.steps.length + ' short, non-diagnostic modules about general experiences, respectful language, and accessible participation.</p></div><button class="course-primary-button" type="button" data-action="course-preferences">Choose this course <span aria-hidden="true">→</span></button></article></div>', 'browse') + '</main>';
 
+
+  const moduleProgressItem = (step, index, includeFinalExam = false) => {
+    const complete = state.progress.completedSteps.includes(index);
+    const active = isReviewingModule()
+      ? index === displayedModuleIndex()
+      : (!includeFinalExam || !isFinalExamPhase()) && index === state.progress.lessonIndex;
+    const status = active
+      ? (isReviewingModule() ? 'Reviewing now' : taskLabel())
+      : complete ? 'Completed · Review' : 'Available next';
+    const details = complete && !active
+      ? '<button type="button" data-action="review-module" data-module-index="' + index + '" aria-label="Review completed module ' + (index + 1) + ': ' + escapeHtml(step.title) + '"><strong>' + escapeHtml(step.title) + '</strong><small>' + escapeHtml(status) + '</small></button>'
+      : '<div><strong>' + escapeHtml(step.title) + '</strong><small>' + escapeHtml(status) + '</small></div>';
+    return '<li class="' + (complete ? 'is-complete ' : '') + (active ? 'is-active ' : '') + (complete && !active ? 'is-reviewable' : '') + '"' + (active ? ' aria-current="step"' : '') + '><span>' + (complete ? '✓' : index + 1) + '</span>' + details + '</li>';
+  };
+
+  const courseModuleStripWithFinalExam = () => {
+    const modules = COURSE.steps.map((step, index) => moduleProgressItem(step, index, true)).join('');
+    const examActive = isFinalExamPhase() && !isReviewingModule();
+    const examComplete = Boolean(state.progress.finalExam.completed);
+    const examStatus = examActive
+      ? taskLabel()
+      : examComplete
+        ? 'Completed'
+        : 'Available after module ' + COURSE.steps.length;
+    const examItem = '<li class="course-module-exam ' + (examComplete ? 'is-complete ' : '') + (examActive ? 'is-active' : '') + '"><span>' + (examComplete ? '✓' : COURSE.steps.length + 1) + '</span><div><strong>' + escapeHtml(finalExam().title || 'Final exam') + '</strong><small>' + escapeHtml(examStatus) + '</small></div></li>';
+    return '<nav class="course-module-strip" aria-label="' + (state.preferences.visibleProgress ? 'Course progress' : 'Course module navigation') + '"><div class="course-module-strip-heading"><p class="course-eyebrow">' + (state.preferences.visibleProgress ? 'Course progress' : 'Course modules') + '</p><span>' + COURSE.steps.length + ' small modules · one final exam</span></div><ol class="course-module-list">' + modules + examItem + '</ol></nav>';
+  };
+
+  const courseNextStepCopy = () => {
+    if (isReviewingModule()) return 'Return to your saved current task';
+    return ({
+    preview: 'Read the short explanation',
+    read: 'Type the first lesson section',
+    type: 'Complete the lesson typing',
+    check: 'Use the idea in a small situation',
+    apply: 'Mark this step complete',
+    complete: isLastStep() ? 'Start the final exam' : 'Preview the next short step',
+    'exam-intro': 'Start the first exam question',
+    exam: state.progress.finalExam.submitted
+      ? state.progress.finalExam.questionIndex === finalExamQuestionCount() - 1 ? 'See your final results' : 'Move to the next question'
+      : 'Submit your selected answer',
+    'exam-results': 'Return to your learning overview'
+    }[state.progress.phase] || 'Continue learning');
+  };
+
+  const courseReturnLocation = () => {
+    if (isReviewingModule()) {
+      const savedStep = COURSE.steps[state.progress.lessonIndex];
+      return savedStep.title + ' · ' + savedTaskLabel();
+    }
+    if (state.progress.phase === 'exam') return 'Final exam · Question ' + (state.progress.finalExam.questionIndex + 1) + ' of ' + finalExamQuestionCount();
+    if (state.progress.phase === 'exam-intro') return 'Final exam · Ready to begin';
+    if (state.progress.phase === 'exam-results') return 'Final exam · Results and review';
+    return currentStep().title + ' · ' + taskLabel();
+  };
+
+  const courseProgressWithFinalExam = () => {
+    if (!isFinalExamPhase()) return courseProgressBar();
+    const exam = state.progress.finalExam;
+    const total = finalExamQuestionCount();
+    const answered = exam.answers.filter((answer) => Number.isInteger(answer)).length;
+    const progress = state.progress.phase === 'exam-results' ? total : state.progress.phase === 'exam' ? Math.min(exam.questionIndex + (exam.submitted ? 1 : 0), total) : 0;
+    const status = state.progress.phase === 'exam-results'
+      ? 'Results are ready'
+      : state.progress.phase === 'exam'
+        ? 'Question ' + (exam.questionIndex + 1) + ' of ' + total
+        : 'Ready when you are';
+    return '<section class="course-progress-panel" aria-label="Learning progress"><div><p>Course progress</p><strong>Final exam</strong><span>One calm question at a time</span></div><div class="course-progress-bars"><div><span>Final exam · ' + escapeHtml(status) + '</span><progress value="' + progress + '" max="' + total + '">' + progress + ' of ' + total + '</progress></div><div><span>Course modules · ' + state.progress.completedSteps.length + ' lessons completed</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + state.progress.completedSteps.length + ' of ' + COURSE.steps.length + '</progress></div><div><span>Answers saved · ' + answered + ' of ' + total + '</span><progress value="' + answered + '" max="' + total + '">' + answered + ' of ' + total + '</progress></div></div></section>';
+  };
