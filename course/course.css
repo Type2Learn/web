@@ -4012,3 +4012,672 @@ html[dir="rtl"] body[data-course-animations="lively"][data-course-layout="open"]
 }
 
 .course-success-medal::before {
+  position: absolute;
+  z-index: -1;
+  top: 25px;
+  left: 7px;
+  width: 10px;
+  height: 28px;
+  content: '';
+  transform: rotate(9deg);
+  background: linear-gradient(90deg, #0abf76, #0d86dc);
+  clip-path: polygon(0 0, 100% 0, 82% 100%, 50% 82%, 18% 100%);
+}
+
+.course-success-medal::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  content: '✓';
+  color: #5d4211;
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.course-success-petal {
+  width: 11px;
+  height: 17px;
+  border-radius: 90% 12% 90% 12%;
+  box-shadow: 0 2px 5px rgb(2 76 96 / .16);
+  background: linear-gradient(135deg, #1fd282, #16b9d7);
+  animation: course-success-petal-fall 1.62s cubic-bezier(.12, .7, .28, 1) both;
+}
+
+.course-success-medal--1 { left: 13%; animation-delay: 0ms; --celebration-drift: 10vw; }
+.course-success-medal--2 { left: 36%; animation-delay: 90ms; --celebration-drift: -7vw; }
+.course-success-medal--3 { left: 61%; animation-delay: 35ms; --celebration-drift: 8vw; }
+.course-success-medal--4 { left: 84%; animation-delay: 130ms; --celebration-drift: -10vw; }
+
+.course-success-petal--1 { left: 4%; animation-delay: 30ms; --celebration-drift: 8vw; --celebration-turn: 195deg; }
+.course-success-petal--2 { left: 12%; animation-delay: 180ms; --celebration-drift: -4vw; --celebration-turn: -220deg; }
+.course-success-petal--3 { left: 21%; animation-delay: 80ms; --celebration-drift: 10vw; --celebration-turn: 250deg; }
+.course-success-petal--4 { left: 30%; animation-delay: 240ms; --celebration-drift: -8vw; --celebration-turn: -280deg; }
+.course-success-petal--5 { left: 40%; animation-delay: 35ms; --celebration-drift: 5vw; --celebration-turn: 220deg; }
+.course-success-petal--6 { left: 49%; animation-delay: 160ms; --celebration-drift: -11vw; --celebration-turn: -250deg; }
+.course-success-petal--7 { left: 57%; animation-delay: 100ms; --celebration-drift: 7vw; --celebration-turn: 270deg; }
+.course-success-petal--8 { left: 66%; animation-delay: 230ms; --celebration-drift: -6vw; --celebration-turn: -210deg; }
+.course-success-petal--9 { left: 74%; animation-delay: 50ms; --celebration-drift: 9vw; --celebration-turn: 240deg; }
+.course-success-petal--10 { left: 82%; animation-delay: 190ms; --celebration-drift: -9vw; --celebration-turn: -290deg; }
+.course-success-petal--11 { left: 91%; animation-delay: 115ms; --celebration-drift: 3vw; --celebration-turn: 200deg; }
+.course-success-petal--12 { left: 97%; animation-delay: 270ms; --celebration-drift: -10vw; --celebration-turn: -245deg; }
+
+.course-success-petal--2,
+.course-success-petal--5,
+.course-success-petal--8,
+.course-success-petal--11 { background: linear-gradient(135deg, #7d9cff, #34d9bd); }
+.course-success-petal--3,
+.course-success-petal--6,
+.course-success-petal--9,
+.course-success-petal--12 { background: linear-gradient(135deg, #f1c35a, #28c9d9); }
+
+@keyframes course-success-medal-flow {
+  0% { opacity: 0; transform: translate3d(0, -13vh, 0) rotate(-12deg) scale(.7); }
+  18% { opacity: 1; }
+  74% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--celebration-drift), 103vh, 0) rotate(25deg) scale(1); }
+}
+
+@keyframes course-success-petal-fall {
+  0% { opacity: 0; transform: translate3d(0, -8vh, 0) rotate(0) scale(.7); }
+  14% { opacity: .95; }
+  82% { opacity: .9; }
+  100% { opacity: 0; transform: translate3d(var(--celebration-drift), 108vh, 0) rotate(var(--celebration-turn)) scale(1); }
+}
+
+@media (max-width: 767px) {
+  .course-support-moment { max-width: 100%; }
+  body[data-course-encouragement="expressive"] .course-support-moment strong { font-size: 1.1rem; }
+  .course-success-celebration { display: none !important; }
+}
+
+/* -------------------------------------------------------------------------
+   Course-wide motion language
+
+   These effects are driven by the saved learner preference. Still remains
+   immediate, Gentle confirms actions quietly, and Lively gives every direct
+   interaction and route change an unmistakable response. */
+
+.course-support-progress { display: none; }
+
+body[data-course-encouragement="balanced"] .course-support-popup,
+body[data-course-encouragement="expressive"] .course-support-popup {
+  position: fixed;
+  z-index: 130;
+  --course-support-popup-limit: 580px;
+  left: var(--course-support-popup-x, 50%);
+  bottom: clamp(18px, 3vw, 34px);
+  width: min(var(--course-support-popup-width, var(--course-support-popup-limit)), calc(100vw - 36px));
+  max-width: min(var(--course-support-popup-width, var(--course-support-popup-limit)), calc(100vw - 36px));
+  margin: 0;
+  overflow: hidden;
+  transform: translateX(-50%);
+  pointer-events: none;
+  box-shadow: 0 20px 52px rgb(7 44 72 / .22), 0 4px 12px rgb(7 44 72 / .12);
+}
+
+body[data-course-encouragement="expressive"] .course-support-popup {
+  --course-support-popup-limit: 660px;
+  box-shadow: 0 26px 70px rgb(5 62 93 / .26), 0 6px 18px rgb(5 62 93 / .14);
+}
+
+.course-support-popup .course-support-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  display: block;
+  transform: scaleX(1);
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--course-green), var(--course-teal), var(--course-blue));
+}
+
+.course-support-popup[dir="rtl"] .course-support-progress { transform-origin: right; }
+
+html[data-color-mode="flat"] .course-support-popup {
+  border-color: #858f91;
+  border-left-color: #647b70;
+  background: #fffefb;
+  box-shadow: 0 16px 40px rgb(38 49 59 / .16);
+}
+
+html[data-color-mode="flat"] .course-support-popup .course-support-symbol {
+  color: #fff;
+  background: #647b70;
+}
+
+html[data-color-mode="flat"] .course-support-popup .course-support-progress { background: #647b70; }
+
+html[data-color-mode="balanced"] .course-support-popup {
+  border-color: #70cfc5 #a7c9d9 #a7c9d9 #16bfae;
+  background: linear-gradient(112deg, #effcf6 0%, #f4fbff 58%, #fff 100%);
+}
+
+html[data-color-mode="vivid"] .course-support-popup {
+  border-color: #00c3b6 #68b8ff #68b8ff #006bff;
+  background: linear-gradient(112deg, #d7ffe8 0%, #dff7ff 48%, #edf1ff 100%);
+  box-shadow: 0 26px 70px rgb(0 89 184 / .28), 0 6px 20px rgb(0 184 187 / .18);
+}
+
+html[data-color-mode="vivid"] .course-support-popup .course-support-symbol {
+  background: linear-gradient(135deg, #00c967, #00b7f0 58%, #006bff);
+  box-shadow: 0 8px 20px rgb(0 105 245 / .26);
+}
+
+body[data-course-animations="gentle"] .course-support-popup.is-support-entering {
+  animation: course-popup-gentle-in 240ms cubic-bezier(.2, .72, .2, 1) both;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-entering {
+  animation: course-popup-lively-in 520ms cubic-bezier(.16, 1.16, .3, 1) both;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-entering .course-support-symbol {
+  animation: course-popup-symbol-lively 560ms cubic-bezier(.16, 1.2, .3, 1) both;
+}
+
+body[data-course-animations="gentle"] .course-support-popup.is-new-support-moment .course-support-progress,
+body[data-course-animations="lively"] .course-support-popup.is-new-support-moment .course-support-progress {
+  animation: course-popup-progress 5.2s linear both;
+}
+
+body[data-course-animations="gentle"] .course-support-popup:is(.course-support-moment--module-complete, .course-support-moment--course-complete) .course-support-progress,
+body[data-course-animations="lively"] .course-support-popup:is(.course-support-moment--module-complete, .course-support-moment--course-complete) .course-support-progress {
+  animation-duration: 7.2s;
+}
+
+body[data-course-animations="gentle"] .course-support-popup.is-support-popup-leaving {
+  animation: course-popup-gentle-out 220ms ease-in both;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-popup-leaving {
+  animation: course-popup-lively-out 400ms cubic-bezier(.55, 0, .85, .35) both;
+}
+
+@keyframes course-popup-gentle-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes course-popup-lively-in {
+  0% { opacity: 0; transform: translate(-50%, 46px) scale(.88) rotate(-1.2deg); }
+  62% { opacity: 1; transform: translate(-50%, -5px) scale(1.025) rotate(.25deg); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(0); }
+}
+
+@keyframes course-popup-symbol-lively {
+  0% { opacity: 0; transform: scale(.42) rotate(-24deg); }
+  66% { opacity: 1; transform: scale(1.16) rotate(5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes course-popup-gentle-out {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to { opacity: 0; transform: translate(-50%, 8px); }
+}
+
+@keyframes course-popup-lively-out {
+  from { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  to { opacity: 0; transform: translate(-50%, 30px) scale(.94); }
+}
+
+@keyframes course-popup-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* Pointer/keyboard action confirmation lives outside the rerendered app so it
+   remains visible even when a button immediately opens the next task. */
+.course-action-echo,
+.course-route-motion {
+  position: fixed;
+  z-index: 145;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.course-action-echo > i,
+.course-action-echo > b {
+  position: fixed;
+  left: var(--action-x);
+  top: var(--action-y);
+  display: block;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.course-action-echo > i {
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--course-blue);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgb(255 255 255 / .72);
+}
+
+.course-action-echo--gentle > i { animation: course-action-ring-gentle 380ms ease-out both; }
+
+.course-action-echo--lively > i { animation: course-action-ring-lively 680ms cubic-bezier(.12, .7, .2, 1) both; }
+.course-action-echo--lively > i:nth-child(2) { animation-delay: 70ms; border-color: var(--course-teal); }
+.course-action-echo--lively > i:nth-child(3) { animation-delay: 140ms; border-color: var(--course-green); }
+
+.course-action-echo--lively > b {
+  color: var(--course-blue);
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1;
+  animation: course-action-chevron 560ms cubic-bezier(.12, .76, .2, 1) both;
+}
+.course-action-echo--lively > b:nth-of-type(2) { animation-delay: 55ms; color: var(--course-teal); }
+.course-action-echo--lively > b:nth-of-type(3) { animation-delay: 110ms; color: var(--course-green); }
+
+@keyframes course-action-ring-gentle {
+  0% { opacity: .72; transform: translate(-50%, -50%) scale(.45); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.5); }
+}
+
+@keyframes course-action-ring-lively {
+  0% { opacity: .86; transform: translate(-50%, -50%) scale(.35); }
+  55% { opacity: .52; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(4.4); }
+}
+
+@keyframes course-action-chevron {
+  0% { opacity: 0; transform: translate(-70%, -50%) scale(.7); }
+  25% { opacity: .92; }
+  100% { opacity: 0; transform: translate(90px, -50%) scale(1.15); }
+}
+
+.course-route-motion { z-index: 118; }
+.course-route-motion > span,
+.course-route-motion > i,
+.course-route-motion > b {
+  position: absolute;
+  top: 50%;
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  transform-origin: center;
+}
+
+.course-route-motion > span {
+  left: -22vw;
+  width: 34vw;
+  background: linear-gradient(90deg, transparent, var(--course-green), var(--course-teal));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--course-teal) 48%, transparent);
+  animation: course-route-sweep-ltr 680ms cubic-bezier(.2, .78, .2, 1) both;
+}
+
+.course-route-motion > i,
+.course-route-motion > b {
+  left: -12vw;
+  width: 12vw;
+  border: 2px solid var(--course-blue);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  background: transparent;
+  animation: course-route-arc-ltr 690ms cubic-bezier(.16, .8, .2, 1) both;
+}
+.course-route-motion > b { top: calc(50% + 15px); animation-delay: 60ms; border-color: var(--course-teal); }
+
+.course-route-motion[data-direction="rtl"] > span { right: -22vw; left: auto; animation-name: course-route-sweep-rtl; }
+.course-route-motion[data-direction="rtl"] > i,
+.course-route-motion[data-direction="rtl"] > b {
+  right: -12vw;
+  left: auto;
+  border-right: 0;
+  border-left: 2px solid var(--course-blue);
+  border-radius: 999px 0 0 999px;
+  animation-name: course-route-arc-rtl;
+}
+
+@keyframes course-route-sweep-ltr {
+  0% { opacity: 0; transform: translateX(0) scaleX(.55); }
+  30% { opacity: .9; }
+  100% { opacity: 0; transform: translateX(134vw) scaleX(1.25); }
+}
+@keyframes course-route-sweep-rtl {
+  0% { opacity: 0; transform: translateX(0) scaleX(.55); }
+  30% { opacity: .9; }
+  100% { opacity: 0; transform: translateX(-134vw) scaleX(1.25); }
+}
+@keyframes course-route-arc-ltr {
+  0% { opacity: 0; transform: translateX(0) scale(.7); }
+  28% { opacity: .7; }
+  100% { opacity: 0; transform: translateX(122vw) scale(1.35); }
+}
+@keyframes course-route-arc-rtl {
+  0% { opacity: 0; transform: translateX(0) scale(.7); }
+  28% { opacity: .7; }
+  100% { opacity: 0; transform: translateX(-122vw) scale(1.35); }
+}
+
+/* Buttons and selectable answers visibly inherit the chosen motion level. */
+body[data-course-animations="gentle"] .course-app-shell button:not(:disabled),
+body[data-course-animations="gentle"] .course-app-shell summary,
+body[data-course-animations="gentle"] .course-check-option,
+body[data-course-animations="gentle"] .exam-option {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+body[data-course-animations="lively"] .course-app-shell button:not(:disabled),
+body[data-course-animations="lively"] .course-app-shell summary,
+body[data-course-animations="lively"] .course-check-option,
+body[data-course-animations="lively"] .exam-option {
+  transition: transform 280ms cubic-bezier(.16, 1, .3, 1), box-shadow 280ms ease, border-color 220ms ease, background-color 220ms ease, color 220ms ease;
+}
+
+@media (hover: hover) {
+  body[data-course-animations="lively"] .course-app-shell button:not(:disabled):hover,
+  body[data-course-animations="lively"] .course-app-shell summary:hover,
+  body[data-course-animations="lively"] .course-check-option:hover,
+  body[data-course-animations="lively"] .exam-option:hover {
+    transform: translateY(-3px) scale(1.012);
+    box-shadow: 0 12px 24px rgb(8 73 112 / .15);
+  }
+
+  body[data-course-animations="lively"] .course-primary-button:hover:not(:disabled) {
+    box-shadow: 0 16px 32px color-mix(in srgb, var(--course-green) 38%, transparent);
+  }
+}
+
+body[data-course-animations="lively"] .course-app-shell button:not(:disabled):active,
+body[data-course-animations="lively"] .course-app-shell summary:active,
+body[data-course-animations="lively"] .course-check-option:active,
+body[data-course-animations="lively"] .exam-option:active { transform: translateY(1px) scale(.965); }
+
+body[data-course-animations="lively"] .course-primary-button > span[aria-hidden="true"],
+body[data-course-animations="lively"] .course-text-button > span[aria-hidden="true"] {
+  display: inline-block;
+  transition: transform 260ms cubic-bezier(.16, 1, .3, 1);
+}
+
+@media (hover: hover) {
+  body[data-course-animations="lively"] .course-primary-button:hover > span[aria-hidden="true"],
+  body[data-course-animations="lively"] .course-text-button:hover > span[aria-hidden="true"] { transform: translateX(6px); }
+  body[data-course-animations="lively"][data-course-direction="rtl"] .course-primary-button:hover > span[aria-hidden="true"],
+  body[data-course-animations="lively"][data-course-direction="rtl"] .course-text-button:hover > span[aria-hidden="true"] { transform: translateX(-6px); }
+}
+
+/* New view/phase entrances. Existing support-event card animations remain in
+   charge when only a task section changes inside the same phase. */
+body[data-course-animations="gentle"] #course-main.is-course-page-entering > * {
+  animation: course-page-gentle-in 240ms ease-out both;
+}
+
+body[data-course-animations="lively"] #course-main.is-course-page-entering > * {
+  animation: course-page-lively-in 460ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"] #course-main.is-course-page-entering .course-module-strip {
+  animation: course-route-panel-lively-in 520ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"] #course-main.is-course-page-entering .course-module-list > li,
+body[data-course-animations="lively"] #course-main.is-course-page-entering .course-catalogue-card,
+body[data-course-animations="lively"] #course-main.is-course-page-entering .course-secondary-actions > * {
+  animation: course-sequence-lively-in 420ms cubic-bezier(.16, 1, .3, 1) both;
+  animation-delay: calc(var(--course-motion-index, 0) * 45ms);
+}
+
+body[data-course-animations="gentle"] .course-modal-backdrop { animation: course-backdrop-in 180ms ease-out both; }
+body[data-course-animations="gentle"] .course-modal { animation: course-modal-gentle-in 220ms ease-out both; }
+body[data-course-animations="lively"] .course-modal-backdrop { animation: course-backdrop-in 220ms ease-out both; }
+body[data-course-animations="lively"] .course-modal { animation: course-modal-lively-in 430ms cubic-bezier(.16, 1.14, .3, 1) both; }
+body[data-course-animations="gentle"] .course-settings-menu { animation: course-settings-gentle-in 200ms ease-out both; }
+body[data-course-animations="lively"] .course-settings-menu { animation: course-settings-lively-in 390ms cubic-bezier(.16, 1.14, .3, 1) both; }
+
+@keyframes course-page-gentle-in {
+  from { opacity: .35; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes course-page-lively-in {
+  0% { opacity: .08; transform: translateY(24px) scale(.988); }
+  68% { opacity: 1; transform: translateY(-3px) scale(1.003); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes course-route-panel-lively-in {
+  from { opacity: .12; transform: translateY(-18px); clip-path: inset(0 16% 0 0); }
+  to { opacity: 1; transform: translateY(0); clip-path: inset(0 0 0 0); }
+}
+@keyframes course-sequence-lively-in {
+  from { opacity: 0; transform: translateX(18px) translateY(6px) scale(.975); }
+  to { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+}
+@keyframes course-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes course-modal-gentle-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes course-modal-lively-in {
+  0% { opacity: 0; transform: translateY(30px) scale(.9); }
+  68% { opacity: 1; transform: translateY(-4px) scale(1.015); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes course-settings-gentle-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes course-settings-lively-in {
+  0% { opacity: 0; transform: translateY(-18px) scale(.94); }
+  72% { opacity: 1; transform: translateY(3px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+body[data-course-animations="lively"] .typing-character.is-just-typed {
+  position: relative;
+  color: #079c48;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--course-green) 62%, transparent);
+  animation-duration: 300ms;
+}
+
+body[data-course-animations="lively"] .course-check-option.is-selected,
+body[data-course-animations="lively"] .exam-option.is-selected {
+  animation: course-selected-option-lively 360ms cubic-bezier(.16, 1.15, .3, 1) both;
+}
+
+@keyframes course-selected-option-lively {
+  0% { transform: scale(.975); box-shadow: 0 0 0 0 color-mix(in srgb, var(--course-blue) 30%, transparent); }
+  58% { transform: scale(1.012); box-shadow: 0 0 0 7px color-mix(in srgb, var(--course-blue) 12%, transparent); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+}
+
+body[data-course-animations="still"] .course-support-popup,
+body[data-course-animations="still"] .course-support-popup *,
+body[data-course-animations="still"] #course-main,
+body[data-course-animations="still"] #course-main *,
+body[data-course-animations="still"] .course-modal,
+body[data-course-animations="still"] .course-modal-backdrop,
+body[data-course-animations="still"] .course-settings-menu {
+  animation: none !important;
+  transition: none !important;
+}
+
+body[data-course-animations="still"] .course-support-progress,
+body[data-course-animations="still"] .course-action-echo,
+body[data-course-animations="still"] .course-route-motion { display: none !important; }
+
+@media (max-width: 767px) {
+  body[data-course-encouragement="balanced"] .course-support-popup,
+  body[data-course-encouragement="expressive"] .course-support-popup {
+    bottom: 12px;
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+  .course-route-motion { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-action-echo,
+  .course-route-motion { display: none !important; }
+  .course-support-popup,
+  .course-support-popup *,
+  #course-main,
+  #course-main *,
+  .course-modal,
+  .course-modal-backdrop,
+  .course-settings-menu {
+    animation: none !important;
+    transition: none !important;
+  }
+  .course-support-progress { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-app-shell *,
+  .course-app-shell *::before,
+  .course-app-shell *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+  .course-success-celebration { display: none !important; }
+}
+
+/* -------------------------------------------------------------------------
+   Earned encouragement and varied reward motion
+
+   Popups are centred so they read as a clear moment rather than an unrelated
+   footer. Inline/Subtle support is placed immediately before the active work.
+   Every earned event has its own short motion signature; none loops. */
+
+body[data-course-encouragement="balanced"] .course-support-popup,
+body[data-course-encouragement="expressive"] .course-support-popup {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
+/* The acknowledgement sits over the active work column, but it should feel
+   like a brief learning moment—not a second full-width panel competing with
+   the task.  The column is calculated in course.js from the task card, which
+   keeps this identical with and without the mascot. */
+.course-support-popup {
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-width: 1px 1px 1px 4px;
+  border-radius: 18px;
+  padding: 14px 17px 15px;
+  background: rgb(255 255 255 / .98);
+  box-shadow: 0 14px 34px rgb(16 54 77 / .18), 0 2px 7px rgb(16 54 77 / .1);
+}
+
+.course-support-popup .course-support-symbol {
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  border-radius: 11px;
+  font-size: 18px;
+}
+
+.course-support-popup .course-support-label {
+  margin-bottom: 2px;
+  font-size: 9px;
+}
+
+.course-support-popup strong {
+  font-size: clamp(1rem, 1.25vw, 1.16rem);
+  line-height: 1.25;
+}
+
+.course-support-popup p {
+  margin-top: 2px;
+  font-size: .84rem;
+  line-height: 1.42;
+}
+
+.course-support-popup .course-support-next {
+  margin-top: 7px !important;
+  padding-top: 7px;
+  font-size: .76rem !important;
+}
+
+/* Open keeps the complete context. Balanced removes the directional icon and
+   next-choice copy, while Focused keeps one strong line only. The divider is
+   intentionally retained in the latter two modes as a quiet visual anchor. */
+.course-support-popup--open .course-support-symbol {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  align-self: center;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  line-height: 1;
+  text-align: center;
+  transform: translateX(1px);
+}
+
+.course-support-popup--open[dir="rtl"] .course-support-symbol { transform: translateX(-1px); }
+
+body[data-course-encouragement] .course-support-popup.course-support-popup--balanced {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.course-support-popup--focused {
+  display: block;
+  padding: 15px 20px 14px;
+  text-align: center;
+}
+
+.course-support-popup--focused .course-support-copy { display: block; }
+.course-support-popup--focused strong { display: block; }
+
+.course-support-popup .course-support-next--line {
+  width: 100%;
+  height: 1px;
+  min-height: 1px;
+  display: block;
+  margin: 12px 0 0 !important;
+  border-top: 1px solid var(--course-line-strong);
+  padding: 0 !important;
+  color: transparent !important;
+  font-size: 0 !important;
+}
+
+/* Colour style owns the popup palette. Encouragement decides prominence and
+   copy only; it must never quietly make a Balanced page look Vivid. */
+html[data-color-mode="flat"] .course-support-popup {
+  border-color: #c9d0ce;
+  border-left-color: #788682;
+  background: #fffefb;
+  box-shadow: 0 12px 28px rgb(38 49 59 / .12), 0 2px 6px rgb(38 49 59 / .06);
+}
+
+html[data-color-mode="flat"] .course-support-popup .course-support-symbol {
+  color: #fff;
+  background: #6d7d78;
+  box-shadow: none;
+}
+
+html[data-color-mode="flat"] .course-support-popup .course-support-label,
+html[data-color-mode="flat"] .course-support-popup .course-support-next > span { color: #50615b; }
+html[data-color-mode="flat"] .course-support-popup .course-support-next { border-top-color: #d9dfdc; }
+html[data-color-mode="flat"] .course-support-popup .course-support-progress { background: #71817c; }
+
+html[data-color-mode="balanced"] .course-support-popup {
+  border-color: #9ccfc7 #bad0e2 #bad0e2 #29ac98;
+  border-left-color: #29ac98;
+  background: #fff;
+  box-shadow: 0 14px 32px rgb(22 93 100 / .17), 0 2px 7px rgb(22 93 100 / .08);
+}
+
+html[data-color-mode="balanced"] .course-support-popup .course-support-symbol {
+  color: #fff;
+  background: linear-gradient(135deg, #45bf91, #469fdb);
+  box-shadow: 0 5px 12px rgb(32 132 150 / .17);
+}
+
+html[data-color-mode="balanced"] .course-support-popup .course-support-label,
+html[data-color-mode="balanced"] .course-support-popup .course-support-next > span { color: #267aaf; }
+html[data-color-mode="balanced"] .course-support-popup .course-support-next { border-top-color: #a9d6d1; }
+html[data-color-mode="balanced"] .course-support-popup .course-support-next--line { border-top-color: #a9d6d1; }
+html[data-color-mode="balanced"] .course-support-popup .course-support-progress { background: linear-gradient(90deg, #28b895, #429cdb); }
+
+html[data-color-mode="vivid"] .course-support-popup {
+  border-color: #68b8ff;
+  border-left-color: #00bfa7;
+  background: linear-gradient(112deg, #e7fff1 0%, #eef8ff 54%, #f2f4ff 100%);
+  box-shadow: 0 18px 42px rgb(0 89 184 / .22), 0 4px 12px rgb(0 184 187 / .14);
+}
+
+html[data-color-mode="vivid"] .course-support-popup .course-support-symbol {
+  color: #fff;
+  background: linear-gradient(135deg, #00c967, #00b7f0 58%, #006bff);
+  box-shadow: 0 8px 20px rgb(0 105 245 / .26);
+}
