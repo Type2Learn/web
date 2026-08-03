@@ -398,3 +398,60 @@ export const PRESETS = deepFreeze([
     category: 'Structure and focus',
     compatibleWith: ['clear-progress', 'clear-predictable'],
     conflictsWith: [],
+    conditionLabel: 'Step-by-step learning support',
+    description: 'Short, explicit actions with helpful repetition.',
+    longDescription: 'Breaks a learning action into clear, respectful, repeatable steps.',
+    primaryDimensions: ['step_by_step', 'predictability', 'focus'],
+    matchWeights: { step_by_step: 1, predictability: 0.8, focus: 0.35 },
+    settings: { smallerSections: true, literalInstructions: true, simplerExplanations: true, extraExamples: true, extraHints: true, recap: true, visibleNextSteps: true, visibleProgress: true },
+    exampleSettings: ['Smaller sections', 'Literal instructions', 'Examples before practice', 'Clear next steps', 'Recap and repetition'],
+    internalInspiration: 'scaffolded-learning'
+  }),
+  createProfile({
+    id: 'flexible-input',
+    name: 'Flexible Input',
+    category: 'Input and motor control',
+    compatibleWith: ['focus-flow', 'comfortable-control', 'flexible-expression'],
+    conflictsWith: [],
+    conditionLabel: 'Flexible input support',
+    description: 'Keep assistive and alternative input routes available.',
+    longDescription: 'Offers more comfortable ways to operate the interface and enter a response.',
+    primaryDimensions: ['flexible_input', 'motor_support', 'flexible_expression'],
+    matchWeights: { flexible_input: 1, motor_support: 0.9, flexible_expression: 0.6 },
+    settings: { alternativeInput: true, speechToText: true, alternativeResponses: true, oneHandedInput: true, switchInput: true, keyboardShortcuts: true, largerControls: true, restBreaks: true },
+    exampleSettings: ['Alternative input', 'Voice input and speech-to-text', 'One-handed input', 'Switch input', 'Larger controls'],
+    internalInspiration: 'physical-and-motor-access'
+  }),
+  createProfile({
+    id: 'low-stimulation',
+    name: 'Low Stimulation',
+    category: 'Sensory environment',
+    compatibleWith: ['clear-predictable'],
+    conflictsWith: ['readable-view'],
+    conflictMetadata: [{ type: 'high-contrast-and-low-stimulation', message: 'Low Stimulation keeps visual detail low, while Readable View includes high contrast.' }],
+    conditionLabel: 'Calmer display support',
+    description: 'A quieter display with reduced motion and fewer distractions.',
+    longDescription: 'Reduces non-essential visual, audio, and motion load while keeping the task clear.',
+    primaryDimensions: ['sensory_comfort', 'predictability', 'focus'],
+    matchWeights: { sensory_comfort: 1, predictability: 0.75, focus: 0.4 },
+    settings: { fewerDistractions: true, reducedMotion: true, quietDisplay: true, stableLayout: true, narrationAutoScroll: false },
+    exampleSettings: ['Reduced motion', 'Quiet display', 'Fewer distractions', 'Stable layout'],
+    internalInspiration: 'sensory-comfort'
+  })
+]);
+
+export const BALANCED_START_PRESET = deepFreeze({
+  id: BALANCED_START_PRESET_ID,
+  name: 'Balanced Starting Setup',
+  conditionLabel: 'Standard learning setup',
+  description: 'A calm, standard course experience that you can customise anytime.',
+  longDescription: 'Keeps written content visible, narration available on request, automatic saving on, and countdown pressure off.',
+  primaryDimensions: [],
+  matchWeights: {},
+  settings: {},
+  allowedSettingKeys: [],
+  exampleSettings: []
+});
+
+const validKeys = new Set(Object.keys(PLATFORM_DEFAULTS));
+const editableKeySet = new Set(EDITABLE_SETTING_KEYS);
