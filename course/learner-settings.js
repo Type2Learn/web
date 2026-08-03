@@ -626,3 +626,61 @@ const looksLikeResolvedSettingsSnapshot = (value) => {
   // A learner could reasonably have made a dozen individual changes in an
   // older build. Only treat a preferences object as a broad resolved snapshot
   // when it contains most of today's editable surface, or carries the old
+  // always-on platform signature.
+  return settingKeyCount >= 20 || signatureCount >= 4;
+};
+
+const provenLegacyAliasOverrides = (value) => {
+  const source = safeObject(value);
+  const overrides = {};
+  if (source.voiceInput === true || source.speechToText === true) overrides.speechToText = true;
+  if (source.textSizeLarge === true) overrides.textSize = 'large';
+  if (source.spacingRelaxed === true) overrides.spacing = 'relaxed';
+  return overrides;
+};
+
+const explicitLegacyOverrideEnvelope = (value) => {
+  const container = safeObject(value);
+  return {
+    ...(looksLikeResolvedSettingsSnapshot(container) ? provenLegacyAliasOverrides(container) : cleanOverrides(container)),
+    ...cleanOverrides(container.overrides),
+    ...cleanOverrides(container.userOverrides)
+  };
+};
+
+const migrateExplicitLegacyOverrides = (record) => ({
+  ...explicitLegacyOverrideEnvelope(record.legacyPreferences),
+  ...explicitLegacyOverrideEnvelope(record.preferences),
+  ...provenLegacyAliasOverrides(record),
+  ...directLegacyOverrides(record)
+});
+
+const cleanTimestamp = (value) => typeof value === 'string' && value.length <= 80 ? value : '';
+
+const normaliseOnboarding = (raw, state) => {
+  const saved = safeObject(raw);
+  const requestedMethod = typeof saved.method === 'string' ? saved.method : '';
+  const completed = Boolean(saved.completed || state.legacyComplete);
+  const primaryCandidate = typeof saved.primaryProfile === 'string'
+    ? saved.primaryProfile
+    : (typeof saved.primaryProfileId === 'string' ? saved.primaryProfileId : state.primaryPresetId);
+  const primaryProfile = isRecommendationProfileId(primaryCandidate)
+    ? primaryCandidate
+    : (state.primaryPresetId || (completed ? BALANCED_START_PRESET_ID : ''));
+  const secondarySource = Array.isArray(saved.secondaryProfiles)
+    ? saved.secondaryProfiles
+    : (Array.isArray(saved.secondaryProfileIds) ? saved.secondaryProfileIds : state.selectedPresetIds.filter((id) => id !== primaryProfile));
+  const secondaryProfiles = orderProfileIds(secondarySource).filter((id) => id !== primaryProfile).slice(0, 2);
+  const inferredMethod = primaryProfile === BALANCED_START_PRESET_ID ? 'standard' : (state.selectedPresetIds.length ? 'legacy' : '');
+  return {
+    completed,
+    method: requestedMethod && validOnboardingMethods.has(requestedMethod) ? requestedMethod : inferredMethod,
+    recommendationVersion: Number.isInteger(saved.recommendationVersion) && saved.recommendationVersion > 0
+      ? saved.recommendationVersion
+      : RECOMMENDATION_VERSION,
+    primaryProfile,
+    secondaryProfiles,
+    selectedAnswers: cleanSelectedAnswerIds(saved.selectedAnswers),
+    completedAt: cleanTimestamp(saved.completedAt)
+  };
+};
