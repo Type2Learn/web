@@ -1084,3 +1084,60 @@ export const applyPresetConflictResolution = (input, conflict, choice) => {
       ...state.conflictResolutions,
       [String(entry.id || conflictIdFor('manual-resolution', [], key))]: { key, choice, value: safeValue[key] }
     },
+    customSetup: true,
+    updatedAt: timestamp()
+  };
+};
+
+const onboardingMetadata = (state, {
+  method,
+  primaryProfileId,
+  secondaryProfileIds,
+  selectedAnswers,
+  completed
+} = {}) => {
+  const primary = isRecommendationProfileId(primaryProfileId)
+    ? primaryProfileId
+    : (primaryProfileId === '' && completed === false
+      ? ''
+      : (state.primaryPresetId || BALANCED_START_PRESET_ID));
+  const secondary = orderProfileIds(secondaryProfileIds).filter((id) => id !== primary).slice(0, 2);
+  const isComplete = typeof completed === 'boolean' ? completed : state.setupComplete;
+  const candidateMethod = typeof method === 'string' ? method : state.onboarding.method;
+  return {
+    completed: isComplete,
+    method: validOnboardingMethods.has(candidateMethod)
+      ? candidateMethod
+      : (primary === BALANCED_START_PRESET_ID ? 'standard' : 'manual'),
+    recommendationVersion: RECOMMENDATION_VERSION,
+    primaryProfile: primary,
+    secondaryProfiles: secondary,
+    selectedAnswers: cleanSelectedAnswerIds(selectedAnswers ?? state.onboarding.selectedAnswers),
+    completedAt: isComplete ? (state.onboarding.completedAt || timestamp()) : ''
+  };
+};
+
+/*
+ * Select multiple support overlays without overwriting explicit learner
+ * changes. Passing { completed: false } is useful while a UI is reviewing
+ * choices; applyRecommendation() is the accepting action and completes setup.
+ */
+export const selectSupportProfiles = (input, profileIds, metadata = {}) => {
+  const state = createSettingsState(input);
+  const requested = cleanProfileIds(profileIds);
+  const analysis = getPresetSelectionAnalysis(state, requested);
+  if (!analysis.canApply) return state;
+  const requestedPrimary = metadata.primaryProfileId || metadata.primaryProfile;
+  const primary = isProfileId(requestedPrimary) && requested.includes(requestedPrimary)
+    ? requestedPrimary
+    : (requested[0] || BALANCED_START_PRESET_ID);
+  const selectedPresetIds = primary === BALANCED_START_PRESET_ID
+    ? []
+    : orderProfileIds(requested, primary);
+  const completed = typeof metadata.completed === 'boolean' ? metadata.completed : state.setupComplete;
+  const onboarding = onboardingMetadata(state, {
+    method: metadata.method || (primary === BALANCED_START_PRESET_ID ? 'standard' : 'manual'),
+    primaryProfileId: primary,
+    secondaryProfileIds: selectedPresetIds.slice(1),
+    selectedAnswers: metadata.selectedAnswers ?? metadata.selectedOptionIds,
+    completed
