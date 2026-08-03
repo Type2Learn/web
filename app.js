@@ -1057,18 +1057,6 @@
       const target = nextStop(direction);
       if (target === null || target === undefined) return false;
 
-      if (direction > 0) return stops.find((stop) => stop > current + tolerance);
-      for (let index = stops.length - 1; index >= 0; index -= 1) {
-        if (stops[index] < current - tolerance) return stops[index];
-      }
-      return null;
-    };
-
-    const scrollToStop = (direction) => {
-      if (!enabled() || Date.now() < lockedUntil) return false;
-      const target = nextStop(direction);
-      if (target === null || target === undefined) return false;
-
       const travel = Math.abs(target - window.scrollY);
       const duration = Math.min(1150, Math.max(460, 260 + travel * .32));
       lockedUntil = Date.now() + duration;
@@ -1352,6 +1340,26 @@
     const motion = document.getElementById('motion-toggle');
     if (motion) motion.addEventListener('click', () => setMotion(!document.body.classList.contains('motion-off')));
 
+    const colorModeCycle = ['flat', 'balanced', 'vivid'];
+    const syncColorModeControls = (value) => {
+      const mode = colorModeCycle.includes(value) ? value : colorModeApi.get();
+      document.querySelectorAll('[data-color-mode-toggle]').forEach((control) => {
+        control.dataset.colorMode = mode;
+        control.setAttribute('aria-label', colorModeAria(mode));
+        const state = control.querySelector('[data-color-mode-state]');
+        if (state) state.textContent = colorModeLabel(mode);
+      });
+    };
+    document.querySelectorAll('[data-color-mode-toggle]').forEach((control) => {
+      control.addEventListener('click', () => {
+        const current = colorModeApi.get();
+        const next = colorModeCycle[(colorModeCycle.indexOf(current) + 1) % colorModeCycle.length];
+        colorModeApi.set(next);
+      });
+    });
+    window.addEventListener('type2learn:color-mode', (event) => syncColorModeControls(event.detail?.mode));
+    syncColorModeControls(colorModeApi.get());
+
     document.querySelectorAll('[data-scroll-target]').forEach((link) => {
       link.addEventListener('click', (event) => {
         const target = document.getElementById(link.dataset.scrollTarget);
@@ -1411,6 +1419,9 @@
     const googleButton = document.querySelector('[data-google-auth]');
     if (googleButton && !document.querySelector('.auth-google-terms')) {
       googleButton.insertAdjacentHTML('afterend', '<p class="auth-google-terms">By continuing with Google, you agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</p>');
+    }
+    if (googleButton && !document.querySelector('[data-guest-access]')) {
+      (document.querySelector('.auth-google-terms') || googleButton).insertAdjacentHTML('afterend', '<div class="auth-guest-access"><button class="auth-guest-button" type="button" data-guest-access>Continue as a guest</button><p>A random browser cookie keeps this guest space separate. No account is created.</p></div>');
     }
     if (integrationNote?.lastChild) {
       integrationNote.lastChild.textContent = 'Connecting secure account services…';
@@ -1508,6 +1519,20 @@
       status.textContent = message;
     };
 
+    const guestButton = document.querySelector('[data-guest-access]');
+    guestButton?.addEventListener('click', async () => {
+      guestButton.disabled = true;
+      setAuthStatus(document.querySelector('[data-auth-form="login"]'), 'Opening a private guest learning space…', 'working');
+      try {
+        const { createType2LearnGuest } = await import('/guest-session.js?v=20260731-guest1');
+        if (!createType2LearnGuest()) throw new Error('Guest cookie unavailable');
+        window.location.assign('/course/');
+      } catch (_) {
+        guestButton.disabled = false;
+        setAuthStatus(document.querySelector('[data-auth-form="login"]'), 'Guest access needs browser cookies. Enable cookies for this site and try again.', 'error');
+      }
+    });
+
     const loginForm = document.querySelector('[data-auth-form="login"]');
     const loginEmail = document.getElementById('login-email');
     const rememberEmail = document.getElementById('remember-email');
@@ -1528,7 +1553,7 @@
     };
     registerPassword?.addEventListener('input', validatePasswordMatch);
     registerConfirm?.addEventListener('input', validatePasswordMatch);
-    import('/firebase-auth.js?v=20260722-1')
+    import('/firebase-auth.js?v=20260801-courseflow1')
       .then(({ setupFirebaseAuth }) => setupFirebaseAuth({ setStatus: setAuthStatus }))
       .catch(() => {
         if (integrationNote?.lastChild) integrationNote.lastChild.textContent = 'Account services could not connect';
