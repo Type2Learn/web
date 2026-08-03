@@ -1,26 +1,70 @@
-import { signOutType2LearnUser, waitForType2LearnUser } from '/firebase-auth.js?v=20260722-1';
+import { getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
 
 const app = document.getElementById('learn-app');
-const sidebarStorageKey = 'type2learn.learnSidebarAutoHide';
-const desktopQuery = window.matchMedia('(min-width: 821px)');
-const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+const preferenceStoragePrefix = 'type2learn-course-preferences-v1:';
+const legacyPreferenceStoragePrefix = 'type2learn-learning-preferences-v1:';
+const supportedCourseIds = new Set(['course-1-neurodivergent-conditions-v2']);
+const selectedCourseId = new URLSearchParams(window.location.search).get('course') || '';
+const backgroundNoiseSources = {
+  pink: '/assets/audio/background-noise/pink-noise-loop.mp3',
+  white: '/assets/audio/background-noise/white-noise-loop.mp3',
+  brown: '/assets/audio/background-noise/brown-noise-loop.mp3'
+};
+const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0.15, playing: false, fadeFrame: null, playRequest: 0 };
+const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';
+let mascotAssetsWarmed = false;
+let mascotPreview = null;
+let mascotPreviewLoad = null;
+let setupStage = 'language';
+let focusedStepIndex = 0;
+let mascotLanguageExplicitlyChosen = false;
+let layoutBeforeFocused = 'balanced';
+let setupFeedbackTimer = 0;
+let setupMotionSequence = 0;
+const mascotScreenIsSupported = () => window.matchMedia?.('(min-width: 1181px)').matches;
 
-const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  "'": '&#39;',
-  '"': '&quot;'
-}[character]));
+const preferenceControls = [
+  { id: 'layout', label: 'Page layout', description: 'How much space sits around one task.', choices: [['focused', 'Focused'], ['balanced', 'Balanced'], ['open', 'Open']] },
+  { id: 'colours', label: 'Color style', description: 'How much color appears around the task.', choices: [['flat', 'Flat'], ['balanced', 'Balanced'], ['vivid', 'Vivid']] },
+  { id: 'encouragement', label: 'Encouragement', description: 'How visible supportive moments feel.', choices: [['subtle', 'Subtle'], ['balanced', 'Balanced'], ['expressive', 'Expressive']] },
+  { id: 'animations', label: 'Animations', description: 'How much supportive movement you would like to see.', choices: [['still', 'Still'], ['gentle', 'Gentle'], ['lively', 'Lively']] },
+  { id: 'background-noise', label: 'Background noise', description: 'Optional looping sound, always off to start.', choices: [['off', 'Off'], ['on', 'On']] },
+  { id: 'text-to-speech', label: 'Text to speech', description: 'Optional read-aloud support.', choices: [['off', 'Off'], ['on', 'On']] },
+  { id: 'mascot', label: 'Mascot', description: 'A learning companion when you want one.', choices: [['off', 'Off'], ['on', 'On']] }
+];
 
-const initialsFor = (user) => {
-  const source = user?.displayName?.trim() || user?.email?.split('@')[0] || 'Type2Learn learner';
-  return source.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'T2';
+const defaultChoices = {
+  ...Object.fromEntries(preferenceControls.map(({ id, choices }) => [id, id === 'colours' || id === 'layout' ? 'balanced' : id === 'animations' ? 'gentle' : choices[0][0]])),
+  'learning-language': 'english',
+  'mascot-language': 'english',
+  'mascot-language-explicit': false,
+  'mascot-voice': 'text',
+  'mascot-behaviour': 'calm',
+  'background-noise-type': 'pink',
+  // A deliberately quiet starting point. The interface caps this at 35% so
+  // background sound cannot jump to an unexpectedly loud browser volume.
+  'background-noise-volume': '15'
 };
 
-const nameFor = (user) => user?.displayName?.trim() || user?.email?.split('@')[0] || 'Type2Learn learner';
+const preferenceKey = (user, courseId) => preferenceStoragePrefix
+  + encodeURIComponent(user?.uid || user?.email || 'learner')
+  + ':' + encodeURIComponent(courseId);
 
-const readAutoHide = () => {
+const legacyPreferenceKey = (user) => legacyPreferenceStoragePrefix
+  + encodeURIComponent(user?.uid || user?.email || 'learner');
+
+const readPreferences = (user, courseId) => {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(preferenceKey(user, courseId)) || 'null');
+    if (value && typeof value === 'object') return value;
+    // Existing general settings are used only to prefill this course once.
+    // Continuing saves a separate, course-specific preference record.
+    const legacy = JSON.parse(window.localStorage.getItem(legacyPreferenceKey(user)) || 'null');
+    return legacy && typeof legacy === 'object' ? legacy : null;
+  } catch (_) {
+    return null;
+  }
+};
   try {
     return window.localStorage.getItem(sidebarStorageKey) !== 'false';
   } catch (_) {

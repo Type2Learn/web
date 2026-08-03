@@ -5,8 +5,10 @@
 }
 
 @font-face {
-  font-family: "Cormorant Garamond";
-  src: url("/assets/fonts/cormorant-garamond-latin-wght-normal.woff2") format("woff2");
+  font-family: "Noto Sans Arabic Local";
+  src: url("/assets/fonts/noto-sans-arabic.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 900;
   font-display: swap;
 }
 
@@ -22,48 +24,60 @@
   --learn-teal: #19C5B5;
   --learn-cyan: #19BDEB;
   --learn-blue: #1769F5;
-  --learn-display: "Cormorant Garamond", Georgia, serif;
   --learn-sans: "Manrope", "Atkinson Hyperlegible", Arial, sans-serif;
-  --sidebar-width: 306px;
+}
+
+html[data-color-mode="flat"] {
+  --learn-ink: #26313B;
+  --learn-soft: #4F5F6C;
+  --learn-muted: #707A80;
+  --learn-cloud: #F5F4F0;
+  --learn-paper: #FFFEFB;
+  --learn-line: #DDDCD5;
+  --learn-line-strong: #C5C6BE;
+  --learn-green: #6F8876;
+  --learn-teal: #6F8580;
+  --learn-cyan: #718490;
+  --learn-blue: #516F7B;
+}
+
+html[data-color-mode="vivid"] {
+  --learn-ink: #061A38;
+  --learn-soft: #164B78;
+  --learn-muted: #416D94;
+  --learn-cloud: #E6F6FF;
+  --learn-paper: #FFFFFF;
+  --learn-line: #B9DDF7;
+  --learn-line-strong: #88C5F2;
+  --learn-green: #05C967;
+  --learn-teal: #00C3B6;
+  --learn-cyan: #00B7F0;
+  --learn-blue: #006BFF;
 }
 
 * { box-sizing: border-box; }
 
-html {
-  min-width: 320px;
-  background: var(--learn-cloud);
-}
+html,
+body { min-width: 320px; min-height: 100%; }
 
 body {
-  min-width: 320px;
   margin: 0;
   color: var(--learn-ink);
   background:
-    linear-gradient(135deg, rgba(25, 200, 90, .08), transparent 22%),
-    linear-gradient(225deg, rgba(23, 105, 245, .09), transparent 28%),
+    linear-gradient(135deg, rgba(25, 200, 90, .08), transparent 24%),
+    linear-gradient(225deg, rgba(23, 105, 245, .09), transparent 30%),
     var(--learn-cloud);
   font: 500 16px/1.55 var(--learn-sans);
 }
 
-body.is-sidebar-dragging {
-  cursor: ew-resize;
-  user-select: none;
+html[data-color-mode="flat"] body { background: var(--learn-cloud); }
+html[data-color-mode="vivid"] body {
+  background:
+    linear-gradient(135deg, rgba(22, 212, 101, .12), transparent 24%),
+    linear-gradient(225deg, rgba(18, 109, 253, .14), transparent 30%),
+    var(--learn-cloud);
 }
 
-button,
-a,
-input {
-  -webkit-tap-highlight-color: transparent;
-}
-
-button {
-  font: inherit;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
 
 button:focus-visible,
 a:focus-visible {
