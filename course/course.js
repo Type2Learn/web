@@ -3225,3 +3225,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const animateReadingSectionChange = () => {
     if (!contentTransitionsAreEnabled()) return;
     const reading = app.querySelector('.course-reading-copy[data-structured="true"]');
+    if (!reading) return;
+    // The new element has just been rendered. Adding the state on the next
+    // frame lets the animation describe only the replacement text, not a page
+    // scroll or the surrounding lesson controls.
+    window.requestAnimationFrame(() => reading.classList.add('is-reading-section-entering'));
+  };
+
+  const retainReadingSectionPosition = (focusSelector) => {
+    const card = app.querySelector('.course-task-card');
+    const reading = card?.querySelector('.course-reading-copy[data-structured="true"]');
+    const actions = card?.querySelector('.course-task-actions');
+    const previousScrollY = Number(window.scrollY ?? window.pageYOffset) || 0;
+    if (!card || !reading || !actions) {
+      // This fallback only protects an unexpected markup mismatch. Normal
+      // smaller-section navigation updates the existing reading panel below.
+      render();
+      window.requestAnimationFrame(() => window.scrollTo?.({ left: 0, top: previousScrollY, behavior: 'auto' }));
+      return;
+    }
+
+    // Update only the bounded reading region. Replacing the whole course shell
+    // caused focus and browser layout to return learners to the page heading.
+    // Keeping this panel in place lets the text change without moving the page.
+    if (state.preferences.readAloud) ensureNarrationService().stop({ silent: true });
+    reading.innerHTML = readingContentMarkup(Boolean(state.preferences.readAloud));
+    const progress = card.querySelector('.course-reading-section-progress');
+    const progressMarkup = readingSectionProgress();
+    if (progress && progressMarkup) progress.outerHTML = progressMarkup;
+    else if (!progress && progressMarkup) reading.insertAdjacentHTML('beforebegin', progressMarkup);
+    actions.innerHTML = readingTaskActions();
+    addSourceNotice();
+    prepareNarrationForRenderedTask();
+    const restoreScroll = () => window.scrollTo?.({ left: 0, top: previousScrollY, behavior: 'auto' });
+    restoreScroll();
+    window.requestAnimationFrame(() => {
+      // CSS scroll anchoring can otherwise react to a shorter final section
+      // after the markup change. Restore the same reading position before and
+      // after the frame without using smooth scrolling.
+      restoreScroll();
+      const control = card.querySelector(focusSelector);
+      try {
+        control?.focus?.({ preventScroll: true });
+      } catch (_) {
+        // Do not fall back to a scrolling focus call. Pointer users do not
+        // need focus moved, and keyboard users keep the visible action.
+      }
+      animateReadingSectionChange();
+      window.requestAnimationFrame(restoreScroll);
+    });
+  };
+
+  const startFinalExam = () => {
+    if (!finalExamQuestionCount()) {
+      announce('The final exam is not available yet.');
+      return;
+    }
+    state.view = 'course';
+    if (state.progress.finalExam.completed) state.progress.finalExam = blankFinalExamAttempt();
+    state.progress.phase = 'exam';
+    state.progress.finalExam.submitted = false;
+    state.modal = '';
+    recordSupportMoment('task-entry', { result: 'exam-question' });
+    save();
+    render();
+    focusCurrentTask('#exam-question-card');
+  };
+
+  const submitFinalExamAnswer = () => {
