@@ -1508,3 +1508,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       // sections, stop at the end of the visible section instead of continuing
       // into lesson text that has not been opened yet.
       stopAtSourceChar: visibleSectionEnd
+    }];
+    if (shouldShowSimple() && assets.simpleAddon && step.simple) {
+      const simpleChunkIndexes = narrationChunkIndexes(chunks, (text) => text === simpleLabel || text === simpleText);
+      if (simpleChunkIndexes.length) {
+        const simpleChunks = simpleChunkIndexes.map((index) => chunks[index]);
+        const simpleMap = mapAudioTextToNarrationChunks(step.simple, simpleChunks)
+          .map((entry) => ({ ...entry, index: simpleChunkIndexes[entry.index] }));
+        playlist.push({
+          src: assets.simpleAddon,
+          text: step.simple,
+          chunkIndexes: simpleChunkIndexes,
+          chunkMap: simpleMap,
+          wordCues: assets.simpleAddonCues
+        });
+      }
+    }
+    return playlist;
+  };
+
+  const configureLocalAvaPlaylist = (service, chunks) => {
+    if (typeof service?.setAudioPlaylist !== 'function') return [];
+    const playlist = localAvaPlaylist(chunks);
+    service.setAudioPlaylist(playlist);
+    return playlist;
+  };
+
+  const narrationVoiceOptions = () => (hasLocalAvaNarration()
+    ? '<option value="' + LOCAL_AVA_VOICE_URI + '">Microsoft Edge Ava (included)</option>'
+    : '') + '<option value="' + SYSTEM_NARRATION_VOICE_URI + '">Device voice</option>';
+
+  const narrationStatusCopy = () => ({
+    idle: 'Ready to listen. Choose Listen, or choose a section to start there.',
+    playing: 'Listening. The current section is marked in the panel.',
+    paused: 'Paused. Choose Resume when you are ready.',
+    finished: 'Finished. You can listen again or choose another section.',
+    unsupported: 'Narration is not available in this browser. You can use your device’s usual reading support.',
+    error: 'Narration could not continue. The lesson text is still available to read.'
+  }[narration.status] || 'Ready to listen.');
+
+  const narrationControls = () => '<section class="course-narration-controls" aria-label="Narration controls"><div class="course-narration-actions"><button class="course-secondary-button narration-primary-button" type="button" data-action="narration-listen" data-narration-listen>Listen</button><button class="course-secondary-button" type="button" data-action="narration-pause" data-narration-pause hidden>Pause</button><button class="course-secondary-button" type="button" data-action="narration-stop" data-narration-stop hidden>Stop</button><button class="course-text-button narration-restart" type="button" data-action="narration-restart">Restart</button></div><div class="course-narration-preferences"><label class="narration-select"><span>Playback speed</span><select data-narration-speed aria-label="Narration playback speed"><option value="0.75"' + (state.preferences.narrationSpeed === '0.75' ? ' selected' : '') + '>0.75×</option><option value="1"' + (state.preferences.narrationSpeed === '1' ? ' selected' : '') + '>1×</option><option value="1.25"' + (state.preferences.narrationSpeed === '1.25' ? ' selected' : '') + '>1.25×</option><option value="1.5"' + (state.preferences.narrationSpeed === '1.5' ? ' selected' : '') + '>1.5×</option></select></label><label class="narration-select"><span>Voice</span><select data-narration-voice aria-label="Narration voice">' + narrationVoiceOptions() + '</select></label><label class="narration-toggle"><input type="checkbox" data-narration-autoscroll' + (state.preferences.narrationAutoScroll ? ' checked' : '') + '><span>Auto-scroll</span></label></div><p class="narration-status" data-narration-status role="status" aria-live="polite">' + escapeHtml(narrationStatusCopy()) + '</p></section>';
+
+  const narrationChunkButton = (index, label) => '<button class="narration-chunk-button" type="button" data-action="narration-jump" data-narration-chunk-button data-narration-index="' + index + '" aria-label="Listen from ' + escapeHtml(label) + '">Listen from here</button>';
+
+  const textToSpeechStatusCopy = () => ({
+    idle: state.progress.phase === 'read' || isReviewingModule()
+      ? 'Text to speech is ready. Choose Listen, or click or tap inside lesson text to start from that point.'
+      : 'Text to speech is ready. Choose Listen when you want the current task read aloud.',
+    playing: state.preferences.narrationHighlight === false
+      ? 'Text to speech is playing. Narration highlighting is off.'
+      : 'Text to speech is playing. The current word is highlighted as it is read.',
+    paused: 'Text to speech is paused. Choose Resume when you are ready.',
+    finished: 'Text to speech finished. You can listen again, restart, or select another section.',
+    unsupported: 'Text to speech is not available in this browser. You can use your device’s usual reading support.',
+    error: 'Text to speech could not continue. The lesson text is still available to read.'
+  }[narration.status] || 'Text to speech is ready.');
+
+  const textToSpeechOptions = () => '<section class="course-narration-controls" aria-label="Text to speech options"><div class="course-narration-preferences"><label class="narration-select"><span>Playback speed</span><select data-narration-speed aria-label="Text to speech playback speed"><option value="0.75"' + (state.preferences.narrationSpeed === '0.75' ? ' selected' : '') + '>0.75×</option><option value="1"' + (state.preferences.narrationSpeed === '1' ? ' selected' : '') + '>1×</option><option value="1.25"' + (state.preferences.narrationSpeed === '1.25' ? ' selected' : '') + '>1.25×</option><option value="1.5"' + (state.preferences.narrationSpeed === '1.5' ? ' selected' : '') + '>1.5×</option></select></label><label class="narration-select"><span>Voice</span><select data-narration-voice aria-label="Text to speech voice">' + narrationVoiceOptions() + '</select></label><label class="narration-toggle"><input type="checkbox" data-narration-autoscroll' + (state.preferences.narrationAutoScroll ? ' checked' : '') + '><span>Auto-scroll</span></label></div><p class="narration-status" data-narration-status role="status" aria-live="polite">' + escapeHtml(textToSpeechStatusCopy()) + '</p></section>';
+
+  const readingTextMarkup = (tagName, value, narrationState) => {
+    const interactive = Boolean(narrationState);
+    if (!interactive) return '<' + tagName + '>' + escapeHtml(value) + '</' + tagName + '>';
+    const index = narrationState.index++;
+    return '<' + tagName + '><button class="course-narration-text" type="button" data-narration-text data-narration-index="' + index + '" aria-label="Start text to speech here: ' + escapeHtml(value) + '">' + escapeHtml(value) + '</button></' + tagName + '>';
+  };
+
+  const readingContentMarkup = (interactive = false) => {
+    const narrationState = interactive ? { index: 0 } : null;
+    const sections = visibleReadingSections().map(({ heading, value }) => {
+      const title = readingTextMarkup('h3', heading || 'Key idea', narrationState);
