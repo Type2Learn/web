@@ -300,3 +300,36 @@ export const COURSE_CONTENT = {
       duration: 'About 4 minutes',
       content: {
         definitionHeading: 'What is it?',
+        definition: 'Visual impairment and low vision are broad terms for vision differences that can affect reading, recognising objects, navigating spaces, or accessing visual information.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'A person may need alternative ways to access worksheets, screens, charts, videos, signs, or unfamiliar spaces.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'Some people may develop strong listening, tactile, memory, navigation, communication, or problem-solving skills.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Reading small or crowded text', 'Seeing low-contrast information', 'Managing glare or bright lights', 'Reading boards or charts', 'Navigating unfamiliar spaces', 'Experiencing eye strain'],
+        supportsHeading: 'What support can help?',
+        supports: ['Larger text and better contrast', 'Screen readers and magnification', 'Alt text and descriptions of visuals', 'Large-print or digital materials', 'Clear descriptions of spaces', 'Accessible pathways']
+      },
+      simple: 'A digital page is more accessible when it can be read, enlarged, understood, and used in different ways.',
+      example: 'One support idea from this module is to provide alt text and descriptions of visuals.',
+      hint: 'Look for a change that makes visual information easier to access without assuming everyone sees it the same way.',
+      typing: { level: 'Guided typing', prompt: 'Type one short phrase at a time in the field.', phrases: ['Readable text and good contrast help make a page accessible.', 'Alt text and screen-reader-friendly formatting help too.'] },
+      check: {
+        question: 'What is one way to make a digital page more accessible?',
+        options: [['Use readable text, good contrast, zoom, alt text, or screen-reader-friendly formatting.', true], ['Make all text small and crowded.', false], ['Use low contrast so fewer details are visible.', false], ['Remove zoom and screen-reader support.', false]],
+        explanation: 'Correct. The module lists readable text, contrast, zoom, alt text, and screen-reader-friendly formatting.'
+      }
+    },
+    {
+      module: 'Module 9',
+      title: 'Intellectual / Developmental Disabilities',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'Developmental disabilities can affect learning, communication, movement, behaviour, or daily living. Intellectual disability involves differences in intellectual functioning and everyday adaptive skills.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'A person may need more time, repetition, practical examples, or support with routines, communication, planning, money, or safety.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'Strengths may include practical skills, creativity, memory for familiar routines, music, art, sports, kindness, or strong relationships.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Understanding abstract ideas', 'Following long instructions', 'Making quick decisions', 'Managing unfamiliar routines', 'Explaining what support they need', 'Being rushed or spoken over'],
