@@ -266,3 +266,37 @@ export const COURSE_CONTENT = {
         question: 'Why can diagrams help with dyscalculia?',
         options: [['They make numbers and mathematical steps easier to see and organise.', true], ['They remove the need to understand the task.', false], ['They make every maths question timed.', false], ['They mean mathematical ideas never need explaining.', false]],
         explanation: 'Correct. Diagrams can make number relationships and steps easier to see and organise.'
+      }
+    },
+    {
+      module: 'Module 7',
+      title: 'Auditory Processing Disorder',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
+        definition: 'Auditory Processing Disorder involves difficulty making sense of spoken sounds, even when a person may hear sounds normally.',
+        dailyLifeHeading: 'How might it affect learning or daily life?',
+        dailyLife: 'Understanding speech may become harder in noisy rooms, during fast conversations, or when instructions are given only once.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'Some people may learn especially well through visual information, written examples, demonstrations, or hands-on activities.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Following long verbal instructions', 'Understanding speech in background noise', 'Confusing similar-sounding words', 'Remembering spoken information', 'Becoming tired after long lectures'],
+        supportsHeading: 'What support can help?',
+        supports: ['Written instructions', 'Visual examples', 'Shorter directions', 'Quiet seating', 'Seeing the speaker\'s face', 'Repeating instructions in their own words']
+      },
+      simple: 'Spoken information can be easier to use when it is shorter, quieter, and available in writing too.',
+      example: 'One support idea from this module is to give a shorter direction and a written version.',
+      hint: 'Think about a way to make spoken information easier to keep and revisit.',
+      typing: { level: 'Key idea typing', prompt: 'Type the key support idea in the field.', target: 'Shorter steps and a written version can make spoken instructions easier.' },
+      check: {
+        question: 'What is one way to make spoken instructions easier?',
+        options: [['Give them in shorter steps and provide a written version.', true], ['Give them only once in a noisy room.', false], ['Make the direction longer and faster.', false], ['Use only fast spoken directions without a written version.', false]],
+        explanation: 'Right. The module recommends shorter directions and a written version.'
+      }
+    },
+    {
+      module: 'Module 8',
+      title: 'Visual Impairment / Low Vision',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What is it?',
