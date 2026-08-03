@@ -615,3 +615,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         still: ['صفحہ پُرسکون رہے گا', 'آپ کے اگلے انتخاب فوراً اور بغیر حرکت کے ظاہر ہوں گے۔'],
         gentle: ['آرام سے آگے بڑھیں', 'آپ کا اگلا قدم نرم اور مختصر حرکت کے ساتھ سامنے آئے گا۔'],
         lively: ['چلیں، اگلا قدم لیتے ہیں!', 'ہر انتخاب، اگلا مرحلہ اور کامیابی واضح اور پُرجوش حرکت کے ساتھ سامنے آئے گی۔']
+      } : {
+        still: ['Your page will stay calm', 'Your next choices will appear immediately with no extra movement.'],
+        gentle: ['Take the next step smoothly', 'Your next action will arrive with a short, gentle transition.'],
+        lively: ["Let's keep moving!", 'Buttons, new steps, progress, and successful moments will now respond with clear, energetic motion.']
+      };
+      const encouragementCopy = moment.language === 'urdu' ? {
+        subtle: ['آپ یہ کر سکتے ہیں', 'ہم حوصلہ افزائی مختصر اور کام کے قریب رکھیں گے۔'],
+        balanced: ['آپ بہت اچھا کر رہے ہیں', 'ہر اہم قدم کے بعد ایک واضح حوصلہ افزا پیغام سامنے آئے گا۔'],
+        expressive: ['آپ کمال کر رہے ہیں — آگے بڑھتے رہیں!', 'آپ کی ہر کامیابی کو نمایاں حوصلہ افزائی کے ساتھ سراہا جائے گا۔']
+      } : {
+        subtle: ['You can do this', 'Encouragement will stay short and close to your task.'],
+        balanced: ['You are doing really well', 'A clear, encouraging popup will meet you after each meaningful step.'],
+        expressive: ['You are doing amazing — keep going!', 'Every success will be celebrated clearly while your next step stays easy to find.']
+      };
+      return moment.result === 'animations'
+        ? animationCopy[moment.animationLevel]
+        : encouragementCopy[moment.encouragementLevel];
+    }
+    const personalised = personalizedSupportCopy(moment);
+    if (personalised) return personalised;
+    if (moment.kind === 'section-complete' && moment.result === 'lesson-complete') {
+      const completeCopy = moment.language === 'urdu' ? {
+        subtle: ['ٹائپنگ مکمل', 'بہت خوب۔'],
+        balanced: ['آپ نے پورا سبق ٹائپ کر لیا', 'آپ نے ہر حصہ مکمل کیا۔ اب مختصر جائزہ تیار ہے۔'],
+        expressive: ['مبارک ہو — آپ نے پورا سبق ٹائپ کر لیا', 'ہر حصہ مکمل ہے۔ آپ نے یہ کر دکھایا۔ اب مختصر جائزہ تیار ہے۔']
+      } : {
+        subtle: ['Lesson typing complete', 'Nice work.'],
+        balanced: ['You typed the complete lesson', 'You completed every section. The quick check is ready.'],
+        expressive: ['Congratulations — you typed the complete lesson', 'Every section is complete. You did it. The quick check is ready.']
+      };
+      return completeCopy[moment.encouragementLevel];
+    }
+    return SUPPORT_MESSAGES[moment.language]?.[moment.kind]?.[moment.encouragementLevel]
+      || SUPPORT_MESSAGES.english[moment.kind]?.[moment.encouragementLevel]
+      || null;
+  };
+
+  // Support is tied to the work that just happened. These messages name the
+  // current stage instead of recycling one congratulation across the course.
+  const personalizedSupportCopy = (moment) => {
+    if (!moment || moment.encouragementLevel === 'subtle') return null;
+    const expressive = moment.encouragementLevel === 'expressive';
+    const moduleName = moment.module || currentStep?.()?.title || 'this module';
+    const urdu = moment.language === 'urdu';
+    const typingSections = typeof lessonTypingSections === 'function' ? lessonTypingSections() : [];
+    const completedTypingIndex = Math.max(0, (Number(state.progress.attempt?.guidedIndex) || 0) - 1);
+    const completedHeading = typingSections[completedTypingIndex]?.heading || 'this lesson section';
+
+    if (urdu) {
+      if (moment.kind === 'task-entry') {
+        if (moment.result === 'reading') return expressive
+          ? [`آئیے ${moduleName} کو سمجھیں`, 'ایک وقت میں ایک خیال پڑھیں۔ آپ اپنی رفتار سے آگے بڑھ سکتے ہیں۔']
+          : ['اگلا خیال تیار ہے', 'ایک واضح حصہ پڑھیں، پھر جب مناسب لگے آگے بڑھیں۔'];
+        if (moment.result === 'typing') return expressive
+          ? ['آپ کے الفاظ تیار ہیں', 'پہلے واضح لفظ سے شروع کریں۔ ہر درست حرف آپ کو آگے لے جا رہا ہے۔']
+          : ['ایک لفظ سے شروع کریں', 'باقی حصہ ایک ایک حرف کر کے سامنے آ جائے گا۔'];
+        if (moment.result === 'applied-practice') return expressive
+          ? ['اب خیال کو استعمال کریں', `آپ نے ${moduleName} سمجھا ہے۔ اب بہترین عملی جواب منتخب کریں۔`]
+          : ['ایک عملی انتخاب باقی ہے', 'سبق سے ملتا ہوا جواب منتخب کریں۔'];
+        if (moment.result === 'exam-question') return expressive
+          ? ['آپ اگلے سوال کے لیے تیار ہیں', 'جو آپ نے سیکھا ہے اسے یاد کریں اور ایک جواب منتخب کریں۔']
+          : ['اگلا سوال تیار ہے', 'ایک وقت میں صرف یہی سوال۔'];
+      }
+      if (moment.kind === 'section-complete' && moment.result === 'typing-section') return expressive
+        ? [`آپ نے “${completedHeading}” مکمل کر لیا`, 'بہت خوب — اگلا حصہ تیار ہے اور آپ رفتار برقرار رکھے ہوئے ہیں۔']
+        : [`“${completedHeading}” مکمل`, 'آپ نے ایک پورا حصہ ٹائپ کیا۔ اگلا حصہ تیار ہے۔'];
+      if (moment.kind === 'answer-correct' && moment.result === 'quick-check') return expressive
+        ? [`آپ نے ${moduleName} درست سمجھا`, 'زبردست — آپ نے بنیادی خیال پہچان لیا۔ اب اسے عملی صورت میں استعمال کریں۔']
+        : ['درست جواب', 'آپ نے سبق کا بنیادی خیال پہچان لیا۔'];
