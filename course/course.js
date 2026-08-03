@@ -2538,3 +2538,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         else if (status === 'error') announce('Text to speech could not continue. The lesson text is still available to read.');
       },
       onChunkChange: (index) => {
+        narration.activeIndex = index;
+        narration.activeRange = index >= 0 ? { index, start: 0, end: 0 } : null;
+        syncNarrationUi();
+        if (index >= 0) window.requestAnimationFrame(scrollActiveNarrationChunk);
+      },
+      onBoundary: ({ index, charIndex, charLength, startOffset }) => {
+        if (!Number.isInteger(index) || index < 0) return;
+        const start = Math.max(0, Number(startOffset) || 0) + Math.max(0, Number(charIndex) || 0);
+        narration.activeRange = {
+          index,
+          start,
+          end: start + Math.max(1, Number(charLength) || 1)
+        };
+        syncNarrationUi();
+      },
+      onVoicesChange: (voices) => {
+        narration.voices = voices;
+        syncNarrationVoiceOptions();
+      }
+    });
+    narration.status = narration.service.status;
+    narration.voices = narration.service.voices;
+    return narration.service;
+  };
+
+  const prepareNarrationForRenderedTask = () => {
+    const service = ensureNarrationService();
+    service.configure({
+      rate: state.preferences.narrationSpeed,
+      voiceURI: effectiveNarrationVoice(),
+      volume: Number(state.preferences.narrationVolume)
+    });
+    if (state.view === 'course' && (state.progress.phase === 'read' || isReviewingModule()) && state.preferences.readAloud) {
+      narration.chunks = renderedNarrationChunks();
+      service.setChunks(narration.chunks);
+      configureLocalAvaPlaylist(service, narration.chunks);
+      narration.activeIndex = -1;
+      narration.activeRange = null;
+      narration.status = service.status;
+      syncNarrationUi();
+      return;
+    }
+    service.setAudioPlaylist?.([]);
+    narration.chunks = [];
+    narration.activeIndex = -1;
+    narration.activeRange = null;
+    service.stop({ silent: true });
+    if (service.supported) service.setStatus('idle');
+  };
+
+  const genericNarrationChunks = () => {
+    if (state.progress.phase === 'read' || isReviewingModule()) return renderedNarrationChunks().length ? renderedNarrationChunks() : readingNarrationChunks();
+    const step = currentStep();
+    const typing = step.typing || {};
+    const check = step.check || {};
+    if (state.progress.phase === 'exam-intro') return [{ id: 'final-exam-intro', label: 'Final exam introduction', text: [finalExam().title, finalExam().description, 'There are ' + finalExamQuestionCount() + ' questions. There is no timer.'].filter(Boolean).join('. ') }];
+    if (state.progress.phase === 'exam') {
+      const question = currentFinalExamQuestion();
+      return question ? [{ id: 'final-exam-question', label: 'Final exam question', text: [question.question, ...question.options.map(([label]) => label)].filter(Boolean).join('. ') }] : [];
+    }
+    if (state.progress.phase === 'exam-results') return [{ id: 'final-exam-results', label: 'Final exam results', text: 'Your final exam results and question-by-question review are available on this page.' }];
+    if (state.progress.phase === 'type') {
+      if (usesLessonSectionTyping()) {
+        const { section, index, total } = activeLessonTypingSection();
+        return [{ id: 'typing-section-' + index, label: 'Typing section ' + (index + 1) + ' of ' + total, text: [section.heading, section.text].filter(Boolean).join('. ') }];
+      }
+      return [{ id: 'task-prompt', label: 'Current typing task', text: [typing.prompt, typing.target || typing.reference].filter(Boolean).join('. ') }];
+    }
+    if (state.progress.phase === 'check') return [{ id: 'question', label: 'Question', text: [check.question, ...(check.options || []).map(([label]) => label)].filter(Boolean).join('. ') }];
