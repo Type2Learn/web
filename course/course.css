@@ -3342,3 +3342,673 @@ body.course-focus-mode .course-control[data-action="toggle-focus"],
   color: var(--course-blue);
   background: var(--course-blue-pale);
 }
+
+.course-tts-transport [data-action="narration-stop"],
+.course-tts-transport [data-action="tts-stop"] {
+  border-color: var(--course-red);
+  color: #9d2536;
+}
+
+.course-tts-transport [data-action="narration-stop"]:hover:not(:disabled),
+.course-tts-transport [data-action="tts-stop"]:hover:not(:disabled) {
+  border-color: var(--course-red);
+  color: #9d2536;
+  background: #fff1f3;
+}
+
+.course-tts-transport [data-action="narration-pause"],
+.course-tts-transport [data-action="tts-pause"] { border-color: var(--course-blue); }
+
+/* Ordinary reading is untouched while text-to-speech is off. When it is on,
+   only the actual text nodes opt into the I-beam and a flat underline cue—no
+   panel, card, per-section button, or surrounding selection box is added. */
+body.course-tts-mode-active .course-tts-reading [data-narration-text] {
+  display: inline;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  cursor: text;
+}
+
+body.course-tts-mode-active .course-tts-reading [data-narration-text]:focus { outline: none; }
+body.course-tts-mode-active .course-tts-reading [data-narration-text]:focus-visible {
+  border-radius: 2px;
+  outline: 3px solid var(--course-blue);
+  outline-offset: 4px;
+}
+
+.course-tts-reading .course-simple-copy,
+.course-tts-reading .course-example {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+body.course-tts-mode-active .course-tts-reading [data-narration-text]:hover:not(.is-speaking) {
+  text-decoration-line: underline;
+  text-decoration-color: var(--course-cyan);
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+body.course-tts-mode-active .course-tts-reading [data-narration-text].is-speaking,
+body.course-tts-mode-active .course-tts-reading [data-narration-text][data-current-speech] {
+  color: var(--course-ink);
+}
+
+/* Browser speech engines emit word-boundary events while speaking. The UI
+   keeps the already-read text subtly marked and moves a stronger flat highlight
+   across the current word, so progress is visible without boxing a paragraph. */
+body.course-tts-mode-active .course-tts-reading .course-tts-spoken,
+body.course-tts-mode-active .course-tts-reading [data-tts-spoken] {
+  color: #24675f;
+  background: var(--course-teal-pale);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+body.course-tts-mode-active .course-tts-reading .course-tts-highlight,
+body.course-tts-mode-active .course-tts-reading mark[data-tts-highlight] {
+  display: inline-block;
+  color: #ffffff;
+  background: #087d34;
+  border-radius: 2px;
+  /* The marker changes on the audio clock. It is deliberately immediate: a
+     fade-in makes a correctly timed word look late on short spoken words. */
+  animation: none;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+body.course-reduced-motion .course-tts-reading .course-tts-spoken,
+body.course-reduced-motion .course-tts-reading .course-tts-highlight {
+  animation: none;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.course-tts-mode-active .course-tts-reading .course-tts-highlight,
+  body.course-tts-mode-active .course-tts-reading mark[data-tts-highlight] { animation: none; }
+}
+
+/* Questions stay clearly labelled through typography and spacing, without a
+   surrounding card. A keyboard focus outline still appears when needed. */
+.course-question-card,
+.course-check-options .course-question-card,
+.exam-question-card {
+  width: min(100%, var(--course-reading-max-width));
+  gap: 7px;
+  margin: 0 0 10px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.course-question-card:focus:not(:focus-visible),
+.exam-question-card:focus:not(:focus-visible) { outline: 0; }
+
+.course-question-card:focus-visible,
+.exam-question-card:focus-visible { outline: 3px solid var(--course-blue); outline-offset: 4px; }
+
+.course-question-label { margin-bottom: 1px; }
+.course-question-text { font-size: var(--course-question-font-size); }
+.course-question-helper { max-width: 680px; }
+
+.course-check-options { gap: 12px; }
+
+.course-check-option.is-correct,
+.course-check-option.is-answer-correct {
+  border-color: var(--course-green);
+  color: var(--course-ink);
+  background: var(--course-green-pale);
+}
+
+.course-check-option.is-incorrect,
+.course-check-option.is-answer-incorrect {
+  border-color: var(--course-red);
+  color: var(--course-ink);
+  background: #fff1f3;
+}
+
+.course-check-option.is-correct input,
+.course-check-option.is-answer-correct input { accent-color: #087d34; }
+.course-check-option.is-incorrect input,
+.course-check-option.is-answer-incorrect input { accent-color: var(--course-red); }
+
+.course-check-option.is-correct::after,
+.course-check-option.is-answer-correct::after,
+.course-check-option.is-incorrect::after,
+.course-check-option.is-answer-incorrect::after {
+  flex: 0 0 auto;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--course-paper);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.course-check-option.is-correct::after,
+.course-check-option.is-answer-correct::after { color: #087d34; content: "✓ Correct answer"; }
+.course-check-option.is-correct.is-selected::after,
+.course-check-option.is-answer-correct.is-selected::after { content: "✓ Correct"; }
+.course-check-option.is-incorrect::after,
+.course-check-option.is-answer-incorrect::after { color: #9d2536; content: "Not correct"; }
+
+.course-check-option:has(.course-answer-state)::after { display: none; content: none; }
+
+.course-answer-state {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--course-muted);
+  background: var(--course-paper);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.course-check-option.is-correct .course-answer-state,
+.course-check-option.is-answer-correct .course-answer-state { color: #087d34; }
+.course-check-option.is-incorrect .course-answer-state,
+.course-check-option.is-answer-incorrect .course-answer-state { color: #9d2536; }
+
+.course-status.is-complete,
+.course-status--complete,
+.course-status[data-course-status="completed"] {
+  border-color: var(--course-green);
+  color: #087d34;
+  background: var(--course-green-pale);
+}
+
+@media (max-width: 760px) {
+  .course-back-control { width: 42px; height: 42px; }
+  .course-topbar-brand-area { gap: 14px; }
+  .course-tts-transport { margin-left: 0; border-left: 0; padding-left: 0; }
+  .course-tts-transport-label { display: none; }
+  .course-question-text { font-size: var(--course-question-font-size); }
+}
+
+@media (max-width: 520px) {
+  .course-tts-transport-menu { gap: 5px; }
+  .course-tts-transport button,
+  .course-tts-transport summary,
+  .course-tts-transport-menu button,
+  .course-tts-transport-menu summary { min-height: 34px; padding-inline: 8px; }
+  .course-check-option.is-correct,
+  .course-check-option.is-answer-correct,
+  .course-check-option.is-incorrect,
+  .course-check-option.is-answer-incorrect { align-items: flex-start; }
+  .course-answer-state,
+  .course-check-option.is-correct::after,
+  .course-check-option.is-answer-correct::after,
+  .course-check-option.is-incorrect::after,
+  .course-check-option.is-answer-incorrect::after { align-self: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-control,
+  .course-help-button,
+  .course-primary-button,
+  .course-secondary-button,
+  .course-text-button,
+  .course-quiet-button,
+  .course-back-button,
+  .course-back-control,
+  .support-option,
+  .course-preset-option,
+  .course-settings-control,
+  .course-tts-transport button,
+  .course-tts-transport summary,
+  .course-tts-transport-menu button,
+  .course-tts-transport-menu summary,
+  .course-question-card,
+  .exam-question-card,
+  .course-check-option { animation: none !important; transition: none !important; }
+}
+
+body.course-reduced-motion .course-control,
+body.course-reduced-motion .course-help-button,
+body.course-reduced-motion .course-primary-button,
+body.course-reduced-motion .course-secondary-button,
+body.course-reduced-motion .course-text-button,
+body.course-reduced-motion .course-quiet-button,
+body.course-reduced-motion .course-back-button,
+body.course-reduced-motion .course-back-control,
+body.course-reduced-motion .support-option,
+body.course-reduced-motion .course-preset-option,
+body.course-reduced-motion .course-settings-control,
+body.course-reduced-motion .course-tts-transport button,
+body.course-reduced-motion .course-tts-transport summary,
+body.course-reduced-motion .course-tts-transport-menu button,
+body.course-reduced-motion .course-tts-transport-menu summary,
+body.course-reduced-motion .course-question-card,
+body.course-reduced-motion .exam-question-card,
+  body.course-reduced-motion .course-check-option { animation: none !important; transition: none !important; }
+
+/* -------------------------------------------------------------------------
+   Learner-controlled support moments and movement
+
+   Encouragement controls language and prominence. Animation controls motion.
+   Keeping those selectors separate is intentional: Expressive + Still must
+   remain a strong, completely motionless presentation. */
+
+.course-support-moment {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  margin: clamp(16px, 2vw, 24px) 0 0;
+  border: 1px solid #a7c9d9;
+  border-left: 4px solid var(--course-blue);
+  border-radius: 12px;
+  padding: 13px 15px;
+  color: var(--course-ink);
+  background: #f3f9fc;
+}
+
+.course-support-moment[dir="rtl"] {
+  border-right: 4px solid var(--course-blue);
+  border-left-width: 1px;
+  text-align: right;
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.course-support-symbol {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+  border: 1px solid #6ca5df;
+  border-radius: 50%;
+  color: #075fcb;
+  background: #fff;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.course-support-copy { min-width: 0; }
+
+.course-support-label {
+  color: #075fcb;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.course-support-moment strong { display: block; font-size: 1rem; line-height: 1.3; }
+.course-support-moment p { margin: 0; color: var(--course-ink-soft); font-size: .9rem; line-height: 1.5; }
+.course-support-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px !important;
+  color: var(--course-ink) !important;
+  font-size: .82rem !important;
+  font-weight: 700;
+}
+.course-support-next > span {
+  color: #075fcb;
+  font-size: .7rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+body[data-course-encouragement="subtle"] .course-support-moment {
+  width: fit-content;
+  max-width: min(100%, 620px);
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  border-width: 0 0 0 3px;
+  border-radius: 0;
+  padding: 5px 0 5px 11px;
+  background: transparent;
+}
+
+body[data-course-encouragement="subtle"] .course-support-moment[dir="rtl"] {
+  grid-template-columns: minmax(0, 1fr) 18px;
+  border-right-width: 3px;
+  border-left-width: 0;
+  padding-right: 11px;
+  padding-left: 0;
+}
+
+body[data-course-encouragement="subtle"] .course-support-label { display: none; }
+body[data-course-encouragement="subtle"] .course-support-moment strong { font-size: .88rem; }
+body[data-course-encouragement="subtle"] .course-support-moment p { font-size: .82rem; }
+body[data-course-encouragement="subtle"] .course-support-symbol {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 0;
+  color: #087d34;
+  background: transparent;
+  font-size: 14px;
+}
+body[data-course-encouragement="subtle"] .course-support-next { display: none; }
+
+body[data-course-encouragement="balanced"] .course-support-moment {
+  max-width: 820px;
+  border-color: #93d8d2;
+  border-left-color: #12b8aa;
+  background: #effbf9;
+}
+body[data-course-encouragement="balanced"] .course-support-symbol {
+  border-color: #61c9c0;
+  color: #087d70;
+  background: #ddf8f4;
+}
+
+body[data-course-encouragement="expressive"] .course-support-moment {
+  max-width: 960px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 6px;
+  border-width: 1px 1px 1px 6px;
+  border-color: #6fb4ed #a7c9d9 #a7c9d9 #16bfae;
+  padding: clamp(16px, 2vw, 22px);
+  background: linear-gradient(110deg, #eafbf6 0%, #edf6ff 100%);
+}
+
+body[data-course-encouragement="expressive"] .course-support-moment[dir="rtl"] {
+  grid-template-columns: minmax(0, 1fr) 58px;
+  border-width: 1px 6px 1px 1px;
+  border-color: #a7c9d9 #16bfae #a7c9d9 #a7c9d9;
+}
+
+body[data-course-encouragement="expressive"] .course-support-moment strong {
+  font-family: var(--course-display-font, inherit);
+  font-size: clamp(1.16rem, 1.7vw, 1.42rem);
+}
+body[data-course-encouragement="expressive"] .course-support-symbol {
+  width: 50px;
+  height: 50px;
+  border: 0;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, #0abf76, #0e91dc);
+  font-size: 26px;
+}
+body[data-course-encouragement="expressive"] .course-support-next {
+  margin-top: 12px !important;
+  padding-top: 10px;
+  border-top: 1px solid #b7ddd6;
+}
+
+body[data-course-layout="focused"] .course-support-moment { max-width: 720px; }
+body[data-course-layout="open"] .course-support-moment { max-width: none; }
+body[data-course-layout="open"][data-course-encouragement="subtle"] .course-support-moment { max-width: min(100%, 760px); }
+
+.course-complete-card .course-support-moment {
+  margin-block: 18px 4px;
+}
+
+/* Earlier quiz styling animated on every selection rerender. Motion now starts
+   only when the support-event layer marks a new learner-driven transition. */
+.course-question-card,
+.course-check-option { animation: none; }
+
+@keyframes course-support-gentle-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes course-support-focused-lively-enter-ltr {
+  from { opacity: .15; transform: translateX(34px) rotate(.35deg) scale(.992); }
+  to { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+}
+
+@keyframes course-support-focused-lively-enter-rtl {
+  from { opacity: .15; transform: translateX(-34px) rotate(-.35deg) scale(.992); }
+  to { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+}
+
+@keyframes course-support-balanced-lively-enter {
+  from { opacity: .12; transform: translateY(10px) translateX(14px) scale(.994); }
+  to { opacity: 1; transform: translateY(0) translateX(0) scale(1); }
+}
+
+@keyframes course-support-open-lively-enter-ltr {
+  from { opacity: .08; transform: translateX(22px) scale(.992); clip-path: inset(0 7% 0 0); }
+  to { opacity: 1; transform: translateX(0) scale(1); clip-path: inset(0 0 0 0); }
+}
+
+@keyframes course-support-open-lively-enter-rtl {
+  from { opacity: .08; transform: translateX(-22px) scale(.992); clip-path: inset(0 0 0 7%); }
+  to { opacity: 1; transform: translateX(0) scale(1); clip-path: inset(0 0 0 0); }
+}
+
+@keyframes course-support-feedback-lively-enter {
+  from { opacity: .1; transform: translateY(8px) scale(.992); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes course-support-symbol-lively-enter {
+  0% { opacity: 0; transform: scale(.72) rotate(-7deg); }
+  58% { opacity: 1; transform: scale(1.08) rotate(1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes course-typing-character-gentle {
+  from { opacity: .45; }
+  to { opacity: 1; }
+}
+
+@keyframes course-typing-character-lively {
+  0% { opacity: .2; transform: translateY(3px) scale(.82); }
+  62% { opacity: 1; transform: translateY(-1px) scale(1.1); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes course-typing-momentum-lively {
+  from { opacity: .25; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes course-support-option-lively-enter {
+  from { opacity: .18; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes course-support-progress-gentle {
+  from { opacity: .58; }
+  to { opacity: 1; }
+}
+
+@keyframes course-support-route-marker-gentle {
+  from { opacity: .55; transform: scale(.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes course-support-route-marker-lively {
+  from { opacity: .2; transform: translateX(10px) scale(.9); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* Still is an actual zero-motion mode, including controls, route updates, and
+   support moments. Functional color/state changes remain immediate. */
+body[data-course-animations="still"] .course-app-shell *,
+body[data-course-animations="still"] .course-app-shell *::before,
+body[data-course-animations="still"] .course-app-shell *::after {
+  animation: none !important;
+  scroll-behavior: auto !important;
+  transition: none !important;
+}
+
+body[data-course-animations="gentle"] .course-task-card.is-support-task-entering {
+  animation: course-support-gentle-enter 200ms cubic-bezier(.2, .7, .2, 1) both;
+}
+
+body[data-course-animations="gentle"] .course-support-moment.is-support-entering {
+  animation: course-support-gentle-enter 180ms ease-out both;
+}
+
+body[data-course-animations="gentle"] .typing-character.is-just-typed {
+  animation: course-typing-character-gentle 180ms ease-out both;
+}
+
+body[data-course-animations="gentle"] .is-support-progressing {
+  animation: course-support-progress-gentle 220ms ease-out both;
+}
+
+body[data-course-animations="gentle"] .is-support-progressing .course-module-list li.is-active > span {
+  animation: course-support-route-marker-gentle 220ms ease-out both;
+}
+
+body[data-course-animations="gentle"].course-content-transitions .course-reading-copy.is-reading-section-entering {
+  animation: course-support-gentle-enter 200ms ease-out both;
+}
+
+body[data-course-animations="lively"][data-course-layout="focused"] .course-task-card.is-support-task-entering {
+  animation: course-support-focused-lively-enter-ltr 360ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"][data-course-layout="focused"][data-course-urdu-mode="on"] .course-task-card.is-support-task-entering,
+body[data-course-animations="lively"][data-course-layout="focused"][data-course-direction="rtl"] .course-task-card.is-support-task-entering,
+html[dir="rtl"] body[data-course-animations="lively"][data-course-layout="focused"] .course-task-card.is-support-task-entering {
+  animation-name: course-support-focused-lively-enter-rtl;
+}
+
+body[data-course-animations="lively"][data-course-layout="balanced"] .course-task-card.is-support-task-entering {
+  animation: course-support-balanced-lively-enter 340ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"][data-course-layout="open"] .course-task-card.is-support-task-entering {
+  animation: course-support-open-lively-enter-ltr 390ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"][data-course-layout="open"][data-course-urdu-mode="on"] .course-task-card.is-support-task-entering,
+body[data-course-animations="lively"][data-course-layout="open"][data-course-direction="rtl"] .course-task-card.is-support-task-entering,
+html[dir="rtl"] body[data-course-animations="lively"][data-course-layout="open"] .course-task-card.is-support-task-entering {
+  animation-name: course-support-open-lively-enter-rtl;
+}
+
+body[data-course-animations="lively"] .course-support-moment.is-support-entering {
+  animation: course-support-feedback-lively-enter 310ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"] .course-support-moment.is-support-entering .course-support-symbol {
+  animation: course-support-symbol-lively-enter 340ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"] .typing-character.is-just-typed {
+  display: inline-block;
+  animation: course-typing-character-lively 230ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"] .is-question-sequence-entering .course-question-card {
+  animation: course-question-arrive 320ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"] .is-question-sequence-entering .course-check-option {
+  animation: course-support-option-lively-enter 300ms cubic-bezier(.16, 1, .3, 1) both;
+  animation-delay: calc(var(--option-index, 0) * 48ms);
+}
+
+body[data-course-animations="lively"] .is-support-progressing {
+  animation: course-support-progress-gentle 360ms ease-out both;
+}
+
+body[data-course-animations="lively"] .is-support-progressing .course-module-list li.is-active > span {
+  animation: course-support-route-marker-lively 340ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"][data-course-layout="open"] .course-task-card.is-support-task-entering .course-reading-copy > section {
+  animation: course-support-option-lively-enter 340ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"][data-course-layout="open"] .course-task-card.is-support-task-entering .course-reading-copy > section:nth-child(2) { animation-delay: 55ms; }
+body[data-course-animations="lively"][data-course-layout="open"] .course-task-card.is-support-task-entering .course-reading-copy > section:nth-child(3) { animation-delay: 110ms; }
+body[data-course-animations="lively"][data-course-layout="open"] .course-task-card.is-support-task-entering .course-reading-copy > section:nth-child(4) { animation-delay: 165ms; }
+body[data-course-animations="lively"][data-course-layout="open"] .course-task-card.is-support-task-entering .course-reading-copy > section:nth-child(5) { animation-delay: 220ms; }
+
+body[data-course-animations="lively"][data-course-layout="focused"].course-content-transitions .course-reading-copy.is-reading-section-entering {
+  animation: course-support-focused-lively-enter-ltr 360ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"][data-course-layout="balanced"].course-content-transitions .course-reading-copy.is-reading-section-entering {
+  animation: course-support-balanced-lively-enter 340ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"][data-course-layout="open"].course-content-transitions .course-reading-copy.is-reading-section-entering {
+  animation: course-support-open-lively-enter-ltr 390ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+body[data-course-animations="lively"][data-course-layout="focused"][data-course-urdu-mode="on"].course-content-transitions .course-reading-copy.is-reading-section-entering,
+body[data-course-animations="lively"][data-course-layout="focused"][data-course-direction="rtl"].course-content-transitions .course-reading-copy.is-reading-section-entering,
+html[dir="rtl"] body[data-course-animations="lively"][data-course-layout="focused"].course-content-transitions .course-reading-copy.is-reading-section-entering {
+  animation-name: course-support-focused-lively-enter-rtl;
+}
+
+body[data-course-animations="lively"][data-course-layout="open"][data-course-urdu-mode="on"].course-content-transitions .course-reading-copy.is-reading-section-entering,
+body[data-course-animations="lively"][data-course-layout="open"][data-course-direction="rtl"].course-content-transitions .course-reading-copy.is-reading-section-entering,
+html[dir="rtl"] body[data-course-animations="lively"][data-course-layout="open"].course-content-transitions .course-reading-copy.is-reading-section-entering {
+  animation-name: course-support-open-lively-enter-rtl;
+}
+
+/* Incorrect answers and system recovery always appear without motion, even in
+   Lively mode. Their calm wording and marked answer are the complete response. */
+.course-support-moment--answer-incorrect,
+.course-support-moment--typing-incomplete,
+.course-support-moment--response-needed,
+.course-support-moment--system-error {
+  animation: none !important;
+}
+
+/* Full celebration is reserved for Lively + Expressive successful actions.
+   It has no interactive surface, does not block the next control, and fades
+   away on its own. The shapes are CSS-only so no additional network payload
+   is required for a learner who does not choose this presentation. */
+.course-success-celebration {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.course-success-celebration-medals,
+.course-success-celebration-petals { position: absolute; inset: 0; }
+
+.course-success-medal,
+.course-success-petal {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  animation-fill-mode: both;
+}
+
+.course-success-medal {
+  width: 38px;
+  height: 38px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 3px 10px rgb(4 69 95 / .24), inset 0 0 0 3px rgb(255 255 255 / .36);
+  background: conic-gradient(from 28deg, #f6ca4f, #fff2a6, #f0a11f, #f6ca4f);
+  animation: course-success-medal-flow 1.45s cubic-bezier(.12, .72, .24, 1) both;
+}
+
+.course-success-medal::before {
