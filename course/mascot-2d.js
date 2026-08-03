@@ -1,4 +1,4 @@
-const MASCOT_IMAGE_URL = '/assets/2D%20Mascot/blinking.webp';
+const MASCOT_IMAGE_URL = '/assets/2D%20Mascot/blinking.webp?v=20260803-2';
 const DESKTOP_QUERY = '(min-width: 1181px)';
 
 const supportsDesktopMascot = () => window.matchMedia?.(DESKTOP_QUERY)?.matches;

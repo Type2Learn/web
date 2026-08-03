@@ -150,7 +150,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'mascot-language': 'english',
     'mascot-language-explicit': false,
     'mascot-voice': 'text',
-    'mascot-behaviour': 'calm',
+    'mascot-voice-language': 'english',
     'urdu-mode': 'off'
   });
 
@@ -207,9 +207,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       voice: ['text', 'speech', 'both'].includes(choices['mascot-voice'])
         ? choices['mascot-voice']
         : 'text',
-      behaviour: ['low-key', 'calm', 'energetic'].includes(choices['mascot-behaviour'])
-        ? choices['mascot-behaviour']
-        : 'calm'
+      voiceLanguage: choices['mascot-voice-language'] === 'urdu' ? 'urdu' : 'english',
+      // The retained 3D rollback renderer still accepts this presentation
+      // value, although the current 2D companion does not expose it as a UI
+      // preference.
+      behaviour: 'calm'
     };
   };
 
@@ -866,8 +868,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
       settingsSwitch('mascot', 'Mascot', mascotUnavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', choices.mascot === 'on', mascotUnavailable),
       choices.mascot === 'on' ? settingsChoiceGroup('mascot-language', 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || choices['learning-language']) : '',
-      choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice', 'Mascot voice', 'Choose how the mascot will communicate when voice options are connected.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '',
-      choices.mascot === 'on' ? settingsChoiceGroup('mascot-behaviour', 'Mascot behaviour', 'Choose the kind of presence that feels comfortable.', [['low-key', 'Low-key'], ['calm', 'Calm'], ['energetic', 'Energetic']], choices['mascot-behaviour']) : '',
+      choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice', 'Mascot Speech', 'Choose how your mascot will communicate with you.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '',
+      choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice-language', 'Mascot voice', 'Choose the language your mascot will speak.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-voice-language']) : '',
       settingsSwitch('urdu-mode', 'Urdu mode', 'This switch is being prepared. It does not change this lesson language yet.', choices['urdu-mode'] === 'on'),
       '</div>'
     ].join('') : '<p class="course-settings-menu-gate">Choose the available course first. Its personal learning settings will appear here after setup.</p>';
@@ -3119,7 +3121,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       //     return courseMascot;
       //   })
       //   .catch(() => null);
-      mascotControllerLoad = import('./mascot-2d.js?v=20260803-2d1')
+      mascotControllerLoad = import('./mascot-2d.js?v=20260803-2d2')
         .then(({ createCourseMascot }) => {
           courseMascot = createCourseMascot();
           return courseMascot;

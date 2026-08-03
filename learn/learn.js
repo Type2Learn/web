@@ -11,7 +11,7 @@ const backgroundNoiseSources = {
   brown: '/assets/audio/background-noise/brown-noise-loop.mp3'
 };
 const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0.15, playing: false, fadeFrame: null, playRequest: 0 };
-const mascotImageUrl = '/assets/2D%20Mascot/blinking.webp';
+const mascotImageUrl = '/assets/2D%20Mascot/blinking.webp?v=20260803-2';
 // 3D rollback reference: preserve the original model URL alongside the
 // untouched course/mascot-3d.js implementation.
 // const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';
@@ -42,7 +42,7 @@ const defaultChoices = {
   'mascot-language': 'english',
   'mascot-language-explicit': false,
   'mascot-voice': 'text',
-  'mascot-behaviour': 'calm',
+  'mascot-voice-language': 'english',
   'background-noise-type': 'pink',
   // A deliberately quiet starting point. The interface caps this at 35% so
   // background sound cannot jump to an unexpectedly loud browser volume.
@@ -157,8 +157,8 @@ const localizedControls = {
     'text-to-speech': { label: 'متن سے آواز', description: 'اختیاری پڑھ کر سنانے کی مدد۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     mascot: { label: 'میسکاٹ', description: 'جب آپ چاہیں ایک سیکھنے والا ساتھی۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     'mascot-language': { label: 'میسکاٹ کی زبان', description: 'یہ آپ کی ابتدائی زبان کے ساتھ شروع ہوتی ہے۔ آپ میسکاٹ کے لیے الگ زبان منتخب کر سکتے ہیں۔', choices: [['english', 'انگریزی'], ['urdu', 'اردو']] },
-    'mascot-voice': { label: 'میسکاٹ کی آواز', description: 'جب آواز کے اختیارات منسلک ہوں تو میسکاٹ کا رابطہ منتخب کریں۔', choices: [['text', 'متن'], ['speech', 'آواز'], ['both', 'دونوں']] },
-    'mascot-behaviour': { label: 'میسکاٹ کا انداز', description: 'وہ موجودگی منتخب کریں جو آرام دہ محسوس ہو۔', choices: [['low-key', 'پُرسکون'], ['calm', 'نرم'], ['energetic', 'پرجوش']] }
+    'mascot-voice': { label: 'میسکاٹ کی گفتگو', description: 'منتخب کریں کہ میسکاٹ آپ سے کیسے بات کرے گا۔', choices: [['text', 'متن'], ['speech', 'آواز'], ['both', 'دونوں']] },
+    'mascot-voice-language': { label: 'میسکاٹ کی آواز', description: 'منتخب کریں کہ میسکاٹ کس زبان میں بولے گا۔', choices: [['english', 'انگریزی'], ['urdu', 'اردو']] }
   }
 };
 
@@ -306,22 +306,22 @@ const mascotLanguageControl = (choices) => controlMarkup({
   choices: [['english', 'English'], ['urdu', 'اردو']]
 }, choices['mascot-language'] || choices['learning-language'], setupLanguage(choices));
 
-const mascotVoiceControl = (choices) => controlMarkup({
+const mascotSpeechControl = (choices) => controlMarkup({
   id: 'mascot-voice',
-  label: 'Mascot voice',
-  description: 'Choose how the mascot will communicate when voice options are connected.',
+  label: 'Mascot Speech',
+  description: 'Choose how your mascot will communicate with you.',
   choices: [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']]
 }, choices['mascot-voice'], setupLanguage(choices));
 
-const mascotBehaviourControl = (choices) => controlMarkup({
-  id: 'mascot-behaviour',
-  label: 'Mascot behaviour',
-  description: 'Choose the kind of presence that feels comfortable.',
-  choices: [['low-key', 'Low-key'], ['calm', 'Calm'], ['energetic', 'Energetic']]
-}, choices['mascot-behaviour'], setupLanguage(choices));
+const mascotVoiceControl = (choices) => controlMarkup({
+  id: 'mascot-voice-language',
+  label: 'Mascot voice',
+  description: 'Choose the language your mascot will speak.',
+  choices: [['english', 'English'], ['urdu', 'اردو']]
+}, choices['mascot-voice-language'], setupLanguage(choices));
 
 const mascotDetailsMarkup = (choices) => choices.mascot === 'on'
-  ? '<div class="learning-mascot-details">' + mascotLanguageControl(choices) + mascotVoiceControl(choices) + mascotBehaviourControl(choices) + '</div>'
+  ? '<div class="learning-mascot-details">' + mascotLanguageControl(choices) + mascotSpeechControl(choices) + mascotVoiceControl(choices) + '</div>'
   : '';
 
 const setupLanguageAttributes = (choices) => setupLanguage(choices) === 'urdu' ? ' lang="ur" dir="rtl"' : '';
@@ -353,15 +353,15 @@ const focusedSteps = (choices) => {
   ];
   if (choices['background-noise'] === 'on') steps.push({ id: 'noise-details' });
   steps.push({ id: 'text-to-speech' }, { id: 'mascot' });
-  if (choices.mascot === 'on') steps.push({ id: 'mascot-language' }, { id: 'mascot-voice' }, { id: 'mascot-behaviour' });
+  if (choices.mascot === 'on') steps.push({ id: 'mascot-language' }, { id: 'mascot-voice' }, { id: 'mascot-voice-language' });
   return steps;
 };
 
 const focusedStepContent = (step, choices) => {
   if (step.id === 'noise-details') return backgroundNoiseMarkup(choices);
   if (step.id === 'mascot-language') return mascotLanguageControl(choices);
-  if (step.id === 'mascot-voice') return mascotVoiceControl(choices);
-  if (step.id === 'mascot-behaviour') return mascotBehaviourControl(choices);
+  if (step.id === 'mascot-voice') return mascotSpeechControl(choices);
+  if (step.id === 'mascot-voice-language') return mascotVoiceControl(choices);
   return controlMarkup(controlById(step.id), choices[step.id], setupLanguage(choices));
 };
 
@@ -462,7 +462,7 @@ const syncMascotPreview = (choices) => {
     //     return mascotPreview;
     //   })
     //   .catch(() => null);
-    mascotPreviewLoad = import('/course/mascot-2d.js?v=20260803-2d1')
+    mascotPreviewLoad = import('/course/mascot-2d.js?v=20260803-2d2')
       .then(({ createCourseMascot }) => {
         mascotPreview = createCourseMascot();
         return mascotPreview;
