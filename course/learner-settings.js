@@ -1027,3 +1027,60 @@ export const getPresetSelectionAnalysis = (input, profileIds) => {
       message: 'Clear Progress uses a low-pressure progress view, while your current setting asks for full numeric progress. Choose the version you prefer.'
     };
     const resolution = conflictResolutionFor(state, conflict);
+    conflicts.push({ ...conflict, blocking: !resolution.resolved, resolution });
+  }
+
+  const inputMethodIds = getAvailableInputMethods({ ...state, selectedPresetIds, primaryPresetId: selectedPresetIds[0] || BALANCED_START_PRESET_ID });
+  const blockingConflicts = conflicts.filter((conflict) => conflict.blocking);
+  return {
+    selectedPresetIds,
+    profiles,
+    combinedSettingKeys: Array.from(contributions.keys()),
+    duplicateSettingKeys,
+    conflicts,
+    blockingConflicts,
+    canApply: blockingConflicts.length === 0,
+    inputMethodIds
+  };
+};
+
+export const getAvailableInputMethods = (input) => {
+  const settings = resolveSettings(input);
+  const methods = ['keyboard'];
+  if (settings.speechToText) methods.push('voice');
+  if (settings.alternativeInput || settings.alternativeResponses) methods.push('alternative');
+  if (settings.switchInput) methods.push('switch');
+  if (settings.oneHandedInput) methods.push('one-handed');
+  return Array.from(new Set(methods));
+};
+
+export const setActiveInputMethod = (input, method) => {
+  const state = createSettingsState(input);
+  const available = getAvailableInputMethods(state);
+  const activeInputMethod = available.includes(method) ? method : 'keyboard';
+  return { ...state, activeInputMethod, customSetup: activeInputMethod !== 'keyboard' || state.customSetup, updatedAt: timestamp() };
+};
+
+export const applyPresetConflictResolution = (input, conflict, choice) => {
+  const state = createSettingsState(input);
+  const entry = safeObject(conflict);
+  const key = canonicalSettingKey(entry.key);
+  if (!editableKeySet.has(key) || !validConflictChoices.has(choice)) return state;
+  const candidateValue = choice === 'keep-first'
+    ? entry.firstValue
+    : choice === 'use-second'
+      ? entry.secondValue
+      : PLATFORM_DEFAULTS[key];
+  const safeValue = cleanOverrides({ [key]: candidateValue });
+  if (!Object.hasOwn(safeValue, key)) return state;
+  const companionOverrides = {};
+  if (entry.type === 'auto-scroll-reduce-motion' && choice === 'keep-first') companionOverrides.reducedMotion = false;
+  if (entry.type === 'auto-scroll-low-stimulation' && choice === 'keep-first') companionOverrides.quietDisplay = false;
+  if (entry.type === 'high-contrast-low-stimulation' && choice === 'keep-first') companionOverrides.quietDisplay = false;
+  return {
+    ...state,
+    userOverrides: { ...state.userOverrides, [key]: safeValue[key], ...companionOverrides },
+    conflictResolutions: {
+      ...state.conflictResolutions,
+      [String(entry.id || conflictIdFor('manual-resolution', [], key))]: { key, choice, value: safeValue[key] }
+    },
