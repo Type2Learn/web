@@ -3705,3 +3705,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!control && narrationText) {
       if (!state.preferences.readAloud || selectedText || event.target.closest('a, input, textarea, select, label')) return;
       event.preventDefault();
+      startNarrationFromTextPoint(event);
+      return;
+    }
+    if (!control) return;
+    event.preventDefault();
+    handleAction(control.dataset.action, control);
+  });
+
+  app.addEventListener('keydown', (event) => {
+    if (state.settingsMenu && event.key === 'Escape') {
+      event.preventDefault();
+      state.settingsMenu = false;
+      render();
+      window.requestAnimationFrame(() => app.querySelector('[data-action="toggle-settings-menu"]')?.focus?.({ preventScroll: true }));
+      return;
+    }
+    const narrationText = event.target.closest?.('[data-narration-text][data-narration-index]');
+    if (narrationText && (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar')) {
+      event.preventDefault();
+      startNarrationFromChunkPoint(Number(narrationText.dataset.narrationIndex), 0);
+      return;
+    }
+    if (!event.target.matches?.('[data-typing-input]')) return;
+    const typingField = event.target.closest('.typing-tester');
+    const guidedTyping = !typingField?.classList.contains('is-free-response');
+    if (guidedTyping && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      keepGuidedTypingCursorAtEnd(event.target);
+      return;
+    }
+    if (state.progress.phase !== 'type' || event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+    event.preventDefault();
+    checkTyping();
+  });
+
+  app.addEventListener('change', (event) => {
+    if (event.target.matches('[data-settings-noise-type]')) {
+      saveCourseLearningChoice('background-noise-type', event.target.value);
+      return;
+    }
+    if (event.target.matches('[data-active-input-method]')) {
+      setCourseActiveInputMethod(event.target.value);
+      save('Active input method saved.');
+      render();
+      return;
+    }
+    if (event.target.matches('[data-narration-speed]')) {
+      setCourseSetting('narrationSpeed', event.target.value);
+      ensureNarrationService().changePlayback({
+        rate: event.target.value,
+        voiceURI: effectiveNarrationVoice(),
+        volume: Number(state.preferences.narrationVolume)
+      });
+      save('Narration speed saved.');
+      syncNarrationUi();
+      return;
+    }
+    if (event.target.matches('[data-narration-voice]')) {
+      setCourseSetting('narrationVoice', event.target.value);
+      ensureNarrationService().changePlayback({
+        rate: state.preferences.narrationSpeed,
+        voiceURI: effectiveNarrationVoice(),
+        volume: Number(state.preferences.narrationVolume)
+      });
+      save('Narration voice saved.');
+      syncNarrationUi();
+      return;
+    }
+    if (event.target.matches('[data-narration-volume]')) {
