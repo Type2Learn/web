@@ -741,3 +741,60 @@ export const scoreSupportAnswers = (selectedAnswerIds) => {
   selectedOptionIds.forEach((id) => {
     Object.entries(optionById.get(id)?.effects || {}).forEach(([dimension, value]) => {
       dimensionScores[dimension] += Number(value) || 0;
+    });
+  });
+  return {
+    selectedOptionIds,
+    dimensionScores,
+    reasonLabels: selectedOptionIds
+      .map((id) => optionById.get(id))
+      .filter((option) => Object.keys(option.effects || {}).length)
+      .map((option) => option.label)
+  };
+};
+
+const scoreProfile = (profile, dimensionScores) => {
+  const entries = Object.entries(profile.matchWeights || {});
+  const totalWeight = entries.reduce((sum, [, weight]) => sum + Number(weight || 0), 0);
+  if (!totalWeight) return 0;
+  return entries.reduce((sum, [dimension, weight]) => sum + ((dimensionScores[dimension] || 0) * Number(weight || 0)), 0) / totalWeight;
+};
+
+/*
+ * Deterministic, transparent recommendation rules:
+ * - no points means a balanced starting setup;
+ * - a profile needs 1.25 to be considered;
+ * - up to two secondary overlays need at least 65% of the primary score;
+ * - profiles within 0.25 of the winner are surfaced as equally strong choices.
+ */
+export const recommendSupportProfiles = (selectedAnswerIds) => {
+  const scoredAnswers = scoreSupportAnswers(selectedAnswerIds);
+  const total = Object.values(scoredAnswers.dimensionScores).reduce((sum, value) => sum + value, 0);
+  const scores = Object.fromEntries(PRESETS.map((profile) => [profile.id, Number(scoreProfile(profile, scoredAnswers.dimensionScores).toFixed(3))]));
+
+  if (!total) {
+    return {
+      primaryProfileId: BALANCED_START_PRESET_ID,
+      secondaryProfileIds: [],
+      equallyStrongProfileIds: [],
+      dimensionScores: scoredAnswers.dimensionScores,
+      selectedOptionIds: scoredAnswers.selectedOptionIds,
+      reasonLabels: [],
+      scores,
+      isBalanced: true,
+      confidence: 'starting-point'
+    };
+  }
+
+  const ranked = PRESETS
+    .map((profile, index) => ({ id: profile.id, score: scores[profile.id], index }))
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  const eligible = ranked.filter((item) => item.score >= 1.25);
+
+  if (!eligible.length) {
+    return {
+      primaryProfileId: BALANCED_START_PRESET_ID,
+      secondaryProfileIds: [],
+      equallyStrongProfileIds: [],
+      dimensionScores: scoredAnswers.dimensionScores,
+      selectedOptionIds: scoredAnswers.selectedOptionIds,
