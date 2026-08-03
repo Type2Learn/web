@@ -14,6 +14,48 @@
   font-display: swap;
 }
 
+/* Urdu is a first-class course language, not a browser fallback.  English
+   inside bilingual lesson cards stays LTR while its Urdu translation receives
+   its own readable RTL line and the locally bundled Arabic font. */
+html[lang="ur"] body,
+.course-urdu-copy {
+  font-family: "Noto Sans Arabic Local", "Noto Naskh Arabic", Tahoma, sans-serif;
+}
+
+.course-bilingual-copy,
+.course-bilingual-reading {
+  display: block;
+}
+
+.course-english-copy {
+  display: block;
+}
+
+.course-urdu-copy {
+  display: block;
+  margin-top: .48rem;
+  color: var(--course-ink-soft);
+  font-size: .97em;
+  font-weight: 600;
+  line-height: 1.9;
+  text-align: right;
+}
+
+.course-bilingual-reading .course-urdu-copy {
+  margin-top: .36rem;
+}
+
+.course-reading-list .course-urdu-copy {
+  margin-bottom: .4rem;
+}
+
+html[lang="ur"] .course-typing-task,
+html[lang="ur"] .course-typing-task * {
+  direction: ltr;
+  text-align: left;
+  font-family: "Type2Learn Sans", system-ui, sans-serif;
+}
+
 :root {
   --course-ink: #0a1630;
   --course-ink-soft: #26405f;
