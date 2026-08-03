@@ -2126,3 +2126,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         const transcript = result[0]?.transcript || '';
         if (result.isFinal) {
           if (!voiceInput.finalResultIndexes.has(resultIndex)) {
+            voiceInput.finalResultIndexes.add(resultIndex);
+            finalTranscript = [finalTranscript, transcript].filter(Boolean).join(' ').trim();
+          }
+        } else interimTranscript += transcript + ' ';
+      });
+      voiceInput.finalTranscript = finalTranscript;
+      voiceInput.restartCount = 0;
+      const transcript = [finalTranscript, interimTranscript.trim()].filter(Boolean).join(' ').trim();
+      if (!transcript) return;
+      const input = app.querySelector('[data-typing-input]');
+      const nextValue = [voiceInput.initialResponse, transcript].filter(Boolean).join(' ');
+      state.progress.attempt.response = nextValue;
+      state.progress.attempt.feedback = '';
+      if (input) {
+        input.value = nextValue;
+        syncTypingTester(input);
+      }
+      save('Voice input added to your response.');
+    };
+    recognition.onerror = (event) => {
+      if (sessionId !== voiceInput.sessionId || voiceInput.recognition !== recognition || voiceInput.stopRequested) return;
+      const errorCode = String(event?.error || 'unknown');
+      voiceInput.lastError = errorCode;
+      if (errorCode === 'no-speech' || errorCode === 'aborted' || errorCode === 'network') {
+        renderVoiceInputState('listening', errorCode === 'network'
+          ? 'Speech recognition briefly lost its connection and is reconnecting. Typing stays available.'
+          : 'No speech was heard yet. The microphone is staying ready, and typing stays available.');
+        return;
+      }
+      const permissionDenied = errorCode === 'not-allowed' || errorCode === 'service-not-allowed';
+      const error = permissionDenied
+        ? 'Enable microphone permission for this site, or type your response instead.'
+        : errorCode === 'audio-capture'
+          ? 'No working microphone was found. Check your device input, or type your response instead.'
+          : errorCode === 'language-not-supported'
+            ? 'Speech recognition does not support this language on your device. You can type your response instead.'
+            : 'Microphone input could not continue. You can type your response instead.';
+      stopVoiceInput(error, permissionDenied ? 'permission-denied' : 'error');
+      announce((permissionDenied ? 'Permission denied. ' : 'Microphone error. ') + error);
+    };
+    recognition.onend = () => {
+      if (sessionId !== voiceInput.sessionId || voiceInput.recognition !== recognition || voiceInput.stopRequested) return;
+      voiceInput.recognition = null;
+      const networkDelay = voiceInput.lastError === 'network' ? 800 : 350;
+      scheduleVoiceRecognitionRestart(
+        sessionId,
+        voiceInput.lastError === 'network'
+          ? 'Speech recognition briefly lost its connection. The microphone is reconnecting.'
+          : 'The microphone paused briefly. It is still listening for your response.',
+        networkDelay
+      );
+    };
+    try {
+      recognition.start();
+    } catch (_) {
+      if (voiceInput.recognition === recognition) voiceInput.recognition = null;
+      scheduleVoiceRecognitionRestart(sessionId, 'The microphone is starting again. Your response is still here.', 500);
+    }
+  };
+
+  const startVoiceInput = () => {
+    if (!typingAllowsVoiceInput()) {
+      announce(typingIsConceptResponse()
+        ? 'Enable Voice input and speech-to-text in Learning settings before using the microphone.'
+        : 'This is a typing-only activity, so microphone input is not shown.');
+      return;
+    }
+    const Recognition = voiceRecognitionConstructor();
+    voiceInput.supported = Boolean(Recognition);
