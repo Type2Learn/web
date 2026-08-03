@@ -272,3 +272,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       };
       backgroundNoise.fadeFrame = window.requestAnimationFrame(fadeIn);
       backgroundNoise.settleTimer = window.setTimeout(() => {
+        if (!backgroundNoise.isPlaying || audio !== backgroundNoise.audio) return;
+        audio.volume = backgroundNoise.volume;
+        backgroundNoise.settleTimer = null;
+      }, 520);
+      if (announceChange) announce('Background noise started at the selected low volume.');
+    } catch (_) {
+      backgroundNoise.isPlaying = false;
+      if (announceChange) announce('Background noise is ready. Select Start background noise to try again.');
+    }
+  };
+
+  const syncBackgroundNoisePreferences = () => {
+    const preferences = readBackgroundNoisePreferences();
+    const sourceChanged = backgroundNoise.type !== preferences.type;
+    backgroundNoise.enabled = preferences.enabled;
+    backgroundNoise.type = preferences.type;
+    backgroundNoise.volume = preferences.volume;
+    if (!backgroundNoise.enabled) {
+      pauseBackgroundNoise();
+      return;
+    }
+    if (sourceChanged && backgroundNoise.audio) {
+      backgroundNoise.audio.pause();
+      backgroundNoise.audio = null;
+      backgroundNoise.isPlaying = false;
+    }
+    prepareBackgroundNoiseAudio();
+  };
+
+  const defaultPreferences = () => resolveSettings(createSettingsState(null));
+
+  const blankAttempt = () => ({
+    response: '',
+    guidedIndex: 0,
+    lessonTypingVersion: 2,
+    selectedAnswer: '',
+    submitted: false,
+    feedback: '',
+    integrityNotice: false,
+    alternativeInput: false,
+    inputMethod: 'keyboard'
+  });
+
+  const blankFinalExamAttempt = () => ({
+    questionIndex: 0,
+    answers: Array.from({ length: finalExamQuestionCount() }, () => null),
+    submitted: false,
+    completed: false
+  });
+
+  const defaultState = () => ({
+    version: 1,
+    view: 'dashboard',
+    previousView: 'dashboard',
+    settings: createSettingsState(null),
+    preferences: defaultPreferences(),
+    progress: {
+      lessonIndex: 0,
+      phase: 'preview',
+      completedSteps: [],
+      attempt: blankAttempt(),
+      finalExam: blankFinalExamAttempt()
+    },
+    modal: '',
+    helpOption: '',
+    manualExampleVisible: false,
+    showSimple: false,
+    readingSectionIndex: 0,
+    reviewModuleIndex: null,
