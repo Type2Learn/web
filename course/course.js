@@ -1989,3 +1989,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       controls.dataset.voiceInputControls = '';
       const supported = Boolean(voiceRecognitionConstructor());
       controls.innerHTML = '<button class="course-secondary-button typing-mic-button" type="button" data-action="start-voice-input" aria-label="Use microphone to speak your response" aria-describedby="course-voice-input-status"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-5-3v.5a5 5 0 0 0 10 0v-.5M12 17v4M8.5 21h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span data-voice-input-button-label>Speak</span></button><button class="course-secondary-button typing-mic-stop" type="button" data-action="stop-voice-input" aria-describedby="course-voice-input-status" hidden>Stop</button>';
+      field.append(controls);
+      const status = document.createElement('p');
+      status.className = 'typing-voice-input-status';
+      status.id = 'course-voice-input-status';
+      status.dataset.voiceInputStatus = '';
+      status.setAttribute('role', 'status');
+      status.setAttribute('aria-live', 'polite');
+      status.textContent = 'Ready. Microphone input is optional. Typing stays available.';
+      field.append(status);
+      voiceInput.supported = supported;
+      renderVoiceInputState(supported ? voiceInput.status : 'unsupported');
+    }
+    textarea.dataset.typingPreviousValue = textarea.value;
+    syncTypingTester(textarea);
+    keepGuidedTypingCursorAtEnd(textarea);
+  };
+
+  const voiceRecognitionConstructor = () => window.SpeechRecognition || window.webkitSpeechRecognition || null;
+
+  const voiceInputStateDefinition = (status) => ({
+    ready: { name: 'Ready', button: 'Speak', active: false, disabled: false, label: 'Use microphone to speak your response', copy: 'Ready. Microphone input is optional. Typing stays available.' },
+    listening: { name: 'Listening', button: 'Listening', active: true, disabled: true, label: 'Listening for your response', copy: 'Listening. Speak in short phrases, then choose Stop when you are finished. Typing stays available.' },
+    recognising: { name: 'Recognising', button: 'Recognising', active: true, disabled: true, label: 'Recognising your spoken response', copy: 'Recognising. Your words are being added to the response field. Typing stays available.' },
+    stopped: { name: 'Stopped', button: 'Speak again', active: false, disabled: false, label: 'Start microphone input again', copy: 'Stopped. Your response is still in the field, and typing stays available.' },
+    unsupported: { name: 'Unsupported', button: 'Unsupported', active: false, disabled: true, label: 'Microphone input is unsupported in this browser', copy: 'Unsupported. This browser does not provide speech recognition. Type your response instead.' },
+    'permission-denied': { name: 'Permission denied', button: 'Try again', active: false, disabled: false, label: 'Try microphone input again after changing permission', copy: 'Permission denied. Allow microphone access for this site, or type your response instead.' },
+    error: { name: 'Error', button: 'Try again', active: false, disabled: false, label: 'Try microphone input again', copy: 'Error. Microphone input could not continue. Your response is still here, and typing stays available.' }
+  }[status] || null);
+
+  const renderVoiceInputState = (requestedStatus = voiceInput.status, detail = '') => {
+    const definition = voiceInputStateDefinition(requestedStatus) || voiceInputStateDefinition('error');
+    voiceInput.status = voiceInputStateDefinition(requestedStatus) ? requestedStatus : 'error';
+    voiceInput.listening = definition.active;
+    app.querySelectorAll('[data-voice-input-controls]').forEach((controls) => {
+      controls.dataset.voiceInputState = voiceInput.status;
+    });
+    app.querySelectorAll('[data-action="start-voice-input"]').forEach((button) => {
+      button.disabled = definition.disabled;
+      if (definition.disabled) button.setAttribute('aria-disabled', 'true');
+      else button.removeAttribute('aria-disabled');
+      button.setAttribute('aria-label', definition.label);
+      const label = button.querySelector('[data-voice-input-button-label]');
+      if (label) label.textContent = definition.button;
+    });
+    app.querySelectorAll('[data-action="stop-voice-input"]').forEach((button) => {
+      button.hidden = !definition.active;
+    });
+    const status = app.querySelector('[data-voice-input-status]');
+    if (status) status.textContent = detail ? definition.name + '. ' + detail : definition.copy;
+  };
+
+  const stopVoiceInput = (message = '', nextStatus = 'stopped') => {
+    const recognition = voiceInput.recognition;
+    voiceInput.stopRequested = true;
+    voiceInput.sessionId += 1;
+    if (voiceInput.restartTimer) {
+      window.clearTimeout(voiceInput.restartTimer);
+      voiceInput.restartTimer = null;
+    }
+    if (voiceInput.statusTimer) {
+      window.clearTimeout(voiceInput.statusTimer);
+      voiceInput.statusTimer = null;
+    }
+    voiceInput.recognition = null;
+    voiceInput.listening = false;
+    voiceInput.initialResponse = '';
+    voiceInput.finalTranscript = '';
+    voiceInput.finalResultIndexes = new Set();
