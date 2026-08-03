@@ -3843,3 +3843,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       choices['background-noise-volume'] = value;
       saveLearningChoices(choices);
       backgroundNoise.volume = clampBackgroundNoiseVolume(value);
+      if (backgroundNoise.audio) backgroundNoise.audio.volume = backgroundNoise.volume;
+      const output = app.querySelector('[data-settings-noise-volume-output]');
+      if (output) output.textContent = value + '%';
+      return;
+    }
+    if (!event.target.matches('[data-typing-input]')) return;
+    const input = event.target;
+    const previousLength = state.progress.attempt.response.length;
+    const nextValue = input.value;
+    const insertedLength = Math.max(0, nextValue.length - previousLength);
+    const usesAlternativeInput = usingAlternativeInput();
+    const isComposition = Boolean(event.isComposing) || /composition/i.test(event.inputType || '');
+    const isUnexpectedInsertion = event.inputType === 'insertFromPaste' || event.inputType === 'insertFromDrop';
+    if (!usesAlternativeInput && !isComposition && (insertedLength > 24 || isUnexpectedInsertion)) state.progress.attempt.integrityNotice = true;
+    state.progress.attempt.response = nextValue;
+    state.progress.attempt.feedback = '';
+    if (activeSupportMoment && ['response-needed', 'typing-incomplete'].includes(activeSupportMoment.kind)) {
+      clearSupportMoment();
+      app.querySelector('[data-support-moment]')?.remove();
+    }
+    const isSingleTypedCharacter = insertedLength === 1
+      && (event.inputType === 'insertText' || event.inputType === 'insertCompositionText');
+    syncTypingTester(input, isSingleTypedCharacter);
+    keepGuidedTypingCursorAtEnd(input);
+    save();
+  });
+
+  app.addEventListener('focusin', (event) => {
+    if (!event.target.matches?.('[data-typing-input]')) return;
+    window.requestAnimationFrame(() => keepGuidedTypingCursorAtEnd(event.target));
+  });
+
+  app.addEventListener('click', (event) => {
+    const input = event.target.closest?.('[data-typing-input]');
+    if (!input) return;
+    window.requestAnimationFrame(() => keepGuidedTypingCursorAtEnd(input));
+  });
+
+  app.addEventListener('scroll', (event) => {
+    if (!(event.target instanceof HTMLTextAreaElement) || !event.target.matches('[data-typing-input]')) return;
+    syncTypingTester(event.target);
+  }, true);
+
+  app.addEventListener('paste', (event) => {
+    const input = event.target.closest('[data-typing-input]');
+    if (!input) return;
+    const alternative = usingAlternativeInput();
+    if (alternative) return;
+    event.preventDefault();
+    state.progress.attempt.integrityNotice = true;
+    state.progress.attempt.feedback = 'Paste is blocked for this keyboard activity. Type the short idea, or use the microphone when it is available for an eligible concept response.';
+    save();
+    const feedback = document.querySelector('.typing-feedback');
+    if (feedback) feedback.textContent = state.progress.attempt.feedback;
+    announce(state.progress.attempt.feedback);
+  });
+
+  app.addEventListener('drop', (event) => {
+    const input = event.target.closest('[data-typing-input]');
+    if (!input) return;
+    const alternative = usingAlternativeInput();
+    if (alternative) return;
+    event.preventDefault();
+    state.progress.attempt.integrityNotice = true;
+    state.progress.attempt.feedback = 'Dropping text is blocked for this keyboard activity. Type the short idea, or use the microphone when it is available for an eligible concept response.';
+    save();
+    announce(state.progress.attempt.feedback);
+  });
