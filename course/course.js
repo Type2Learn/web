@@ -3156,3 +3156,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     app.innerHTML = renderShell(content);
     enhanceRenderedCourse();
     syncCourseMascot();
+    prepareModalAccessibility();
+  };
+
+  mascotViewportQuery?.addEventListener?.('change', () => {
+    if (authenticatedUser) render();
+  });
+  mascotMotionQuery?.addEventListener?.('change', () => {
+    if (authenticatedUser) render();
+  });
+  // A learner may resize a desktop window or rotate a device after the course
+  // has loaded. Re-rendering only at the mascot threshold left Lively motion
+  // active on a newly small screen. This media query keeps the effective
+  // animation level truthful without changing the saved preference.
+  compactAnimationQuery?.addEventListener?.('change', () => {
+    if (authenticatedUser) render();
+  });
+
+  const openCourseModal = (kind, trigger, fallbackSelector) => {
+    const action = trigger?.dataset?.action;
+    modalReturnFocusSelector = action ? '[data-action="' + action + '"]' : (fallbackSelector || '');
+    state.modal = kind;
+    render();
+  };
+
+  const closeCourseModal = (restoreFocus = true) => {
+    const selector = restoreFocus ? modalReturnFocusSelector : '';
+    modalReturnFocusSelector = '';
+    state.modal = '';
+    render();
+    if (selector) window.requestAnimationFrame(() => app.querySelector(selector)?.focus?.({ preventScroll: true }));
+  };
+
+  const goTo = (view, message) => {
+    state.modal = '';
+    modalReturnFocusSelector = '';
+    state.settingsMenu = false;
+    if (view !== 'course') state.reviewModuleIndex = null;
+    state.view = view;
+    if (view === 'course') recordSupportMoment('task-entry', { result: 'course-return' });
+    else clearSupportMoment();
+    save(message);
+    render();
+    if (view === 'course') window.requestAnimationFrame(() => {
+      window.scrollTo?.({ left: 0, top: 0, behavior: 'auto' });
+      (document.getElementById('course-course-title') || document.getElementById('course-task-heading'))?.focus?.({ preventScroll: true });
+    });
+  };
+
+  const normaliseText = (value) => value.trim().replace(/\s+/g, ' ').replace(/[“”]/g, '"').replace(/[’]/g, "'");
+  const normaliseTypingMatch = (value) => normaliseText(value).toLowerCase().replace(/[.,!?;:]/g, '');
+
+  const focusCurrentTask = (selector = '#course-task-heading') => {
+    window.requestAnimationFrame(() => app.querySelector(selector)?.focus?.());
+  };
+
+  // A new task is a new page in the learner's flow. Re-rendering while the
+  // previous task was scrolled near its action buttons can otherwise leave the
+  // next task title cropped above the viewport. Start each new task from its
+  // real beginning; focus does not force a second scroll afterwards.
+  const showCurrentTaskFromStart = (selector = '#course-task-heading') => {
+    window.requestAnimationFrame(() => {
+      window.scrollTo?.({ left: 0, top: 0, behavior: 'auto' });
+      app.querySelector(selector)?.focus?.({ preventScroll: true });
+    });
+  };
+
+  const animateReadingSectionChange = () => {
+    if (!contentTransitionsAreEnabled()) return;
+    const reading = app.querySelector('.course-reading-copy[data-structured="true"]');
