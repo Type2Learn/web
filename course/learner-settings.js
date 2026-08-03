@@ -1312,3 +1312,60 @@ export const setTemporaryOverride = (input, key, value) => {
 
 export const clearTemporaryOverrides = (input) => {
   const state = createSettingsState(input);
+  return { ...state, temporaryOverrides: {}, updatedAt: timestamp() };
+};
+
+const settingsSaveOutcomes = new WeakMap();
+const UNKNOWN_SAVE_OUTCOME = deepFreeze({ attempted: false, ok: null, reason: '' });
+
+/*
+ * saveLearnerSettings keeps returning the normalised settings object for API
+ * compatibility. Callers that show persistence feedback can inspect that same
+ * object with this helper instead of assuming a localStorage write succeeded.
+ */
+export const getLearnerSettingsSaveStatus = (state) => {
+  if (!state || typeof state !== 'object') return UNKNOWN_SAVE_OUTCOME;
+  return settingsSaveOutcomes.get(state) || UNKNOWN_SAVE_OUTCOME;
+};
+
+export const loadLearnerSettings = (learnerId) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(getLearnerSettingsKey(learnerId)) || 'null');
+    if (saved && typeof saved === 'object') return createSettingsState(saved);
+    const legacyKey = 'type2learn-learner-preferences-v1:' + encodeURIComponent(String(learnerId || 'learner'));
+    const legacy = JSON.parse(localStorage.getItem(legacyKey) || 'null');
+    return createSettingsState(legacy && typeof legacy === 'object' ? legacy : null);
+  } catch (_) {
+    return createSettingsState(null);
+  }
+};
+
+export const saveLearnerSettings = (learnerId, state) => {
+  const normalised = createSettingsState(state);
+  try {
+    localStorage.setItem(getLearnerSettingsKey(learnerId), JSON.stringify(normalised));
+    settingsSaveOutcomes.set(normalised, deepFreeze({ attempted: true, ok: true, reason: '' }));
+    return normalised;
+  } catch (error) {
+    const reason = error && error.name === 'QuotaExceededError' ? 'quota-exceeded' : 'storage-unavailable';
+    settingsSaveOutcomes.set(normalised, deepFreeze({ attempted: true, ok: false, reason }));
+    return normalised;
+  }
+};
+
+export const hasCompletedLearnerSetup = (learnerId) => {
+  try {
+    const state = loadLearnerSettings(learnerId);
+    if (state.setupComplete) return true;
+    // Keep the course prototype's earlier local setup intact while it is migrated.
+    const legacy = localStorage.getItem('type2learn-learner-preferences-v1:' + encodeURIComponent(String(learnerId || 'learner')));
+    return Boolean(safeObject(JSON.parse(legacy || 'null')).onboarded);
+  } catch (_) {
+    return false;
+  }
+};
+
+export const getPreset = (id) => {
+  if (id === BALANCED_START_PRESET_ID) return BALANCED_START_PRESET;
+  return presetById.get(id) || null;
+};
