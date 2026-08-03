@@ -2607,3 +2607,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       return [{ id: 'task-prompt', label: 'Current typing task', text: [typing.prompt, typing.target || typing.reference].filter(Boolean).join('. ') }];
     }
     if (state.progress.phase === 'check') return [{ id: 'question', label: 'Question', text: [check.question, ...(check.options || []).map(([label]) => label)].filter(Boolean).join('. ') }];
+    if (state.progress.phase === 'apply') return [{ id: 'practice', label: 'Practice question', text: 'Choose one practical response. ' + practiceSupport() }];
+    return [{ id: 'task', label: taskLabel(), text: [step.title, ...sourceReadSections(step)].filter(Boolean).join('. ') }];
+  };
+
+  const startNarration = (index) => {
+    const enablingTextToSpeech = !state.preferences.readAloud;
+    if (enablingTextToSpeech) {
+      setCourseSetting('readAloud', true);
+      save('Text to speech mode is on.');
+      render();
+    }
+    const service = ensureNarrationService();
+    const readingTask = state.view === 'course' && (state.progress.phase === 'read' || isReviewingModule());
+    if (!readingTask) {
+      narration.chunks = genericNarrationChunks();
+      service.setAudioPlaylist?.([]);
+      service.setChunks(narration.chunks);
+    } else {
+      narration.chunks = renderedNarrationChunks();
+      if (!narration.chunks.length) narration.chunks = readingNarrationChunks();
+      service.setChunks(narration.chunks);
+      configureLocalAvaPlaylist(service, narration.chunks);
+    }
+    service.configure({
+      rate: state.preferences.narrationSpeed,
+      voiceURI: effectiveNarrationVoice(),
+      volume: Number(state.preferences.narrationVolume)
+    });
+    const startIndex = Number.isInteger(index) ? index : (narration.status === 'finished' ? 0 : undefined);
+    service.start(startIndex);
+    save('Text to speech preference saved.');
+  };
+
+  const pointInsideNarrationText = (event) => {
+    let node = event.target;
+    let offset = 0;
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const position = document.caretPositionFromPoint(event.clientX, event.clientY);
+      if (position) {
+        node = position.offsetNode;
+        offset = position.offset;
+      }
+    } else if (typeof document.caretRangeFromPoint === 'function') {
+      const range = document.caretRangeFromPoint(event.clientX, event.clientY);
+      if (range) {
+        node = range.startContainer;
+        offset = range.startOffset;
+      }
+    }
+    const sourceElement = node?.nodeType === 3 ? node.parentElement : node;
+    const textElement = sourceElement?.closest?.('[data-narration-text][data-narration-index]');
+    if (!textElement) return null;
+    let characterOffset = 0;
+    if (node && typeof document.createRange === 'function') {
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(textElement);
+        range.setEnd(node, offset);
+        characterOffset = range.toString().length;
+      } catch (_) {
+        characterOffset = 0;
+      }
+    }
+    return { element: textElement, index: Number(textElement.dataset.narrationIndex), characterOffset };
+  };
+
+  const startNarrationFromChunkPoint = (requestedIndex, requestedOffset = 0) => {
+    if (!state.preferences.readAloud || state.view !== 'course' || (state.progress.phase !== 'read' && !isReviewingModule())) return;
