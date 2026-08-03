@@ -4681,3 +4681,671 @@ html[data-color-mode="vivid"] .course-support-popup .course-support-symbol {
   background: linear-gradient(135deg, #00c967, #00b7f0 58%, #006bff);
   box-shadow: 0 8px 20px rgb(0 105 245 / .26);
 }
+
+html[data-color-mode="vivid"] .course-support-popup .course-support-label,
+html[data-color-mode="vivid"] .course-support-popup .course-support-next > span { color: #006bdf; }
+html[data-color-mode="vivid"] .course-support-popup .course-support-next { border-top-color: #b9d8f4; }
+html[data-color-mode="vivid"] .course-support-popup .course-support-progress { background: linear-gradient(90deg, #00c967, #00b7f0, #006bff); }
+
+html[data-color-mode="flat"] .course-support-popup[dir="rtl"] { border-left-color: #c9d0ce; border-right-color: #788682; }
+html[data-color-mode="balanced"] .course-support-popup[dir="rtl"] { border-left-color: #bad0e2; border-right-color: #29ac98; }
+html[data-color-mode="vivid"] .course-support-popup[dir="rtl"] { border-left-color: #68b8ff; border-right-color: #00bfa7; }
+
+body[data-course-encouragement="expressive"] .course-support-popup {
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 11px;
+  border-left-width: 5px;
+  padding: 16px 19px 17px;
+}
+
+body[data-course-encouragement="expressive"] .course-support-popup .course-support-symbol {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  font-size: 21px;
+}
+
+body[data-course-encouragement="expressive"] .course-support-popup strong {
+  font-size: clamp(1.08rem, 1.45vw, 1.28rem);
+}
+
+.course-support-popup[dir="rtl"] {
+  grid-template-columns: minmax(0, 1fr) 34px;
+  border-width: 1px 4px 1px 1px;
+}
+
+body[data-course-encouragement="expressive"] .course-support-popup[dir="rtl"] {
+  grid-template-columns: minmax(0, 1fr) 42px;
+  border-width: 1px 5px 1px 1px;
+}
+
+body[data-course-encouragement="subtle"] .course-support-moment--subtle {
+  width: min(100%, 760px);
+  max-width: none;
+  margin: 14px 0 16px;
+}
+
+.course-typing-task .course-support-moment--subtle,
+.course-typing-task .course-typing-momentum {
+  position: relative;
+  z-index: 2;
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+
+body[data-course-encouragement="expressive"] .course-typing-momentum {
+  width: min(100%, 760px);
+}
+
+@keyframes course-popup-centre-gentle-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 12px)) scale(.985); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes course-popup-centre-gentle-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, calc(-50% + 10px)) scale(.985); }
+}
+
+@keyframes course-popup-entry-arrive {
+  0% { opacity: 0; transform: translate(-50%, -42%) scale(.9); clip-path: inset(12% 0 12% 0 round 18px); }
+  68% { opacity: 1; transform: translate(-50%, -52%) scale(1.02); clip-path: inset(0 round 18px); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); clip-path: inset(0 round 18px); }
+}
+
+@keyframes course-popup-section-arrive {
+  0% { opacity: 0; transform: translate(-68%, -50%) rotate(-2.5deg) scale(.9); }
+  64% { opacity: 1; transform: translate(-47%, -50%) rotate(.55deg) scale(1.025); }
+  100% { opacity: 1; transform: translate(-50%, -50%) rotate(0) scale(1); }
+}
+
+@keyframes course-popup-correct-arrive {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); filter: brightness(1.3); }
+  52% { opacity: 1; transform: translate(-50%, -50%) scale(1.045); filter: brightness(1.08); }
+  76% { transform: translate(-50%, -50%) scale(.988); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+}
+
+@keyframes course-popup-applied-arrive {
+  0% { opacity: 0; transform: translate(-50%, -32%) rotateX(18deg) scale(.9); }
+  70% { opacity: 1; transform: translate(-50%, -52%) rotateX(-1deg) scale(1.018); }
+  100% { opacity: 1; transform: translate(-50%, -50%) rotateX(0) scale(1); }
+}
+
+@keyframes course-popup-module-arrive {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(.78); }
+  58% { opacity: 1; transform: translate(-50%, -55%) scale(1.06); }
+  78% { transform: translate(-50%, -48%) scale(.985); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes course-popup-course-arrive {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.68); filter: saturate(1.35) brightness(1.2); }
+  45% { opacity: 1; transform: translate(-50%, -50%) scale(1.07); }
+  72% { transform: translate(-50%, -50%) scale(.985); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: saturate(1) brightness(1); }
+}
+
+@keyframes course-popup-centre-lively-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -56%) scale(.9); }
+}
+
+body[data-course-animations="gentle"] .course-support-popup.is-support-entering {
+  animation-name: course-popup-centre-gentle-in;
+}
+
+body[data-course-animations="gentle"] .course-support-popup.is-support-popup-leaving {
+  animation-name: course-popup-centre-gentle-out;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-entering[data-support-visual="entry"],
+body[data-course-animations="lively"] .course-support-popup.is-support-entering[data-support-visual="preference"] {
+  animation-name: course-popup-entry-arrive;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-entering[data-support-visual="section"],
+body[data-course-animations="lively"] .course-support-popup.is-support-entering[data-support-visual="lesson"] {
+  animation-name: course-popup-section-arrive;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-entering[data-support-visual="correct"] {
+  animation-name: course-popup-correct-arrive;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-entering[data-support-visual="applied"] {
+  animation-name: course-popup-applied-arrive;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-entering[data-support-visual="module"] {
+  animation-name: course-popup-module-arrive;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-entering[data-support-visual="course"] {
+  animation-name: course-popup-course-arrive;
+}
+
+body[data-course-animations="lively"] .course-support-popup.is-support-popup-leaving {
+  animation-name: course-popup-centre-lively-out;
+}
+
+/* A single orbiting rim appears only for the most expressive combination.
+   It is brief, contained to the acknowledgement, and never flashes. */
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-support-popup::before {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  width: 92px;
+  height: 4px;
+  border-radius: 999px;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(0 201 103 / .95), rgb(0 183 240 / .95), transparent);
+  filter: drop-shadow(0 0 7px rgb(0 183 240 / .55));
+  offset-path: inset(2px round 14px);
+  offset-distance: 0%;
+  offset-rotate: 0deg;
+  animation: course-support-rim-orbit 1.7s cubic-bezier(.24, .76, .2, 1) both;
+}
+
+@keyframes course-support-rim-orbit {
+  from { opacity: 0; offset-distance: 0%; }
+  22% { opacity: 1; }
+  78% { opacity: .9; }
+  to { opacity: 0; offset-distance: 100%; }
+}
+
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-task-card[data-support-transition="section-complete"],
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-task-card[data-support-transition="answer-correct"],
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-task-card[data-support-transition="module-complete"],
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-task-card[data-support-transition="course-complete"] {
+  position: relative;
+  isolation: isolate;
+}
+
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-task-card[data-support-transition="section-complete"]::after,
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-task-card[data-support-transition="answer-correct"]::after,
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-task-card[data-support-transition="module-complete"]::after,
+body[data-course-animations="lively"][data-course-encouragement="expressive"] .course-task-card[data-support-transition="course-complete"]::after {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  width: clamp(90px, 12vw, 170px);
+  height: 4px;
+  border-radius: 999px;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--course-green), var(--course-teal), var(--course-blue), transparent);
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--course-teal) 62%, transparent));
+  offset-path: inset(1px round 15px);
+  offset-distance: 0%;
+  offset-rotate: 0deg;
+  animation: course-earned-border-orbit 1.55s cubic-bezier(.2, .72, .22, 1) both;
+}
+
+@keyframes course-earned-surface-glow {
+  0%, 100% { box-shadow: none; }
+  38% { box-shadow: 0 0 0 5px rgb(23 196 145 / .12), 0 20px 46px rgb(0 126 196 / .13); }
+}
+
+@keyframes course-earned-border-orbit {
+  from { opacity: 0; offset-distance: 0%; }
+  20% { opacity: 1; }
+  76% { opacity: .9; }
+  to { opacity: 0; offset-distance: 100%; }
+}
+
+/* Correct and incorrect characters keep unambiguous functional colours. The
+   Lively movement is a tiny one-shot arrival, never a shake or repeating pulse. */
+body[data-course-animations="lively"] .typing-character.is-correct.is-just-typed {
+  color: #079c48;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--course-green) 62%, transparent);
+}
+
+body[data-course-animations="lively"] .typing-character.is-incorrect.is-just-typed,
+body[data-course-animations="lively"] .typing-character.is-extra.is-just-typed {
+  color: var(--course-red) !important;
+  text-shadow: 0 0 9px color-mix(in srgb, var(--course-red) 38%, transparent);
+  animation-name: course-typing-character-wrong-lively;
+}
+
+@keyframes course-typing-character-wrong-lively {
+  0% { opacity: .28; transform: translateY(2px) scale(.86); }
+  62% { opacity: 1; transform: translateY(0) scale(1.06); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Each typing milestone uses a different, small non-looping reveal. */
+body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changing[data-momentum-stage="early"] {
+  animation-name: course-momentum-early;
+}
+body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changing[data-momentum-stage="middle"] {
+  animation-name: course-momentum-middle;
+}
+body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changing[data-momentum-stage="near"] {
+  animation-name: course-momentum-near;
+}
+
+@keyframes course-momentum-early {
+  from { opacity: .25; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes course-momentum-middle {
+  0% { opacity: .3; transform: scale(.97); }
+  65% { opacity: 1; transform: scale(1.015); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes course-momentum-near {
+  0% { opacity: .25; clip-path: inset(0 100% 0 0 round 8px); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0 round 8px); }
+}
+
+/* Generated Type2Learn reward assets. They are shown only after an earned
+   success in Lively + Expressive, and each event follows a separate path. */
+.course-success-medal {
+  width: clamp(74px, 8vw, 112px);
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 16px rgb(4 46 78 / .24));
+  box-shadow: none;
+  background: transparent;
+}
+.course-success-medal::before,
+.course-success-medal::after { display: none; }
+
+.course-success-halo,
+.course-success-celebration-rays { position: absolute; inset: 0; }
+.course-success-halo {
+  top: 50%;
+  left: 50%;
+  width: min(52vw, 600px);
+  height: min(52vw, 600px);
+  border: 2px solid rgb(48 207 177 / .36);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.55);
+  box-shadow: 0 0 0 22px rgb(37 192 225 / .08), 0 0 0 52px rgb(0 107 255 / .045);
+  animation: course-success-halo-breathe 1.35s ease-out both;
+}
+
+.course-success-ray {
+  position: absolute;
+  top: 19%;
+  left: 50%;
+  width: 3px;
+  height: 31%;
+  border-radius: 999px;
+  opacity: 0;
+  transform: rotate(var(--reward-angle)) translateY(-34%) scaleY(.35);
+  transform-origin: 50% 100%;
+  background: linear-gradient(180deg, transparent, rgb(34 207 179 / .78), transparent);
+  animation: course-success-ray-open 1.25s ease-out both;
+}
+.course-success-ray--1 { --reward-angle: -72deg; }
+.course-success-ray--2 { --reward-angle: -42deg; animation-delay: 45ms; }
+.course-success-ray--3 { --reward-angle: -14deg; animation-delay: 90ms; }
+.course-success-ray--4 { --reward-angle: 16deg; animation-delay: 135ms; }
+.course-success-ray--5 { --reward-angle: 46deg; animation-delay: 180ms; }
+.course-success-ray--6 { --reward-angle: 76deg; animation-delay: 225ms; }
+.course-success-ray--7 { --reward-angle: 106deg; animation-delay: 270ms; }
+.course-success-ray--8 { --reward-angle: 136deg; animation-delay: 315ms; }
+
+.course-success-petal--13 { left: 27%; animation-delay: 305ms; --celebration-drift: 13vw; --celebration-turn: 310deg; }
+.course-success-petal--14 { left: 70%; animation-delay: 330ms; --celebration-drift: -13vw; --celebration-turn: -325deg; }
+
+@keyframes course-success-halo-breathe {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.48); }
+  42% { opacity: .9; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.12); }
+}
+@keyframes course-success-ray-open {
+  0% { opacity: 0; transform: rotate(var(--reward-angle)) translateY(-28%) scaleY(.25); }
+  34% { opacity: .85; }
+  100% { opacity: 0; transform: rotate(calc(var(--reward-angle) + 18deg)) translateY(-55%) scaleY(1.12); }
+}
+
+.course-success-celebration--correct .course-success-medal--1 {
+  top: 44%;
+  left: 50%;
+  animation: course-reward-correct-pop 1.35s cubic-bezier(.16, 1, .3, 1) both;
+}
+.course-success-celebration--applied .course-success-medal--1 {
+  top: 43%;
+  left: 50%;
+  animation: course-reward-applied-swing 1.5s cubic-bezier(.16, 1, .3, 1) both;
+}
+.course-success-celebration--section .course-success-medal,
+.course-success-celebration--lesson .course-success-medal { top: 11%; }
+.course-success-celebration--section .course-success-medal--1,
+.course-success-celebration--lesson .course-success-medal--1 { left: 18%; animation: course-reward-section-left 1.65s cubic-bezier(.16, .82, .28, 1) both; }
+.course-success-celebration--section .course-success-medal--2,
+.course-success-celebration--lesson .course-success-medal--2 { left: 47%; animation: course-reward-section-centre 1.7s cubic-bezier(.16, .82, .28, 1) 70ms both; }
+.course-success-celebration--section .course-success-medal--3,
+.course-success-celebration--lesson .course-success-medal--3 { left: 76%; animation: course-reward-section-right 1.65s cubic-bezier(.16, .82, .28, 1) 125ms both; }
+.course-success-celebration--module .course-success-medal--1 {
+  bottom: 8%;
+  left: calc(50% + min(40vw, 520px));
+  width: clamp(128px, 14vw, 190px);
+  animation: course-reward-module-rise 2s cubic-bezier(.16, 1, .3, 1) both;
+}
+.course-success-celebration--course .course-success-medal--1 {
+  top: 50%;
+  left: calc(50% + min(40vw, 520px));
+  width: clamp(145px, 16vw, 220px);
+  animation: course-reward-course-crown 2.2s cubic-bezier(.16, 1, .3, 1) both;
+}
+.course-success-celebration--course .course-success-medal--2 { top: 20%; left: 18%; animation: course-reward-course-orbit-left 2s ease-out 80ms both; }
+.course-success-celebration--course .course-success-medal--3 { top: 20%; left: 76%; animation: course-reward-course-orbit-right 2s ease-out 140ms both; }
+
+@keyframes course-reward-correct-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.25) rotate(-20deg); }
+  48% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(4deg); }
+  72% { opacity: 1; transform: translate(-50%, -52%) scale(.96) rotate(0); }
+  100% { opacity: 0; transform: translate(-50%, -82%) scale(.82) rotate(0); }
+}
+@keyframes course-reward-applied-swing {
+  0% { opacity: 0; transform: translate(-50%, -20%) rotateY(-65deg) scale(.5); }
+  50% { opacity: 1; transform: translate(-50%, -50%) rotateY(8deg) scale(1.04); }
+  76% { opacity: 1; transform: translate(-50%, -50%) rotateY(0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -72%) rotateY(0) scale(.9); }
+}
+@keyframes course-reward-section-left {
+  0% { opacity: 0; transform: translate(-120%, -80%) rotate(-24deg) scale(.45); }
+  48% { opacity: 1; transform: translate(0, 18vh) rotate(7deg) scale(1); }
+  100% { opacity: 0; transform: translate(18vw, 72vh) rotate(22deg) scale(.78); }
+}
+@keyframes course-reward-section-centre {
+  0% { opacity: 0; transform: translateY(-18vh) rotate(8deg) scale(.5); }
+  48% { opacity: 1; transform: translateY(21vh) rotate(-3deg) scale(1.06); }
+  100% { opacity: 0; transform: translateY(78vh) rotate(-16deg) scale(.82); }
+}
+@keyframes course-reward-section-right {
+  0% { opacity: 0; transform: translate(120%, -80%) rotate(22deg) scale(.45); }
+  48% { opacity: 1; transform: translate(0, 18vh) rotate(-7deg) scale(1); }
+  100% { opacity: 0; transform: translate(-18vw, 72vh) rotate(-22deg) scale(.78); }
+}
+@keyframes course-reward-module-rise {
+  0% { opacity: 0; transform: translate(-50%, 70%) scale(.46); }
+  42% { opacity: 1; transform: translate(-50%, -92%) scale(1.08); }
+  68% { opacity: 1; transform: translate(-50%, -98%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -142%) scale(.9); }
+}
+@keyframes course-reward-course-crown {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) rotate(-7deg); }
+  44% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(2deg); }
+  72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -70%) scale(.9); }
+}
+@keyframes course-reward-course-orbit-left {
+  0% { opacity: 0; transform: translate(-30vw, 18vh) rotate(-40deg) scale(.5); }
+  52% { opacity: 1; transform: translate(15vw, 8vh) rotate(8deg) scale(1); }
+  100% { opacity: 0; transform: translate(35vw, -12vh) rotate(30deg) scale(.7); }
+}
+@keyframes course-reward-course-orbit-right {
+  0% { opacity: 0; transform: translate(30vw, 18vh) rotate(40deg) scale(.5); }
+  52% { opacity: 1; transform: translate(-15vw, 8vh) rotate(-8deg) scale(1); }
+  100% { opacity: 0; transform: translate(-35vw, -12vh) rotate(-30deg) scale(.7); }
+}
+
+.course-success-celebration--correct .course-success-petal,
+.course-success-celebration--applied .course-success-petal {
+  top: 50%;
+  left: 50%;
+  animation-name: course-success-petal-burst;
+  animation-duration: 1.25s;
+}
+.course-success-celebration--module .course-success-petal {
+  animation-name: course-success-petal-rise;
+  animation-duration: 1.75s;
+}
+
+@keyframes course-success-petal-burst {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(.4); }
+  28% { opacity: .92; }
+  100% { opacity: 0; transform: translate(var(--celebration-drift), calc(-24vh + var(--celebration-drift))) rotate(var(--celebration-turn)) scale(1); }
+}
+@keyframes course-success-petal-rise {
+  0% { opacity: 0; transform: translateY(82vh) rotate(0) scale(.45); }
+  38% { opacity: .9; }
+  100% { opacity: 0; transform: translate(var(--celebration-drift), 3vh) rotate(var(--celebration-turn)) scale(1); }
+}
+
+/* Next-step transitions differ by the kind of work being opened. The base
+   navigation sweep remains for ordinary navigation; reading, typing,
+   questions, applied practice, and milestones each get their own geometry. */
+.course-route-motion[data-motion-kind="reading"] > span { top: 28%; height: 3px; }
+.course-route-motion[data-motion-kind="reading"] > i { top: 50%; }
+.course-route-motion[data-motion-kind="reading"] > b { top: 72%; }
+
+.course-route-motion[data-motion-kind="typing"] > span {
+  top: 44%;
+  height: 10px;
+  animation-name: course-route-type-ltr;
+}
+.course-route-motion[data-motion-kind="typing"][data-direction="rtl"] > span { animation-name: course-route-type-rtl; }
+
+.course-route-motion[data-motion-kind="question"] { transform: rotate(-5deg) scale(1.08); }
+.course-route-motion[data-motion-kind="question"] > span { height: 4px; }
+.course-route-motion[data-motion-kind="question"] > i,
+.course-route-motion[data-motion-kind="question"] > b { height: 12px; border-radius: 999px; }
+
+.course-route-motion[data-motion-kind="applied"] > span {
+  top: 34%;
+  height: 5px;
+  transform: rotate(7deg);
+}
+.course-route-motion[data-motion-kind="applied"] > i { top: 58%; transform: rotate(-6deg); }
+.course-route-motion[data-motion-kind="applied"] > b { top: 68%; transform: rotate(4deg); }
+
+.course-route-motion[data-motion-kind="milestone"] > span {
+  top: 50%;
+  width: 18vw;
+  height: 18vw;
+  border: 3px solid var(--course-teal);
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 0 0 22px rgb(24 202 163 / .08), 0 0 0 46px rgb(0 107 255 / .05);
+  animation-name: course-route-milestone-ltr;
+}
+.course-route-motion[data-motion-kind="milestone"][data-direction="rtl"] > span { animation-name: course-route-milestone-rtl; }
+
+@keyframes course-route-type-ltr {
+  0% { opacity: 0; transform: translateX(0) scaleX(.2) skewX(-18deg); }
+  28% { opacity: .9; }
+  100% { opacity: 0; transform: translateX(136vw) scaleX(1.5) skewX(18deg); }
+}
+@keyframes course-route-type-rtl {
+  0% { opacity: 0; transform: translateX(0) scaleX(.2) skewX(18deg); }
+  28% { opacity: .9; }
+  100% { opacity: 0; transform: translateX(-136vw) scaleX(1.5) skewX(-18deg); }
+}
+@keyframes course-route-milestone-ltr {
+  0% { opacity: 0; transform: translate(-10vw, -50%) scale(.2); }
+  42% { opacity: .85; }
+  100% { opacity: 0; transform: translate(118vw, -50%) scale(1.35); }
+}
+@keyframes course-route-milestone-rtl {
+  0% { opacity: 0; transform: translate(10vw, -50%) scale(.2); }
+  42% { opacity: .85; }
+  100% { opacity: 0; transform: translate(-118vw, -50%) scale(1.35); }
+}
+
+/* Lively is a movement setting in its own right. A learner who chooses
+   Lively + Subtle should still see the task acknowledge an intentional
+   transition; encouragement only controls the amount of accompanying copy.
+   This rim is a single, finite arrival effect—not an idle glow or a loop. */
+body[data-course-animations="lively"] .course-task-card.is-support-task-entering {
+  position: relative;
+  isolation: isolate;
+}
+
+body[data-course-animations="lively"] .course-task-card.is-support-task-entering::before {
+  position: absolute;
+  z-index: 3;
+  inset: -5px;
+  border: 1px solid color-mix(in srgb, var(--course-lively-ray-core) 66%, var(--course-paper));
+  border-radius: calc(var(--course-radius) + 5px);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, var(--course-lively-ray-soft), transparent) 13% 0 / 26% 2px no-repeat,
+    linear-gradient(90deg, transparent, var(--course-lively-ray-trail), transparent) 61% 100% / 28% 2px no-repeat,
+    linear-gradient(0deg, transparent, var(--course-lively-ray-core), transparent) 0 28% / 2px 28% no-repeat,
+    linear-gradient(0deg, transparent, var(--course-lively-ray-soft), transparent) 100% 58% / 2px 24% no-repeat;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--course-lively-ray-soft) 10%, transparent),
+    0 0 17px color-mix(in srgb, var(--course-lively-ray-core) 26%, transparent),
+    0 0 38px color-mix(in srgb, var(--course-lively-ray-trail) 13%, transparent);
+  animation: course-lively-task-light-rim 1.28s cubic-bezier(.16, .8, .22, 1) both;
+}
+
+/* A focused beam travels the outline once. It uses the current colour style
+   and is deliberately contained to the active card, never the whole page. */
+body[data-course-animations="lively"][data-course-encouragement] .course-task-card.is-support-task-entering::after {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  width: clamp(84px, 14vw, 184px);
+  height: 4px;
+  border-radius: 999px;
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--course-lively-ray-soft), var(--course-lively-ray-core), var(--course-lively-ray-trail), transparent);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--course-lively-ray-core) 70%, transparent));
+  offset-path: inset(1px round 17px);
+  offset-distance: 0%;
+  offset-rotate: 0deg;
+  animation: course-lively-task-rim-trace 1.42s cubic-bezier(.2, .76, .2, 1) both;
+}
+
+/* The active controls arrive after the card rather than all elements moving
+   together. This makes section changes easy to follow without delaying use. */
+body[data-course-animations="lively"] .course-task-card.is-support-task-entering .course-task-actions > * {
+  animation: course-lively-task-action-arrive-ltr 440ms cubic-bezier(.16, 1, .3, 1) 105ms both;
+}
+
+body[data-course-animations="lively"][data-course-direction="rtl"] .course-task-card.is-support-task-entering .course-task-actions > *,
+body[data-course-animations="lively"][data-course-urdu-mode="on"] .course-task-card.is-support-task-entering .course-task-actions > *,
+html[dir="rtl"] body[data-course-animations="lively"] .course-task-card.is-support-task-entering .course-task-actions > * {
+  animation-name: course-lively-task-action-arrive-rtl;
+}
+
+/* Completion gets a slightly stronger rim in Lively. It is still independent
+   of the encouragement level; Expressive alone supplies reward assets. */
+body[data-course-animations="lively"] .course-task-card.is-support-task-entering:is([data-support-transition="section-complete"], [data-support-transition="answer-correct"], [data-support-transition="module-complete"], [data-support-transition="course-complete"])::before {
+  animation-duration: 1.52s;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--course-lively-ray-soft) 14%, transparent),
+    0 0 24px color-mix(in srgb, var(--course-lively-ray-core) 34%, transparent),
+    0 0 52px color-mix(in srgb, var(--course-lively-ray-trail) 18%, transparent);
+}
+
+@keyframes course-lively-task-light-rim {
+  0% { opacity: 0; transform: scale(.992); }
+  24% { opacity: .92; }
+  58% { opacity: .66; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.005); }
+}
+
+@keyframes course-lively-task-rim-trace {
+  0% { opacity: 0; offset-distance: 0%; }
+  17% { opacity: 1; }
+  78% { opacity: .92; }
+  100% { opacity: 0; offset-distance: 100%; }
+}
+
+@keyframes course-lively-task-action-arrive-ltr {
+  0% { opacity: .18; transform: translateX(-12px) translateY(4px) scale(.97); }
+  64% { opacity: 1; transform: translateX(2px) translateY(-1px) scale(1.012); }
+  100% { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+}
+
+@keyframes course-lively-task-action-arrive-rtl {
+  0% { opacity: .18; transform: translateX(12px) translateY(4px) scale(.97); }
+  64% { opacity: 1; transform: translateX(-2px) translateY(-1px) scale(1.012); }
+  100% { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+}
+
+/* Correct keystrokes get a local, positive response in Lively. The pulse is
+   clipped to the response field, lasts 300ms, and does not move the caret or
+   the learner's text. Incorrect characters intentionally receive no version
+   of this effect—their red text is the complete, calm correction signal. */
+body[data-course-animations="lively"] .typing-tester.is-correct-keystroke::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--course-lively-ray-soft) 68%, transparent), transparent) top / 38% 2px no-repeat,
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--course-lively-ray-core) 54%, transparent), transparent) bottom / 31% 2px no-repeat;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--course-lively-ray-core) 36%, transparent);
+  animation: course-typing-correct-pulse 310ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+@keyframes course-typing-correct-pulse {
+  0% { opacity: 0; transform: scale(.992); }
+  48% { opacity: .9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* The reassurance band inherits the page palette. Flat stays quiet,
+   Balanced is recognisably green/blue, and Vivid alone uses a stronger wash. */
+html[data-color-mode="flat"] .course-typing-momentum {
+  color: #4f625a;
+  border-color: #aeb8b2;
+  background: #f6f7f4;
+}
+
+html[data-color-mode="flat"] body[data-course-encouragement="expressive"] .course-typing-momentum {
+  border-left-color: #6f8876;
+  background: #f6f7f4;
+}
+
+html[data-color-mode="balanced"] .course-typing-momentum {
+  color: #14654f;
+  border-color: #9acdc5;
+}
+
+html[data-color-mode="balanced"] body[data-course-encouragement="expressive"] .course-typing-momentum {
+  border-left-color: #23b88c;
+  background: #f2fcf8;
+}
+
+html[data-color-mode="vivid"] .course-typing-momentum {
+  color: #006f77;
+  border-color: #5bcfe3;
+}
+
+html[data-color-mode="vivid"] body[data-course-encouragement="expressive"] .course-typing-momentum {
+  border-left-color: #00c967;
+  background: linear-gradient(100deg, #ddfff0, #e6f8ff 58%, #edf2ff);
+}
+
+@media (max-width: 767px) {
+  body[data-course-encouragement="balanced"] .course-support-popup,
+  body[data-course-encouragement="expressive"] .course-support-popup {
+    top: 50%;
+    bottom: auto;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+  }
+}
+
+body[data-course-animations="still"] .course-success-celebration,
+body.course-reduced-motion .course-success-celebration { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .course-success-celebration,
+  .course-support-popup::before,
+  .course-task-card::after { display: none !important; }
+}
