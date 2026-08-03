@@ -3568,3 +3568,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         save('Reviewing a completed module. Your current task is still saved.');
         render();
         focusCurrentTask();
+        break;
+      }
+      case 'return-from-module-review':
+        state.reviewModuleIndex = null;
+        save('You are back at your saved current task.');
+        render();
+        focusCurrentTask();
+        break;
+      case 'signout': signOut(element); break;
+      case 'listen': narrateCurrentTask(); break;
+      case 'narration-listen': startNarration(); break;
+      case 'narration-pause': ensureNarrationService().pause(); break;
+      case 'narration-stop': ensureNarrationService().stop(); break;
+      case 'narration-restart': ensureNarrationService().restart(); break;
+      case 'narration-jump': startNarration(Number(element.dataset.narrationIndex)); break;
+      case 'pause': openCourseModal('pause', element, '[data-action="pause"]'); break;
+      case 'explain-step': openCourseModal('explain', element, '[data-action="explain-step"]'); break;
+      case 'stuck': state.helpOption = ''; openCourseModal('help', element, '[data-action="stuck"]'); break;
+      case 'close-modal': closeCourseModal(); break;
+      case 'save-exit':
+        state.modal = '';
+        modalReturnFocusSelector = '';
+        state.reviewModuleIndex = null;
+        state.view = 'dashboard';
+        save('Your progress is saved. You can come back whenever you’re ready.');
+        render();
+        break;
+      case 'show-example':
+        state.manualExampleVisible = !state.manualExampleVisible;
+        save(state.manualExampleVisible ? 'The authored course example is visible.' : 'The manually opened example is hidden for this lesson.');
+        render();
+        break;
+      case 'previous-reading-section':
+        if (!smallerSectionsAreActive()) break;
+        state.readingSectionIndex = Math.max(0, currentReadingSectionIndex() - 1);
+        save('The previous small reading section is ready.');
+        retainReadingSectionPosition('[data-action="previous-reading-section"], [data-action="next-reading-section"], [data-action="read-complete"]');
+        break;
+      case 'next-reading-section':
+        if (!smallerSectionsAreActive()) break;
+        state.readingSectionIndex = Math.min(readingSections().length - 1, currentReadingSectionIndex() + 1);
+        save('The next small reading section is ready.');
+        retainReadingSectionPosition('[data-action="next-reading-section"], [data-action="read-complete"]');
+        break;
+      case 'read-complete':
+        state.progress.phase = 'type';
+        state.progress.attempt = blankAttempt();
+        state.showSimple = false;
+        state.readingSectionIndex = 0;
+        recordSupportMoment('task-entry', { result: 'typing' });
+        save();
+        render();
+        showCurrentTaskFromStart('#course-typing-input');
+        break;
+      case 'preview-complete':
+        state.progress.phase = 'read';
+        state.progress.attempt = blankAttempt();
+        state.readingSectionIndex = 0;
+        recordSupportMoment('task-entry', { result: 'reading' });
+        save();
+        render();
+        showCurrentTaskFromStart();
+        break;
+      case 'start-voice-input': startVoiceInput(); break;
+      case 'stop-voice-input': stopVoiceInput('Microphone input stopped. Your response is still here.'); break;
+      case 'check-typing': checkTyping(); break;
+      case 'submit-check': finishCheck(); break;
+      case 'continue-check': continueCheck(); break;
+      case 'submit-apply': finishApply(); break;
