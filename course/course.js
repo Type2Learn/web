@@ -478,3 +478,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   let supportPopupTimer = 0;
   let lastVisualRouteKey = '';
   let actionMotionSequence = 0;
+  let typingPulseTimer = 0;
+  let rewardAssetsPreloaded = false;
+
+  const warmRewardAssets = () => {
+    if (rewardAssetsPreloaded) return;
+    rewardAssetsPreloaded = true;
+    ['/assets/rewards/type2learn-section-medal.webp', '/assets/rewards/type2learn-module-medal.webp'].forEach((source) => {
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = source;
+    });
+  };
+
+  const supportLanguage = () => learningChoices()['learning-language'] === 'urdu' ? 'urdu' : 'english';
+  const selectedEncouragementLevel = () => {
+    const level = learningChoices().encouragement;
+    return ['subtle', 'balanced', 'expressive'].includes(level) ? level : 'subtle';
+  };
+  const savedAnimationLevel = () => {
+    const level = learningChoices().animations;
+    return ['still', 'gentle', 'lively'].includes(level) ? level : 'gentle';
+  };
+  const effectiveAnimationLevel = () => {
+    if (savedAnimationLevel() === 'still'
+      || state.preferences.reducedMotion
+      || state.preferences.quietDisplay
+      || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return 'still';
+    // Small screens keep all written support but never use the broad, staged
+    // movement intended for desktop workspaces.
+    if (window.matchMedia?.('(max-width: 767px)')?.matches) return 'gentle';
+    return savedAnimationLevel();
+  };
+
+  const SUPPORT_MESSAGES = {
+    english: {
+      'task-entry': {
+        subtle: null,
+        balanced: ['You can do this', 'One small step at a time. Start whenever you are ready.'],
+        expressive: ['You are ready for this', 'You have everything you need for the next clear step.']
+      },
+      'section-complete': {
+        subtle: ['Section complete', 'Nice work.'],
+        balanced: ['You did it', 'That part is complete. The next small piece is ready.'],
+        expressive: ['You are doing amazing', 'You cleared this section. Keep going one clear part at a time.']
+      },
+      'answer-correct': {
+        subtle: ['Correct', 'Nice work.'],
+        balanced: ['You got it', 'That matches the lesson. You are ready for the next step.'],
+        expressive: ['You cleared it!', 'That was a strong answer. Your next step is ready when you are.']
+      },
+      'answer-incorrect': {
+        subtle: ['Almost there', 'Try again when you are ready.'],
+        balanced: ['You can do this', 'The marked answer can guide your next try.'],
+        expressive: ['Keep going — you are learning', 'This try gave you useful information. Look at the marked answer, then choose again.']
+      },
+      'response-needed': {
+        subtle: ['Your space is ready', 'Start when you are ready.'],
+        balanced: ['Start with one word', 'You do not need to finish everything at once.'],
+        expressive: ['You can begin anywhere', 'Start with the first visible word. Each word you add is progress.']
+      },
+      'typing-incomplete': {
+        subtle: ['Good start', 'Continue from the first character that differs.'],
+        balanced: ['You are getting there', 'The matching characters stay marked. Continue from the first one that differs.'],
+        expressive: ['Keep going — you have got this', 'The matching characters are already there. Continue from the first character that differs.']
+      },
+      'module-complete': {
+        subtle: ['Module complete', 'Well done.'],
+        balanced: ['You completed a whole module', 'You worked through every part. Take the next step when you are ready.'],
+        expressive: ['Congratulations — you cleared this module', 'You read, typed, checked, and applied one whole idea.']
