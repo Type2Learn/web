@@ -912,3 +912,60 @@ const conflictResolutionFor = (state, conflict) => {
   if (saved && saved.key === conflict.key) return { resolved: true, source: 'resolution', value: saved.value, choice: saved.choice };
   return { resolved: false, source: '', value: undefined };
 };
+
+/*
+ * Inspect a requested set of profiles before it is applied. It intentionally
+ * does not mutate state: setup and Settings can display compatibility,
+ * duplicates, and preference choices before saving a final configuration.
+ */
+export const getPresetSelectionAnalysis = (input, profileIds) => {
+  const state = createSettingsState(input);
+  const selectedPresetIds = orderProfileIds(profileIds, state.primaryPresetId);
+  const profiles = selectedPresetIds.map((id) => presetById.get(id)).filter(Boolean);
+  const conflicts = [];
+
+  if (profiles.length > PRESET_SELECTION_LIMIT) {
+    conflicts.push({
+      id: 'selection-limit',
+      type: 'selection-limit',
+      blocking: true,
+      message: 'Choose up to ' + PRESET_SELECTION_LIMIT + ' support bundles at one time so the setup stays clear and reviewable.'
+    });
+  }
+
+  profiles.forEach((profile, index) => {
+    profiles.slice(index + 1).forEach((other) => {
+      if (profilePairIsCompatible(profile, other)) return;
+      const explicitConflict = profile.conflictsWith.includes(other.id) || other.conflictsWith.includes(profile.id);
+      const customMessage = [...profile.conflictMetadata, ...other.conflictMetadata]
+        .map((item) => item?.message)
+        .find(Boolean);
+      conflicts.push({
+        id: conflictIdFor(explicitConflict ? 'preset-conflict' : 'preset-incompatible', [profile.id, other.id]),
+        type: explicitConflict ? 'preset-conflict' : 'preset-incompatible',
+        blocking: true,
+        profileIds: [profile.id, other.id],
+        message: customMessage || (profile.name + ' and ' + other.name + ' are not a compatible support-bundle combination. Choose one of them, then review individual settings if needed.')
+      });
+    });
+  });
+
+  const contributions = profileValueContributions(profiles);
+  const duplicateSettingKeys = [];
+  contributions.forEach((entries, key) => {
+    if (entries.length > 1 && new Set(entries.map((entry) => JSON.stringify(entry.value))).size === 1) duplicateSettingKeys.push(key);
+    if (entries.length < 2 || new Set(entries.map((entry) => JSON.stringify(entry.value))).size < 2) return;
+    const first = entries[0];
+    const second = entries.find((entry) => JSON.stringify(entry.value) !== JSON.stringify(first.value));
+    const conflict = {
+      id: conflictIdFor('preset-setting', [first.profileId, second.profileId], key),
+      type: 'preset-setting',
+      key,
+      profileIds: [first.profileId, second.profileId],
+      firstValue: first.value,
+      secondValue: second.value,
+      message: first.profileName + ' and ' + second.profileName + ' have different preferences for ' + key + '. Choose which setting you prefer.'
+    };
+    const resolution = conflictResolutionFor(state, conflict);
+    conflicts.push({ ...conflict, blocking: !resolution.resolved, resolution });
+  });
