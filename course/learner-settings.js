@@ -455,3 +455,59 @@ export const BALANCED_START_PRESET = deepFreeze({
 
 const validKeys = new Set(Object.keys(PLATFORM_DEFAULTS));
 const editableKeySet = new Set(EDITABLE_SETTING_KEYS);
+const protectionKeySet = new Set(PROTECTION_KEYS);
+const temporaryOverrideKeys = new Set(['focusMode']);
+const presetById = new Map(PRESETS.map((preset) => [preset.id, preset]));
+const presetOrder = new Map(PRESETS.map((preset, index) => [preset.id, index]));
+const validTextSizes = new Set(['standard', 'large', 'extra-large']);
+const validSpacing = new Set(['standard', 'relaxed']);
+const validWidths = new Set(['narrow', 'comfortable', 'wide']);
+const validNarrationSpeeds = new Set(['0.75', '1', '1.25', '1.5']);
+const validNarrationVolumes = new Set(['0.5', '0.75', '1']);
+const validNumericProgress = new Set(['full', 'reduced']);
+const validOnboardingMethods = new Set(['questionnaire', 'manual', 'standard', 'legacy', '']);
+const validInputMethods = new Set(INPUT_METHOD_IDS);
+const validConflictChoices = new Set(['keep-first', 'use-second', 'disable']);
+
+export const validateSupportConfiguration = () => {
+  const errors = [];
+  const seenOptionIds = new Set();
+  SUPPORT_QUESTIONNAIRE.forEach((question) => {
+    if (!question.id || !question.prompt || !Array.isArray(question.options)) errors.push('Questionnaire question is incomplete.');
+    question.options.forEach((option) => {
+      if (!option.id || !option.label || seenOptionIds.has(option.id)) errors.push('Questionnaire option IDs must be unique.');
+      seenOptionIds.add(option.id);
+      Object.keys(option.effects || {}).forEach((dimension) => {
+        if (!validDimensionIds.has(dimension)) errors.push('Unknown support dimension: ' + dimension);
+      });
+    });
+  });
+  PRESETS.forEach((preset) => {
+    if (!preset.id || !preset.name || !preset.description || !preset.longDescription) errors.push('A support profile is missing learner-facing copy.');
+    if (!preset.category) errors.push('A support profile is missing a category: ' + preset.id);
+    if (!Object.keys(preset.settings || {}).length) errors.push('A support profile has no settings overlay: ' + preset.id);
+    Object.keys(preset.settings || {}).forEach((key) => {
+      if (!validKeys.has(key)) errors.push('Unknown setting in ' + preset.id + ': ' + key);
+      if (!editableKeySet.has(key)) errors.push('Non-editable setting in ' + preset.id + ': ' + key);
+    });
+    Object.keys(preset.matchWeights || {}).forEach((dimension) => {
+      if (!validDimensionIds.has(dimension)) errors.push('Unknown profile dimension: ' + dimension);
+    });
+    [...preset.compatibleWith, ...preset.conflictsWith].forEach((id) => {
+      if (!PRESETS.some((candidate) => candidate.id === id)) errors.push('Unknown profile relationship in ' + preset.id + ': ' + id);
+      if (id === preset.id) errors.push('A support profile cannot reference itself: ' + preset.id);
+    });
+  });
+  return errors;
+};
+
+export const SUPPORT_CONFIGURATION_ERRORS = deepFreeze(validateSupportConfiguration());
+
+const safeObject = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+const unique = (values) => [...new Set(values)];
+const isProfileId = (id) => presetById.has(id);
+const isRecommendationProfileId = (id) => id === BALANCED_START_PRESET_ID || isProfileId(id);
+const timestamp = () => new Date().toISOString();
+
+const cleanProfileIds = (value) => unique((Array.isArray(value) ? value : (value instanceof Set ? [...value] : []))
+  .filter((id) => typeof id === 'string' && isProfileId(id)));
