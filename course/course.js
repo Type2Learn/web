@@ -1371,3 +1371,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     add(step.additionalExamples);
     add(step.examples);
     add(step.content?.additionalExample);
+    add(step.content?.additionalExamples);
+    const primary = String(step.example || '').trim();
+    return [...new Set(values)].filter((value) => value !== primary);
+  };
+
+  const exampleCardsMarkup = (narrationState) => {
+    const first = String(currentStep()?.example || '').trim();
+    const card = (label, value) => '<aside class="course-example" aria-label="' + escapeHtml(label) + '">' + readingTextMarkup('strong', label, narrationState) + readingTextMarkup('p', value, narrationState) + '</aside>';
+    const additional = authoredAdditionalExamples().map((value, index) => card(index === 0 ? 'Another example' : 'Additional example ' + (index + 1), value));
+    return [first ? card('Example', first) : '', ...additional].join('');
+  };
+
+  const readingSectionProgress = () => {
+    if (!smallerSectionsAreActive()) return '';
+    const total = readingSections().length;
+    const index = currentReadingSectionIndex();
+    return '<p class="course-reading-section-progress" aria-live="polite">Small section ' + (index + 1) + ' of ' + total + '. Finish this part, then choose the next section.</p>';
+  };
+
+  const readingTaskActions = () => {
+    const exampleControl = state.preferences.extraExamples
+      ? ''
+      : '<button class="course-secondary-button" type="button" data-action="show-example">' + (shouldShowExample() ? 'Hide examples' : 'Show examples') + '</button>';
+    if (!smallerSectionsAreActive()) return exampleControl + '<button class="course-primary-button" type="button" data-action="read-complete">Continue <span aria-hidden="true">→</span></button>';
+    const index = currentReadingSectionIndex();
+    const total = readingSections().length;
+    const previous = index > 0
+      ? '<button class="course-secondary-button" type="button" data-action="previous-reading-section">Previous section</button>'
+      : '';
+    const example = exampleControl;
+    const primary = index < total - 1
+      ? '<button class="course-primary-button" type="button" data-action="next-reading-section">Next section <span aria-hidden="true">→</span></button>'
+      : '<button class="course-primary-button" type="button" data-action="read-complete">Continue <span aria-hidden="true">→</span></button>';
+    return previous + example + primary;
+  };
+
+  const readingNarrationChunks = () => {
+    const chunks = readingSections().map(({ heading, value }, index) => ({
+      id: 'read-' + index,
+      label: heading || 'Section ' + (index + 1),
+      text: [heading, Array.isArray(value) ? value.join('. ') : value].filter(Boolean).join('. ')
+    }));
+    if (shouldShowSimple()) chunks.push({ id: 'simple', label: 'A simpler way to say it', text: 'A simpler way to say it. ' + currentStep().simple });
+    if (shouldShowExample()) {
+      const primary = String(currentStep()?.example || '').trim();
+      if (primary) chunks.push({ id: 'example', label: 'Example', text: 'Example. ' + primary });
+      authoredAdditionalExamples().forEach((value, index) => {
+        const label = index === 0 ? 'Another example' : 'Additional example ' + (index + 1);
+        chunks.push({ id: 'example-extra-' + index, label, text: label + '. ' + value });
+      });
+    }
+    return chunks.filter((chunk) => chunk.text);
+  };
+
+  const renderedNarrationChunks = () => Array.from(app.querySelectorAll('[data-narration-text][data-narration-index]'))
+    .sort((first, second) => Number(first.dataset.narrationIndex) - Number(second.dataset.narrationIndex))
+    .map((element, index) => {
+      const parent = element.closest('.course-reading-section, .course-simple-copy, .course-example');
+      const label = parent?.querySelector('h3, strong')?.textContent?.trim() || 'Lesson text';
+      return {
+        id: 'read-' + index,
+        label,
+        text: (element.dataset.narrationSource || element.textContent).trim()
+      };
+    })
+    .filter((chunk) => chunk.text);
+
+  const narrationChunkIndexes = (chunks, predicate) => (Array.isArray(chunks) ? chunks : []).reduce((indexes, chunk, index) => {
