@@ -1165,3 +1165,70 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const currentStepSummary = () => {
     if (isReviewingModule()) {
+      const reviewLabel = state.preferences.visibleProgress ? 'Reviewing module ' + (displayedModuleIndex() + 1) + ' of ' + COURSE.steps.length : 'Reviewing a completed module';
+      return '<span>' + escapeHtml(reviewLabel) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(currentStep().duration || 'Ready when you are') + '</span>';
+    }
+    if (isFinalExamPhase()) {
+      const exam = state.progress.finalExam;
+      const detail = !state.preferences.visibleProgress
+        ? (state.progress.phase === 'exam-results' ? 'Results and review' : 'One question at a time')
+        : state.progress.phase === 'exam'
+        ? 'Question ' + (exam.questionIndex + 1) + ' of ' + finalExamQuestionCount()
+        : state.progress.phase === 'exam-results'
+          ? 'Results and review'
+          : finalExamQuestionCount() + ' questions';
+      return '<span>Final exam</span><i aria-hidden="true"></i><span>' + escapeHtml(detail) + '</span>';
+    }
+    const stepNumber = state.progress.lessonIndex + 1;
+    const stepLabel = state.preferences.visibleProgress ? 'Step ' + stepNumber + ' of ' + COURSE.steps.length : currentStep().title;
+    return '<span>' + escapeHtml(stepLabel) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(currentStep().duration) + '</span>';
+  };
+
+  const PLANNED_COURSES = [
+    {
+      title: 'Introduction to Touch Typing',
+      description: 'Build steady keyboard confidence with finger placement, accuracy, and practical typing habits.',
+      urduMode: false
+    },
+    {
+      title: 'Introduction to English Language',
+      description: 'Practise reading, vocabulary, and written expression through short active-learning tasks.',
+      urduMode: false
+    },
+    {
+      title: 'Introduction to Python Programming',
+      description: 'Learn core programming ideas by reading, predicting, and writing small Python programs.',
+      urduMode: true
+    },
+    {
+      title: 'Introduction to C++ Programming',
+      description: 'Explore programming foundations, syntax, and problem-solving with C++.',
+      urduMode: true
+    },
+    {
+      title: 'Introduction to C Programming',
+      description: 'Learn fundamental programming concepts and how C programs are built step by step.',
+      urduMode: true
+    },
+    {
+      title: 'Introduction to ARM Assembly',
+      description: 'Explore registers, instructions, and simple programs for ARM-based systems.',
+      urduMode: true
+    }
+  ];
+
+  const availableCourseCard = () => {
+    const preferencesReady = coursePreferencesAreSaved();
+    return '<section class="course-catalogue-card course-catalogue-card--available" aria-labelledby="available-course-title"><div><p class="course-eyebrow">Available course</p><h2 id="available-course-title">' + escapeHtml(COURSE.title) + '</h2><p class="course-catalogue-setup">' + (preferencesReady
+      ? 'Your course choices are ready. You can change them anytime from the profile picture in the top-right corner.'
+      : 'Choose this course, then set up the learning options that fit this course.') + '</p><p class="course-catalogue-description">Explore respectful language, everyday experiences, and practical ways to support accessible participation.</p><p class="course-catalogue-language">Urdu mode planned</p></div><button class="course-primary-button" type="button" data-action="course-preferences">Choose this course <span aria-hidden="true">→</span></button></section>';
+  };
+
+  const lockedCourseCard = (course) => '<article class="course-catalogue-card course-catalogue-card--locked" aria-label="' + escapeHtml(course.title) + ' is planned and not available yet."><div class="course-catalogue-card-copy"><p class="course-eyebrow">Planned course</p><h2>' + escapeHtml(course.title) + '</h2><p class="course-catalogue-description">' + escapeHtml(course.description) + '</p>' + (course.urduMode ? '<p class="course-catalogue-language">Urdu mode planned</p>' : '') + '</div><div class="course-catalogue-lock" aria-hidden="true"><span>Not available yet</span></div><span class="course-visually-hidden">This planned course is not available yet.</span></article>';
+
+  const courseCatalogue = () => '<section class="course-catalogue" aria-label="Course selection">' + availableCourseCard() + '<div class="course-catalogue-grid">' + PLANNED_COURSES.map(lockedCourseCard).join('') + '</div></section>';
+
+  const renderDashboard = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<header class="course-dashboard-header"><p class="course-eyebrow">Your learning space</p><h1>One small step at a time.</h1><p>Choose one course to begin. You can set up the learning options for that course before you start.</p></header>' + courseCatalogue(), 'dashboard') + '</main>';
+
+  const renderBrowse = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<div class="course-panel-page"><button class="course-back-button" type="button" data-action="dashboard">← Back to learning overview</button><p class="course-eyebrow">Browse courses</p><h1>One course is ready for this prototype.</h1><p class="course-lead">Keeping the next choice small helps this experience stay task-focused. More courses can appear here once their content is reviewed.</p><article class="course-listing"><div><span class="course-status">Prototype course</span><h2>' + escapeHtml(COURSE.title) + '</h2><p>' + COURSE.steps.length + ' short, non-diagnostic modules about general experiences, respectful language, and accessible participation.</p></div><button class="course-primary-button" type="button" data-action="course-preferences">Choose this course <span aria-hidden="true">→</span></button></article></div>', 'browse') + '</main>';
+
