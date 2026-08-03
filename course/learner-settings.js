@@ -684,3 +684,60 @@ const normaliseOnboarding = (raw, state) => {
     completedAt: cleanTimestamp(saved.completedAt)
   };
 };
+
+export const getLearnerSettingsKey = (learnerId) => SETTINGS_STORAGE_PREFIX + encodeURIComponent(String(learnerId || 'learner'));
+
+export const createSettingsState = (saved) => {
+  const record = safeObject(saved);
+  const rawOnboarding = safeObject(record.onboarding);
+  const savedSecondaryProfiles = Array.isArray(rawOnboarding.secondaryProfiles)
+    ? rawOnboarding.secondaryProfiles
+    : (Array.isArray(rawOnboarding.secondaryProfileIds) ? rawOnboarding.secondaryProfileIds : []);
+  const selected = cleanProfileIds([
+    ...(Array.isArray(record.selectedPresetIds) ? record.selectedPresetIds : []),
+    ...savedSecondaryProfiles
+  ]);
+  const requestedPrimary = [
+    typeof record.primaryPresetId === 'string' ? record.primaryPresetId : '',
+    typeof rawOnboarding.primaryProfile === 'string' ? rawOnboarding.primaryProfile : '',
+    typeof rawOnboarding.primaryProfileId === 'string' ? rawOnboarding.primaryProfileId : ''
+  ].find(isRecommendationProfileId) || '';
+  let primary = requestedPrimary || selected[0] || '';
+  const legacyOverrides = migrateExplicitLegacyOverrides(record);
+  const currentOverrides = cleanOverrides(record.userOverrides);
+  const userOverrides = { ...legacyOverrides, ...currentOverrides };
+  const temporaryOverrides = cleanOverrides(record.temporaryOverrides, temporaryOverrideKeys);
+  const conflictResolutions = cleanConflictResolutions(record.conflictResolutions);
+  const activeInputMethod = cleanActiveInputMethod(record.activeInputMethod);
+  const legacyComplete = Boolean(record.setupComplete || record.onboarded || rawOnboarding.completed || primary || selected.length || Object.keys(userOverrides).length);
+  if (!primary && legacyComplete) primary = BALANCED_START_PRESET_ID;
+  const selectedPresetIds = primary === BALANCED_START_PRESET_ID
+    ? []
+    : orderProfileIds(selected, primary);
+  const onboarding = normaliseOnboarding(rawOnboarding, {
+    primaryPresetId: primary,
+    selectedPresetIds,
+    legacyComplete
+  });
+
+  return {
+    version: SETTINGS_VERSION,
+    setupComplete: legacyComplete,
+    primaryPresetId: primary,
+    selectedPresetIds,
+    userOverrides,
+    temporaryOverrides,
+    conflictResolutions,
+    activeInputMethod,
+    customSetup: Boolean(record.customSetup || Object.keys(userOverrides).length || Object.keys(conflictResolutions).length),
+    onboarding,
+    updatedAt: cleanTimestamp(record.updatedAt)
+  };
+};
+
+export const scoreSupportAnswers = (selectedAnswerIds) => {
+  const selectedOptionIds = cleanSelectedAnswerIds(selectedAnswerIds);
+  const dimensionScores = Object.fromEntries(SUPPORT_DIMENSION_IDS.map((id) => [id, 0]));
+  selectedOptionIds.forEach((id) => {
+    Object.entries(optionById.get(id)?.effects || {}).forEach(([dimension, value]) => {
+      dimensionScores[dimension] += Number(value) || 0;
