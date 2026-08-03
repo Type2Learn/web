@@ -1255,3 +1255,60 @@ export const setUserOverride = (input, key, value) => {
     userOverrides: { ...state.userOverrides, [settingKey]: settingValue },
     customSetup: true,
     updatedAt: timestamp()
+  };
+};
+
+/* Return one control to its selected-profile or platform value without
+   changing any other private preference. */
+export const clearUserOverride = (input, key) => {
+  const state = createSettingsState(input);
+  const settingKey = canonicalSettingKey(key);
+  if (!editableKeySet.has(settingKey) || !Object.hasOwn(state.userOverrides, settingKey)) return state;
+  const userOverrides = { ...state.userOverrides };
+  delete userOverrides[settingKey];
+  return { ...state, userOverrides, customSetup: Boolean(Object.keys(userOverrides).length || Object.keys(state.conflictResolutions || {}).length), updatedAt: timestamp() };
+};
+
+export const markSetupComplete = (input, metadata = {}) => {
+  const state = createSettingsState(input);
+  const primary = state.primaryPresetId || BALANCED_START_PRESET_ID;
+  const selectedPresetIds = primary === BALANCED_START_PRESET_ID ? [] : state.selectedPresetIds;
+  return {
+    ...state,
+    setupComplete: true,
+    primaryPresetId: primary,
+    selectedPresetIds,
+    onboarding: onboardingMetadata(state, {
+      method: metadata.method || state.onboarding.method || (primary === BALANCED_START_PRESET_ID ? 'standard' : 'manual'),
+      primaryProfileId: primary,
+      secondaryProfileIds: selectedPresetIds.filter((id) => id !== primary),
+      selectedAnswers: metadata.selectedAnswers ?? metadata.selectedOptionIds ?? state.onboarding.selectedAnswers,
+      completed: true
+    }),
+    updatedAt: timestamp()
+  };
+};
+
+export const resetPresetSettingsOnly = (input) => {
+  const state = createSettingsState(input);
+  const presetKeys = new Set(state.selectedPresetIds.flatMap((id) => Object.keys(presetById.get(id)?.settings || {})));
+  // A conflict decision is also a custom setting, even when the affected key
+  // is not directly contributed by a profile (for example, auto-scroll versus
+  // a reduced-motion bundle). Resetting to the selected presets must clear
+  // those preference decisions while keeping unrelated manual adjustments.
+  const conflictKeys = new Set(Object.values(state.conflictResolutions || {}).map((resolution) => resolution?.key).filter(Boolean));
+  const userOverrides = Object.fromEntries(Object.entries(state.userOverrides).filter(([key]) => !presetKeys.has(key) && !conflictKeys.has(key)));
+  return { ...state, userOverrides, conflictResolutions: {}, customSetup: Boolean(Object.keys(userOverrides).length), updatedAt: timestamp() };
+};
+
+export const setTemporaryOverride = (input, key, value) => {
+  const state = createSettingsState(input);
+  const safeValue = cleanOverrides({ [key]: value }, temporaryOverrideKeys);
+  const entry = Object.entries(safeValue)[0];
+  if (!entry) return state;
+  const [settingKey, settingValue] = entry;
+  return { ...state, temporaryOverrides: { ...state.temporaryOverrides, [settingKey]: settingValue }, updatedAt: timestamp() };
+};
+
+export const clearTemporaryOverrides = (input) => {
+  const state = createSettingsState(input);
