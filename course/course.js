@@ -2263,3 +2263,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       notice.className = 'course-transition-notice';
       notice.dataset.transitionNotice = '';
       notice.textContent = 'This screen keeps one task visible. Next: ' + courseNextStepCopy() + '.';
+      workspace.querySelector('.course-now-panel')?.insertAdjacentElement('afterend', notice);
+    }
+    if (state.preferences.literalInstructions) {
+      const top = app.querySelector('.course-task-top > div');
+      if (top && !top.querySelector('[data-literal-instruction]')) {
+        const instruction = document.createElement('p');
+        instruction.className = 'course-literal-instruction';
+        instruction.dataset.literalInstruction = '';
+        instruction.innerHTML = '<strong>Do this:</strong> ' + escapeHtml(taskLabel()) + '. <strong>Finish when:</strong> ' + escapeHtml(courseNextStepCopy()) + '.';
+        top.append(instruction);
+      }
+    }
+    const taskCard = app.querySelector('.course-task-card');
+    if (taskCard && state.preferences.extraHints && currentStep()?.hint && !taskCard.querySelector('[data-extra-hint]')) {
+      const hint = document.createElement('details');
+      hint.className = 'course-extra-hint';
+      hint.dataset.extraHint = '';
+      hint.innerHTML = '<summary>Optional hint</summary><p>' + escapeHtml(currentStep().hint) + '</p>';
+      taskCard.querySelector('.course-task-top')?.insertAdjacentElement('afterend', hint);
+    }
+    if (taskCard && !taskCard.querySelector('[data-input-access-note]') && (state.preferences.switchInput || state.preferences.keyboardShortcuts)) {
+      const note = document.createElement('p');
+      note.className = 'course-input-access-note';
+      note.dataset.inputAccessNote = '';
+      const messages = [];
+      if (state.preferences.switchInput) messages.push('Switch input is on: use Tab to move between controls, then Space or Enter to activate the focused control.');
+      if (state.preferences.keyboardShortcuts) messages.push('Keyboard shortcuts are on: Alt+P opens Pause and save; Alt+H opens I’m stuck.');
+      note.textContent = messages.join(' ');
+      taskCard.querySelector('.course-task-top')?.insertAdjacentElement('afterend', note);
+    }
+    if (!state.preferences.extraHints) {
+      app.querySelector('[data-help-option="hint"]')?.remove();
+    }
+    if (!state.preferences.restBreaks) {
+      app.querySelector('[data-help-option="break"]')?.remove();
+    }
+    if (state.preferences.readAloud) {
+      const reading = app.querySelector('.course-tts-reading');
+      if (reading && !reading.previousElementSibling?.matches?.('[data-written-access-note]')) {
+        const note = document.createElement('p');
+        note.className = 'course-written-access-note';
+        note.dataset.writtenAccessNote = '';
+        note.textContent = 'Written lesson text stays visible while optional text to speech plays.';
+        reading.insertAdjacentElement('beforebegin', note);
+      }
+    }
+    app.querySelectorAll('.course-progress-panel').forEach((panel) => {
+      if (!numericProgressIsReduced()) return;
+      panel.querySelector('strong')?.replaceChildren(document.createTextNode('One small step at a time'));
+      panel.querySelectorAll('.course-progress-bars span').forEach((label, index) => {
+        label.textContent = index === 0 ? 'Current learning step' : (isFinalExamPhase() ? 'Saved course progress' : 'Course progress');
+      });
+    });
+    app.querySelectorAll('[data-action="show-example"]').forEach((button) => {
+      button.textContent = shouldShowExample() ? 'Hide examples' : 'Show examples';
+    });
+    addTypingSupportControls();
+  };
+
+  const structureReadingContent = () => {
+    if (state.view !== 'course' || state.progress.phase !== 'read') return;
+    const reading = app.querySelector('.course-reading-copy');
+    const content = currentStep().content;
+    if (!reading || reading.classList.contains('course-narration-content') || !content || reading.dataset.structured) return;
+    reading.querySelectorAll(':scope > p').forEach((paragraph) => paragraph.remove());
+
+    const sections = [
+      [content.definitionHeading, content.definition],
+      [content.dailyLifeHeading, content.dailyLife],
