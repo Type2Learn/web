@@ -203,3 +203,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       animations: effectiveAnimationLevel(),
       language: choices['mascot-language'] === 'urdu'
         ? 'urdu'
+        : choices['learning-language'] === 'urdu' ? 'urdu' : 'english',
+      voice: ['text', 'speech', 'both'].includes(choices['mascot-voice'])
+        ? choices['mascot-voice']
+        : 'text',
+      behaviour: ['low-key', 'calm', 'energetic'].includes(choices['mascot-behaviour'])
+        ? choices['mascot-behaviour']
+        : 'calm'
+    };
+  };
+
+  const cancelBackgroundNoiseFade = () => {
+    if (backgroundNoise.fadeFrame) {
+      window.cancelAnimationFrame(backgroundNoise.fadeFrame);
+      backgroundNoise.fadeFrame = null;
+    }
+    if (backgroundNoise.settleTimer) {
+      window.clearTimeout(backgroundNoise.settleTimer);
+      backgroundNoise.settleTimer = null;
+    }
+  };
+
+  const prepareBackgroundNoiseAudio = () => {
+    if (!backgroundNoise.enabled) return null;
+    const source = BACKGROUND_NOISE_SOURCES[backgroundNoise.type] || BACKGROUND_NOISE_SOURCES.pink;
+    if (backgroundNoise.audio?.src?.endsWith(source)) return backgroundNoise.audio;
+    cancelBackgroundNoiseFade();
+    if (backgroundNoise.audio) backgroundNoise.audio.pause();
+    const audio = new Audio(source);
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = 0;
+    audio.playsInline = true;
+    backgroundNoise.audio = audio;
+    backgroundNoise.isPlaying = false;
+    audio.load();
+    return audio;
+  };
+
+  const pauseBackgroundNoise = (announceChange = false) => {
+    cancelBackgroundNoiseFade();
+    if (backgroundNoise.audio) backgroundNoise.audio.pause();
+    const wasPlaying = backgroundNoise.isPlaying;
+    backgroundNoise.isPlaying = false;
+    if (announceChange && wasPlaying) announce('Background noise paused.');
+  };
+
+  const playBackgroundNoise = async ({ announceChange = true } = {}) => {
+    if (!backgroundNoise.enabled) return;
+    const audio = prepareBackgroundNoiseAudio();
+    if (!audio) return;
+    cancelBackgroundNoiseFade();
+    // A route transition can delay requestAnimationFrame on some browsers.
+    // Start at a deliberately low non-zero level, then smoothly rise to the
+    // learner's selected (and capped) value. This prevents a silent control
+    // that says “Pause” when the initial fade frame has not run yet.
+    audio.volume = Math.min(backgroundNoise.volume, 0.055);
+    try {
+      await audio.play();
+      backgroundNoise.isPlaying = true;
+      const startedAt = window.performance.now();
+      const fadeIn = (timestamp) => {
+        if (!backgroundNoise.isPlaying || audio !== backgroundNoise.audio) return;
+        const progress = Math.min(1, (timestamp - startedAt) / 420);
+        audio.volume = backgroundNoise.volume * progress;
+        if (progress < 1) backgroundNoise.fadeFrame = window.requestAnimationFrame(fadeIn);
+        else backgroundNoise.fadeFrame = null;
+      };
+      backgroundNoise.fadeFrame = window.requestAnimationFrame(fadeIn);
+      backgroundNoise.settleTimer = window.setTimeout(() => {
