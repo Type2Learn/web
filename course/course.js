@@ -890,3 +890,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const mascotDialogue = () => {
     const moment = activeSupportMoment;
     const urdu = mascotPresentation.language === 'urdu';
+    if ((state.modal === 'help' || state.modal === 'explain') && mascotPresentation.enabled) {
+      return urdu
+        ? 'یہیں رہیں۔ ہم ایک وقت میں صرف اگلا واضح قدم دیکھتے ہیں۔'
+        : 'Stay here with me. We only need the next clear step.';
+    }
+    if (!moment) return '';
+    const level = moment.encouragementLevel;
+    const subtleDialogue = ['module-complete', 'course-complete', 'system-error'].includes(moment.kind)
+      || (moment.kind === 'task-entry' && ['course-entry', 'module-entry'].includes(moment.result));
+    if (level === 'subtle' && !subtleDialogue) return '';
+    if (level === 'balanced' && moment.kind === 'answer-incorrect') return '';
+    const messages = urdu ? {
+      'task-entry': 'آپ یہ کر سکتے ہیں۔ ایک وقت میں ایک واضح قدم۔',
+      'section-complete': 'آپ نے کر لیا۔ یہ حصہ مکمل ہے۔',
+      'answer-correct': 'آپ نے درست سمجھا۔ بہت خوب!',
+      'answer-incorrect': 'آپ یہ کر سکتے ہیں۔ نشان زد جواب دیکھیں، پھر دوبارہ کوشش کریں۔',
+      'typing-incomplete': 'اچھی شروعات۔ پہلے مختلف حرف سے جاری رکھیں۔',
+      'response-needed': 'ایک لفظ سے شروع کریں۔ میں آپ کے ساتھ ہوں۔',
+      'module-complete': 'آپ نے پورا ماڈیول مکمل کر لیا۔ یہ بہت اچھا کام ہے۔',
+      'course-complete': 'آپ نے بہت اچھا کام کیا۔ ہر قدم اہم تھا۔',
+      'system-error': 'آپ کا کام محفوظ ہے۔ جب تیار ہوں دوبارہ کوشش کریں۔'
+    } : {
+      'task-entry': 'You can do this. One clear step at a time.',
+      'section-complete': 'You did it. This part is complete.',
+      'answer-correct': 'You got it. Nice work!',
+      'answer-incorrect': 'You can do this. Use the marked answer, then try again.',
+      'typing-incomplete': 'Nice start. Continue from the first character that differs.',
+      'response-needed': 'Start with one word. I am right here with you.',
+      'module-complete': 'You cleared a whole module. That is amazing.',
+      'course-complete': 'You did something amazing. Every step counted.',
+      'system-error': 'Your work is still here. Try again when you are ready.'
+    };
+    return messages[moment.kind] || '';
+  };
+
+  const courseMascotMarkup = (location) => {
+    if (!mascotCanAppear()) return '';
+    const mascotLanguage = mascotPresentation.language === 'urdu' ? 'ur' : 'en';
+    const mascotDirection = mascotPresentation.language === 'urdu' ? 'rtl' : 'ltr';
+    const dialogue = mascotDialogue();
+    const dialogueMarkup = dialogue
+      ? '<p class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '">' + escapeHtml(dialogue) + '</p>'
+      : '';
+    return '<aside class="course-mascot-rail course-mascot-rail--' + location + '" data-course-mascot><div class="course-mascot-stage" data-course-mascot-stage aria-hidden="true"></div>' + dialogueMarkup + '</aside>';
+  };
+
+  const dashboardWithMascot = (content, location) => {
+    if (!mascotCanAppear()) return '<div class="course-dashboard-content">' + content + '</div>';
+    return '<div class="course-dashboard-content has-course-mascot"><div class="course-dashboard-primary">' + content + '</div>' + courseMascotMarkup(location) + '</div>';
+  };
+
+  const courseTopbar = () => {
+    return [
+      '<header class="course-topbar" aria-label="Learning navigation">',
+      '<div class="course-topbar-inner">',
+      '<button class="course-brand" type="button" data-action="pause" aria-label="Pause and save your course"><img src="/assets/type2learn-logo-nav.webp" alt=""><span>TYPE2LEARN</span></button>',
+      '<div class="course-topbar-profile">',
+      '<button class="course-pause-button" type="button" data-action="pause" aria-label="Pause and save"><span aria-hidden="true">Ⅱ</span><span>Pause &amp; save</span></button>',
+      '<button class="course-profile-button" type="button" data-action="toggle-settings-menu" aria-expanded="' + String(Boolean(state.settingsMenu)) + '" aria-controls="course-settings-menu" aria-label="Open learning settings">' + profileAvatar() + '</button>',
+      courseSettingsMenu(),
+      '</div>',
+      '</div>',
+      '</header>'
+    ].join('');
+  };
+
+  const renderShell = (content) => authenticatedUser
+    ? '<div class="course-app-shell">' + courseTopbar() + '<div class="course-page-content">' + content + '</div></div>'
+    : content;
