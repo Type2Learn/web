@@ -1096,3 +1096,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     document.body.classList.toggle('course-keyboard-shortcuts', Boolean(state.preferences.keyboardShortcuts));
     document.body.classList.toggle('course-reduced-movement', Boolean(state.preferences.reducedRepeatedMovement));
     document.body.dataset.courseTextSize = state.preferences.textSize;
+    document.body.dataset.courseSpacing = state.preferences.spacing;
+    document.body.dataset.courseReadingWidth = state.preferences.readingWidth;
+    document.body.dataset.courseNumericProgress = state.preferences.numericProgress;
+    document.body.classList.toggle('course-high-contrast', Boolean(state.preferences.highContrast));
+    document.body.classList.toggle('course-large-controls', Boolean(state.preferences.largerControls));
+    document.body.classList.toggle('course-reduced-motion', Boolean(state.preferences.reducedMotion));
+    document.body.classList.toggle('course-content-transitions', contentTransitionsAreEnabled());
+    document.body.classList.toggle('course-tts-mode-active', Boolean(state.preferences.readAloud));
+  };
+
+  const refreshResolvedPreferences = () => {
+    state.preferences = resolveSettings(state.settings);
+    state.preferences.automaticSaving = true;
+  };
+
+  const setCourseSetting = (key, value) => {
+    state.settings = setUserOverride(state.settings, key, value);
+    refreshResolvedPreferences();
+  };
+  const setCourseActiveInputMethod = (method) => {
+    state.settings = setActiveInputMethod(state.settings, method);
+    const available = getAvailableInputMethods(state.settings);
+    const active = available.includes(state.settings.activeInputMethod) ? state.settings.activeInputMethod : 'keyboard';
+    state.settings.activeInputMethod = active;
+    if (active === 'voice') {
+      state.progress.attempt.inputMethod = 'voice';
+      state.progress.attempt.alternativeInput = true;
+    } else {
+      state.progress.attempt.inputMethod = active;
+      state.progress.attempt.alternativeInput = active === 'alternative';
+      if (voiceInput.listening) stopVoiceInput('Microphone input stopped because you chose another input method.');
+    }
+    refreshResolvedPreferences();
+  };
+
+  const upgradeLegacyNarrationVoice = () => {
+    const savedVoice = state.preferences.narrationVoice;
+    if (!hasLocalAvaNarration()
+      || !savedVoice
+      || savedVoice === LOCAL_AVA_VOICE_URI
+      || savedVoice === SYSTEM_NARRATION_VOICE_URI) return false;
+    setCourseSetting('narrationVoice', LOCAL_AVA_VOICE_URI);
+    return true;
+  };
+
+  const shouldShowSimple = () => Boolean(state.showSimple || (state.preferences.simplerExplanations && currentStep()?.simple));
+  const shouldShowExample = () => Boolean(state.preferences.extraExamples || state.manualExampleVisible);
+  const typingIsConceptResponse = () => !usesLessonSectionTyping() && currentStep()?.typing?.level === 'Recall typing';
+  const typingAllowsAlternativeInput = () => typingIsConceptResponse() && Boolean(state.preferences.alternativeInput);
+  const typingAllowsAlternativeResponse = () => typingIsConceptResponse() && Boolean(state.preferences.alternativeResponses);
+  const availableInputMethods = () => getAvailableInputMethods(state.settings);
+  const activeInputMethod = () => availableInputMethods().includes(state.settings.activeInputMethod) ? state.settings.activeInputMethod : 'keyboard';
+  // Speech input is always a deliberate button press and only appears after the
+  // learner enables Speech-to-text in their shared learning settings. Recall
+  // responses are concept responses; Key idea and Guided activities retain
+  // typing as their stated learning objective and never show a microphone.
+  const typingAllowsVoiceInput = () => typingIsConceptResponse() && Boolean(state.preferences.speechToText) && activeInputMethod() === 'voice';
+  const usingAlternativeInput = () => Boolean(
+    typingIsConceptResponse()
+      && ((state.progress.attempt.inputMethod === 'voice' && state.preferences.speechToText)
+        || (typingAllowsAlternativeInput() && state.progress.attempt.alternativeInput && activeInputMethod() === 'alternative'))
+  );
+  const typingIsAccuracyObjective = () => usesLessonSectionTyping() || ['Key idea typing', 'Guided typing'].includes(currentStep()?.typing?.level);
+  const numericProgressIsReduced = () => state.preferences.numericProgress === 'reduced';
+
+  const renderAuthChecking = () => '<main class="course-setup" id="course-main"><div class="course-setup-card course-auth-check"><p class="course-eyebrow">Private course access</p><h1>Checking your sign-in&hellip;</h1><p class="course-lead">Preparing your course.</p></div></main>';
+
+  const currentStepSummary = () => {
+    if (isReviewingModule()) {
