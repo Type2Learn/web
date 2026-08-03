@@ -537,29 +537,74 @@ const showSetupFeedback = (kind, choices) => {
   }
   const symbol = document.createElement('span');
   symbol.setAttribute('aria-hidden', 'true');
-      clearReveal();
-      return;
+  symbol.textContent = '♥';
+  const text = document.createElement('div');
+  const title = document.createElement('strong');
+  title.textContent = copy[0];
+  const detail = document.createElement('p');
+  detail.textContent = copy[1];
+  const progress = document.createElement('i');
+  progress.setAttribute('aria-hidden', 'true');
+  text.append(title, detail);
+  popup.append(symbol, text, progress);
+  document.body.append(popup);
+  setupFeedbackTimer = window.setTimeout(() => {
+    if (effectiveSetupAnimation(choices) === 'still') popup.remove();
+    else {
+      popup.classList.add('is-leaving');
+      window.setTimeout(() => popup.remove(), 320);
     }
-    const safeY = event.clientY > 28 && event.clientY < window.innerHeight - 28;
-    const hardEdge = event.clientX <= 10;
-    const intentEdge = event.clientX <= 26 && dx < -0.7 && dy < 18;
-    const edgeDwell = event.clientX <= 26 && Math.abs(dx) < 2.5 && dy < 10;
-    if (safeY && (hardEdge || intentEdge || edgeDwell)) scheduleReveal();
-    else if (event.clientX > 36) clearReveal();
-  }, { passive: true });
+  }, 4700);
+};
 
-  window.addEventListener('pointerdown', (event) => {
-    pointerDown = true;
-    clearReveal();
-    if (!enabled() || hidden) return;
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target || target.closest('[data-learn-sidebar], [data-sidebar-reveal]')) {
-      clearOutside();
-      return;
+const render = (choices) => {
+  applySetupPresentation(choices);
+  app.innerHTML = mainContent(choices);
+  app.querySelector('#learn-main')?.classList.add('is-learning-stage-entering');
+  syncMascotPreview(choices);
+};
+
+const updateChoiceUi = (controlId, value) => {
+  document.querySelectorAll('[data-preference="' + controlId + '"]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.value === value));
+  });
+};
+
+const updateNoiseVolumeUi = (value) => {
+  const output = document.querySelector('[data-background-noise-volume-output]');
+  if (output) output.textContent = noiseVolume(value) + '%';
+  const input = document.querySelector('[data-background-noise-volume]');
+  if (input) input.style.setProperty('--noise-volume-fill', ((noiseVolume(value) / 35) * 100).toFixed(2) + '%');
+};
+
+const boot = async () => {
+  if (!supportedCourseIds.has(selectedCourseId)) {
+    window.location.replace('/course/');
+    return;
+  }
+
+  let user = getType2LearnGuest();
+  if (!user) {
+    try {
+      const { waitForType2LearnUser } = await import('/firebase-auth.js?v=20260801-courseflow1');
+      user = await waitForType2LearnUser();
+    } catch (_) {
+      user = null;
     }
-    outsideClicks += 1;
-    if (outsideClicks >= 2) {
-      hidden = true;
+  }
+
+  if (!user) {
+    window.location.replace('/login/?next=' + encodeURIComponent('/afterlogin/?course=' + encodeURIComponent(selectedCourseId)));
+    return;
+  }
+
+  const saved = readPreferences(user, selectedCourseId);
+
+  const choices = { ...defaultChoices, colours: window.Type2LearnColorMode?.get?.() || 'balanced', ...(saved?.choices || {}) };
+  // Do not keep or prefetch the optional 3D companion on a small screen.
+  if (!mascotScreenIsSupported()) choices.mascot = 'off';
+  window.Type2LearnColorMode?.set(choices.colours, false);
+  render(choices);
       clearOutside();
       clearHide();
       apply();
