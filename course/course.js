@@ -3293,3 +3293,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const submitFinalExamAnswer = () => {
+    if (state.progress.phase !== 'exam') return;
+    const exam = state.progress.finalExam;
+    const question = currentFinalExamQuestion();
+    const selected = exam.answers[exam.questionIndex];
+    if (!question || exam.submitted || !Number.isInteger(selected) || !question.options[selected]) return;
+    const correctIndex = question.options.findIndex(([, correct]) => correct);
+    exam.submitted = true;
+    recordSupportMoment(selected === correctIndex ? 'answer-correct' : 'answer-incorrect', { result: 'exam' });
+    save();
+    render();
+    window.requestAnimationFrame(() => app.querySelector('.course-task-actions button')?.focus?.({ preventScroll: true }));
+  };
+
+  const nextFinalExamQuestion = () => {
+    if (state.progress.phase !== 'exam' || !state.progress.finalExam.submitted) return;
+    const exam = state.progress.finalExam;
+    if (exam.questionIndex >= finalExamQuestionCount() - 1) {
+      exam.completed = true;
+      state.progress.phase = 'exam-results';
+      recordSupportMoment('course-complete', { result: 'final-exam' });
+      save();
+      render();
+      focusCurrentTask('#course-task-heading');
+      return;
+    }
+    exam.questionIndex += 1;
+    exam.submitted = false;
+    recordSupportMoment('task-entry', { result: 'exam-question' });
+    save();
+    render();
+    focusCurrentTask('#exam-question-card');
+  };
+
+  const retryQuestion = () => {
+    if (state.progress.phase !== 'check' && state.progress.phase !== 'apply') return;
+    state.progress.attempt.selectedAnswer = '';
+    state.progress.attempt.submitted = false;
+    state.progress.attempt.feedback = '';
+    clearSupportMoment();
+    save();
+    render();
+    const firstChoice = app.querySelector('[data-check-answer], [data-apply-answer]');
+    firstChoice?.focus?.({ preventScroll: true });
+  };
+
+  const startNextStep = () => {
+    if (isLastStep()) {
+      state.view = 'course';
+      state.progress.phase = 'exam-intro';
+      state.progress.finalExam = state.progress.finalExam.completed ? blankFinalExamAttempt() : state.progress.finalExam;
+      state.modal = '';
+      recordSupportMoment('task-entry', { result: 'exam-intro' });
+      save();
+      render();
+      showCurrentTaskFromStart();
+      return;
+    }
+    state.progress.lessonIndex += 1;
+    state.progress.phase = 'preview';
+    state.progress.attempt = blankAttempt();
+    state.manualExampleVisible = false;
+    state.showSimple = false;
+    state.readingSectionIndex = 0;
+    recordSupportMoment('task-entry', { result: 'module-entry' });
+    save();
+    render();
+    showCurrentTaskFromStart();
+  };
