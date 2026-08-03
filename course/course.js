@@ -2195,3 +2195,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     const Recognition = voiceRecognitionConstructor();
     voiceInput.supported = Boolean(Recognition);
+    if (!Recognition) {
+      renderVoiceInputState('unsupported');
+      announce('Microphone input is not available in this browser. Typing remains available.');
+      return;
+    }
+    stopVoiceInput('', 'ready');
+    voiceInput.stopRequested = false;
+    voiceInput.restartCount = 0;
+    voiceInput.lastError = '';
+    voiceInput.sessionId += 1;
+    const sessionId = voiceInput.sessionId;
+    voiceInput.initialResponse = state.progress.attempt.response.trim();
+    voiceInput.finalTranscript = '';
+    voiceInput.finalResultIndexes = new Set();
+    renderVoiceInputState('listening', 'Starting microphone input. Speak when your browser shows that it is listening. Typing stays available.');
+    beginVoiceRecognitionCycle(sessionId);
+  };
+
+  const addTypingSupportControls = () => {
+    if (state.view !== 'course' || state.progress.phase !== 'type') return;
+    const practice = app.querySelector('.typing-practice');
+    if (!practice) return;
+    if (!practice.querySelector('[data-typing-objective]')) {
+      const objective = document.createElement('p');
+      objective.className = 'course-input-help course-typing-objective';
+      objective.dataset.typingObjective = '';
+      objective.textContent = typingIsAccuracyObjective()
+        ? 'This activity checks the visible typing practice sentence. It does not measure speed.'
+        : 'This activity checks your idea, not spelling or handwriting. You can use a typed, speech-to-text, or other valid response when the option is available.';
+      practice.querySelector('#typing-help')?.insertAdjacentElement('afterend', objective);
+    }
+    if (typingIsAccuracyObjective() && state.preferences.alternativeInput && !practice.querySelector('[data-typing-objective-note]')) {
+      const note = document.createElement('p');
+      note.className = 'course-input-help';
+      note.dataset.typingObjectiveNote = '';
+      note.textContent = 'This is a keyboard typing practice, so the visible sentence stays the learning objective. Your device’s keyboard, switch, and one-handed input can still be used.';
+      practice.querySelector('#typing-help')?.insertAdjacentElement('afterend', note);
+    }
+    if (typingAllowsAlternativeInput() && !practice.querySelector('[data-alternative-input-note]')) {
+      const note = document.createElement('p');
+      note.className = 'course-input-help';
+      note.dataset.alternativeInputNote = '';
+      note.textContent = 'Alternative input changes how a response is entered, not what makes it valid. An authored input route appears beside the field only when this activity provides one.';
+      practice.querySelector('#typing-help')?.insertAdjacentElement('afterend', note);
+    }
+    if (typingAllowsAlternativeResponse() && !practice.querySelector('[data-alternative-response-note]')) {
+      const note = document.createElement('p');
+      note.className = 'course-input-help';
+      note.dataset.alternativeResponseNote = '';
+      note.textContent = 'Alternative response formats change the form of an answer only when the learning objective and authored activity allow it. This activity still checks the same concept.';
+      practice.querySelector('#typing-help')?.insertAdjacentElement('afterend', note);
+    }
+  };
+
+  const applyRenderedSupportBehavior = () => {
+    if (state.view !== 'course') return;
+    const nowPanels = app.querySelectorAll('.course-now-panel');
+    nowPanels.forEach((panel) => {
+      const next = panel.children[1];
+      panel.classList.toggle('course-no-next-step', !state.preferences.visibleNextSteps);
+      if (next) next.hidden = !state.preferences.visibleNextSteps;
+    });
+    const workspace = app.querySelector('.course-workspace');
+    if (workspace && selectedCourseLayout() === 'open' && state.preferences.advanceNotice && !workspace.querySelector('[data-transition-notice]')) {
+      const notice = document.createElement('p');
+      notice.className = 'course-transition-notice';
+      notice.dataset.transitionNotice = '';
+      notice.textContent = 'This screen keeps one task visible. Next: ' + courseNextStepCopy() + '.';
