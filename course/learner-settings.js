@@ -1197,3 +1197,61 @@ export const resetRecommendation = (input, { reopen = false } = {}) => {
     updatedAt: timestamp()
   };
 };
+
+export const resetAllLearnerSettings = (input) => {
+  const state = createSettingsState(input);
+  return {
+    ...state,
+    setupComplete: true,
+    primaryPresetId: BALANCED_START_PRESET_ID,
+    selectedPresetIds: [],
+    userOverrides: {},
+    temporaryOverrides: {},
+    conflictResolutions: {},
+    activeInputMethod: 'keyboard',
+    customSetup: false,
+    onboarding: onboardingMetadata(state, {
+      method: 'standard',
+      primaryProfileId: BALANCED_START_PRESET_ID,
+      secondaryProfileIds: [],
+      selectedAnswers: [],
+      completed: true
+    }),
+    updatedAt: timestamp()
+  };
+};
+
+export const clearQuestionnaireAnswers = (input) => {
+  const state = createSettingsState(input);
+  return {
+    ...state,
+    onboarding: { ...state.onboarding, selectedAnswers: [] },
+    updatedAt: timestamp()
+  };
+};
+
+/*
+ * Legacy API: choose just one profile. It intentionally preserves setup
+ * completion state so onboarding can show a review before it is accepted.
+ */
+export const selectPrimaryPreset = (input, presetId) => {
+  const state = createSettingsState(input);
+  if (!isRecommendationProfileId(presetId)) return state;
+  return selectSupportProfiles(state, presetId === BALANCED_START_PRESET_ID ? [] : [presetId], {
+    method: presetId === BALANCED_START_PRESET_ID ? 'standard' : 'manual',
+    primaryProfileId: presetId,
+    completed: state.setupComplete
+  });
+};
+
+export const setUserOverride = (input, key, value) => {
+  const state = createSettingsState(input);
+  const safeValue = cleanOverrides({ [key]: value });
+  const entry = Object.entries(safeValue)[0];
+  if (!entry) return state;
+  const [settingKey, settingValue] = entry;
+  return {
+    ...state,
+    userOverrides: { ...state.userOverrides, [settingKey]: settingValue },
+    customSetup: true,
+    updatedAt: timestamp()
