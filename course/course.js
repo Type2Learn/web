@@ -821,3 +821,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const usesLocalAvaNarration = () => effectiveNarrationVoice() === LOCAL_AVA_VOICE_URI && hasLocalAvaNarration();
 
   const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[char]));
+
+  const colorModes = ['flat', 'balanced', 'vivid'];
+  const currentColorMode = () => window.Type2LearnColorMode?.get?.() || document.documentElement.dataset.colorMode || 'balanced';
+
+  const profileName = () => {
+    if (authenticatedUser?.isGuest) return 'Guest learner';
+    return authenticatedUser?.displayName?.trim()
+      || authenticatedUser?.email?.split('@')[0]
+      || 'Type2Learn learner';
+  };
+
+  const profileInitials = () => profileName().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'T2';
+
+  const profileAvatar = () => authenticatedUser?.isGuest
+    ? '<span class="course-guest-avatar" aria-hidden="true"><img src="/assets/mascot/guest-profile-bunny.webp" alt=""></span>'
+    : '<span class="course-profile-initials" aria-hidden="true">' + escapeHtml(profileInitials()) + '</span>';
+
+  const settingsChoiceGroup = (id, label, description, choices, selected) => '<fieldset class="course-settings-choice-group"><legend>' + escapeHtml(label) + '</legend><p>' + escapeHtml(description) + '</p><div role="group" aria-label="' + escapeHtml(label) + '">' + choices.map(([value, optionLabel]) => {
+    const isUrdu = /[\u0600-\u06ff]/.test(optionLabel);
+    return '<button type="button" data-settings-choice="' + escapeHtml(id) + '" data-value="' + escapeHtml(value) + '" aria-pressed="' + String(value === selected) + '"' + (isUrdu ? ' lang="ur" dir="rtl"' : '') + '>' + escapeHtml(optionLabel) + '</button>';
+  }).join('') + '</div></fieldset>';
+
+  const settingsSwitch = (id, label, description, checked, disabled = false) => '<button class="course-settings-switch" type="button" role="switch" aria-checked="' + String(checked) + '" data-settings-toggle="' + escapeHtml(id) + '"' + (disabled ? ' disabled' : '') + '><span><strong>' + escapeHtml(label) + '</strong><small>' + escapeHtml(description) + '</small></span><i aria-hidden="true"><b></b></i></button>';
+
+  const courseSettingsMenu = () => {
+    if (!state.settingsMenu) return '';
+    const preferencesSaved = coursePreferencesAreSaved();
+    const choices = learningChoices();
+    const noiseType = ['pink', 'white', 'brown'].includes(choices['background-noise-type']) ? choices['background-noise-type'] : 'pink';
+    const noiseVolume = Math.min(35, Math.max(0, Number(choices['background-noise-volume']) || 15));
+    const mascotUnavailable = !mascotViewportQuery?.matches;
+    const controls = preferencesSaved ? [
+      '<div class="course-settings-menu-controls">',
+      settingsChoiceGroup('learning-language', 'Starting language', 'Choose the mascot language you would like to begin with.', [['english', 'English'], ['urdu', 'اردو']], choices['learning-language']),
+      settingsChoiceGroup('colours', 'Color style', 'Choose how much color appears around the task.', [['flat', 'Flat'], ['balanced', 'Balanced'], ['vivid', 'Vivid']], choices.colours),
+      settingsChoiceGroup('layout', 'Page layout', 'Choose how much space sits around one task.', [['focused', 'Focused'], ['balanced', 'Balanced'], ['open', 'Open']], choices.layout),
+      settingsChoiceGroup('encouragement', 'Encouragement', 'Choose how visible supportive moments feel.', [['subtle', 'Subtle'], ['balanced', 'Balanced'], ['expressive', 'Expressive']], choices.encouragement),
+      settingsChoiceGroup('animations', 'Animations', 'Choose how much supportive movement you would like to see.', [['still', 'Still'], ['gentle', 'Gentle'], ['lively', 'Lively']], choices.animations),
+      settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It always starts quietly.', choices['background-noise'] === 'on'),
+      choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="35" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
+      settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
+      settingsSwitch('mascot', 'Mascot', mascotUnavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', choices.mascot === 'on', mascotUnavailable),
+      choices.mascot === 'on' ? settingsChoiceGroup('mascot-language', 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || choices['learning-language']) : '',
+      choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice', 'Mascot voice', 'Choose how the mascot will communicate when voice options are connected.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '',
+      choices.mascot === 'on' ? settingsChoiceGroup('mascot-behaviour', 'Mascot behaviour', 'Choose the kind of presence that feels comfortable.', [['low-key', 'Low-key'], ['calm', 'Calm'], ['energetic', 'Energetic']], choices['mascot-behaviour']) : '',
+      settingsSwitch('urdu-mode', 'Urdu mode', 'This switch is being prepared. It does not change this lesson language yet.', choices['urdu-mode'] === 'on'),
+      '</div>'
+    ].join('') : '<p class="course-settings-menu-gate">Choose the available course first. Its personal learning settings will appear here after setup.</p>';
+    return '<section class="course-settings-menu" id="course-settings-menu" role="dialog" aria-label="Learning settings"><header><span class="course-settings-profile">' + profileAvatar() + '<strong>' + escapeHtml(profileName()) + '</strong></span><button class="course-settings-close" type="button" data-action="close-settings-menu" aria-label="Close settings">×</button></header>' + controls + '<footer><button class="course-settings-signout" type="button" data-action="signout">Sign out</button></footer></section>';
+  };
+
+  const mascotCanAppear = () => Boolean(
+    mascotPresentation.enabled
+    && state.view !== 'dashboard'
+    && mascotViewportQuery?.matches
+  );
+
+  const mascotScene = () => {
+    if (state.view === 'dashboard') return 'dashboard';
+    if (state.view === 'browse') return 'browse';
+    if (state.view === 'saved') return 'saved';
+    return 'course-' + (state.progress.phase || 'preview');
+  };
+
+  const mascotDialogue = () => {
+    const moment = activeSupportMoment;
+    const urdu = mascotPresentation.language === 'urdu';
