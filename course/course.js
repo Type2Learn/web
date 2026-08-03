@@ -1439,3 +1439,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     .filter((chunk) => chunk.text);
 
   const narrationChunkIndexes = (chunks, predicate) => (Array.isArray(chunks) ? chunks : []).reduce((indexes, chunk, index) => {
+    if (predicate(String(chunk?.text || '').trim())) indexes.push(index);
+    return indexes;
+  }, []);
+
+  const mapAudioTextToNarrationChunks = (audioText, chunks) => {
+    const source = String(audioText || '');
+    const lowerSource = source.toLowerCase();
+    let cursor = 0;
+    return (Array.isArray(chunks) ? chunks : []).reduce((maps, chunk, index) => {
+      const text = String(chunk?.text || '').trim();
+      if (!text) return maps;
+      let sourceStart = source.indexOf(text, cursor);
+      if (sourceStart < 0) sourceStart = lowerSource.indexOf(text.toLowerCase(), cursor);
+      if (sourceStart < 0) return maps;
+      maps.push({
+        index,
+        sourceStart,
+        sourceEnd: sourceStart + text.length,
+        startOffset: Math.max(0, Number(chunk?.startOffset) || 0)
+      });
+      cursor = sourceStart + text.length;
+      return maps;
+    }, []);
+  };
+
+  const localAvaPlaylist = (chunks) => {
+    if (!usesLocalAvaNarration()) return [];
+    const audioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex()];
+    const assets = COURSE_AUDIO_MANIFEST.modules?.[audioKey];
+    if (!assets?.read) return [];
+    const step = currentStep();
+    const readText = [step.title, ...sourceReadSections(step)].filter(Boolean).join(' ');
+    const simpleLabel = 'A simpler way to say it';
+    const simpleText = String(step.simple || '').trim();
+    const exampleText = String(step.example || '').trim();
+    const additionalExampleTexts = authoredAdditionalExamples();
+    const exampleLabels = ['Example', 'Another example', ...additionalExampleTexts.slice(1).map((_, index) => 'Additional example ' + (index + 2))];
+    const optionalExampleChunks = new Set([...exampleLabels, exampleText, ...additionalExampleTexts].filter(Boolean));
+    const mainChunkIndexes = narrationChunkIndexes(chunks, (text) => text
+      && text !== simpleLabel
+      && text !== simpleText
+      && !optionalExampleChunks.has(text));
+    if (!mainChunkIndexes.length) return [];
+    const mainChunks = mainChunkIndexes.map((index) => chunks[index]);
+    const readMap = mapAudioTextToNarrationChunks(readText, mainChunks)
+      .map((entry) => ({ ...entry, index: mainChunkIndexes[entry.index] }));
+    // Never use a whole-module recording for a smaller visible section unless
+    // every visible narration chunk maps back to the paired source text. If
+    // authored copy changes later, browser speech can still read only the
+    // rendered section instead of an unbounded recording reading ahead.
+    if (smallerSectionsAreActive() && readMap.length !== mainChunkIndexes.length) return [];
+    const visibleSectionEnd = smallerSectionsAreActive() && readMap.length
+      ? Math.max(...readMap.map((entry) => entry.sourceEnd))
+      : null;
+    const playlist = [{
+      src: assets.read,
+      text: readText,
+      chunkIndexes: mainChunkIndexes,
+      // Keep source ranges tied only to text that is actually narrated. The
+      // service leaves an unrendered module-title intro unhighlighted instead
+      // of moving the green marker to an unrelated visible section.
+      chunkMap: readMap,
+      // Exact WordBoundary cues were produced with this versioned MP3, so the
+      // media clock and current-word marker use the same source timeline.
+      wordCues: assets.readCues,
+      // The recording contains the whole module. When a learner chose smaller
+      // sections, stop at the end of the visible section instead of continuing
+      // into lesson text that has not been opened yet.
+      stopAtSourceChar: visibleSectionEnd
