@@ -226,3 +226,60 @@ export const PLATFORM_DEFAULTS = deepFreeze({
   narrationVoice: '',
   narrationVolume: '1',
   narrationAutoScroll: false,
+  narrationHighlight: true,
+  extraExamples: false,
+  simplerExplanations: false,
+  literalInstructions: false,
+  textSize: 'standard',
+  spacing: 'standard',
+  readingWidth: 'comfortable',
+  alternativeInput: false,
+  speechToText: false,
+  alternativeResponses: false,
+  oneHandedInput: false,
+  switchInput: false,
+  keyboardShortcuts: false,
+  reducedRepeatedMovement: false,
+  restBreaks: true,
+  flexibleTiming: true,
+  noTimedTyping: true,
+  spellingExemption: true,
+  highContrast: false,
+  largerControls: false,
+  reducedMotion: false,
+  contentTransitions: false,
+  quietDisplay: false,
+  gentleFeedback: true,
+  immediateFeedback: true,
+  extraHints: false,
+  numericProgress: 'full',
+  recap: false
+});
+
+const createProfile = (definition) => deepFreeze({
+  ...definition,
+  category: definition.category || 'Learning support',
+  compatibleWith: Array.from(new Set(definition.compatibleWith || [])),
+  conflictsWith: Array.from(new Set(definition.conflictsWith || [])),
+  conflictMetadata: Array.isArray(definition.conflictMetadata) ? definition.conflictMetadata : [],
+  allowedSettingKeys: Object.keys(definition.settings),
+  exampleSettings: definition.exampleSettings || []
+});
+
+/*
+ * These are support profiles, not condition labels. The optional internal
+ * inspiration field is intentionally not used in learner-facing copy.
+ */
+export const PRESETS = deepFreeze([
+  createProfile({
+    id: 'focus-flow',
+    name: 'Focus & Flow',
+    category: 'Structure and focus',
+    compatibleWith: ['readable-view', 'flexible-input', 'clear-progress'],
+    conflictsWith: [],
+    conditionLabel: 'Focus and pacing support',
+    description: 'Smaller sections, clear next steps, and less pressure.',
+    longDescription: 'A calmer task structure that makes it easier to start, pause, and return.',
+    primaryDimensions: ['focus', 'step_by_step', 'predictability', 'fatigue_support'],
+    matchWeights: { focus: 1, step_by_step: 0.8, predictability: 0.4, fatigue_support: 0.4 },
+    settings: { smallerSections: true, visibleNextSteps: true, visibleProgress: true, fewerDistractions: true, gentleReminders: true },
