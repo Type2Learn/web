@@ -753,3 +753,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!copy) return '';
     const [title, description] = copy;
     return '<p class="' + className + ' ' + (kind === 'answer-correct' ? 'is-correct' : 'is-incorrect') + '" role="note" aria-live="off"><strong>' + escapeHtml(title) + '</strong>' + (description ? ' ' + escapeHtml(description) : '') + '</p>';
+  };
+
+  const setSupportMoment = (kind, detail = {}) => {
+    const moment = {
+      id: ++supportEventSequence,
+      kind,
+      phase: detail.phase || state.progress.phase,
+      layout: selectedCourseLayout(),
+      animationLevel: effectiveAnimationLevel(),
+      encouragementLevel: selectedEncouragementLevel(),
+      module: detail.module || currentStep()?.title || '',
+      result: detail.result || '',
+      language: supportLanguage()
+    };
+    activeSupportMoment = moment;
+    return moment;
+  };
+
+  const clearSupportMoment = () => { activeSupportMoment = null; };
+  const supportMomentAnnouncement = (moment = activeSupportMoment) => {
+    const copy = supportCopy(moment);
+    return copy ? copy.filter(Boolean).join('. ') : '';
+  };
+
+  const supportMomentMeta = (moment = activeSupportMoment) => {
+    const urdu = moment?.language === 'urdu';
+    const metadata = urdu ? {
+      'task-entry': ['→', 'اگلا قدم', 'ایک واضح کام پر توجہ دیں۔'],
+      'section-complete': ['✓', 'کیا مکمل ہوا', 'اگلے حصے کے لیے تیار ہوں تو آگے بڑھیں۔'],
+      'answer-correct': ['✓', 'کیا مکمل ہوا', 'جب مناسب لگے اگلے عمل پر جائیں۔'],
+      'answer-incorrect': ['↗', 'اگلا انتخاب', 'درست جواب دیکھیں یا دوسرا جواب منتخب کریں۔'],
+      'response-needed': ['→', 'اگلا انتخاب', 'جب تیار ہوں جواب شامل کریں۔'],
+      'typing-incomplete': ['↗', 'اگلا انتخاب', 'پہلے مختلف حرف سے جاری رکھیں۔'],
+      'module-complete': ['✓', 'کیا مکمل ہوا', 'اگلا مختصر ماڈیول آپ کے لیے تیار ہے۔'],
+      'course-complete': ['✓', 'کیا مکمل ہوا', 'اپنی پیش رفت کو جب چاہیں دوبارہ دیکھیں۔'],
+      'system-error': ['!', 'اگلا انتخاب', 'آپ کا کام یہی ہے۔ جب تیار ہوں دوبارہ کوشش کریں۔'],
+      'preference-preview': ['♥', '', '']
+    } : {
+      'task-entry': ['→', 'Next step', 'Focus on one clear action.'],
+      'section-complete': ['✓', 'What changed', 'Continue when the next section feels right.'],
+      'answer-correct': ['✓', 'What changed', 'Move to the next action when it feels right.'],
+      'answer-incorrect': ['↗', 'Next choice', 'Review the marked answer or choose another response.'],
+      'response-needed': ['→', 'Next choice', 'Add a response when you are ready.'],
+      'typing-incomplete': ['↗', 'Next choice', 'Continue from the first character that differs.'],
+      'module-complete': ['✓', 'What changed', 'The next short module is ready when you are.'],
+      'course-complete': ['✓', 'What changed', 'You can revisit your progress whenever you want.'],
+      'system-error': ['!', 'Next choice', 'Your work is still here. Try again when ready.'],
+      'preference-preview': ['♥', '', '']
+    };
+    return metadata[moment?.kind] || metadata['task-entry'];
+  };
+  const recordSupportMoment = (kind, detail = {}) => {
+    const moment = setSupportMoment(kind, detail);
+    return supportMomentAnnouncement(moment);
+  };
+
+  // The bundled Ava recordings are the normal course narrator. Older builds
+  // saved a browser-specific voice URI, which made an existing learner keep
+  // hearing their device voice after the recordings were added. Preserve only
+  // an explicit "Device voice" choice as an opt-out from the included audio.
+  const effectiveNarrationVoice = () => {
+    if (state.preferences.narrationVoice === SYSTEM_NARRATION_VOICE_URI) return '';
+    if (hasLocalAvaNarration()) return LOCAL_AVA_VOICE_URI;
+    return state.preferences.narrationVoice || '';
+  };
+  const usesLocalAvaNarration = () => effectiveNarrationVoice() === LOCAL_AVA_VOICE_URI && hasLocalAvaNarration();
+
+  const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({
