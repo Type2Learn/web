@@ -335,29 +335,73 @@ const mascotMainClass = (choices) => choices.mascot === 'on' && mascotScreenIsSu
 const languageStageMarkup = (choices) => [
   '<main class="learn-main learn-main--single learn-main--language" id="learn-main"' + setupLanguageAttributes(choices) + '>',
   '<section class="learning-single-setting learning-language-setting" aria-labelledby="learning-settings-title">',
-    outsideClicks = 0;
-    window.clearTimeout(outsideTimer);
-  };
-  const apply = () => {
-    shell.classList.toggle('is-sidebar-hidden', enabled() && hidden);
-    reveal.classList.toggle('is-active', enabled() && hidden);
-    toggle.setAttribute('aria-pressed', String(autoHide));
-    toggle.querySelector('span:last-child').textContent = autoHide ? 'On' : 'Off';
-  };
-  const scheduleHide = (delay = 8500) => {
-    clearHide();
-    if (!enabled() || insideSidebar) return;
-    hideTimer = window.setTimeout(() => {
-      hidden = true;
-      apply();
-    }, delay);
-  };
-  const show = () => {
-    clearReveal();
-    hidden = false;
-    clearOutside();
-    apply();
-    scheduleHide();
+  '<header class="learning-settings-header">',
+  '<p>' + setupCopy(choices).welcome + '</p>',
+  '<h1 id="learning-settings-title">' + setupCopy(choices).startingTitle + '</h1>',
+  '<span>' + setupCopy(choices).startingIntro + '</span>',
+  '</header>',
+  '<div class="learning-language-options">',
+  '<section class="learning-control" aria-labelledby="learning-language-label"><h2 id="learning-language-label">' + setupCopy(choices).startingLabel + '</h2><p>' + setupCopy(choices).startingDescription + '</p><div class="preference-options" style="--option-count:2" role="group" aria-label="' + setupCopy(choices).startingLabel + '"><button type="button" data-preference="learning-language" data-value="english" aria-pressed="' + String(choices['learning-language'] === 'english') + '">English</button><button type="button" data-preference="learning-language" data-value="urdu" aria-pressed="' + String(choices['learning-language'] === 'urdu') + '" lang="ur" dir="rtl">اردو</button></div></section>',
+  '</div>',
+  '<div class="learning-settings-action"><button class="learning-continue" type="button" data-advance-setup="language">' + setupCopy(choices).useLanguage + ' <span aria-hidden="true">→</span></button></div>',
+  '</section>',
+  '</main>'
+].join('');
+
+const focusedSteps = (choices) => {
+  const steps = [
+    { id: 'layout' },
+    { id: 'colours' },
+    { id: 'encouragement' },
+    { id: 'animations' },
+    { id: 'background-noise' }
+  ];
+  if (choices['background-noise'] === 'on') steps.push({ id: 'noise-details' });
+  steps.push({ id: 'text-to-speech' }, { id: 'mascot' });
+  if (choices.mascot === 'on') steps.push({ id: 'mascot-language' }, { id: 'mascot-voice' }, { id: 'mascot-behaviour' });
+  return steps;
+};
+
+const focusedStepContent = (step, choices) => {
+  if (step.id === 'noise-details') return backgroundNoiseMarkup(choices);
+  if (step.id === 'mascot-language') return mascotLanguageControl(choices);
+  if (step.id === 'mascot-voice') return mascotVoiceControl(choices);
+  if (step.id === 'mascot-behaviour') return mascotBehaviourControl(choices);
+  return controlMarkup(controlById(step.id), choices[step.id], setupLanguage(choices));
+};
+
+const focusedStageMarkup = (choices) => {
+  const copy = setupCopy(choices);
+  const steps = focusedSteps(choices);
+  const step = steps[Math.min(focusedStepIndex, steps.length - 1)];
+  const last = focusedStepIndex >= steps.length - 1;
+  const backLabel = focusedStepIndex === 0
+    ? (setupLanguage(choices) === 'urdu' ? 'زبان پر واپس' : 'Back to language')
+    : (setupLanguage(choices) === 'urdu' ? 'واپس' : 'Back');
+  return [
+    '<main class="learn-main learn-main--focused' + mascotMainClass(choices) + '" id="learn-main"' + setupLanguageAttributes(choices) + '>',
+    '<section class="learning-focused-settings" aria-labelledby="learning-settings-title">',
+    '<header class="learning-settings-header">',
+    '<p>' + copy.focused + '</p>',
+    '<h1 id="learning-settings-title">' + copy.title + '</h1>',
+    '<span>' + copy.focusedIntro + '</span>',
+    '<small class="learning-settings-later">' + copy.laterSettings + '</small>',
+    '</header>',
+    '<article class="learning-setting-chit learning-setting-chit--focused">',
+    focusedStepContent(step, choices),
+    '</article>',
+    '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="focused">' + backLabel + '</button><button class="learning-continue" type="button" data-advance-setup="focused">' + (last ? copy.course : copy.keep) + ' <span aria-hidden="true">→</span></button></div>',
+    '</section>',
+    mascotRailMarkup(choices),
+    '</main>'
+  ].join('');
+};
+
+const balancedStageMarkup = (choices) => {
+  const copy = setupCopy(choices);
+  return [
+  '<main class="learn-main' + mascotMainClass(choices) + '" id="learn-main"' + setupLanguageAttributes(choices) + '>',
+  '<section class="learning-settings" aria-labelledby="learning-settings-title">',
   };
   const scheduleReveal = () => {
     if (!enabled() || !hidden || pointerDown || revealTimer) return;
