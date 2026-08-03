@@ -2675,3 +2675,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const startNarrationFromChunkPoint = (requestedIndex, requestedOffset = 0) => {
     if (!state.preferences.readAloud || state.view !== 'course' || (state.progress.phase !== 'read' && !isReviewingModule())) return;
+    if (!Number.isInteger(requestedIndex)) return;
+    const service = ensureNarrationService();
+    const chunks = renderedNarrationChunks();
+    if (!chunks.length || !chunks[requestedIndex]) return;
+    let startIndex = requestedIndex;
+    const characterOffset = Math.max(0, Number(requestedOffset) || 0);
+    const rawRemainingText = chunks[startIndex].text.slice(characterOffset);
+    const leadingWhitespace = rawRemainingText.length - rawRemainingText.trimStart().length;
+    const remainingText = rawRemainingText.trim();
+    if (remainingText) chunks[startIndex] = { ...chunks[startIndex], text: remainingText, startOffset: characterOffset + leadingWhitespace };
+    else {
+      startIndex = chunks.findIndex((chunk, index) => index > requestedIndex && chunk.text.trim());
+      if (startIndex < 0) return;
+    }
+    narration.chunks = chunks;
+    narration.activeIndex = -1;
+    narration.activeRange = null;
+    service.setChunks(chunks);
+    const playlist = configureLocalAvaPlaylist(service, chunks);
+    // Examples are optional visual additions and do not have a matching Ava
+    // recording. Starting from one should use the device fallback instead of
+    // unexpectedly restarting the main recorded lesson from its beginning.
+    if (usesLocalAvaNarration() && playlist.length && !playlist.some((track) => track.chunkIndexes.includes(startIndex))) {
+      service.setAudioPlaylist([]);
+    }
+    service.configure({
+      rate: state.preferences.narrationSpeed,
+      voiceURI: effectiveNarrationVoice(),
+      volume: Number(state.preferences.narrationVolume)
+    });
+    service.start(startIndex);
+    save('Text to speech started from the selected point.');
+  };
+
+  const startNarrationFromTextPoint = (event) => {
+    const point = pointInsideNarrationText(event);
+    if (!point) return;
+    startNarrationFromChunkPoint(point.index, point.characterOffset);
+  };
+
+  const supportMomentBelongsToCurrentTask = () => Boolean(
+    activeSupportMoment
+      && state.view === 'course'
+      && activeSupportMoment.phase === state.progress.phase
+  );
+
+  // The strongest celebration is intentionally narrow: it is only earned by
+  // a successful learner action when *both* learner controls ask for the
+  // most visible presentation. It is never used for an error, a rerender, or
+  // an automatic state change.
+  const shouldCelebrateSupportMoment = (moment, isNew) => Boolean(
+    isNew
+      && moment
+      && moment.animationLevel === 'lively'
+      && moment.encouragementLevel === 'expressive'
+      && ['section-complete', 'answer-correct', 'module-complete', 'course-complete'].includes(moment.kind)
+  );
+
+  const supportVisualKind = (moment = activeSupportMoment) => {
+    if (!moment) return 'entry';
+    if (moment.kind === 'section-complete') return moment.result === 'lesson-complete' ? 'lesson' : 'section';
+    if (moment.kind === 'answer-correct') return moment.result === 'applied-practice' ? 'applied' : 'correct';
+    if (moment.kind === 'module-complete') return 'module';
+    if (moment.kind === 'course-complete') return 'course';
+    if (['answer-incorrect', 'typing-incomplete', 'response-needed', 'system-error'].includes(moment.kind)) return 'recovery';
+    if (moment.kind === 'preference-preview') return 'preference';
+    return 'entry';
+  };
