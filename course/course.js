@@ -409,3 +409,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
 
   const migrateLegacyCoursePreferences = (sharedSettings, legacyPreferences) => {
+    let next = createSettingsState(sharedSettings);
+    const legacy = legacyPreferences && typeof legacyPreferences === 'object' && !Array.isArray(legacyPreferences)
+      ? legacyPreferences
+      : {};
+    const platform = defaultPreferences();
+    const current = resolveSettings(next);
+    const candidates = {};
+
+    // Only migrate settings the old in-course controls could change, and only
+    // when their saved value differs from the platform default. This preserves
+    // meaningful legacy choices without freezing a complete resolved snapshot.
+    ['smallerSections', 'readAloud', 'fewerDistractions', 'gentleReminders', 'extraExamples', 'visibleProgress', 'alternativeInput', 'narrationAutoScroll', 'narrationHighlight'].forEach((key) => {
+      if (typeof legacy[key] === 'boolean' && legacy[key] !== platform[key]) candidates[key] = legacy[key];
+    });
+    if (legacy.speechToText === true || legacy.voiceInput === true) candidates.speechToText = true;
+    if (['large', 'extra-large'].includes(legacy.textSize)) candidates.textSize = legacy.textSize;
+    else if (legacy.textSizeLarge === true) candidates.textSize = 'large';
+    if (legacy.spacing === 'relaxed' || legacy.spacingRelaxed === true) candidates.spacing = 'relaxed';
+    if (['narrow', 'wide'].includes(legacy.readingWidth)) candidates.readingWidth = legacy.readingWidth;
+    if (['0.75', '1.25', '1.5'].includes(String(legacy.narrationSpeed))) candidates.narrationSpeed = String(legacy.narrationSpeed);
+    if (typeof legacy.narrationVoice === 'string' && legacy.narrationVoice) candidates.narrationVoice = legacy.narrationVoice;
+
+    Object.entries(candidates).forEach(([key, value]) => {
+      // A current learner override or a non-default resolved value (for example
+      // from an active support profile) is newer and must win over course legacy.
+      if (hasOwn(next.userOverrides, key) || current[key] !== platform[key]) return;
+      next = setUserOverride(next, key, value);
+    });
+    return next;
+  };
+
+  const savePreferenceShell = (savedPreferences) => {
+    localStorage.setItem(storageKeys.preferences, JSON.stringify({
+      version: 2,
+      settingsMigrationVersion: LEGACY_COURSE_SETTINGS_MIGRATION_VERSION
+    }));
+  };
+
+  const loadState = () => {
+    try {
+      const savedPreferences = safeJson(localStorage.getItem(storageKeys.preferences), {}) || {};
+      const savedCourse = safeJson(localStorage.getItem(storageKeys.course), {}) || {};
+      let sharedSettings = loadLearnerSettings(storageKeys.learnerId);
+      if (Number(savedPreferences.settingsMigrationVersion) < LEGACY_COURSE_SETTINGS_MIGRATION_VERSION) {
+        const migrated = migrateLegacyCoursePreferences(sharedSettings, savedPreferences.preferences);
+        sharedSettings = saveLearnerSettings(storageKeys.learnerId, migrated);
+        // Remove the historical full snapshot after the bounded migration. A
+        // failed marker write is harmless: the migration is idempotent because
+        // current explicit learner overrides always take priority on retry.
+        try { savePreferenceShell(savedPreferences); } catch (_) { /* Best-effort legacy cleanup. */ }
+      }
+      return normaliseState(savedCourse, sharedSettings);
+    } catch (_) {
+      const state = defaultState();
+      state.storageAvailable = false;
+      return state;
+    }
+  };
+
+  let state = defaultState();
+  // Support moments are deliberately ephemeral. Progress is saved, but an
+  // acknowledgement is created only by the learner action that earned it; it
+  // is never restored from storage or recreated by a settings/modal render.
+  let supportEventSequence = 0;
+  let activeSupportMoment = null;
+  let lastRenderedSupportEventId = 0;
+  let supportPopupTimer = 0;
+  let lastVisualRouteKey = '';
+  let actionMotionSequence = 0;
