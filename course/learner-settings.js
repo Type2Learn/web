@@ -169,3 +169,60 @@ export const EDITABLE_SETTING_KEYS = deepFreeze([
   'switchInput',
   'keyboardShortcuts',
   'largerControls',
+  'reducedRepeatedMovement',
+  'restBreaks',
+  'reducedMotion',
+  'contentTransitions',
+  'quietDisplay',
+  'stableLayout',
+  'advanceNotice',
+  'highContrast',
+  'extraHints',
+  'numericProgress'
+]);
+
+/* These protections are intentionally suitable for the read-only learner
+   protections section. Gentle/immediate feedback remain internal course
+   behaviour and are enforced separately below. */
+export const BUILT_IN_PROTECTION_KEYS = deepFreeze([
+  'automaticSaving',
+  'noTimers',
+  'pauseResume',
+  'easyReturn',
+  'writtenInstructions',
+  'captionsTranscripts',
+  'noAutoplay',
+  'noUnexpectedSound',
+  'flexibleTiming',
+  'noTimedTyping',
+  'spellingExemption',
+  'oneTask'
+]);
+
+const INTERNAL_PROTECTION_KEYS = deepFreeze(['gentleFeedback', 'immediateFeedback']);
+const PROTECTION_KEYS = deepFreeze([...BUILT_IN_PROTECTION_KEYS, ...INTERNAL_PROTECTION_KEYS]);
+const PROTECTION_VALUES = deepFreeze(Object.fromEntries(PROTECTION_KEYS.map((key) => [key, true])));
+
+export const PLATFORM_DEFAULTS = deepFreeze({
+  smallerSections: false,
+  oneTask: true,
+  visibleNextSteps: true,
+  visibleProgress: true,
+  automaticSaving: true,
+  noTimers: true,
+  pauseResume: true,
+  easyReturn: true,
+  focusMode: false,
+  fewerDistractions: false,
+  gentleReminders: false,
+  writtenInstructions: true,
+  captionsTranscripts: true,
+  noAutoplay: true,
+  noUnexpectedSound: true,
+  stableLayout: true,
+  advanceNotice: true,
+  readAloud: false,
+  narrationSpeed: '1',
+  narrationVoice: '',
+  narrationVolume: '1',
+  narrationAutoScroll: false,
