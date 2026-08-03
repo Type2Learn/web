@@ -511,3 +511,61 @@ const timestamp = () => new Date().toISOString();
 
 const cleanProfileIds = (value) => unique((Array.isArray(value) ? value : (value instanceof Set ? [...value] : []))
   .filter((id) => typeof id === 'string' && isProfileId(id)));
+
+const orderProfileIds = (value, primary = '') => {
+  const ids = cleanProfileIds(value);
+  const chosenPrimary = isProfileId(primary) ? primary : '';
+  const remaining = ids
+    .filter((id) => id !== chosenPrimary)
+    .sort((left, right) => (presetOrder.get(left) ?? Number.MAX_SAFE_INTEGER) - (presetOrder.get(right) ?? Number.MAX_SAFE_INTEGER));
+  return chosenPrimary ? [chosenPrimary, ...remaining] : remaining;
+};
+
+const cleanSelectedAnswerIds = (value) => unique((Array.isArray(value) ? value : (value instanceof Set ? [...value] : []))
+  .filter((id) => typeof id === 'string' && optionById.has(id)));
+
+const canonicalSettingKey = (key) => ({
+  voiceInput: 'speechToText',
+  textSizeLarge: 'textSize',
+  spacingRelaxed: 'spacing'
+}[key] || key);
+
+const migrateLegacySettingAliases = (value) => {
+  const source = safeObject(value);
+  const migrated = { ...source };
+  const hasSpeechToText = typeof source.speechToText === 'boolean';
+  const hasVoiceInput = typeof source.voiceInput === 'boolean';
+  if (hasSpeechToText || hasVoiceInput) {
+    migrated.speechToText = source.speechToText === true || source.voiceInput === true;
+  }
+  if (!Object.hasOwn(source, 'textSize') && typeof source.textSizeLarge === 'boolean') {
+    migrated.textSize = source.textSizeLarge ? 'large' : 'standard';
+  }
+  if (!Object.hasOwn(source, 'spacing') && typeof source.spacingRelaxed === 'boolean') {
+    migrated.spacing = source.spacingRelaxed ? 'relaxed' : 'standard';
+  }
+  delete migrated.voiceInput;
+  delete migrated.textSizeLarge;
+  delete migrated.spacingRelaxed;
+  return migrated;
+};
+
+const cleanOverrides = (value, allowedKeys = editableKeySet) => {
+  const clean = {};
+  Object.entries(migrateLegacySettingAliases(value)).forEach(([key, setting]) => {
+    if (!allowedKeys.has(key)) return;
+    if (key === 'textSize' && !validTextSizes.has(setting)) return;
+    if (key === 'spacing' && !validSpacing.has(setting)) return;
+    if (key === 'readingWidth' && !validWidths.has(setting)) return;
+    if (key === 'narrationSpeed' && !validNarrationSpeeds.has(String(setting))) return;
+    if (key === 'narrationVolume' && !validNarrationVolumes.has(String(setting))) return;
+    if (key === 'numericProgress' && !validNumericProgress.has(setting)) return;
+    if (key === 'narrationVoice' && (typeof setting !== 'string' || setting.length > 300)) return;
+    if (!['textSize', 'spacing', 'readingWidth', 'narrationSpeed', 'narrationVolume', 'narrationVoice', 'numericProgress'].includes(key) && typeof setting !== 'boolean') return;
+    clean[key] = ['narrationSpeed', 'narrationVolume'].includes(key) ? String(setting) : setting;
+  });
+  return clean;
+};
+
+const cleanConflictResolutions = (value) => {
+  const source = safeObject(value);
