@@ -11,11 +11,16 @@ const backgroundNoiseSources = {
   brown: '/assets/audio/background-noise/brown-noise-loop.mp3'
 };
 const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0.15, playing: false, fadeFrame: null, playRequest: 0 };
-const mascotImageUrl = '/assets/2D%20Mascot/blinking.webp?v=20260803-2';
+const mascotAnimationUrls = [
+  '/assets/2D%20Mascot/blinking.webp?v=20260803-2',
+  '/assets/2D%20Mascot/waving.webp?v=20260803-1'
+];
+const mascotModuleUrl = '/course/mascot-2d.js?v=20260803-2d3';
 // 3D rollback reference: preserve the original model URL alongside the
 // untouched course/mascot-3d.js implementation.
 // const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';
 let mascotAssetsWarmed = false;
+let mascotPreloadLinks = [];
 let mascotPreview = null;
 let mascotPreviewLoad = null;
 let setupStage = 'language';
@@ -81,18 +86,28 @@ const warmMascotAssets = () => {
   if (mascotAssetsWarmed || !mascotScreenIsSupported()) return;
   mascotAssetsWarmed = true;
   [
-    ['preload', mascotImageUrl]
-  ].forEach(([rel, href]) => {
+    ['modulepreload', mascotModuleUrl, ''],
+    ...mascotAnimationUrls.map((url) => ['preload', url, 'image/webp'])
+  ].forEach(([rel, href, type]) => {
     const link = document.createElement('link');
     link.rel = rel;
     link.href = href;
     if (rel === 'preload') {
       link.as = 'image';
-      link.type = 'image/webp';
+      link.type = type;
     }
     document.head.append(link);
+    mascotPreloadLinks.push(link);
   });
-  window.fetch?.(mascotImageUrl, { cache: 'force-cache' }).catch(() => {});
+};
+
+const releaseMascotAssets = () => {
+  mascotPreloadLinks.forEach((link) => link.remove());
+  mascotPreloadLinks = [];
+  mascotAssetsWarmed = false;
+  mascotPreview?.destroy?.();
+  mascotPreview = null;
+  mascotPreviewLoad = null;
 };
 
 const setupLanguage = (choices) => choices['learning-language'] === 'urdu' ? 'urdu' : 'english';
@@ -462,7 +477,7 @@ const syncMascotPreview = (choices) => {
     //     return mascotPreview;
     //   })
     //   .catch(() => null);
-    mascotPreviewLoad = import('/course/mascot-2d.js?v=20260803-2d2')
+    mascotPreviewLoad = import(mascotModuleUrl)
       .then(({ createCourseMascot }) => {
         mascotPreview = createCourseMascot();
         return mascotPreview;
@@ -635,7 +650,9 @@ const boot = async () => {
       if (preference === 'colours') window.Type2LearnColorMode?.set(value);
       if (preference === 'learning-language') {
         // Language is the first choice, so its direction and copy update on
-        // this same screen rather than only after the learner continues.
+        // this same screen rather than only after the learner continues. Start
+        // warming both mascot animations now, before the preferences appear.
+        warmMascotAssets();
         render(choices);
         return;
       }
@@ -666,6 +683,11 @@ const boot = async () => {
         render(choices);
         return;
       }
+      if (preference === 'mascot' && value === 'off') {
+        releaseMascotAssets();
+        render(choices);
+        return;
+      }
       if (preference === 'mascot' || (preference === 'animations' && choices.mascot === 'on') || (preference === 'mascot-language' && choices.mascot === 'on')) {
         render(choices);
         if (preference === 'animations') showSetupFeedback('animations', choices);
@@ -688,6 +710,7 @@ const boot = async () => {
 
     if (event.target.closest('[data-save-preferences]')) {
       savePreferences(user, selectedCourseId, choices);
+      if (choices.mascot !== 'on') releaseMascotAssets();
       window.location.assign('/course/?course=' + encodeURIComponent(selectedCourseId) + '&start=course');
     }
 
@@ -710,6 +733,7 @@ const boot = async () => {
     if (advance) {
       const stage = advance.dataset.advanceSetup;
       if (stage === 'language') {
+        warmMascotAssets();
         setupStage = 'balanced';
         render(choices);
         return;
@@ -737,7 +761,8 @@ const boot = async () => {
 
   window.addEventListener('pagehide', () => {
     stopBackgroundNoisePreview();
-    mascotPreview?.destroy?.();
+    if (choices.mascot === 'on') mascotPreview?.destroy?.();
+    else releaseMascotAssets();
   }, { once: true });
 };
 
