@@ -367,3 +367,36 @@ export const COURSE_CONTENT = {
       hint: 'Think about personal space, safety, and asking before offering hands-on help.',
       typing: { level: 'Key idea typing', prompt: 'Type the respectful support idea in the field.', target: 'Ask before helping with a mobility device because it is part of a person\'s personal space.' },
       check: {
+        question: 'Why should someone ask before helping with a mobility device?',
+        options: [['The person may have a preferred or safer way to move, and their equipment is part of their personal space.', true], ['It is always faster to move the equipment without asking.', false], ['Mobility equipment does not need personal boundaries.', false], ['Touch the equipment first, then ask later.', false]],
+        explanation: 'Correct. The module notes that a person may have a preferred or safer way to move, and their equipment is part of their personal space.'
+      }
+    },
+    {
+      module: 'Module 11',
+      title: 'Sensory Processing Sensitivities',
+      duration: 'About 4 minutes',
+      content: {
+        definitionHeading: 'What are sensory sensitivities?',
+        definition: 'Sensory sensitivities happen when sounds, lights, touch, movement, smells, tastes, or visual information feel unusually strong, weak, or distracting. They can occur alongside autism, ADHD, anxiety, migraine, or other experiences.',
+        dailyLifeHeading: 'How might they affect learning or daily life?',
+        dailyLife: 'A person may find classrooms, crowds, clothing, food, screens, smells, or sudden sounds difficult to tolerate or concentrate around.',
+        strengthsHeading: 'What strengths might a person have?',
+        strengths: 'Some people may notice details, patterns, sounds, textures, or changes that others miss. They may also have strong self-awareness about what helps them feel comfortable.',
+        challengesHeading: 'What challenges might they experience?',
+        challenges: ['Noise, bright lights, or strong smells', 'Unexpected touch', 'Crowded spaces', 'Flashing images or fast movement', 'Certain clothing or food textures', 'Becoming overwhelmed or unable to communicate'],
+        supportsHeading: 'What support can help?',
+        supports: ['Reduce noise, brightness, or visual clutter', 'Use headphones or fidget tools', 'Offer quiet spaces', 'Allow movement or regulation breaks', 'Notice early signs of overload', 'Let people explain their sensory needs without embarrassment']
+      },
+      simple: 'Reducing stimulation and taking a break can help before sensory overload becomes more severe.',
+      example: 'One support idea from this module is to reduce noise or visual clutter and offer a quiet space.',
+      hint: 'Look for the response that reduces stimulation before someone becomes overwhelmed.',
+      typing: { level: 'Recall typing', prompt: 'In your own words, describe a helpful response to early signs of sensory overload. The prompt stays inside the field while you type.', reference: 'Reduce stimulation and take a break before the overload becomes more severe.' },
+      check: {
+        question: 'What should someone do when they notice early signs of sensory overload?',
+        options: [['Reduce stimulation and take a break before the overload becomes more severe.', true], ['Add more flashing images and noise.', false], ['Ignore the signs until the task is over.', false], ['Increase stimulation so the learner gets used to it.', false]],
+        explanation: 'Right. The module recommends reducing stimulation and taking a break before overload becomes more severe.'
+      }
+    }
+  ]
+};
