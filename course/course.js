@@ -2881,3 +2881,72 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       if (movesTask && ['check', 'apply', 'exam'].includes(state.progress.phase)) card.classList.add('is-question-sequence-entering');
       if (movesTask) app.querySelector('.course-module-strip, .course-progress-panel')?.classList.add('is-support-progressing');
       scheduleSupportPopupDismissal(moment);
+      lastRenderedSupportEventId = moment.id;
+    }
+  };
+
+  const enhanceQuizPresentation = () => {
+    if (state.view !== 'course' || !['check', 'apply'].includes(state.progress.phase)) return;
+    const fieldset = app.querySelector('.course-check-options');
+    const legend = fieldset?.querySelector('legend');
+    if (!fieldset || !legend || legend.dataset.enhancedQuestion) return;
+    const applying = state.progress.phase === 'apply';
+    const question = applying
+      ? 'Which response best uses the idea from this module?'
+      : legend.textContent.trim();
+    const helper = applying
+      ? 'Choose one practical response. You can change your choice before finishing this step.'
+      : 'Choose one answer. You can change your choice before checking it.';
+    legend.textContent = '';
+    legend.className = 'course-question-card';
+    legend.tabIndex = -1;
+    legend.dataset.enhancedQuestion = 'true';
+    legend.dataset.questionKey = (applying ? 'apply-' : 'check-') + state.progress.lessonIndex;
+    const label = document.createElement('span');
+    label.className = 'course-question-label';
+    label.textContent = 'Question';
+    const text = document.createElement('strong');
+    text.className = 'course-question-text';
+    text.textContent = question;
+    const description = document.createElement('span');
+    description.className = 'course-question-helper';
+    description.textContent = helper;
+    legend.append(label, text, description);
+    fieldset.closest('.course-task-card')?.classList.add('course-question-transition');
+    fieldset.querySelectorAll('.course-check-option').forEach((option, index) => {
+      option.style.setProperty('--option-index', String(index));
+    });
+  };
+
+  const routeMotionActions = new Set([
+    'dashboard', 'browse', 'saved', 'continue-course', 'course-preferences',
+    'preview-complete', 'read-complete', 'next-reading-section',
+    'check-typing', 'submit-check', 'continue-check', 'submit-apply',
+    'continue-apply', 'next-step', 'start-final-exam', 'next-exam-question',
+    'return-course', 'return-to-read', 'simple-read', 'return-from-module-review'
+  ]);
+
+  const routeMotionKind = (action) => {
+    if (['preview-complete', 'read-complete', 'next-reading-section', 'simple-read', 'return-to-read'].includes(action)) return 'reading';
+    if (['check-typing'].includes(action)) return 'typing';
+    if (['submit-check', 'continue-check', 'submit-exam-answer', 'next-exam-question'].includes(action)) return 'question';
+    if (['submit-apply', 'continue-apply'].includes(action)) return 'applied';
+    if (['next-step', 'start-final-exam', 'return-course'].includes(action)) return 'milestone';
+    return 'navigation';
+  };
+
+  const launchCourseControlMotion = (control, event) => {
+    const animationLevel = effectiveAnimationLevel();
+    if (!control || animationLevel === 'still' || control.matches(':disabled, [aria-disabled="true"]')) return;
+    const rect = control.getBoundingClientRect();
+    const hasPointerPosition = Number(event?.clientX) > 0 || Number(event?.clientY) > 0;
+    const x = hasPointerPosition ? event.clientX : rect.left + rect.width / 2;
+    const y = hasPointerPosition ? event.clientY : rect.top + rect.height / 2;
+    const motionId = ++actionMotionSequence;
+    const echo = document.createElement('span');
+    echo.className = 'course-action-echo course-action-echo--' + animationLevel;
+    echo.dataset.actionMotion = String(motionId);
+    echo.setAttribute('aria-hidden', 'true');
+    echo.style.setProperty('--action-x', x + 'px');
+    echo.style.setProperty('--action-y', y + 'px');
+    echo.innerHTML = animationLevel === 'lively'
