@@ -527,6 +527,19 @@
           ['اب', 'خیال مکمل کریں', 'ویری ایبل ایک ایسی قدر محفوظ کرتا ہے جو…'],
           ['اگلا', 'اپنے الفاظ جانچیں', 'دیکھیں کہ تعریف کا مطلب کیا ہے۔'],
           ['مکمل', 'اسے کوڈ میں استعمال کریں', 'اسکور کی ایک قدر بنائیں۔']
+        ];
+        tasks.forEach((task, index) => {
+          const item = taskCopy[index];
+          if (!item) return;
+          write(task.querySelector('.state-name'), item[0]);
+          write(task.querySelector('strong'), item[1]);
+          write(task.querySelector('span:last-child'), item[2]);
+        });
+        const progress = workspace.querySelectorAll('.workspace-progress > span');
+        write(progress[0], 'سیکھنے کا راستہ');
+        write(progress[1], '3 میں سے 1');
+      }
+    }
 
     const demo = document.getElementById('demo');
     if (demo) {
@@ -1032,6 +1045,18 @@
       const current = window.scrollY;
       const tolerance = 30;
       const stops = getStops();
+      if (direction > 0) return stops.find((stop) => stop > current + tolerance);
+      for (let index = stops.length - 1; index >= 0; index -= 1) {
+        if (stops[index] < current - tolerance) return stops[index];
+      }
+      return null;
+    };
+
+    const scrollToStop = (direction) => {
+      if (!enabled() || Date.now() < lockedUntil) return false;
+      const target = nextStop(direction);
+      if (target === null || target === undefined) return false;
+
       if (direction > 0) return stops.find((stop) => stop > current + tolerance);
       for (let index = stops.length - 1; index >= 0; index -= 1) {
         if (stops[index] < current - tolerance) return stops[index];
