@@ -1419,7 +1419,6 @@
 
     const slides = Array.from(document.querySelectorAll('[data-auth-slide]'));
     const slideButtons = Array.from(document.querySelectorAll('[data-auth-slide-button]'));
-    const forms = Array.from(document.querySelectorAll('[data-auth-form]'));
     const formStage = document.querySelector('.auth-form-stage');
     const title = document.getElementById('auth-title');
     const description = document.getElementById('auth-description');
@@ -1434,6 +1433,15 @@
     if (googleButton && !document.querySelector('[data-guest-access]')) {
       (document.querySelector('.auth-google-terms') || googleButton).insertAdjacentHTML('afterend', '<div class="auth-guest-access"><button class="auth-guest-button" type="button" data-guest-access>Continue as a guest</button><p>A random browser cookie keeps this guest space separate. No account is created.</p></div>');
     }
+    const loginFormForEmailLink = document.querySelector('[data-auth-form="login"]');
+    const loginOptions = loginFormForEmailLink?.querySelector('.auth-form-options');
+    if (loginOptions && !document.querySelector('[data-auth-mode="email-link"]')) {
+      loginOptions.insertAdjacentHTML('beforeend', '<button type="button" class="auth-text-button" data-auth-mode="email-link">Email me a sign-in link</button>');
+    }
+    if (formStage && !document.querySelector('[data-auth-form="email-link"]')) {
+      formStage.insertAdjacentHTML('beforeend', '<form class="auth-form" data-auth-form="email-link" aria-hidden="true" hidden><div class="auth-reset-mark" aria-hidden="true">✉</div><p class="auth-reset-copy" data-email-link-copy>We will email a one-time sign-in link. It also verifies that you control this email address.</p><label class="auth-field"><span>Email address</span><input id="email-link-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="name@example.com" required></label><button class="button button-primary auth-submit" type="submit" data-email-link-submit>Email me a sign-in link</button><p class="auth-status" data-auth-status role="status" aria-live="polite"></p><p class="auth-switch"><button type="button" data-auth-mode="login">Back to sign in</button></p></form>');
+    }
+    const forms = Array.from(document.querySelectorAll('[data-auth-form]'));
     if (integrationNote?.lastChild) {
       integrationNote.lastChild.textContent = 'Connecting secure account services…';
       integrationNote.classList.add('is-connecting');
@@ -1441,7 +1449,8 @@
     const modeCopy = {
       login: ['Welcome back.', 'Continue from the exact point where your learning paused.'],
       register: ['Create your account.', 'Set up a private place for progress, preferences, and return.'],
-      reset: ['Reset your password.', 'Prepare a secure recovery link for the email connected to your account.']
+      reset: ['Reset your password.', 'Prepare a secure recovery link for the email connected to your account.'],
+      'email-link': ['Sign in by email.', 'We will send a one-time link that securely signs you in and verifies your email address.']
     };
     let activeSlide = 0;
     let slideTimer = null;
@@ -1506,6 +1515,11 @@
         const loginEmail = document.getElementById('login-email');
         if (resetEmail && loginEmail?.value && !resetEmail.value) resetEmail.value = loginEmail.value;
       }
+      if (mode === 'email-link') {
+        const emailLinkEmail = document.getElementById('email-link-email');
+        const loginEmail = document.getElementById('login-email');
+        if (emailLinkEmail && loginEmail?.value && !emailLinkEmail.value) emailLinkEmail.value = loginEmail.value;
+      }
       if (focus) window.requestAnimationFrame(() => document.querySelector('[data-auth-form="' + mode + '"] input')?.focus());
     };
 
@@ -1564,7 +1578,7 @@
     };
     registerPassword?.addEventListener('input', validatePasswordMatch);
     registerConfirm?.addEventListener('input', validatePasswordMatch);
-    import('/firebase-auth.js?v=20260801-courseflow1')
+    import('/firebase-auth.js?v=20260804-email-link1')
       .then(({ setupFirebaseAuth }) => setupFirebaseAuth({ setStatus: setAuthStatus }))
       .catch(() => {
         if (integrationNote?.lastChild) integrationNote.lastChild.textContent = 'Account services could not connect';

@@ -2123,48 +2123,6 @@ body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .
 
 .course-explain-support { border-left: 4px solid var(--course-teal) !important; background: var(--course-teal-pale) !important; }
 
-.course-ai-chat-locked {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 18px;
-  border-color: var(--course-line-strong) !important;
-  background: color-mix(in srgb, var(--course-paper) 74%, var(--course-blue-pale)) !important;
-}
-
-.course-ai-chat-locked .course-eyebrow { margin: 0 0 4px; }
-.course-ai-chat-locked h3 span,
-.course-ai-chat-locked button span {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 6px;
-  border: 1px solid var(--course-line-strong);
-  border-radius: 999px;
-  padding: 2px 6px;
-  color: var(--course-muted);
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
-
-.course-ai-chat-locked > p { grid-column: 1 / -1; }
-
-.course-ai-chat-locked button {
-  align-self: start;
-  min-height: 36px;
-  border: 1px dashed var(--course-line-strong);
-  border-radius: 8px;
-  padding: 8px 10px;
-  color: var(--course-muted);
-  background: var(--course-paper);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: not-allowed;
-  opacity: .84;
-}
-
 .help-choice-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2387,6 +2345,232 @@ body.course-stable-layout *::after { transition-duration: .01ms; }
     animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
   }
+}
+
+/* Course AI is a separate, bounded surface from the normal mascot dialogue.
+   Its blinking companion lives inside the assistant box itself, and compact
+   screens use a full dedicated assistant page rather than a cramped modal. */
+.course-ai-chat {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  color: var(--course-ink);
+  text-align: start;
+}
+
+.course-ai-chat-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: 10px 14px;
+  border-bottom: 1px solid var(--course-line);
+  padding: 16px 18px 13px;
+}
+
+.course-ai-chat.has-ai-mascot .course-ai-chat-header { grid-template-columns: minmax(0, 1fr) clamp(68px, 16vw, 104px) auto; }
+.course-ai-chat-header-copy { min-width: 0; }
+.course-ai-chat-header .course-eyebrow { margin: 0 0 4px; }
+.course-ai-chat-header h2 { margin: 0; color: var(--course-ink); font-size: clamp(1.15rem, 2vw, 1.45rem); line-height: 1.15; }
+.course-ai-chat-header p:last-child { margin: 7px 0 0; color: var(--course-ink-soft); font-size: 12px; font-weight: 650; line-height: 1.5; }
+
+.course-ai-chat-mascot {
+  align-self: end;
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+}
+
+.course-ai-chat-mascot-image {
+  display: block;
+  width: 100%;
+  max-height: 106px;
+  height: auto;
+  object-fit: contain;
+  object-position: center bottom;
+  background: transparent;
+}
+
+.course-ai-chat-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 9px;
+  padding: 0;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.course-ai-chat-close:hover { border-color: var(--course-blue); color: var(--course-blue); }
+
+.course-ai-chat-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: auto;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--course-cloud);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.course-ai-message-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 14px 18px;
+  scrollbar-color: var(--course-line-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.course-ai-message {
+  max-width: 94%;
+  border: 1px solid var(--course-line);
+  border-radius: 13px;
+  padding: 10px 12px;
+  background: var(--course-cloud);
+  box-shadow: 0 3px 10px rgba(18, 52, 83, .035);
+  overflow-wrap: anywhere;
+}
+
+.course-ai-message--assistant { justify-self: start; border-inline-start: 3px solid var(--course-teal); }
+.course-ai-message--user { justify-self: end; border-color: #9ad8bb; border-inline-end: 3px solid var(--course-green); background: var(--course-green-pale); }
+.course-ai-message > span { display: block; color: var(--course-muted); font-size: 10px; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+.course-ai-message p { margin: 4px 0 0; color: var(--course-ink); font-size: 13px; font-weight: 600; line-height: 1.52; white-space: pre-wrap; unicode-bidi: plaintext; }
+
+.course-ai-composer {
+  border-top: 1px solid var(--course-line);
+  padding: 12px 18px 15px;
+  background: color-mix(in srgb, var(--course-paper) 94%, var(--course-blue-pale));
+}
+
+.course-ai-composer label { display: block; }
+.course-ai-composer textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 10px;
+  padding: 10px 11px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: start;
+}
+
+.course-ai-composer textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--course-blue) 44%, transparent); outline-offset: 2px; }
+.course-ai-composer textarea:disabled { cursor: not-allowed; color: var(--course-muted); background: var(--course-cloud); }
+
+.course-ai-composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.course-ai-composer-actions .course-primary-button,
+.course-ai-composer-actions .course-secondary-button { min-height: 38px; padding: 8px 12px; font-size: 12px; }
+.course-ai-dictation[disabled] { opacity: .55; }
+
+.course-ai-chat-status {
+  min-height: 19px;
+  margin: 9px 0 0;
+  color: var(--course-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.course-ai-chat-status.is-error { color: var(--course-red); }
+.course-ai-chat-status.is-recording { color: #087d34; }
+
+.course-ai-page-backdrop {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  overflow: hidden;
+  background: var(--course-cloud);
+}
+
+.course-ai-page {
+  width: min(100%, 920px);
+  height: 100dvh;
+  margin-inline: auto;
+  border-inline: 1px solid var(--course-line);
+  background: var(--course-paper);
+  box-shadow: 0 0 36px rgba(18, 52, 83, .1);
+}
+
+.course-ai-chat--page {
+  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--course-paper);
+}
+
+.course-ai-chat--page .course-ai-chat-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.course-ai-chat--page.has-ai-mascot .course-ai-chat-header { grid-template-columns: minmax(0, 1fr) clamp(76px, 20vw, 120px); }
+.course-ai-chat--page .course-ai-chat-back { grid-column: 1 / -1; grid-row: 1; justify-self: start; }
+.course-ai-chat--page .course-ai-chat-header-copy { grid-column: 1; grid-row: 2; }
+.course-ai-chat--page .course-ai-chat-mascot { grid-column: 2; grid-row: 2; }
+.course-ai-chat--page .course-ai-message-list { max-height: none; }
+
+@media (min-width: 1181px) {
+  .course-mascot-rail--lesson.is-ai-open {
+    display: block;
+    pointer-events: auto;
+    isolation: isolate;
+  }
+
+  .course-ai-chat--rail {
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--course-line-strong);
+    border-radius: 16px;
+    background: var(--course-paper);
+    box-shadow: 0 16px 38px rgba(18, 52, 83, .1);
+  }
+
+  .course-ai-chat--rail .course-ai-chat-header { padding: 13px 15px 11px; }
+  .course-ai-chat--rail .course-ai-chat-mascot { max-width: 88px; }
+  .course-ai-chat--rail .course-ai-chat-mascot-image { max-height: 92px; }
+  .course-ai-chat--rail .course-ai-message-list { padding: 11px 15px; }
+  .course-ai-chat--rail .course-ai-composer { padding: 10px 15px 12px; }
+  .course-ai-chat--rail .course-ai-composer textarea { min-height: 64px; }
+}
+
+@media (max-width: 760px) {
+  .course-ai-page { width: 100%; border: 0; box-shadow: none; }
+  .course-ai-chat-header { gap: 10px; padding: 15px 15px 12px; }
+  .course-ai-chat--page.has-ai-mascot .course-ai-chat-header { grid-template-columns: minmax(0, 1fr) clamp(70px, 23vw, 96px); }
+  .course-ai-chat-mascot-image { max-height: 92px; }
+  .course-ai-message-list { padding: 12px 15px; }
+  .course-ai-composer { padding: 10px 15px 13px; }
+  .course-ai-composer textarea { min-height: 68px; }
+  .course-ai-composer-actions .course-primary-button,
+  .course-ai-composer-actions .course-secondary-button { flex: 1 1 130px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-ai-message-list { scroll-behavior: auto; }
 }
 
 /* Course 1 additions: one flat typing field and in-course support controls. */

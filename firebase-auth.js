@@ -5,10 +5,13 @@ import {
   browserSessionPersistence,
   createUserWithEmailAndPassword,
   getAuth,
+  isSignInWithEmailLink,
   onAuthStateChanged,
+  sendSignInLinkToEmail,
   sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
+  signInWithEmailLink,
   signInWithPopup,
   signOut,
   updateProfile
@@ -29,6 +32,8 @@ const errorMessages = {
   'auth/account-exists-with-different-credential': 'An account already uses this email with another sign-in method. Use that method first.',
   'auth/cancelled-popup-request': 'The newer Google sign-in window replaced the previous one.',
   'auth/email-already-in-use': 'An account already uses this email. Sign in or reset the password instead.',
+  'auth/expired-action-code': 'This email link has expired. Request a new one and try again.',
+  'auth/invalid-action-code': 'This email link is invalid or has already been used. Request a new one and try again.',
   'auth/invalid-credential': 'The email or password was not recognized. Check both fields and try again.',
   'auth/invalid-email': 'Enter a valid email address.',
   'auth/network-request-failed': 'The connection was interrupted. Check your internet connection and try again.',
@@ -36,12 +41,36 @@ const errorMessages = {
   'auth/popup-blocked': 'Your browser blocked the Google sign-in window. Allow popups for Type2Learn and try again.',
   'auth/popup-closed-by-user': 'Google sign-in was closed before it finished.',
   'auth/too-many-requests': 'Too many attempts were made. Wait a moment before trying again.',
+  'auth/unauthorized-continue-uri': 'This sign-in link is not configured for this website yet. Please contact Type2Learn support.',
   'auth/unauthorized-domain': 'This domain needs to be added to Firebase Authentication authorized domains.',
   'auth/user-disabled': 'This account has been disabled. Contact Type2Learn support.',
   'auth/weak-password': 'Choose a stronger password with at least eight characters.'
 };
 
 const messageFor = (error) => errorMessages[error?.code] || 'Authentication could not be completed. Please try again.';
+const EMAIL_LINK_EMAIL_KEY = 'type2learn-email-link-email';
+const EMAIL_LINK_DESTINATION_KEY = 'type2learn-email-link-destination';
+
+const readStoredValue = (key) => {
+  try { return window.localStorage.getItem(key) || ''; } catch (_) { return ''; }
+};
+
+const storeEmailLinkState = (email, destination) => {
+  try {
+    window.localStorage.setItem(EMAIL_LINK_EMAIL_KEY, email);
+    window.localStorage.setItem(EMAIL_LINK_DESTINATION_KEY, destination);
+  } catch (_) {
+    // Firebase can still complete this in the same tab, but another device
+    // will need the learner to confirm the email again.
+  }
+};
+
+const clearEmailLinkState = () => {
+  try {
+    window.localStorage.removeItem(EMAIL_LINK_EMAIL_KEY);
+    window.localStorage.removeItem(EMAIL_LINK_DESTINATION_KEY);
+  } catch (_) { /* Storage is optional for this flow. */ }
+};
 
 export const getType2LearnAuth = () => {
   const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -80,8 +109,13 @@ export const setupFirebaseAuth = ({ setStatus }) => {
   const loginForm = document.querySelector('[data-auth-form="login"]');
   const registerForm = document.querySelector('[data-auth-form="register"]');
   const resetForm = document.querySelector('[data-auth-form="reset"]');
+  const emailLinkForm = document.querySelector('[data-auth-form="email-link"]');
+  const emailLinkInput = document.getElementById('email-link-email');
+  const emailLinkCopy = document.querySelector('[data-email-link-copy]');
+  const emailLinkSubmit = document.querySelector('[data-email-link-submit]');
   const loginEmail = document.getElementById('login-email');
   const rememberEmail = document.getElementById('remember-email');
+  let emailLinkNeedsEmailConfirmation = false;
 
   const safeAuthDestination = () => {
     const fallback = '/course/';
@@ -101,11 +135,63 @@ export const setupFirebaseAuth = ({ setStatus }) => {
     window.location.assign(safeAuthDestination());
   };
 
+  const emailLinkActionCodeSettings = () => ({
+    // The return URL itself is authorized in Firebase Authentication. Do not
+    // include the learner email or a destination URL in this link.
+    url: new URL('/login/', window.location.origin).toString(),
+    handleCodeInApp: true
+  });
+
   const setBusy = (form, busy) => {
     dialog?.setAttribute('aria-busy', String(busy));
     form?.querySelectorAll('button, input').forEach((control) => {
       control.disabled = busy;
     });
+  };
+
+  const showEmailLinkForm = ({ confirmation = false, email = '', focus = true } = {}) => {
+    if (!emailLinkForm) return;
+    emailLinkNeedsEmailConfirmation = confirmation;
+    formStage.hidden = false;
+    forms.forEach((form) => {
+      const active = form === emailLinkForm;
+      form.hidden = !active;
+      form.classList.toggle('is-active', active);
+      form.setAttribute('aria-hidden', String(!active));
+    });
+    if (account) {
+      account.hidden = true;
+      account.setAttribute('aria-hidden', 'true');
+    }
+    if (title) title.textContent = confirmation ? 'Confirm your email.' : 'Sign in by email.';
+    if (description) description.textContent = confirmation
+      ? 'For your security, enter the email address that received this one-time link.'
+      : 'We will send a one-time link that securely signs you in and verifies your email address.';
+    if (emailLinkCopy) emailLinkCopy.textContent = confirmation
+      ? 'You opened this sign-in link on a different device or browser. Enter the exact email address you used to request it.'
+      : 'We will email a one-time sign-in link. It also verifies that you control this email address.';
+    if (emailLinkSubmit) emailLinkSubmit.textContent = confirmation ? 'Verify and sign in' : 'Email me a sign-in link';
+    if (emailLinkInput && email && !emailLinkInput.value) emailLinkInput.value = email;
+    if (focus) window.requestAnimationFrame(() => emailLinkInput?.focus?.({ preventScroll: true }));
+  };
+
+  const completeEmailLinkSignIn = async (email) => {
+    const confirmedEmail = String(email || '').trim();
+    if (!confirmedEmail || !emailLinkForm) return;
+    setBusy(emailLinkForm, true);
+    setStatus(emailLinkForm, 'Verifying your email and signing you in…', 'working');
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithEmailLink(auth, confirmedEmail, window.location.href);
+      const destination = readStoredValue(EMAIL_LINK_DESTINATION_KEY) || safeAuthDestination();
+      clearEmailLinkState();
+      clearType2LearnGuest();
+      window.location.assign(destination);
+    } catch (error) {
+      setStatus(emailLinkForm, messageFor(error), 'error');
+    } finally {
+      setBusy(emailLinkForm, false);
+    }
   };
 
   const showAuthenticatedUser = (user) => {
@@ -230,6 +316,34 @@ export const setupFirebaseAuth = ({ setStatus }) => {
       setBusy(resetForm, false);
     }
   });
+
+  emailLinkForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!emailLinkForm.reportValidity()) return;
+    const email = emailLinkInput?.value.trim() || '';
+    if (emailLinkNeedsEmailConfirmation || isSignInWithEmailLink(auth, window.location.href)) {
+      await completeEmailLinkSignIn(email);
+      return;
+    }
+    setBusy(emailLinkForm, true);
+    setStatus(emailLinkForm, 'Sending your secure sign-in link…', 'working');
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      await sendSignInLinkToEmail(auth, email, emailLinkActionCodeSettings());
+      storeEmailLinkState(email, safeAuthDestination());
+      setStatus(emailLinkForm, 'Check your email for the one-time Type2Learn sign-in link. It may take a minute to arrive.', 'success');
+    } catch (error) {
+      setStatus(emailLinkForm, messageFor(error), 'error');
+    } finally {
+      setBusy(emailLinkForm, false);
+    }
+  });
+
+  if (isSignInWithEmailLink(auth, window.location.href)) {
+    const storedEmail = readStoredValue(EMAIL_LINK_EMAIL_KEY);
+    showEmailLinkForm({ confirmation: !storedEmail, email: storedEmail, focus: !storedEmail });
+    if (storedEmail) void completeEmailLinkSignIn(storedEmail);
+  }
 
   document.querySelector('[data-auth-signout]')?.addEventListener('click', async () => {
     const button = document.querySelector('[data-auth-signout]');

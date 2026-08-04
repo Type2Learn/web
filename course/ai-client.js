@@ -1,0 +1,57 @@
+const apiBase = () => {
+  const override = String(window.TYPE2LEARN_AI_API_URL || '').trim();
+  if (override) return override.replace(/\/$/, '');
+  const configured = document.querySelector('meta[name="type2learn-ai-api"]')?.getAttribute('content')?.trim();
+  return (configured || window.location.origin).replace(/\/$/, '');
+};
+
+export class CourseAiError extends Error {
+  constructor(message, code = 'AI_REQUEST_FAILED') {
+    super(message);
+    this.name = 'CourseAiError';
+    this.code = code;
+  }
+}
+
+const readJson = async (response) => response.json().catch(() => ({}));
+
+const requireToken = async (user) => {
+  if (!user || user.isGuest || typeof user.getIdToken !== 'function') {
+    throw new CourseAiError('Please sign in to use the AI helper. You can still use the course support on this page.', 'SIGN_IN_REQUIRED');
+  }
+  return user.getIdToken();
+};
+
+const request = async (path, options = {}) => {
+  let response;
+  try {
+    response = await fetch(apiBase() + path, { ...options, cache: 'no-store' });
+  } catch {
+    throw new CourseAiError('The AI helper is not connected right now. You can still use the course support on this page.', 'AI_OFFLINE');
+  }
+  const payload = await readJson(response);
+  if (!response.ok) throw new CourseAiError(payload?.error?.message || 'The AI helper could not continue.', payload?.error?.code || 'AI_REQUEST_FAILED');
+  return payload;
+};
+
+export const getCourseAiStatus = () => request('/api/v1/health');
+
+export const askCourseAi = async ({ user, message, history, courseId, page, language, signal }) => {
+  const token = await requireToken(user);
+  return request('/api/v1/ai/chat', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history, courseId, page, language }),
+    signal
+  });
+};
+
+export const transcribeCourseAudio = async ({ user, audio, durationMs, language, purpose, signal }) => {
+  const token = await requireToken(user);
+  const form = new FormData();
+  form.append('audio', audio, 'type2learn-voice.webm');
+  form.append('durationMs', String(Math.round(durationMs)));
+  form.append('language', language === 'ur' ? 'ur' : 'en');
+  form.append('purpose', purpose);
+  return request('/api/v1/speech/transcribe', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: form, signal });
+};

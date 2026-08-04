@@ -2,6 +2,7 @@ import { COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
+import { askCourseAi, getCourseAiStatus, transcribeCourseAudio } from './ai-client.js?v=20260804-ai2';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
 
@@ -49,11 +50,21 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const mascotViewportQuery = window.matchMedia?.('(min-width: 1181px)');
   const mascotMotionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   const compactAnimationQuery = window.matchMedia?.('(max-width: 767px)');
+  // The supplied transparent WebP is the single mascot animation source. It
+  // is used directly inside the AI surface as well as by the desktop mascot
+  // controller, so it remains a continuous blinking loop in either view.
+  const AI_MASCOT_IMAGE_URL = '/assets/2D%20Mascot/blinking.webp?v=20260804-loop1';
   // Voice input is deliberately separate from text-to-speech narration. It is
   // created only after a learner presses the microphone control, so a profile never
   // causes a microphone permission prompt by itself.
   const voiceInput = {
     recognition: null,
+    recorder: null,
+    stream: null,
+    chunks: [],
+    startedAt: 0,
+    recordingTimer: null,
+    recorderStopping: false,
     listening: false,
     supported: null,
     status: 'ready',
@@ -67,6 +78,29 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     stopRequested: false,
     sessionId: 0,
     lastError: ''
+  };
+  // AI chat is intentionally session-only. It never enters the course progress
+  // record or local storage, so a learner's questions disappear on close,
+  // navigation, and refresh. The service itself also receives only a bounded
+  // course/page identifier, not a copy of the page HTML or saved learner work.
+  const aiChat = {
+    open: false,
+    contextKey: '',
+    messages: [],
+    draft: '',
+    status: 'idle',
+    error: '',
+    connection: { checked: false, checking: false, ai: false, speech: false },
+    requestController: null,
+    dictation: {
+      recorder: null,
+      stream: null,
+      chunks: [],
+      startedAt: 0,
+      timer: null,
+      session: 0,
+      stopping: false
+    }
   };
   // A modal render replaces the triggering control, so remember its stable
   // action selector rather than a stale DOM reference. This lets keyboard and
@@ -469,6 +503,17 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         // failed marker write is harmless: the migration is idempotent because
         // current explicit learner overrides always take priority on retry.
         try { savePreferenceShell(savedPreferences); } catch (_) { /* Best-effort legacy cleanup. */ }
+      }
+      // The course setup screen stores this per-course choice separately from
+      // the wider learner-support settings. Restore its explicit value when a
+      // learner returns, otherwise the visible Listen control could disappear
+      // even though they selected Text to speech: On during setup.
+      const savedChoices = readLearningChoices();
+      if (hasOwn(savedChoices, 'text-to-speech') && ['on', 'off'].includes(savedChoices['text-to-speech'])) {
+        sharedSettings = saveLearnerSettings(
+          storageKeys.learnerId,
+          setUserOverride(sharedSettings, 'readAloud', savedChoices['text-to-speech'] === 'on')
+        );
       }
       return normaliseState(savedCourse, sharedSettings);
     } catch (_) {
@@ -913,6 +958,291 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     && mascotViewportQuery?.matches
   );
 
+  const canUseMascotAiPanel = () => Boolean(
+    mascotCanAppear()
+    && state.view === 'course'
+    && !mascotMotionQuery?.matches
+  );
+
+  const aiLanguage = () => courseUsesUrdu() ? 'ur' : 'en';
+  const aiDirection = () => aiLanguage() === 'ur' ? 'rtl' : 'ltr';
+  const aiCopy = (english, urdu) => aiLanguage() === 'ur' ? urdu : english;
+  const aiContextKey = () => [state.view, displayedModuleIndex(), state.progress.phase, Number.isInteger(state.reviewModuleIndex) ? state.reviewModuleIndex : '', aiLanguage()].join(':');
+  const aiInitialMessage = () => aiCopy(
+    'I can help you understand this current page. I will not complete typing or choose answers for you.',
+    'میں اس موجودہ صفحے کو سمجھنے میں مدد کر سکتا ہوں۔ میں آپ کی ٹائپنگ مکمل نہیں کروں گا اور نہ ہی آپ کے لیے جواب منتخب کروں گا۔'
+  );
+
+  const clearAiChatTimer = () => {
+    if (aiChat.dictation.timer !== null) window.clearTimeout(aiChat.dictation.timer);
+    aiChat.dictation.timer = null;
+  };
+
+  const abortAiRequest = () => {
+    aiChat.requestController?.abort?.();
+    aiChat.requestController = null;
+  };
+
+  const discardAiDictation = () => {
+    const dictation = aiChat.dictation;
+    dictation.session += 1;
+    clearAiChatTimer();
+    if (dictation.recorder && dictation.recorder.state !== 'inactive') {
+      try { dictation.recorder.stop(); } catch (_) { /* Stopping a recorder is best-effort. */ }
+    }
+    dictation.stream?.getTracks?.().forEach((track) => track.stop());
+    dictation.recorder = null;
+    dictation.stream = null;
+    dictation.chunks = [];
+    dictation.startedAt = 0;
+    dictation.stopping = false;
+  };
+
+  const resetAiChat = ({ close = true } = {}) => {
+    abortAiRequest();
+    discardAiDictation();
+    aiChat.messages = [];
+    aiChat.draft = '';
+    aiChat.status = 'idle';
+    aiChat.error = '';
+    if (close) aiChat.open = false;
+  };
+
+  const syncAiChatContext = () => {
+    const nextKey = aiContextKey();
+    if (aiChat.contextKey && aiChat.contextKey !== nextKey) {
+      resetAiChat();
+      if (state.modal === 'ai-chat') state.modal = '';
+    }
+    aiChat.contextKey = nextKey;
+  };
+
+  const aiChatIsVisible = () => aiChat.open || state.modal === 'ai-chat';
+
+  const aiMessagesMarkup = () => {
+    const messages = aiChat.messages.length ? aiChat.messages : [{ role: 'assistant', content: aiInitialMessage(), initial: true }];
+    return messages.map((message) => '<article class="course-ai-message course-ai-message--' + (message.role === 'user' ? 'user' : 'assistant') + (message.initial ? ' is-initial' : '') + '"><span>' + escapeHtml(message.role === 'user' ? aiCopy('You', 'آپ') : aiCopy('Course helper', 'کورس مددگار')) + '</span><p>' + escapeHtml(message.content) + '</p></article>').join('');
+  };
+
+  const aiChatStatusMarkup = () => {
+    if (aiChat.status === 'checking') return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('Checking the assistant connection…', 'مددگار کے کنکشن کی جانچ ہو رہی ہے…')) + '</p>';
+    if (aiChat.status === 'sending') return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('The course helper is thinking…', 'کورس مددگار غور کر رہا ہے…')) + '</p>';
+    if (aiChat.status === 'recording') return '<p class="course-ai-chat-status is-recording" role="status">' + escapeHtml(aiCopy('Listening. Choose Stop speaking when you are finished.', 'سن رہا ہے۔ مکمل ہونے پر بولنا بند کریں منتخب کریں۔')) + '</p>';
+    if (aiChat.status === 'transcribing') return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('Turning your recording into editable text…', 'آپ کی ریکارڈنگ کو قابلِ ترمیم متن میں بدلا جا رہا ہے…')) + '</p>';
+    if (aiChat.error) return '<p class="course-ai-chat-status is-error" role="status">' + escapeHtml(aiChat.error) + '</p>';
+    if (aiChat.connection.checked && !aiChat.connection.ai) return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('AI chat is being set up. The course support on this page is still available.', 'AI چیٹ ترتیب دی جا رہی ہے۔ اس صفحے کی کورس مدد اب بھی دستیاب ہے۔')) + '</p>';
+    return '<p class="course-ai-chat-status">' + escapeHtml(aiCopy('Ask about this page only. Do not include private information.', 'صرف اس صفحے کے بارے میں پوچھیں۔ ذاتی معلومات شامل نہ کریں۔')) + '</p>';
+  };
+
+  const courseAiChatMarkup = (surface) => {
+    const busy = ['checking', 'sending', 'recording', 'transcribing'].includes(aiChat.status);
+    const canSend = aiChat.connection.checked && aiChat.connection.ai && !busy && Boolean(aiChat.draft.trim());
+    const canSpeak = aiChat.connection.checked && aiChat.connection.speech && !busy;
+    const closeLabel = aiCopy('Close AI chat', 'AI چیٹ بند کریں');
+    const backLabel = aiCopy('Back to course', 'کورس پر واپس جائیں');
+    const heading = aiCopy('Course AI', 'کورس AI');
+    const inputLabel = aiCopy('Ask about the current page', 'موجودہ صفحے کے بارے میں پوچھیں');
+    const speechLabel = aiChat.status === 'recording'
+      ? aiCopy('Stop speaking', 'بولنا بند کریں')
+      : aiCopy('Speak', 'بولیں');
+    const hasMascot = mascotPresentation.enabled;
+    const mascot = hasMascot
+      ? '<div class="course-ai-chat-mascot" data-ai-chat-mascot aria-hidden="true"><img class="course-ai-chat-mascot-image" src="' + AI_MASCOT_IMAGE_URL + '" alt="" decoding="async" fetchpriority="high"></div>'
+      : '';
+    const closeControl = surface === 'page'
+      ? '<button class="course-ai-chat-close course-ai-chat-back" type="button" data-action="close-ai-chat" aria-label="' + escapeHtml(backLabel) + '"><span aria-hidden="true">' + escapeHtml(aiDirection() === 'rtl' ? '→' : '←') + '</span><span>' + escapeHtml(backLabel) + '</span></button>'
+      : '<button class="course-ai-chat-close" type="button" data-action="close-ai-chat" aria-label="' + escapeHtml(closeLabel) + '">×</button>';
+    return '<section class="course-ai-chat course-ai-chat--' + surface + (hasMascot ? ' has-ai-mascot' : '') + '" data-course-ai-chat data-course-ai-surface="' + surface + '" lang="' + aiLanguage() + '" dir="' + aiDirection() + '" aria-label="' + escapeHtml(heading) + '"><header class="course-ai-chat-header"><div class="course-ai-chat-header-copy"><p class="course-eyebrow">' + escapeHtml(aiCopy('PAGE SUPPORT', 'صفحے کی مدد')) + '</p><h2' + (surface === 'page' ? ' id="course-ai-chat-title" tabindex="-1"' : '') + '>' + escapeHtml(heading) + '</h2><p>' + escapeHtml(aiCopy('A focused helper for this task. It cannot complete your work or choose answers.', 'اس کام کے لیے محدود مددگار۔ یہ آپ کا کام مکمل نہیں کر سکتا اور نہ ہی جواب منتخب کر سکتا ہے۔')) + '</p></div>' + mascot + closeControl + '</header><div class="course-ai-message-list" data-ai-message-list role="log" aria-live="polite" aria-relevant="additions text">' + aiMessagesMarkup() + '</div><div class="course-ai-composer"><label><span class="course-visually-hidden">' + escapeHtml(inputLabel) + '</span><textarea data-ai-chat-input maxlength="900" rows="3" placeholder="' + escapeHtml(inputLabel) + '"' + (busy ? ' disabled' : '') + '>' + escapeHtml(aiChat.draft) + '</textarea></label><div class="course-ai-composer-actions"><button class="course-secondary-button course-ai-dictation" type="button" data-action="ai-dictation-toggle"' + (canSpeak || aiChat.status === 'recording' ? '' : ' disabled') + '>' + escapeHtml(speechLabel) + '</button><button class="course-primary-button" type="button" data-action="ai-send"' + (canSend ? '' : ' disabled') + '>' + escapeHtml(aiCopy('Send', 'بھیجیں')) + ' <span aria-hidden="true">' + escapeHtml(aiDirection() === 'rtl' ? '←' : '→') + '</span></button></div>' + aiChatStatusMarkup() + '</div></section>';
+  };
+
+  const focusAiInput = () => window.requestAnimationFrame(() => app.querySelector('[data-ai-chat-input]')?.focus?.({ preventScroll: true }));
+
+  const refreshAiConnection = async () => {
+    if (aiChat.connection.checking) return;
+    aiChat.connection = { ...aiChat.connection, checking: true };
+    aiChat.status = aiChat.status === 'idle' ? 'checking' : aiChat.status;
+    const contextKey = aiChat.contextKey;
+    try {
+      const status = await getCourseAiStatus();
+      if (contextKey !== aiChat.contextKey) return;
+      aiChat.connection = { checked: true, checking: false, ai: Boolean(status?.ai?.available), speech: Boolean(status?.speechToText?.available) };
+      if (aiChat.status === 'checking') aiChat.status = 'idle';
+      if (aiChatIsVisible()) {
+        render();
+        focusAiInput();
+      }
+    } catch (_) {
+      if (contextKey !== aiChat.contextKey) return;
+      aiChat.connection = { checked: true, checking: false, ai: false, speech: false };
+      if (aiChat.status === 'checking') aiChat.status = 'idle';
+      if (aiChatIsVisible()) {
+        render();
+        focusAiInput();
+      }
+    }
+  };
+
+  const openCourseAi = (trigger) => {
+    syncAiChatContext();
+    if (!aiChat.open) {
+      aiChat.open = true;
+      aiChat.messages = [{ role: 'assistant', content: aiInitialMessage(), initial: true }];
+      aiChat.draft = '';
+      aiChat.error = '';
+    }
+    if (canUseMascotAiPanel()) {
+      state.modal = '';
+      render();
+      focusAiInput();
+    } else {
+      openCourseModal('ai-chat', trigger, '[data-action="call-ai"]');
+    }
+    void refreshAiConnection();
+  };
+
+  const closeCourseAi = () => {
+    const selector = state.modal === 'ai-chat' ? modalReturnFocusSelector : '[data-action="call-ai"]';
+    modalReturnFocusSelector = '';
+    state.modal = '';
+    resetAiChat();
+    render();
+    if (selector) window.requestAnimationFrame(() => app.querySelector(selector)?.focus?.({ preventScroll: true }));
+  };
+
+  // A learner can rotate a device or resize a browser with the assistant
+  // open. Keep exactly one visible surface: the desktop rail or the compact
+  // full-page assistant, never neither and never both.
+  const syncAiChatViewportSurface = () => {
+    if (!aiChat.open) return;
+    state.modal = canUseMascotAiPanel() ? '' : 'ai-chat';
+  };
+
+  const aiPageRequestContext = () => ({
+    courseId: COURSE.id,
+    page: { moduleIndex: displayedModuleIndex(), phase: state.progress.phase },
+    language: aiLanguage()
+  });
+
+  const sendAiMessage = async () => {
+    const message = aiChat.draft.trim();
+    if (!message || !aiChat.connection.ai || aiChat.status !== 'idle') return;
+    const history = aiChat.messages.filter((entry) => !entry.initial).slice(-6).map((entry) => ({ role: entry.role, content: entry.content }));
+    aiChat.messages.push({ role: 'user', content: message });
+    aiChat.draft = '';
+    aiChat.error = '';
+    aiChat.status = 'sending';
+    const contextKey = aiChat.contextKey;
+    const controller = new AbortController();
+    aiChat.requestController = controller;
+    render();
+    try {
+      const reply = await askCourseAi({ user: authenticatedUser, message, history, ...aiPageRequestContext(), signal: controller.signal });
+      if (contextKey !== aiChat.contextKey || controller.signal.aborted) return;
+      aiChat.messages.push({ role: 'assistant', content: String(reply?.reply || '').trim() || aiCopy('I could not make a clear response. Please try a shorter question.', 'میں واضح جواب تیار نہیں کر سکا۔ براہ کرم مختصر سوال کریں۔') });
+    } catch (error) {
+      if (controller.signal.aborted || contextKey !== aiChat.contextKey) return;
+      aiChat.error = error?.message || aiCopy('The AI helper could not continue. Please try again later.', 'AI مددگار جاری نہیں رہ سکا۔ براہ کرم بعد میں دوبارہ کوشش کریں۔');
+    } finally {
+      if (aiChat.requestController === controller) aiChat.requestController = null;
+      if (contextKey === aiChat.contextKey) {
+        aiChat.status = 'idle';
+        if (aiChatIsVisible()) {
+          render();
+          focusAiInput();
+        }
+      }
+    }
+  };
+
+  const supportedRecorderMimeType = () => {
+    if (!window.MediaRecorder?.isTypeSupported) return '';
+    return ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((type) => window.MediaRecorder.isTypeSupported(type)) || '';
+  };
+
+  const finishAiDictation = async (session) => {
+    const dictation = aiChat.dictation;
+    if (session !== dictation.session || !aiChatIsVisible()) return;
+    const elapsed = Math.max(300, Math.round(window.performance.now() - dictation.startedAt));
+    const type = dictation.recorder?.mimeType || 'audio/webm';
+    const recording = new Blob(dictation.chunks, { type });
+    dictation.stream?.getTracks?.().forEach((track) => track.stop());
+    dictation.recorder = null;
+    dictation.stream = null;
+    dictation.chunks = [];
+    dictation.startedAt = 0;
+    dictation.stopping = false;
+    clearAiChatTimer();
+    if (!recording.size) {
+      aiChat.status = 'idle';
+      aiChat.error = aiCopy('No speech was recorded. Try again or type your question.', 'کوئی آواز ریکارڈ نہیں ہوئی۔ دوبارہ کوشش کریں یا سوال ٹائپ کریں۔');
+      render();
+      focusAiInput();
+      return;
+    }
+    aiChat.status = 'transcribing';
+    aiChat.error = '';
+    render();
+    try {
+      const result = await transcribeCourseAudio({ user: authenticatedUser, audio: recording, durationMs: elapsed, language: aiLanguage(), purpose: 'chat' });
+      if (session !== dictation.session || !aiChatIsVisible()) return;
+      const transcript = String(result?.transcript || '').trim();
+      aiChat.draft = [aiChat.draft.trim(), transcript].filter(Boolean).join(aiChat.draft.trim() ? ' ' : '');
+    } catch (error) {
+      if (session !== dictation.session) return;
+      aiChat.error = error?.message || aiCopy('Voice input could not continue. You can type your question instead.', 'آواز کے ذریعے ان پٹ جاری نہیں رہ سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
+    } finally {
+      if (session === dictation.session && aiChatIsVisible()) {
+        aiChat.status = 'idle';
+        render();
+        focusAiInput();
+      }
+    }
+  };
+
+  const startAiDictation = async () => {
+    if (!aiChat.connection.speech || aiChat.status !== 'idle') return;
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      aiChat.error = aiCopy('This browser cannot record a short voice message. You can type your question instead.', 'یہ براؤزر مختصر صوتی پیغام ریکارڈ نہیں کر سکتا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
+      render();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!aiChatIsVisible()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      const session = ++aiChat.dictation.session;
+      const mimeType = supportedRecorderMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      aiChat.dictation = { ...aiChat.dictation, recorder, stream, chunks: [], startedAt: window.performance.now(), stopping: false, session };
+      recorder.addEventListener('dataavailable', (event) => {
+        if (session === aiChat.dictation.session && event.data?.size) aiChat.dictation.chunks.push(event.data);
+      });
+      recorder.addEventListener('stop', () => { void finishAiDictation(session); }, { once: true });
+      aiChat.status = 'recording';
+      aiChat.error = '';
+      recorder.start(250);
+      clearAiChatTimer();
+      aiChat.dictation.timer = window.setTimeout(() => stopAiDictation(), 45000);
+      render();
+    } catch (error) {
+      aiChat.status = 'idle';
+      aiChat.error = error?.name === 'NotAllowedError'
+        ? aiCopy('Allow microphone access to speak, or type your question instead.', 'بولنے کے لیے مائیکروفون کی اجازت دیں، یا سوال ٹائپ کریں۔')
+        : aiCopy('Voice input could not start. You can type your question instead.', 'آواز کے ذریعے ان پٹ شروع نہیں ہو سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
+      render();
+    }
+  };
+
+  const stopAiDictation = () => {
+    const recorder = aiChat.dictation.recorder;
+    if (!recorder || recorder.state === 'inactive' || aiChat.dictation.stopping) return;
+    aiChat.dictation.stopping = true;
+    clearAiChatTimer();
+    try { recorder.stop(); } catch (_) { discardAiDictation(); }
+  };
+
   const mascotScene = () => {
     if (state.view === 'dashboard') return 'dashboard';
     if (state.view === 'browse') return 'browse';
@@ -967,9 +1297,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const mascotLanguage = mascotPresentation.language === 'urdu' ? 'ur' : 'en';
     const mascotDirection = mascotPresentation.language === 'urdu' ? 'rtl' : 'ltr';
     const dialogue = mascotDialogue();
-    const dialogueMarkup = dialogue
+    const showAiPanel = location === 'lesson' && aiChat.open && canUseMascotAiPanel();
+    const dialogueMarkup = !showAiPanel && dialogue
       ? '<p class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '">' + escapeHtml(dialogue) + '</p>'
       : '';
+    if (showAiPanel) {
+      // The assistant owns this rail while it is open: the animated mascot is
+      // deliberately inside its bordered chat box, never a separate sibling.
+      return '<aside class="course-mascot-rail course-mascot-rail--' + location + ' is-ai-open" data-course-mascot>' + courseAiChatMarkup('rail') + '</aside>';
+    }
     return '<aside class="course-mascot-rail course-mascot-rail--' + location + '" data-course-mascot><div class="course-mascot-stage" data-course-mascot-stage aria-hidden="true"></div>' + dialogueMarkup + '</aside>';
   };
 
@@ -1129,7 +1465,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   // keep that area for support instead, so no duration is presented as a
   // requirement or expectation.
   const taskHeaderControls = (paceCopy = taskTime()) => {
-    const explain = '<button class="course-task-explain" type="button" data-action="explain-step">' + (courseUsesUrdu() && state.progress.phase !== 'type' ? 'یہ مرحلہ سمجھائیں' : 'Explain this step') + '</button>';
+    const explain = '<button class="course-task-explain" type="button" data-action="call-ai">' + (courseUsesUrdu() ? 'AI کو بلائیں' : 'Call AI') + '</button>';
     const narrationControl = taskNarrationControlMarkup();
     const showPace = learningChoices().layout === 'open' || Boolean(narrationControl);
     return '<span class="course-task-header-controls">' + narrationControl + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + explain + '</span>';
@@ -2357,7 +2693,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const controls = document.createElement('div');
       controls.className = 'typing-tester-controls';
       controls.dataset.voiceInputControls = '';
-      const supported = Boolean(voiceRecognitionConstructor());
+      const supported = Boolean(voiceRecognitionConstructor()) || Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
       controls.innerHTML = '<button class="course-secondary-button typing-mic-button" type="button" data-action="start-voice-input" aria-label="Use microphone to speak your response" aria-describedby="course-voice-input-status"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-5-3v.5a5 5 0 0 0 10 0v-.5M12 17v4M8.5 21h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span data-voice-input-button-label>Speak</span></button><button class="course-secondary-button typing-mic-stop" type="button" data-action="stop-voice-input" aria-describedby="course-voice-input-status" hidden>Stop</button>';
       field.append(controls);
       const status = document.createElement('p');
@@ -2412,6 +2748,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const stopVoiceInput = (message = '', nextStatus = 'stopped') => {
     const recognition = voiceInput.recognition;
+    const recorder = voiceInput.recorder;
     voiceInput.stopRequested = true;
     voiceInput.sessionId += 1;
     if (voiceInput.restartTimer) {
@@ -2422,7 +2759,17 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       window.clearTimeout(voiceInput.statusTimer);
       voiceInput.statusTimer = null;
     }
+    if (voiceInput.recordingTimer) {
+      window.clearTimeout(voiceInput.recordingTimer);
+      voiceInput.recordingTimer = null;
+    }
     voiceInput.recognition = null;
+    voiceInput.recorder = null;
+    voiceInput.stream?.getTracks?.().forEach((track) => track.stop());
+    voiceInput.stream = null;
+    voiceInput.chunks = [];
+    voiceInput.startedAt = 0;
+    voiceInput.recorderStopping = false;
     voiceInput.listening = false;
     voiceInput.initialResponse = '';
     voiceInput.finalTranscript = '';
@@ -2431,6 +2778,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.lastError = '';
     if (recognition) {
       try { recognition.stop(); } catch (_) { /* Stopping is best-effort. */ }
+    }
+    if (recorder && recorder.state !== 'inactive') {
+      try { recorder.stop(); } catch (_) { /* Stopping a recorder is best-effort. */ }
     }
     renderVoiceInputState(nextStatus, message);
   };
@@ -2556,7 +2906,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
   };
 
-  const startVoiceInput = () => {
+  const startBrowserVoiceInput = () => {
     if (!typingAllowsVoiceInput()) {
       announce(typingIsConceptResponse()
         ? 'Enable Voice input and speech-to-text in Learning settings before using the microphone.'
@@ -2581,6 +2931,129 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.finalResultIndexes = new Set();
     renderVoiceInputState('listening', 'Starting microphone input. Speak when your browser shows that it is listening. Typing stays available.');
     beginVoiceRecognitionCycle(sessionId);
+  };
+
+  const browserCanRecordVoice = () => Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+
+  const clearSpeechmaticsTypingTimer = () => {
+    if (voiceInput.recordingTimer) window.clearTimeout(voiceInput.recordingTimer);
+    voiceInput.recordingTimer = null;
+  };
+
+  const stopSpeechmaticsTypingInput = () => {
+    const recorder = voiceInput.recorder;
+    if (!recorder || recorder.state === 'inactive' || voiceInput.recorderStopping) return;
+    voiceInput.recorderStopping = true;
+    clearSpeechmaticsTypingTimer();
+    try { recorder.stop(); } catch (_) { stopVoiceInput('Voice input stopped. Your response is still here.'); }
+  };
+
+  const finishSpeechmaticsTypingInput = async (sessionId) => {
+    if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
+    const elapsed = Math.max(300, Math.round(window.performance.now() - voiceInput.startedAt));
+    const mimeType = voiceInput.recorder?.mimeType || 'audio/webm';
+    const recording = new Blob(voiceInput.chunks, { type: mimeType });
+    voiceInput.stream?.getTracks?.().forEach((track) => track.stop());
+    voiceInput.recorder = null;
+    voiceInput.stream = null;
+    voiceInput.chunks = [];
+    voiceInput.startedAt = 0;
+    voiceInput.recorderStopping = false;
+    clearSpeechmaticsTypingTimer();
+    if (!recording.size) {
+      renderVoiceInputState('error', 'No speech was recorded. Try again or type your response.');
+      return;
+    }
+    renderVoiceInputState('recognising', 'Turning your short recording into editable text. Typing stays available.');
+    try {
+      const result = await transcribeCourseAudio({
+        user: authenticatedUser,
+        audio: recording,
+        durationMs: elapsed,
+        language: courseUsesUrdu() ? 'ur' : 'en',
+        purpose: 'typing'
+      });
+      if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
+      const transcript = String(result?.transcript || '').trim();
+      if (!transcript) throw new Error('No transcript');
+      const input = app.querySelector('[data-typing-input]');
+      const nextValue = [voiceInput.initialResponse, transcript].filter(Boolean).join(' ');
+      state.progress.attempt.response = nextValue;
+      state.progress.attempt.feedback = '';
+      state.progress.attempt.inputMethod = 'voice';
+      state.progress.attempt.alternativeInput = true;
+      if (input) {
+        input.value = nextValue;
+        syncTypingTester(input);
+      }
+      save('Voice input added to your response. You can edit it before checking.');
+      renderVoiceInputState('stopped', 'Your recording is now editable in the response field.');
+    } catch (error) {
+      if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
+      renderVoiceInputState('error', error?.message || 'Voice input could not continue. Your response is still here, and typing stays available.');
+    }
+  };
+
+  const startSpeechmaticsTypingInput = async () => {
+    if (!browserCanRecordVoice()) return false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (state.view !== 'course' || state.progress.phase !== 'type') {
+        stream.getTracks().forEach((track) => track.stop());
+        return true;
+      }
+      const sessionId = ++voiceInput.sessionId;
+      const mimeType = supportedRecorderMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      voiceInput.stopRequested = false;
+      voiceInput.initialResponse = state.progress.attempt.response.trim();
+      voiceInput.recorder = recorder;
+      voiceInput.stream = stream;
+      voiceInput.chunks = [];
+      voiceInput.startedAt = window.performance.now();
+      voiceInput.recorderStopping = false;
+      recorder.addEventListener('dataavailable', (event) => {
+        if (sessionId === voiceInput.sessionId && event.data?.size) voiceInput.chunks.push(event.data);
+      });
+      recorder.addEventListener('stop', () => { void finishSpeechmaticsTypingInput(sessionId); }, { once: true });
+      state.progress.attempt.inputMethod = 'voice';
+      state.progress.attempt.alternativeInput = true;
+      recorder.start(250);
+      clearSpeechmaticsTypingTimer();
+      voiceInput.recordingTimer = window.setTimeout(() => stopSpeechmaticsTypingInput(), 45000);
+      renderVoiceInputState('listening', 'Listening. Speak for up to 45 seconds, then choose Stop. Typing stays available.');
+      announce('Microphone input is listening.');
+      return true;
+    } catch (error) {
+      renderVoiceInputState('permission-denied', error?.name === 'NotAllowedError'
+        ? 'Allow microphone access for this site, or type your response instead.'
+        : 'Voice input could not start. You can type your response instead.');
+      return true;
+    }
+  };
+
+  const speechmaticsTypingIsReady = async () => {
+    if (!authenticatedUser || authenticatedUser.isGuest || !browserCanRecordVoice()) return false;
+    try {
+      const status = await getCourseAiStatus();
+      return Boolean(status?.speechToText?.available);
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const startVoiceInput = async () => {
+    if (!typingAllowsVoiceInput()) {
+      announce(typingIsConceptResponse()
+        ? 'Enable Voice input and speech-to-text in Learning settings before using the microphone.'
+        : 'This is a typing-only activity, so microphone input is not shown.');
+      return;
+    }
+    if (await speechmaticsTypingIsReady()) {
+      await startSpeechmaticsTypingInput();
+      return;
+    }
+    startBrowserVoiceInput();
   };
 
   const addTypingSupportControls = () => {
@@ -3462,11 +3935,17 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const explainStepMarkup = () => {
     const details = explainStepDetails();
-    return '<div class="course-explain-sections"><section><h3>What this step is for</h3><p>' + escapeHtml(details.purpose) + '</p></section><section><h3>A clear way to do it</h3><ol>' + details.steps.map((step) => '<li>' + escapeHtml(step) + '</li>').join('') + '</ol></section><section class="course-explain-support"><h3>If you need a little more support</h3><p>' + escapeHtml(details.support) + '</p></section><section class="course-ai-chat-locked" aria-labelledby="course-ai-chat-title"><div><p class="course-eyebrow">Planned support</p><h3 id="course-ai-chat-title">Course AI chat <span>Locked</span></h3></div><p>AI chat is not available in this prototype. This keeps the help on this page clear, predictable, and human-reviewed while the course is being built.</p><button type="button" disabled aria-disabled="true">Ask the course helper <span>Locked</span></button></section></div>';
+    return '<div class="course-explain-sections"><section><h3>What this step is for</h3><p>' + escapeHtml(details.purpose) + '</p></section><section><h3>A clear way to do it</h3><ol>' + details.steps.map((step) => '<li>' + escapeHtml(step) + '</li>').join('') + '</ol></section><section class="course-explain-support"><h3>If you need a little more support</h3><p>' + escapeHtml(details.support) + '</p></section></div>';
   };
 
   const renderModal = () => {
     if (!state.modal) return '';
+    if (state.modal === 'ai-chat') {
+      // On compact screens this is a dedicated full-screen course view rather
+      // than a squeezed modal. The learner can return without losing the
+      // course state or the bounded in-memory chat session.
+      return '<div class="course-ai-page-backdrop" data-course-ai-page role="presentation"><section class="course-ai-page" role="dialog" aria-modal="true" aria-labelledby="course-ai-chat-title">' + courseAiChatMarkup('page') + '</section></div>';
+    }
     if (courseUsesUrdu()) {
       if (state.modal === 'pause') return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal" role="dialog" aria-modal="true" aria-labelledby="pause-title" lang="ur" dir="rtl"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="وقفے کا ڈائیلاگ بند کریں">×</button><p class="course-eyebrow">وقفہ کریں اور محفوظ کریں</p><h2 id="pause-title" tabindex="-1">آپ کی پیش رفت محفوظ ہے۔</h2><p>جب آپ تیار ہوں واپس آ سکتے ہیں۔ آپ «' + escapeHtml(courseReturnLocation()) + '» پر واپس آئیں گے۔</p><div class="course-modal-actions"><button class="course-secondary-button" type="button" data-action="close-modal">سیکھتے رہیں</button><button class="course-primary-button" type="button" data-action="save-exit">محفوظ کریں اور باہر جائیں</button></div></section></div>';
       if (state.modal === 'explain') {
@@ -3476,12 +3955,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal course-help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title" lang="ur" dir="rtl"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="مدد کا ڈائیلاگ بند کریں">×</button><p class="course-eyebrow">مدد کے اختیارات</p><h2 id="help-title" tabindex="-1">مجھے مدد چاہیے</h2><p>سبق چھوڑے بغیر سنبھلنے کا ایک طریقہ منتخب کریں۔</p><div class="help-choice-grid"><button type="button" data-action="help" data-help-option="simple">مزید آسان الفاظ میں سمجھائیں</button><button type="button" data-action="help" data-help-option="example">ایک مثال دکھائیں</button><button type="button" data-action="listen">اسے بلند آواز سے پڑھیں</button><button type="button" data-action="help" data-help-option="smaller">اسے چھوٹے مرحلوں میں تقسیم کریں</button><button type="button" data-action="help" data-help-option="hint">مجھے اشارہ دیں</button><button type="button" data-action="help" data-help-option="retry">مجھے دوبارہ کوشش کرنے دیں</button><button type="button" data-action="help" data-help-option="break">مختصر وقفہ لیں</button></div>' + helpDetail() + '</section></div>';
     }
     if (state.modal === 'pause') return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal" role="dialog" aria-modal="true" aria-labelledby="pause-title"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="Close pause dialog">×</button><p class="course-eyebrow">Pause and save</p><h2 id="pause-title" tabindex="-1">Your progress is saved.</h2><p>You can come back whenever you’re ready. You will return to ' + escapeHtml(courseReturnLocation()) + '.</p><div class="course-modal-actions"><button class="course-secondary-button" type="button" data-action="close-modal">Keep learning</button><button class="course-primary-button" type="button" data-action="save-exit">Save and exit</button></div></section></div>';
-    if (state.modal === 'explain') return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal course-explain-modal" role="dialog" aria-modal="true" aria-labelledby="explain-title"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="Close explanation">×</button><p class="course-eyebrow">Step support</p><h2 id="explain-title" tabindex="-1">Explain this step</h2><p class="course-explain-intro">Here is a calm guide for the task in front of you. Your current work stays in place.</p>' + explainStepMarkup() + '<div class="course-modal-actions"><button class="course-primary-button" type="button" data-action="close-modal">Return to this step</button></div></section></div>';
+    if (state.modal === 'explain') return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal course-explain-modal" role="dialog" aria-modal="true" aria-labelledby="explain-title"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="Close course support">×</button><p class="course-eyebrow">Course support</p><h2 id="explain-title" tabindex="-1">Support for this step</h2><p class="course-explain-intro">Here is a calm guide for the task in front of you. Your current work stays in place.</p>' + explainStepMarkup() + '<div class="course-modal-actions"><button class="course-primary-button" type="button" data-action="close-modal">Return to this step</button></div></section></div>';
     return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal course-help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="Close help dialog">×</button><p class="course-eyebrow">Support options</p><h2 id="help-title" tabindex="-1">I’m stuck</h2><p>Choose one way to recover without leaving your lesson.</p><div class="help-choice-grid"><button type="button" data-action="help" data-help-option="simple">Explain more simply</button><button type="button" data-action="help" data-help-option="example">Show an example</button><button type="button" data-action="listen">Read this aloud</button><button type="button" data-action="help" data-help-option="smaller">Break this into smaller steps</button><button type="button" data-action="help" data-help-option="hint">Give me a hint</button><button type="button" data-action="help" data-help-option="retry">Let me try again</button><button type="button" data-action="help" data-help-option="break">Take a short break</button></div>' + helpDetail() + '</section></div>';
   };
 
   const prepareModalAccessibility = () => {
-    const backdrop = app.querySelector('.course-modal-backdrop');
+    const backdrop = app.querySelector('.course-modal-backdrop, .course-ai-page-backdrop');
     const dialog = backdrop?.querySelector('[role="dialog"][aria-modal="true"]');
     if (!backdrop || !dialog) return;
     window.requestAnimationFrame(() => {
@@ -3576,7 +4055,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'Pause and save': 'وقفہ کریں اور محفوظ کریں',
     'Your progress is saved.': 'آپ کی پیش رفت محفوظ ہے۔',
     'Step support': 'مرحلے کی مدد',
-    'Explain this step': 'یہ مرحلہ سمجھائیں',
+    'Call AI': 'AI کو بلائیں',
     'Support options': 'مدد کے اختیارات',
     'I’m stuck': 'میں رُک گیا/گئی ہوں',
     'Show an example': 'ایک مثال دکھائیں',
@@ -3640,6 +4119,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const render = () => {
     cancelNarrationAutoScroll();
     stopTaskNarration({ silent: true });
+    syncAiChatContext();
     if (state.view !== 'course' || state.progress.phase !== 'type' || isReviewingModule()) stopVoiceInput();
     applyPreferences();
     let content = '';
@@ -3655,10 +4135,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   mascotViewportQuery?.addEventListener?.('change', () => {
-    if (authenticatedUser) render();
+    if (authenticatedUser) {
+      syncAiChatViewportSurface();
+      render();
+    }
   });
   mascotMotionQuery?.addEventListener?.('change', () => {
-    if (authenticatedUser) render();
+    if (authenticatedUser) {
+      syncAiChatViewportSurface();
+      render();
+    }
   });
   // A learner may resize a desktop window or rotate a device after the course
   // has loaded. Re-rendering only at the mascot threshold left Lively motion
@@ -4082,9 +4568,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'narration-restart': ensureNarrationService().restart(); break;
       case 'narration-jump': startNarration(Number(element.dataset.narrationIndex)); break;
       case 'pause': openCourseModal('pause', element, '[data-action="pause"]'); break;
-      case 'explain-step': openCourseModal('explain', element, '[data-action="explain-step"]'); break;
+      case 'call-ai': openCourseAi(element); break;
+      case 'close-ai-chat': closeCourseAi(); break;
+      case 'ai-send': void sendAiMessage(); break;
+      case 'ai-dictation-toggle':
+        if (aiChat.status === 'recording') stopAiDictation();
+        else void startAiDictation();
+        break;
       case 'stuck': state.helpOption = ''; openCourseModal('help', element, '[data-action="stuck"]'); break;
-      case 'close-modal': closeCourseModal(); break;
+      case 'close-modal': state.modal === 'ai-chat' ? closeCourseAi() : closeCourseModal(); break;
       case 'save-exit':
         window.requestAnimationFrame(() => window.scrollTo?.({ left: 0, top: 0, behavior: 'auto' }));
         state.modal = '';
@@ -4130,8 +4622,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         render();
         showCurrentTaskFromStart();
         break;
-      case 'start-voice-input': startVoiceInput(); break;
-      case 'stop-voice-input': stopVoiceInput('Microphone input stopped. Your response is still here.'); break;
+      case 'start-voice-input': void startVoiceInput(); break;
+      case 'stop-voice-input':
+        if (voiceInput.recorder?.state === 'recording') stopSpeechmaticsTypingInput();
+        else stopVoiceInput('Microphone input stopped. Your response is still here.');
+        break;
       case 'check-typing': checkTyping(); break;
       case 'submit-check': finishCheck(); break;
       case 'continue-check': continueCheck(); break;
@@ -4218,6 +4713,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       state.settingsMenu = false;
       render();
       window.requestAnimationFrame(() => app.querySelector('[data-action="toggle-settings-menu"]')?.focus?.({ preventScroll: true }));
+      return;
+    }
+    if (event.target.matches?.('[data-ai-chat-input]')) {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        void sendAiMessage();
+      }
       return;
     }
     const narrationText = event.target.closest?.('[data-narration-text][data-narration-index]');
@@ -4347,6 +4849,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       if (output) output.textContent = value + '%';
       return;
     }
+    if (event.target.matches('[data-ai-chat-input]')) {
+      aiChat.draft = event.target.value.slice(0, 900);
+      return;
+    }
     if (!event.target.matches('[data-typing-input]')) return;
     const input = event.target;
     const previousLength = state.progress.attempt.response.length;
@@ -4419,10 +4925,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       window.requestAnimationFrame(() => app.querySelector('[data-action="toggle-settings-menu"]')?.focus?.({ preventScroll: true }));
       return;
     }
+    if (aiChat.open && event.key === 'Escape') {
+      event.preventDefault();
+      closeCourseAi();
+      return;
+    }
     if (state.modal) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        closeCourseModal();
+        if (state.modal === 'ai-chat') closeCourseAi();
+        else closeCourseModal();
         return;
       }
       if (event.key === 'Tab') {
@@ -4543,6 +5055,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     stopTaskNarration({ silent: true });
     narration.service?.destroy();
     stopVoiceInput();
+    resetAiChat();
     pauseBackgroundNoise();
     courseMascot?.destroy();
   });

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Keep the repository-level guard portable across Git for Windows, macOS, and Linux.
+node scripts/check-staged-secrets.mjs
