@@ -95,14 +95,25 @@
 
   const nav = () => {
     const links = navItems.map(([key, label]) => '<a href="' + (isUrdu ? "/ur/" + key + "/" : "/" + key + "/") + '"' + (routeKey === key ? ' aria-current="page"' : '') + '>' + label + '</a>').join('');
-    const englishRoute = isHomeRoute ? "/" : "/" + routeKey + "/";
-    const urduRoute = isHomeRoute ? "/ur/" : "/ur/" + routeKey + "/";
-    const languageSwitch = '<a class="language-switch" href="' + (isUrdu ? englishRoute + "?lang=en" : urduRoute + "?lang=ur") + '" lang="' + (isUrdu ? "en" : "ur") + '">' + (isUrdu ? "English" : "اردو") + '</a>';
+    const trustAnchor = routeKey === 'trust' && ['#accessibility', '#security'].includes(window.location.hash)
+      ? window.location.hash
+      : '';
+    const englishRoute = (isHomeRoute ? "/" : "/" + routeKey + "/") + trustAnchor;
+    const urduRouteAliases = {
+      accessibility: '/ur/trust/#accessibility',
+      security: '/ur/trust/#security',
+      support: '/ur/community/#support'
+    };
+    const hasUrduCounterpart = isHomeRoute
+      || navItems.some(([key]) => key === routeKey)
+      || Object.prototype.hasOwnProperty.call(urduRouteAliases, routeKey);
+    const urduRoute = urduRouteAliases[routeKey] || ((isHomeRoute ? "/ur/" : "/ur/" + routeKey + "/") + trustAnchor);
+    const languageSwitch = '<a class="language-switch" href="' + (isUrdu ? englishRoute : urduRoute) + '" lang="' + (isUrdu ? "en" : "ur") + '">' + (isUrdu ? "English" : "اردو") + '</a>';
     const motionLabel = isUrdu ? "حرکت" : "Motion";
     const motionState = isUrdu ? "آن" : "On";
     const getStarted = isUrdu ? "شروع کریں" : "Get started";
     const openMenu = isUrdu ? "مینو کھولیں" : "Open menu";
-    return '<header class="site-header"><div class="scroll-progress" aria-hidden="true"><i id="scroll-progress"></i></div><div class="header-inner">' + brand() + '<nav class="desktop-nav" aria-label="' + (isUrdu ? "مرکزی نیویگیشن" : "Primary") + '">' + links + '</nav><div class="header-actions">' + languageSwitch + colorModeControl() + '<button class="motion-switch" id="motion-toggle" type="button" aria-pressed="false" aria-label="' + motionLabel + ' ' + motionState + '">' + icon('pause', true) + '<span class="motion-switch-label">' + motionLabel + '</span><span class="motion-switch-state">' + motionState + '</span></button><a class="button button-primary is-small" href="/login/">' + getStarted + icon('arrow', true) + '</a><button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="' + openMenu + '">' + icon('menu') + '</button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="' + (isUrdu ? "موبائل نیویگیشن" : "Mobile primary") + '">' + links + languageSwitch + colorModeControl() + '<a class="button button-primary" href="/login/">' + getStarted + icon('arrow', true) + '</a></nav></header>';
+    return '<header class="site-header"><div class="scroll-progress" aria-hidden="true"><i id="scroll-progress"></i></div><div class="header-inner">' + brand() + '<nav class="desktop-nav" aria-label="' + (isUrdu ? "مرکزی نیویگیشن" : "Primary") + '">' + links + '</nav><div class="header-actions">' + (hasUrduCounterpart ? languageSwitch : '') + colorModeControl() + '<button class="motion-switch" id="motion-toggle" type="button" aria-pressed="false" aria-label="' + motionLabel + ' ' + motionState + '">' + icon('pause', true) + '<span class="motion-switch-label">' + motionLabel + '</span><span class="motion-switch-state">' + motionState + '</span></button><a class="button button-primary is-small" href="/login/">' + getStarted + icon('arrow', true) + '</a><button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="' + openMenu + '">' + icon('menu') + '</button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="' + (isUrdu ? "موبائل نیویگیشن" : "Mobile primary") + '">' + links + (hasUrduCounterpart ? languageSwitch : '') + colorModeControl() + '<a class="button button-primary" href="/login/">' + getStarted + icon('arrow', true) + '</a></nav></header>';
   };
 
   const urduFooter = () => '<footer class="site-footer"><div class="content-wrap footer-top"><div class="footer-brand">' + brand() + '<p class="footer-description">فعال، ٹائپنگ پر مبنی سیکھنا جس میں سیکھنے والے کے اپنے کنٹرولز موجود ہیں۔ شرکت، رازداری اور واضح اگلے قدم کے گرد بنایا گیا۔</p><span class="footer-preview-label">تعلیمی مصنوعات کا پیش منظر</span></div><div class="footer-grid"><div><h2>دریافت کریں</h2><a href="/ur/how-it-works/">طریقۂ کار اور بنیاد</a><a href="/ur/pathways/">سیکھنے کے راستے</a><a href="/ur/learners/">سیکھنے والے کے کنٹرولز</a><a href="/ur/families/">خاندانوں کے لیے</a></div><div><h2>اعتماد</h2><a href="/ur/trust/#accessibility">رسائی پذیری</a><a href="/privacy/">رازداری پالیسی <span lang="en">(English)</span></a><a href="/ur/trust/#security">سکیورٹی</a><a href="/terms/">سروس کی شرائط <span lang="en">(English)</span></a></div><div><h2>رابطہ</h2><a href="/ur/team/">بانی ٹیم</a><a href="/ur/co-design/">مشترکہ ڈیزائن</a><a href="/ur/community/">کمیونٹی</a><a href="/ur/schools/">اسکولوں کے لیے</a><div class="footer-social-links"><a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (نئے ٹیب میں کھلتا ہے)</span></a><a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span><span class="sr-only"> (نئے ٹیب میں کھلتا ہے)</span></a></div></div></div></div><div class="content-wrap footer-bottom"><span>© 2026 Type2Learn۔ غیر منافع بخش مقصد کے ساتھ زیرِ تیاری تعلیمی اقدام۔</span><span class="footer-status"><i></i>عوامی معلومات پر مسلسل کام جاری ہے۔</span></div></footer>';

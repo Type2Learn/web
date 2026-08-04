@@ -455,6 +455,14 @@ a:focus-visible {
   box-shadow: 0 18px 38px rgba(10, 22, 48, .16);
 }
 
+/* In Urdu the profile trigger moves to the left side of the top bar. Anchor
+   its menu from that same edge so the panel stays inside the viewport. */
+html[dir="rtl"] .course-settings-menu,
+body[data-course-direction="rtl"] .course-settings-menu {
+  right: auto;
+  left: 0;
+}
+
 .course-settings-menu > header,
 .course-settings-menu > footer {
   display: flex;
