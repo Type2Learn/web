@@ -16,6 +16,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   let storageKeys = { preferences: '', course: '', learnerId: '' };
   let authenticatedUser = null;
   const narration = { service: null, status: 'idle', activeIndex: -1, activeRange: null, chunks: [], voices: [], scrollFrame: null };
+  const taskNarration = {
+    preludeActive: false,
+    preludePaused: false,
+    session: 0,
+    preludeTimer: null,
+    preludeContinue: null
+  };
   const BACKGROUND_NOISE_SOURCES = {
     pink: '/assets/audio/background-noise/pink-noise-loop.mp3',
     white: '/assets/audio/background-noise/white-noise-loop.mp3',
@@ -1089,15 +1096,43 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return estimate;
   };
 
+  const taskNarrationIsAvailable = () => Boolean(
+    state.preferences.readAloud
+    && state.view === 'course'
+    && state.progress.phase !== 'type'
+  );
+
+  const taskNarrationStatus = () => taskNarration.preludeActive
+    ? (taskNarration.preludePaused ? 'paused' : 'playing')
+    : narration.status;
+
+  const taskNarrationControlCopy = () => {
+    const status = taskNarrationStatus();
+    return status === 'playing'
+      ? courseUi('Pause audio', 'آڈیو روکیں')
+      : status === 'paused'
+        ? courseUi('Resume audio', 'آڈیو جاری رکھیں')
+        : status === 'finished'
+          ? courseUi('Play again', 'دوبارہ چلائیں')
+          : courseUi('Play audio', 'آڈیو چلائیں');
+  };
+
+  const taskNarrationControlMarkup = () => {
+    if (!taskNarrationIsAvailable()) return '';
+    const status = taskNarrationStatus();
+    const copy = taskNarrationControlCopy();
+    const icon = status === 'playing' ? 'Ⅱ' : '▶';
+    return '<button class="course-task-narration-button" type="button" data-action="task-narration-toggle" data-task-narration-control aria-label="' + escapeHtml(copy) + '"><span aria-hidden="true">' + icon + '</span>' + escapeHtml(copy) + '</button>';
+  };
+
   // Open layout deliberately keeps a lightweight pace cue. The other layouts
   // keep that area for support instead, so no duration is presented as a
   // requirement or expectation.
   const taskHeaderControls = (paceCopy = taskTime()) => {
     const explain = '<button class="course-task-explain" type="button" data-action="explain-step">' + (courseUsesUrdu() && state.progress.phase !== 'type' ? 'یہ مرحلہ سمجھائیں' : 'Explain this step') + '</button>';
-    if (learningChoices().layout === 'open') {
-      return '<span class="course-task-header-controls"><span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' + explain + '</span>';
-    }
-    return '<span class="course-task-header-controls">' + explain + '</span>';
+    const narrationControl = taskNarrationControlMarkup();
+    const showPace = learningChoices().layout === 'open' || Boolean(narrationControl);
+    return '<span class="course-task-header-controls">' + narrationControl + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + explain + '</span>';
   };
 
   const applyPreferences = () => {
@@ -1135,7 +1170,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     document.body.classList.toggle('course-large-controls', Boolean(state.preferences.largerControls));
     document.body.classList.toggle('course-reduced-motion', Boolean(state.preferences.reducedMotion));
     document.body.classList.toggle('course-content-transitions', contentTransitionsAreEnabled());
-    document.body.classList.toggle('course-tts-mode-active', Boolean(state.preferences.readAloud));
+    // The first task-card playback release is intentionally non-visual: it
+    // provides a deliberate audio control without word/paragraph highlighting.
+    document.body.classList.remove('course-tts-mode-active');
   };
 
   const refreshResolvedPreferences = () => {
@@ -1585,6 +1622,277 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return playlist;
   };
 
+  // The supplied word clips deliberately do not cover every sentence in the
+  // reviewed course. The paired Ava recording does, so it remains the primary
+  // voice for a natural, paced reading. These three verified male clips let
+  // the first question use the second supplied voice without manufacturing
+  // filename guesses for missing words.
+  const MALE_FIRST_QUESTION_TRACKS = [
+    ['What', '/assets/audio/voice-library/ENGLISH/MALE/Voices%20(male)/What.opus'],
+    ['is', '/assets/audio/voice-library/ENGLISH/MALE/Voices%20(male)/is.opus'],
+    ['it', '/assets/audio/voice-library/ENGLISH/MALE/Voices%20(male)/It.opus']
+  ];
+
+  const narrationSectionValue = (value) => Array.isArray(value) ? value.join('; ') + '.' : String(value || '').trim();
+
+  const taskNarrationReadingChunks = () => {
+    const step = currentStep();
+    const sections = visibleReadingSections();
+    const useUrdu = courseUsesUrdu();
+    const chunks = [{
+      id: 'task-title',
+      label: useUrdu ? (urduStep()?.title || step.title) : step.title,
+      text: useUrdu ? (urduStep()?.title || step.title) : step.title
+    }];
+    sections.forEach((section, index) => {
+      const heading = useUrdu ? section.urduHeading : section.heading;
+      const value = useUrdu ? section.urduValue : section.value;
+      const answer = narrationSectionValue(value);
+      if (heading) chunks.push({ id: 'task-question-' + index, label: heading, text: heading });
+      if (answer) chunks.push({ id: 'task-answer-' + index, label: heading || 'Lesson answer', text: answer });
+    });
+    return chunks.filter((chunk) => chunk.text);
+  };
+
+  const taskNarrationReadingPlaylist = (chunks) => {
+    if (courseUsesUrdu() || !usesLocalAvaNarration() || !chunks.length) return [];
+    const audioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex()];
+    const assets = COURSE_AUDIO_MANIFEST.modules?.[audioKey];
+    const step = currentStep();
+    if (!assets?.read || !step) return [];
+
+    const source = [step.title, ...sourceReadSections(step)].filter(Boolean).join(' ');
+    const lowerSource = source.toLocaleLowerCase();
+    const playlist = [];
+    let sourceCursor = 0;
+    const findSource = (text) => {
+      const value = String(text || '').trim();
+      if (!value) return -1;
+      const exact = source.indexOf(value, sourceCursor);
+      if (exact >= 0) return exact;
+      return lowerSource.indexOf(value.toLocaleLowerCase(), sourceCursor);
+    };
+    const addAvaExcerpt = (chunkIndex, text) => {
+      const sourceStart = findSource(text);
+      if (sourceStart < 0) return false;
+      const sourceEnd = sourceStart + String(text).length;
+      playlist.push({
+        id: 'ava-' + chunkIndex,
+        src: assets.read,
+        text: source,
+        chunkIndexes: [chunkIndex],
+        chunkMap: [{ index: chunkIndex, sourceStart, sourceEnd }],
+        wordCues: assets.readCues,
+        stopAtSourceChar: sourceEnd,
+        advanceOnStop: true
+      });
+      sourceCursor = sourceEnd;
+      return true;
+    };
+
+    for (let index = 0; index < chunks.length; index += 1) {
+      const chunk = chunks[index];
+      // Use the supplied male question clips only where all three exact words
+      // exist. Any later heading with incomplete male source material stays
+      // with the fluent course recording rather than sounding clipped.
+      if (chunk.text === 'What is it?' && MALE_FIRST_QUESTION_TRACKS.length) {
+        const sourceStart = findSource(chunk.text);
+        if (sourceStart < 0) return [];
+        MALE_FIRST_QUESTION_TRACKS.forEach(([word, src], wordIndex) => {
+          playlist.push({
+            id: 'male-first-question-' + wordIndex,
+            src,
+            text: word,
+            chunkIndexes: [index],
+            chunkMap: [{ index, sourceStart: 0, sourceEnd: word.length }]
+          });
+        });
+        sourceCursor = sourceStart + chunk.text.length;
+        continue;
+      }
+      if (!addAvaExcerpt(index, chunk.text)) return [];
+    }
+    return playlist;
+  };
+
+  const taskNarrationGenericChunks = () => {
+    const step = courseUsesUrdu() ? (urduStep() || currentStep()) : currentStep();
+    const check = step.check || {};
+    const optionText = (option) => Array.isArray(option) ? option[0] : option;
+    const englishPracticeChoices = [
+      practiceSupport(),
+      'Assume one support will work for everyone.',
+      'Make the learner explain or prove a diagnosis before offering support.',
+      'Withhold support until the learner finishes the task alone.'
+    ];
+    const urduContent = urduStep()?.content || {};
+    const urduPracticeChoices = [
+      urduContent.supports?.[0],
+      'یہ فرض کر لیں کہ ایک مدد سب کے لیے کارآمد ہو گی۔',
+      'مدد دینے سے پہلے سیکھنے والے سے تشخیص سمجھانے یا ثابت کرنے کا مطالبہ کریں۔',
+      'اس وقت تک مدد روک لیں جب تک سیکھنے والا اکیلے کام مکمل نہ کرے۔'
+    ];
+    if (state.progress.phase === 'preview') return [{
+      id: 'preview',
+      label: taskLabel(),
+      text: courseUsesUrdu()
+        ? ('«' + (urduStep()?.title || step.title) + '» کے بارے میں ایک باعزت خیال کو سمجھیں اور اسے ایک مختصر صورتحال میں استعمال کریں۔')
+        : ('Understand one respectful idea from “' + currentStep().title + '” and use it in a small situation.')
+    }];
+    if (state.progress.phase === 'check') return [{ id: 'question', label: 'Question', text: [check.question, ...(check.options || []).map(optionText)].filter(Boolean).join('. ') }];
+    if (state.progress.phase === 'apply') return [{
+      id: 'practice',
+      label: courseUi('Practice question', 'عملی مشق'),
+      text: [
+        courseUi('Which response best uses the idea from this module?', 'کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟'),
+        ...(courseUsesUrdu() ? urduPracticeChoices : englishPracticeChoices)
+      ].filter(Boolean).join('. ')
+    }];
+    if (state.progress.phase === 'exam-intro') {
+      const exam = courseUsesUrdu() ? (COURSE_URDU.finalExam || finalExam()) : finalExam();
+      return [{ id: 'final-exam-intro', label: exam.title, text: [exam.title, exam.description].filter(Boolean).join('. ') }];
+    }
+    if (state.progress.phase === 'exam') {
+      const question = courseUsesUrdu() ? (COURSE_URDU.finalExam?.questions || [])[state.progress.finalExam.questionIndex] : currentFinalExamQuestion();
+      return question ? [{ id: 'final-exam-question', label: 'Final exam question', text: [question.question, ...(question.options || []).map(optionText)].filter(Boolean).join('. ') }] : [];
+    }
+    if (state.progress.phase === 'exam-results') return [{ id: 'final-exam-results', label: 'Final exam results', text: courseUi('Your final exam results and question-by-question review are available on this page.', 'آپ کے آخری امتحان کے نتائج اور ہر سوال کا جائزہ اس صفحے پر موجود ہے۔') }];
+    if (state.progress.phase === 'complete') return [{
+      id: 'complete',
+      label: courseUi('Completion', 'تکمیل'),
+      text: courseUi(
+        'One small step is complete. Your progress is saved. You can come back whenever you are ready, or continue to the next short step.',
+        'ایک مختصر مرحلہ مکمل ہو گیا ہے۔ آپ کی پیش رفت محفوظ ہے۔ جب تیار ہوں واپس آ سکتے ہیں یا اگلے مختصر مرحلے پر جا سکتے ہیں۔'
+      )
+    }];
+    return [{ id: 'task', label: taskLabel(), text: [step.title, step.objective || step.hint || step.simple].filter(Boolean).join('. ') }];
+  };
+
+  const taskNarrationPlan = () => {
+    const readingTask = state.progress.phase === 'read' || isReviewingModule();
+    const language = courseUsesUrdu() ? 'ur' : 'en';
+    const chunks = (readingTask ? taskNarrationReadingChunks() : taskNarrationGenericChunks())
+      .map((chunk) => ({ ...chunk, lang: language }));
+    return { chunks, playlist: readingTask ? taskNarrationReadingPlaylist(chunks) : [] };
+  };
+
+  const syncTaskNarrationControl = () => {
+    const control = app.querySelector('[data-task-narration-control]');
+    if (!control) return;
+    const status = taskNarrationStatus();
+    const copy = taskNarrationControlCopy();
+    control.disabled = status === 'unsupported';
+    control.setAttribute('aria-label', copy);
+    control.innerHTML = '<span aria-hidden="true">' + (status === 'playing' ? 'Ⅱ' : '▶') + '</span>' + escapeHtml(copy);
+  };
+
+  const clearTaskNarrationPrelude = () => {
+    if (taskNarration.preludeTimer !== null) window.clearTimeout(taskNarration.preludeTimer);
+    taskNarration.preludeTimer = null;
+    taskNarration.preludeActive = false;
+    taskNarration.preludePaused = false;
+    taskNarration.preludeContinue = null;
+  };
+
+  const stopTaskNarration = ({ silent = true } = {}) => {
+    taskNarration.session += 1;
+    clearTaskNarrationPrelude();
+    try { window.speechSynthesis?.cancel?.(); } catch (_) { /* Best-effort cancellation. */ }
+    narration.service?.stop({ silent });
+    narration.activeIndex = -1;
+    narration.activeRange = null;
+    if (silent) narration.status = 'idle';
+    syncTaskNarrationControl();
+  };
+
+  const startTaskNarration = () => {
+    if (!taskNarrationIsAvailable()) return;
+    const service = ensureNarrationService();
+    if (taskNarration.preludeActive) {
+      try {
+        if (taskNarration.preludePaused) {
+          window.speechSynthesis?.resume?.();
+          taskNarration.preludePaused = false;
+          taskNarration.preludeTimer = window.setTimeout(() => taskNarration.preludeContinue?.(), 6500);
+        } else {
+          window.speechSynthesis?.pause?.();
+          taskNarration.preludePaused = true;
+          if (taskNarration.preludeTimer !== null) window.clearTimeout(taskNarration.preludeTimer);
+          taskNarration.preludeTimer = null;
+        }
+        syncTaskNarrationControl();
+        return;
+      } catch (_) {
+        // Continue into the recorded lesson if a browser cannot pause its cue.
+      }
+    }
+    if (narration.status === 'playing') {
+      service.pause();
+      return;
+    }
+    if (narration.status === 'paused') {
+      service.start();
+      return;
+    }
+    const plan = taskNarrationPlan();
+    if (!plan.chunks.length) {
+      announce(courseUi('There is no audio summary for this step yet.', 'اس مرحلے کے لیے ابھی آڈیو خلاصہ موجود نہیں ہے۔'));
+      return;
+    }
+    service.configure({
+      rate: Math.min(1, Number(state.preferences.narrationSpeed) || 1),
+      voiceURI: effectiveNarrationVoice(),
+      volume: Number(state.preferences.narrationVolume)
+    });
+    narration.chunks = plan.chunks;
+    narration.activeIndex = -1;
+    narration.activeRange = null;
+    service.setChunks(plan.chunks);
+    service.setAudioPlaylist(plan.playlist);
+
+    const session = ++taskNarration.session;
+    let lessonStarted = false;
+    const beginLesson = () => {
+      if (lessonStarted || session !== taskNarration.session) return;
+      lessonStarted = true;
+      clearTaskNarrationPrelude();
+      service.start(0);
+      syncTaskNarrationControl();
+    };
+    taskNarration.preludeContinue = beginLesson;
+    const canSkipTask = taskTime() === 'You can skip this step';
+    const prelude = courseUi(
+      COURSE.title + (canSkipTask ? '. You can skip this step.' : '.'),
+      COURSE_URDU.title + (canSkipTask ? '۔ آپ اس مرحلے کو چھوڑ سکتے ہیں۔' : '۔')
+    );
+    const canSpeakPrelude = typeof window.SpeechSynthesisUtterance === 'function' && window.speechSynthesis;
+    if (!canSpeakPrelude) {
+      beginLesson();
+      return;
+    }
+    clearTaskNarrationPrelude();
+    taskNarration.preludeActive = true;
+    taskNarration.preludePaused = false;
+    const utterance = new SpeechSynthesisUtterance(prelude);
+    utterance.rate = 0.9;
+    utterance.volume = Number(state.preferences.narrationVolume);
+    utterance.lang = courseUsesUrdu() ? 'ur' : 'en';
+    const preludeVoice = service.voices.find((voice) => String(voice.lang || '').toLowerCase().startsWith(utterance.lang));
+    if (preludeVoice) utterance.voice = preludeVoice;
+    utterance.onend = beginLesson;
+    utterance.onerror = beginLesson;
+    // Some browser engines never resolve a speech cue. The real course audio
+    // must still begin rather than leaving the learner on a paused-looking UI.
+    taskNarration.preludeTimer = window.setTimeout(beginLesson, 6500);
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    } catch (_) {
+      beginLesson();
+    }
+    syncTaskNarrationControl();
+  };
+
   const narrationVoiceOptions = () => (hasLocalAvaNarration()
     ? '<option value="' + LOCAL_AVA_VOICE_URI + '">Microsoft Edge Ava (included)</option>'
     : '') + '<option value="' + SYSTEM_NARRATION_VOICE_URI + '">Device voice</option>';
@@ -1660,9 +1968,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const readTaskWithTextToSpeech = () => '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Learn', 'سیکھیں') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Read this short explanation', 'یہ مختصر وضاحت پڑھیں') + '</h2><p>' + bilingualCopy('Text to speech mode is on. Click or tap inside the text where you want it to begin, or focus a text part and press Enter or Space. The current word is highlighted as it is read.', 'متن کو آواز میں پڑھنے کا موڈ فعال ہے۔ متن میں جہاں سے شروع کرنا ہو وہاں کلک یا ٹیپ کریں، یا متن کے حصے پر فوکس کر کے Enter یا Space دبائیں۔ پڑھتے وقت موجودہ لفظ نمایاں ہوتا ہے۔') + '</p></div>' + taskHeaderControls() + '</div>' + readingSectionProgress() + '<div class="course-reading-copy course-tts-reading" data-narration-content data-structured="true">' + readingContentMarkup(true) + '</div><div class="course-task-actions">' + readingTaskActions() + '</div></article>';
 
   const reviewModuleTask = () => {
-    const interactive = Boolean(state.preferences.readAloud);
     const urdu = urduStep();
-    return '<article class="course-task-card course-review-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Completed module review', 'مکمل ماڈیول کا جائزہ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy(currentStep().title, urdu?.title) + '</h2><p>' + bilingualCopy('You are reviewing a completed module. Your current task is still saved and will be ready when you return.', 'آپ مکمل ماڈیول کا جائزہ لے رہے ہیں۔ آپ کا موجودہ کام محفوظ ہے اور واپسی پر تیار ہوگا۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-reading-copy' + (interactive ? ' course-tts-reading' : '') + '"' + (interactive ? ' data-narration-content' : '') + ' data-structured="true">' + readingContentMarkup(interactive) + '</div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="return-from-module-review">' + courseUi('Return to current task', 'موجودہ کام پر واپس جائیں') + ' <span aria-hidden="true">→</span></button></div></article>';
+    return '<article class="course-task-card course-review-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Completed module review', 'مکمل ماڈیول کا جائزہ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy(currentStep().title, urdu?.title) + '</h2><p>' + bilingualCopy('You are reviewing a completed module. Your current task is still saved and will be ready when you return.', 'آپ مکمل ماڈیول کا جائزہ لے رہے ہیں۔ آپ کا موجودہ کام محفوظ ہے اور واپسی پر تیار ہوگا۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-reading-copy" data-structured="true">' + readingContentMarkup(false) + '</div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="return-from-module-review">' + courseUi('Return to current task', 'موجودہ کام پر واپس جائیں') + ' <span aria-hidden="true">→</span></button></div></article>';
   };
 
   const inputMethodLabels = {
@@ -1846,9 +2153,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Adapted practice', 'عملی مشق') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Use the idea in a small situation', 'خیال کو ایک مختصر صورتحال میں استعمال کریں') + '</h2><p>' + bilingualCopy('A learner is working on a similar task. Which response best uses the idea from this module?', 'ایک سیکھنے والا ملتے جلتے کام پر ہے۔ کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + bilingualCopy('Which response best uses the idea from this module?', 'کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</legend>' + renderedTaskOptions(choices, 'course-apply', 'data-apply-answer', urduChoices) + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
   };
 
-  const completeTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><p class="course-task-label">' + bilingualCopy('Progress update', 'پیش رفت کی تازہ کاری') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('One small step complete.', 'ایک مختصر مرحلہ مکمل ہو گیا۔') + '</h2><p>' + bilingualCopy(isLastStep() ? 'You have reached the end of this prototype course. Your completed steps and settings are saved locally.' : 'Your progress is saved. You can come back whenever you are ready, or continue to the next short step.', isLastStep() ? 'آپ اس نمونہ کورس کے اختتام تک پہنچ گئے ہیں۔ آپ کے مکمل مراحل اور ترتیبات مقامی طور پر محفوظ ہیں۔' : 'آپ کی پیش رفت محفوظ ہے۔ جب تیار ہوں واپس آ سکتے ہیں، یا اگلے مختصر مرحلے پر جا سکتے ہیں۔') + '</p><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="next-step">' + courseUi(isLastStep() ? 'Return to learning overview' : 'Continue to step ' + (state.progress.lessonIndex + 2), isLastStep() ? 'سیکھنے کے خلاصے پر واپس جائیں' : 'مرحلہ ' + (state.progress.lessonIndex + 2) + ' جاری رکھیں') + ' <span aria-hidden="true">→</span></button></div></article>';
+  const completeTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Progress update', 'پیش رفت کی تازہ کاری') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('One small step complete.', 'ایک مختصر مرحلہ مکمل ہو گیا۔') + '</h2><p>' + bilingualCopy(isLastStep() ? 'You have reached the end of this prototype course. Your completed steps and settings are saved locally.' : 'Your progress is saved. You can come back whenever you are ready, or continue to the next short step.', isLastStep() ? 'آپ اس نمونہ کورس کے اختتام تک پہنچ گئے ہیں۔ آپ کے مکمل مراحل اور ترتیبات مقامی طور پر محفوظ ہیں۔' : 'آپ کی پیش رفت محفوظ ہے۔ جب تیار ہوں واپس آ سکتے ہیں، یا اگلے مختصر مرحلے پر جا سکتے ہیں۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="next-step">' + courseUi(isLastStep() ? 'Return to learning overview' : 'Continue to step ' + (state.progress.lessonIndex + 2), isLastStep() ? 'سیکھنے کے خلاصے پر واپس جائیں' : 'مرحلہ ' + (state.progress.lessonIndex + 2) + ' جاری رکھیں') + ' <span aria-hidden="true">→</span></button></div></article>';
 
-  const finalModuleCompleteTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('The 11 learning modules are complete.', 'سیکھنے کے 11 ماڈیولز مکمل ہو گئے ہیں۔') + '</h2><p>' + bilingualCopy('Your completed modules and settings are saved locally. When you are ready, complete the final exam one question at a time. It has ' + finalExamQuestionCount() + ' questions and no timer.', 'آپ کے مکمل ماڈیولز اور ترتیبات مقامی طور پر محفوظ ہیں۔ جب تیار ہوں، آخری امتحان ایک وقت میں ایک سوال مکمل کریں۔ اس میں ' + finalExamQuestionCount() + ' سوال ہیں اور کوئی ٹائمر نہیں ہے۔') + '</p><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="start-final-exam">' + courseUi('Start final exam', 'آخری امتحان شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
+  const finalModuleCompleteTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('The 11 learning modules are complete.', 'سیکھنے کے 11 ماڈیولز مکمل ہو گئے ہیں।') + '</h2><p>' + bilingualCopy('Your completed modules and settings are saved locally. When you are ready, complete the final exam one question at a time. It has ' + finalExamQuestionCount() + ' questions and no timer.', 'آپ کے مکمل ماڈیولز اور ترتیبات مقامی طور پر محفوظ ہیں۔ جب تیار ہوں، آخری امتحان ایک وقت میں ایک سوال مکمل کریں۔ اس میں ' + finalExamQuestionCount() + ' سوال ہیں اور کوئی ٹائمر نہیں ہے۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="start-final-exam">' + courseUi('Start final exam', 'آخری امتحان شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
 
   const completionTask = () => isLastStep() ? finalModuleCompleteTask() : completeTask();
 
@@ -2594,6 +2901,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         narration.status = status;
         if (status !== 'playing') cancelNarrationAutoScroll();
         syncNarrationUi();
+        syncTaskNarrationControl();
         if (status === 'playing') announce('Text to speech started from the selected section.');
         else if (status === 'paused') announce('Text to speech paused.');
         else if (status === 'finished') announce('Text to speech finished.');
@@ -2604,6 +2912,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         narration.activeIndex = index;
         narration.activeRange = index >= 0 ? { index, start: 0, end: 0 } : null;
         syncNarrationUi();
+        syncTaskNarrationControl();
         if (index >= 0) window.requestAnimationFrame(scrollActiveNarrationChunk);
       },
       onBoundary: ({ index, charIndex, charLength, startOffset }) => {
@@ -2615,6 +2924,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
           end: start + Math.max(1, Number(charLength) || 1)
         };
         syncNarrationUi();
+        syncTaskNarrationControl();
       },
       onVoicesChange: (voices) => {
         narration.voices = voices;
@@ -2633,16 +2943,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       voiceURI: effectiveNarrationVoice(),
       volume: Number(state.preferences.narrationVolume)
     });
-    if (state.view === 'course' && (state.progress.phase === 'read' || isReviewingModule()) && state.preferences.readAloud) {
-      narration.chunks = renderedNarrationChunks();
-      service.setChunks(narration.chunks);
-      configureLocalAvaPlaylist(service, narration.chunks);
-      narration.activeIndex = -1;
-      narration.activeRange = null;
-      narration.status = service.status;
-      syncNarrationUi();
-      return;
-    }
     service.setAudioPlaylist?.([]);
     narration.chunks = [];
     narration.activeIndex = -1;
@@ -3067,7 +3367,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const renderTask = () => isReviewingModule()
     ? reviewModuleTask()
-    : ({ preview: previewTask, read: state.preferences.readAloud ? readTaskWithTextToSpeech : readTask, type: typingTask, check: checkTaskWithFeedback, apply: applyTaskWithFeedback, complete: completionTask, 'exam-intro': finalExamIntroTask, exam: finalExamQuestionTask, 'exam-results': finalExamResultsTask }[state.progress.phase] || previewTask)();
+    : ({ preview: previewTask, read: readTask, type: typingTask, check: checkTaskWithFeedback, apply: applyTaskWithFeedback, complete: completionTask, 'exam-intro': finalExamIntroTask, exam: finalExamQuestionTask, 'exam-results': finalExamResultsTask }[state.progress.phase] || previewTask)();
 
   const courseProgressBar = () => '<section class="course-progress-panel" aria-label="Learning progress"><div><p>Course progress</p><strong>Step ' + (state.progress.lessonIndex + 1) + ' of ' + COURSE.steps.length + '</strong><span>One small step at a time</span></div><div class="course-progress-bars"><div><span>Current step · Task ' + phaseNumber() + ' of 5</span><progress value="' + phaseNumber() + '" max="5">' + phaseNumber() + ' of 5</progress></div><div><span>Course · ' + state.progress.completedSteps.length + ' lessons completed</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + state.progress.completedSteps.length + ' of ' + COURSE.steps.length + '</progress></div></div></section>';
 
@@ -3339,6 +3639,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const render = () => {
     cancelNarrationAutoScroll();
+    stopTaskNarration({ silent: true });
     if (state.view !== 'course' || state.progress.phase !== 'type' || isReviewingModule()) stopVoiceInput();
     applyPreferences();
     let content = '';
@@ -3444,8 +3745,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     // Update only the bounded reading region. Replacing the whole course shell
     // caused focus and browser layout to return learners to the page heading.
     // Keeping this panel in place lets the text change without moving the page.
-    if (state.preferences.readAloud) ensureNarrationService().stop({ silent: true });
-    reading.innerHTML = readingContentMarkup(Boolean(state.preferences.readAloud));
+    if (state.preferences.readAloud) stopTaskNarration({ silent: true });
+    reading.innerHTML = readingContentMarkup(false);
     const progress = card.querySelector('.course-reading-section-progress');
     const progressMarkup = readingSectionProgress();
     if (progress && progressMarkup) progress.outerHTML = progressMarkup;
@@ -3774,6 +4075,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         break;
       case 'signout': signOut(element); break;
       case 'listen': narrateCurrentTask(); break;
+      case 'task-narration-toggle': startTaskNarration(); break;
       case 'narration-listen': startNarration(); break;
       case 'narration-pause': ensureNarrationService().pause(); break;
       case 'narration-stop': ensureNarrationService().stop(); break;
@@ -4238,6 +4540,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   window.addEventListener('pagehide', () => {
     cancelNarrationAutoScroll();
+    stopTaskNarration({ silent: true });
     narration.service?.destroy();
     stopVoiceInput();
     pauseBackgroundNoise();

@@ -17,6 +17,7 @@ const normaliseChunks = (chunks) => (Array.isArray(chunks) ? chunks : [])
     id: String(chunk?.id || index),
     label: textForSpeech(chunk?.label || ''),
     text: textForSpeech(typeof chunk === 'string' ? chunk : chunk?.text),
+    lang: String(chunk?.lang || '').trim(),
     // A click inside a rendered text node can start speech partway through a
     // chunk. Keep that source offset so the UI can highlight the matching word
     // in the original visible text rather than the beginning of the paragraph.
@@ -176,6 +177,9 @@ const normaliseAudioPlaylist = (playlist, chunks) => (Array.isArray(playlist) ? 
       // In that case the caller supplies the source boundary where playback
       // must stop, instead of reading unseen content from the same recording.
       stopAtSourceChar,
+      // A narrated task can join several bounded excerpts from one recording.
+      // These excerpts continue to the next item instead of ending the task.
+      advanceOnStop: Boolean(item?.advanceOnStop),
       // Paired recordings carry exact Edge WordBoundary cues. A legacy or
       // unpaired recording can still use the deterministic timeline below as
       // a graceful fallback, but course narration supplies the exact path.
@@ -281,6 +285,8 @@ export class NarrationService {
     this.audioLastBoundaryKey = '';
     this.audioPendingSeekRatio = null;
     this.audioPendingSeekSourceChar = null;
+    this.preloadedAudio = null;
+    this.preloadedTrackIndex = -1;
     this.audioTimelineCache = new WeakMap();
     this.audioAnimationFrame = null;
     this.audioAnimationSession = 0;
@@ -302,6 +308,7 @@ export class NarrationService {
 
   setChunks(chunks) {
     this.stop({ silent: true, resetIndex: true });
+    this.clearPreloadedAudio();
     this.chunks = normaliseChunks(chunks);
     // A caller can set its playlist before it knows the final visible chunk
     // list. Rebuild fallback maps now that those chunks are available.
@@ -320,6 +327,7 @@ export class NarrationService {
    */
   setAudioPlaylist(playlist) {
     this.stop({ silent: true, resetIndex: true });
+    this.clearPreloadedAudio();
     this.rawAudioPlaylist = Array.isArray(playlist) ? playlist.slice() : [];
     this.audioPlaylist = normaliseAudioPlaylist(this.rawAudioPlaylist, this.chunks);
     if (this.supported) this.setStatus('idle');
@@ -346,8 +354,12 @@ export class NarrationService {
     this.onChunkChange(index);
   }
 
-  selectedVoice() {
-    return this.voices.find((voice) => voice.voiceURI === this.voiceURI) || null;
+  selectedVoice(language = '') {
+    const explicit = this.voices.find((voice) => voice.voiceURI === this.voiceURI);
+    if (explicit) return explicit;
+    const requestedLanguage = String(language || '').toLowerCase();
+    if (!requestedLanguage) return null;
+    return this.voices.find((voice) => String(voice.lang || '').toLowerCase().startsWith(requestedLanguage)) || null;
   }
 
   hasAudioPlaylist() {
@@ -500,6 +512,47 @@ export class NarrationService {
     }
   }
 
+  clearPreloadedAudio() {
+    const audio = this.preloadedAudio;
+    this.preloadedAudio = null;
+    this.preloadedTrackIndex = -1;
+    if (!audio) return;
+    try { audio.pause?.(); } catch (_) { /* Best-effort preload cleanup. */ }
+    try { audio.removeAttribute?.('src'); } catch (_) { /* Best-effort preload cleanup. */ }
+    try { audio.src = ''; } catch (_) { /* Best-effort preload cleanup. */ }
+    try { audio.load?.(); } catch (_) { /* Best-effort preload cleanup. */ }
+  }
+
+  preloadNextAudioTrack(trackIndex) {
+    const nextTrack = this.audioPlaylist[trackIndex + 1];
+    if (!nextTrack?.src || !this.AudioConstructor) return;
+    if (this.preloadedAudio && this.preloadedTrackIndex === trackIndex + 1) return;
+    this.clearPreloadedAudio();
+    try {
+      const preload = new this.AudioConstructor();
+      preload.preload = 'auto';
+      preload.src = nextTrack.src;
+      this.preloadedAudio = preload;
+      this.preloadedTrackIndex = trackIndex + 1;
+    } catch (_) {
+      // Playback still loads the next clip directly if this optional hint fails.
+    }
+  }
+
+  advanceAudioTrack(trackIndex, activeSession) {
+    if (activeSession !== this.session) return;
+    const nextTrackIndex = trackIndex + 1;
+    if (nextTrackIndex >= this.audioPlaylist.length) {
+      this.setStatus('finished');
+      return;
+    }
+    const nextTrack = this.audioPlaylist[nextTrackIndex];
+    this.currentIndex = this.firstTrackChunkIndex(nextTrack, this.currentIndex);
+    this.setActiveChunk(this.currentIndex);
+    const sourceChar = nextTrack.chunkMap?.[0]?.sourceStart || 0;
+    this.playAudioTrack(nextTrackIndex, activeSession, sourceChar);
+  }
+
   emitAudioPosition(track, { force = false } = {}) {
     const audio = this.audio;
     if (!audio || !track || this.status !== 'playing') return;
@@ -522,8 +575,11 @@ export class NarrationService {
       // The current screen intentionally exposes only part of a full lesson
       // recording. Stop cleanly at its final visible word rather than moving
       // into later, unopened content.
+      const trackIndex = this.audioTrackIndex;
+      const activeSession = this.audioSession;
       this.disposeAudio({ clearSource: true });
-      this.setStatus('finished');
+      if (track.advanceOnStop) this.advanceAudioTrack(trackIndex, activeSession);
+      else this.setStatus('finished');
       return;
     }
     const map = this.mapForSourcePosition(track, cue.sourceStart);
@@ -592,12 +648,18 @@ export class NarrationService {
       this.startSpeech(this.currentIndex, activeSession);
       return false;
     }
-    let audio;
-    try {
-      audio = new this.AudioConstructor();
-    } catch (_) {
-      this.startSpeech(this.currentIndex, activeSession);
-      return false;
+    const usePreloadedAudio = this.preloadedTrackIndex === trackIndex && this.preloadedAudio;
+    let audio = usePreloadedAudio ? this.preloadedAudio : null;
+    if (usePreloadedAudio) {
+      this.preloadedAudio = null;
+      this.preloadedTrackIndex = -1;
+    } else {
+      try {
+        audio = new this.AudioConstructor();
+      } catch (_) {
+        this.startSpeech(this.currentIndex, activeSession);
+        return false;
+      }
     }
     this.disposeAudio({ clearSource: true });
     this.audio = audio;
@@ -626,24 +688,19 @@ export class NarrationService {
       // an add-on or another track that the learner has not chosen to hear.
       if (Number.isFinite(track.stopAtSourceChar)) {
         this.disposeAudio({ clearSource: true });
-        this.setStatus('finished');
+        if (track.advanceOnStop) this.advanceAudioTrack(trackIndex, activeSession);
+        else this.setStatus('finished');
         return;
       }
       if (this.status !== 'playing' || this.audio !== audio) return;
-      const nextTrackIndex = trackIndex + 1;
-      if (nextTrackIndex >= this.audioPlaylist.length) {
-        this.setStatus('finished');
-        return;
-      }
-      const nextTrack = this.audioPlaylist[nextTrackIndex];
-      this.currentIndex = this.firstTrackChunkIndex(nextTrack, this.currentIndex);
-      this.setActiveChunk(this.currentIndex);
-      this.playAudioTrack(nextTrackIndex, activeSession, 0);
+      this.advanceAudioTrack(trackIndex, activeSession);
     };
     audio.onerror = () => this.handleAudioFailure(audio, activeSession, track, this.currentIndex);
-    try { audio.src = track.src; } catch (_) {
-      this.handleAudioFailure(audio, activeSession, track, this.currentIndex);
-      return false;
+    if (!usePreloadedAudio) {
+      try { audio.src = track.src; } catch (_) {
+        this.handleAudioFailure(audio, activeSession, track, this.currentIndex);
+        return false;
+      }
     }
     // Cached local media may already know its duration before an event fires.
     this.applyPendingAudioSeek(audio, track, activeSession);
@@ -651,6 +708,7 @@ export class NarrationService {
     try {
       const playResult = audio.play();
       this.startAudioPositionLoop(audio, track, activeSession);
+      this.preloadNextAudioTrack(trackIndex);
       if (playResult && typeof playResult.catch === 'function') {
         playResult.catch(() => this.handleAudioFailure(audio, activeSession, track, this.currentIndex));
       }
@@ -747,7 +805,8 @@ export class NarrationService {
     const utterance = new SpeechSynthesisUtterance(this.chunks[this.currentIndex].text);
     utterance.rate = this.rate;
     utterance.volume = this.volume;
-    const voice = this.selectedVoice();
+    if (this.chunks[this.currentIndex]?.lang) utterance.lang = this.chunks[this.currentIndex].lang;
+    const voice = this.selectedVoice(utterance.lang);
     if (voice) utterance.voice = voice;
 
     utterance.onboundary = (event) => {
@@ -850,6 +909,7 @@ export class NarrationService {
 
   destroy() {
     this.stop({ silent: true });
+    this.clearPreloadedAudio();
     if (this.synth && typeof this.synth.removeEventListener === 'function') this.synth.removeEventListener('voiceschanged', this.handleVoicesChanged);
   }
 }

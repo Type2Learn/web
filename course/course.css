@@ -701,6 +701,28 @@ body[data-course-direction="rtl"] .course-settings-menu {
 .course-task-explain:hover,
 .course-task-explain:focus-visible { background: var(--course-blue-pale); }
 
+.course-task-narration-button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--course-green);
+  border-radius: 999px;
+  padding: 5px 11px;
+  color: #087d34;
+  background: var(--course-green-pale);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.course-task-narration-button:hover,
+.course-task-narration-button:focus-visible { background: #d6f7e1; }
+.course-task-narration-button:disabled { border-color: var(--course-line); color: var(--course-muted); background: var(--course-cloud); cursor: default; }
+
 .course-quiet-button,
 .course-back-button,
 .course-text-button {
