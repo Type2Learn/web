@@ -1,5 +1,4 @@
-const BLINKING_IMAGE_URL = '/assets/2D%20Mascot/blinking.webp?v=20260803-2';
-const WAVING_IMAGE_URL = '/assets/2D%20Mascot/waving.webp?v=20260803-1';
+const BLINKING_IMAGE_URL = '/assets/2D%20Mascot/blinking.webp?v=20260804-loop1';
 const DESKTOP_QUERY = '(min-width: 1181px)';
 
 const supportsDesktopMascot = () => window.matchMedia?.(DESKTOP_QUERY)?.matches;
@@ -12,15 +11,6 @@ export const createCourseMascot = () => {
   let image = null;
   let presentation = { scene: '' };
   let currentAnimation = BLINKING_IMAGE_URL;
-  let waveTimer = null;
-
-  const animationForScene = (sceneName) => [
-    'dashboard',
-    'browse',
-    'saved',
-    'course-preview',
-    'course-exam-intro'
-  ].includes(sceneName) ? WAVING_IMAGE_URL : BLINKING_IMAGE_URL;
 
   const setAnimation = (nextAnimation) => {
     currentAnimation = nextAnimation;
@@ -29,26 +19,8 @@ export const createCourseMascot = () => {
     image.src = nextAnimation;
   };
 
-  const clearWaveTimer = () => {
-    if (!waveTimer) return;
-    window.clearTimeout(waveTimer);
-    waveTimer = null;
-  };
-
   const showBlinking = () => {
-    clearWaveTimer();
     setAnimation(BLINKING_IMAGE_URL);
-  };
-
-  const playWave = () => {
-    clearWaveTimer();
-    setAnimation(WAVING_IMAGE_URL);
-    // A wave is a brief greeting or acknowledgement, never a persistent
-    // distraction. The already-preloaded blink loop resumes immediately.
-    waveTimer = window.setTimeout(() => {
-      waveTimer = null;
-      setAnimation(BLINKING_IMAGE_URL);
-    }, 333);
   };
 
   const ensureImage = () => {
@@ -72,33 +44,28 @@ export const createCourseMascot = () => {
       }
       target = nextTarget;
       presentation = { ...presentation, ...nextPresentation };
-      currentAnimation = animationForScene(presentation.scene);
+      // Keep one uninterrupted animated WebP source for every scene and
+      // support event. It contains the intended blinking loop itself; never
+      // replace it with a temporary pose or restart it between reactions.
+      currentAnimation = BLINKING_IMAGE_URL;
       ensureImage();
-      if (currentAnimation === WAVING_IMAGE_URL) playWave();
-      else showBlinking();
+      showBlinking();
     },
-    // The animated WebPs supply the visual response while the existing course
-    // event and dialogue system continues to determine when a greeting fits.
-    celebrate() { playWave(); },
-    wave() { playWave(); },
+    // Preserve the controller's public event API, but each event keeps the
+    // same continuous blinking animation rather than swapping to a wave.
+    celebrate() { showBlinking(); },
+    wave() { showBlinking(); },
     present(sceneName) {
       presentation.scene = sceneName;
-      if (animationForScene(sceneName) === WAVING_IMAGE_URL) playWave();
-      else showBlinking();
+      showBlinking();
     },
     react(event) {
-      if (['task-entry', 'section-complete', 'module-complete', 'course-complete', 'answer-correct'].includes(event?.kind)) {
-        this.celebrate();
-        return;
-      }
       showBlinking();
     },
     unmount() {
-      clearWaveTimer();
       target = null;
     },
     destroy() {
-      clearWaveTimer();
       target = null;
       image?.remove();
       image = null;

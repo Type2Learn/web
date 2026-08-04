@@ -11,11 +11,8 @@ const backgroundNoiseSources = {
   brown: '/assets/audio/background-noise/brown-noise-loop.mp3'
 };
 const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0.15, playing: false, fadeFrame: null, playRequest: 0 };
-const mascotAnimationUrls = [
-  '/assets/2D%20Mascot/blinking.webp?v=20260803-2',
-  '/assets/2D%20Mascot/waving.webp?v=20260803-1'
-];
-const mascotModuleUrl = '/course/mascot-2d.js?v=20260803-2d4';
+const mascotAnimationUrls = ['/assets/2D%20Mascot/blinking.webp?v=20260804-loop1'];
+const mascotModuleUrl = '/course/mascot-2d.js?v=20260804-blink1';
 // 3D rollback reference: preserve the original model URL alongside the
 // untouched course/mascot-3d.js implementation.
 // const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';

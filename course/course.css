@@ -1483,6 +1483,26 @@ a:focus-visible {
   }
 }
 
+/* In Urdu the full course canvas mirrors, putting the companion in the left
+   rail. Anchor its dialogue on the companion's inner, page-facing side so the
+   bubble never runs off the left edge or collapses into a narrow column. */
+html[dir="rtl"] .course-mascot-rail .course-mascot-dialogue,
+body[data-course-direction="rtl"] .course-mascot-rail .course-mascot-dialogue {
+  right: auto;
+  left: 76%;
+  text-align: right;
+}
+
+html[dir="rtl"] .course-mascot-rail .course-mascot-dialogue::after,
+body[data-course-direction="rtl"] .course-mascot-rail .course-mascot-dialogue::after {
+  right: auto;
+  left: -8px;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 1px solid var(--course-line-strong);
+  border-left: 1px solid var(--course-line-strong);
+}
+
 .course-module-strip {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);

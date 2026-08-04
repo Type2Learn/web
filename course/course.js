@@ -3186,7 +3186,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       //     return courseMascot;
       //   })
       //   .catch(() => null);
-      mascotControllerLoad = import('./mascot-2d.js?v=20260803-2d4')
+      mascotControllerLoad = import('./mascot-2d.js?v=20260804-blink1')
         .then(({ createCourseMascot }) => {
           courseMascot = createCourseMascot();
           return courseMascot;
