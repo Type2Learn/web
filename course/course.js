@@ -109,7 +109,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const COURSE = COURSE_CONTENT;
   const LOCAL_AVA_VOICE_URI = 'type2learn-local-edge-ava';
-  const SYSTEM_NARRATION_VOICE_URI = 'type2learn-system-default';
 
   const hasLocalAvaNarration = () => COURSE_AUDIO_MANIFEST.courseId === COURSE.id
     && COURSE_AUDIO_MANIFEST.courseVersion === COURSE.version
@@ -889,10 +888,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   // The bundled Ava recordings are the normal course narrator. Older builds
   // saved a browser-specific voice URI, which made an existing learner keep
-  // hearing their device voice after the recordings were added. Preserve only
-  // an explicit "Device voice" choice as an opt-out from the included audio.
+  // hearing their device voice after the recordings were added. The course
+  // now keeps the fluent included recording as its only narrator.
   const effectiveNarrationVoice = () => {
-    if (state.preferences.narrationVoice === SYSTEM_NARRATION_VOICE_URI) return '';
     if (hasLocalAvaNarration()) return LOCAL_AVA_VOICE_URI;
     return state.preferences.narrationVoice || '';
   };
@@ -1435,7 +1433,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const taskNarrationIsAvailable = () => Boolean(
     state.preferences.readAloud
     && state.view === 'course'
-    && state.progress.phase !== 'type'
+    && (state.progress.phase === 'read' || isReviewingModule())
   );
 
   const taskNarrationStatus = () => taskNarration.preludeActive
@@ -1540,8 +1538,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const savedVoice = state.preferences.narrationVoice;
     if (!hasLocalAvaNarration()
       || !savedVoice
-      || savedVoice === LOCAL_AVA_VOICE_URI
-      || savedVoice === SYSTEM_NARRATION_VOICE_URI) return false;
+      || savedVoice === LOCAL_AVA_VOICE_URI) return false;
     setCourseSetting('narrationVoice', LOCAL_AVA_VOICE_URI);
     return true;
   };
@@ -1958,17 +1955,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return playlist;
   };
 
-  // The supplied word clips deliberately do not cover every sentence in the
-  // reviewed course. The paired Ava recording does, so it remains the primary
-  // voice for a natural, paced reading. These three verified male clips let
-  // the first question use the second supplied voice without manufacturing
-  // filename guesses for missing words.
-  const MALE_FIRST_QUESTION_TRACKS = [
-    ['What', '/assets/audio/voice-library/ENGLISH/MALE/Voices%20(male)/What.opus'],
-    ['is', '/assets/audio/voice-library/ENGLISH/MALE/Voices%20(male)/is.opus'],
-    ['it', '/assets/audio/voice-library/ENGLISH/MALE/Voices%20(male)/It.opus']
-  ];
-
   const narrationSectionValue = (value) => Array.isArray(value) ? value.join('; ') + '.' : String(value || '').trim();
 
   const taskNarrationReadingChunks = () => {
@@ -2028,24 +2014,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
     for (let index = 0; index < chunks.length; index += 1) {
       const chunk = chunks[index];
-      // Use the supplied male question clips only where all three exact words
-      // exist. Any later heading with incomplete male source material stays
-      // with the fluent course recording rather than sounding clipped.
-      if (chunk.text === 'What is it?' && MALE_FIRST_QUESTION_TRACKS.length) {
-        const sourceStart = findSource(chunk.text);
-        if (sourceStart < 0) return [];
-        MALE_FIRST_QUESTION_TRACKS.forEach(([word, src], wordIndex) => {
-          playlist.push({
-            id: 'male-first-question-' + wordIndex,
-            src,
-            text: word,
-            chunkIndexes: [index],
-            chunkMap: [{ index, sourceStart: 0, sourceEnd: word.length }]
-          });
-        });
-        sourceCursor = sourceStart + chunk.text.length;
-        continue;
-      }
       if (!addAvaExcerpt(index, chunk.text)) return [];
     }
     return playlist;
@@ -2186,6 +2154,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     service.setChunks(plan.chunks);
     service.setAudioPlaylist(plan.playlist);
 
+    // Do not bridge a slow recording with the browser's synthetic voice. The
+    // included Ava recording is intentionally the only course narration voice.
+    clearTaskNarrationPrelude();
+    service.start(0);
+    syncTaskNarrationControl();
+    return;
+
+    /* Legacy browser-speech prelude retained as a rollback reference.
     const session = ++taskNarration.session;
     let lessonStarted = false;
     const beginLesson = () => {
@@ -2227,11 +2203,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       beginLesson();
     }
     syncTaskNarrationControl();
+    */
   };
 
-  const narrationVoiceOptions = () => (hasLocalAvaNarration()
+  const narrationVoiceOptions = () => hasLocalAvaNarration()
     ? '<option value="' + LOCAL_AVA_VOICE_URI + '">Microsoft Edge Ava (included)</option>'
-    : '') + '<option value="' + SYSTEM_NARRATION_VOICE_URI + '">Device voice</option>';
+    : '';
 
   const narrationStatusCopy = () => ({
     idle: 'Ready to listen. Choose Listen, or choose a section to start there.',
@@ -3252,9 +3229,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const select = app.querySelector('[data-narration-voice]');
     if (!select) return;
     select.innerHTML = narrationVoiceOptions();
-    select.value = state.preferences.narrationVoice === SYSTEM_NARRATION_VOICE_URI
-      ? SYSTEM_NARRATION_VOICE_URI
-      : effectiveNarrationVoice();
+    select.value = effectiveNarrationVoice();
     select.disabled = narration.status === 'unsupported' || (!hasLocalAvaNarration() && narration.voices.length === 0);
   };
 
@@ -3411,16 +3386,27 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const prepareNarrationForRenderedTask = () => {
     const service = ensureNarrationService();
+    service.setRecordedAudioOnly?.(true);
     service.configure({
       rate: state.preferences.narrationSpeed,
       voiceURI: effectiveNarrationVoice(),
       volume: Number(state.preferences.narrationVolume)
     });
-    service.setAudioPlaylist?.([]);
-    narration.chunks = [];
     narration.activeIndex = -1;
     narration.activeRange = null;
     service.stop({ silent: true });
+    const readingTask = state.view === 'course' && (state.progress.phase === 'read' || isReviewingModule());
+    if (readingTask) {
+      narration.chunks = renderedNarrationChunks();
+      if (!narration.chunks.length) narration.chunks = readingNarrationChunks();
+      service.setChunks(narration.chunks);
+      // This calls the service's page-level preloader even if Text-to-speech
+      // is currently off, so the included Ava file is ready on demand.
+      configureLocalAvaPlaylist(service, narration.chunks);
+    } else {
+      narration.chunks = [];
+      service.setAudioPlaylist?.([]);
+    }
     if (service.supported) service.setStatus('idle');
   };
 

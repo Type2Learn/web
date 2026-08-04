@@ -285,8 +285,12 @@ export class NarrationService {
     this.audioLastBoundaryKey = '';
     this.audioPendingSeekRatio = null;
     this.audioPendingSeekSourceChar = null;
-    this.preloadedAudio = null;
-    this.preloadedTrackIndex = -1;
+    // One preload per source is enough. A task may use several excerpts from
+    // the same recording; duplicating it per excerpt wastes memory and can
+    // create competing requests on slower connections.
+    this.preloadedAudio = new Map();
+    this.audioPreloadLinks = new Map();
+    this.recordedAudioOnly = false;
     this.audioTimelineCache = new WeakMap();
     this.audioAnimationFrame = null;
     this.audioAnimationSession = 0;
@@ -332,7 +336,15 @@ export class NarrationService {
     this.audioPlaylist = normaliseAudioPlaylist(this.rawAudioPlaylist, this.chunks);
     if (this.supported) this.setStatus('idle');
     else this.setStatus('unsupported');
+    // Warm every unique recording for the current rendered page before the
+    // learner presses Play. This is intentionally independent of their TTS
+    // preference, so turning it on never starts a fresh download.
+    this.preloadAudioTracks();
     return this.audioPlaylist.slice();
+  }
+
+  setRecordedAudioOnly(enabled) {
+    this.recordedAudioOnly = Boolean(enabled);
   }
 
   configure({ rate, voiceURI, volume } = {}) {
@@ -513,30 +525,50 @@ export class NarrationService {
   }
 
   clearPreloadedAudio() {
-    const audio = this.preloadedAudio;
-    this.preloadedAudio = null;
-    this.preloadedTrackIndex = -1;
-    if (!audio) return;
-    try { audio.pause?.(); } catch (_) { /* Best-effort preload cleanup. */ }
-    try { audio.removeAttribute?.('src'); } catch (_) { /* Best-effort preload cleanup. */ }
-    try { audio.src = ''; } catch (_) { /* Best-effort preload cleanup. */ }
-    try { audio.load?.(); } catch (_) { /* Best-effort preload cleanup. */ }
+    this.preloadedAudio.forEach((audio) => {
+      try { audio.pause?.(); } catch (_) { /* Best-effort preload cleanup. */ }
+      try { audio.removeAttribute?.('src'); } catch (_) { /* Best-effort preload cleanup. */ }
+      try { audio.src = ''; } catch (_) { /* Best-effort preload cleanup. */ }
+      try { audio.load?.(); } catch (_) { /* Best-effort preload cleanup. */ }
+    });
+    this.preloadedAudio.clear();
+    this.audioPreloadLinks.forEach((link) => link.remove?.());
+    this.audioPreloadLinks.clear();
+  }
+
+  preloadAudioTrack(trackIndex) {
+    const track = this.audioPlaylist[trackIndex];
+    if (!track?.src || !this.AudioConstructor || this.preloadedAudio.has(track.src)) return;
+    try {
+      // An explicit resource hint makes the browser fetch the recording while
+      // the page is idle. Unlike an unattached Audio object, it is honoured
+      // consistently by Chromium and remains usable by the later Audio call.
+      if (typeof document !== 'undefined' && !this.audioPreloadLinks.has(track.src)) {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'audio';
+        link.href = track.src;
+        link.dataset.type2learnNarrationPreload = 'true';
+        document.head.append(link);
+        this.audioPreloadLinks.set(track.src, link);
+      }
+      const preload = new this.AudioConstructor();
+      preload.preload = 'auto';
+      preload.src = track.src;
+      // Some browsers defer detached media elements until load() is explicit.
+      preload.load?.();
+      this.preloadedAudio.set(track.src, preload);
+    } catch (_) {
+      // Playback still loads directly if this optional warm-up fails.
+    }
+  }
+
+  preloadAudioTracks() {
+    this.audioPlaylist.forEach((_, index) => this.preloadAudioTrack(index));
   }
 
   preloadNextAudioTrack(trackIndex) {
-    const nextTrack = this.audioPlaylist[trackIndex + 1];
-    if (!nextTrack?.src || !this.AudioConstructor) return;
-    if (this.preloadedAudio && this.preloadedTrackIndex === trackIndex + 1) return;
-    this.clearPreloadedAudio();
-    try {
-      const preload = new this.AudioConstructor();
-      preload.preload = 'auto';
-      preload.src = nextTrack.src;
-      this.preloadedAudio = preload;
-      this.preloadedTrackIndex = trackIndex + 1;
-    } catch (_) {
-      // Playback still loads the next clip directly if this optional hint fails.
-    }
+    this.preloadAudioTrack(trackIndex + 1);
   }
 
   advanceAudioTrack(trackIndex, activeSession) {
@@ -628,7 +660,7 @@ export class NarrationService {
     if (activeSession !== this.session || this.audio !== audio) return;
     const selectedIndex = nonNegativeInteger(this.currentIndex) ?? this.firstTrackChunkIndex(track, fallbackIndex);
     this.disposeAudio({ clearSource: true });
-    if (!this.speechSupported) {
+    if (this.recordedAudioOnly || !this.speechSupported) {
       this.setStatus('error');
       return;
     }
@@ -645,19 +677,21 @@ export class NarrationService {
   playAudioTrack(trackIndex, activeSession, sourceChar = 0) {
     const track = this.audioPlaylist[trackIndex];
     if (!track || !this.AudioConstructor || activeSession !== this.session) {
-      this.startSpeech(this.currentIndex, activeSession);
+      if (this.recordedAudioOnly) this.setStatus('error');
+      else this.startSpeech(this.currentIndex, activeSession);
       return false;
     }
-    const usePreloadedAudio = this.preloadedTrackIndex === trackIndex && this.preloadedAudio;
-    let audio = usePreloadedAudio ? this.preloadedAudio : null;
+    const preloaded = this.preloadedAudio.get(track.src);
+    const usePreloadedAudio = Boolean(preloaded);
+    let audio = preloaded || null;
     if (usePreloadedAudio) {
-      this.preloadedAudio = null;
-      this.preloadedTrackIndex = -1;
+      this.preloadedAudio.delete(track.src);
     } else {
       try {
         audio = new this.AudioConstructor();
       } catch (_) {
-        this.startSpeech(this.currentIndex, activeSession);
+        if (this.recordedAudioOnly) this.setStatus('error');
+        else this.startSpeech(this.currentIndex, activeSession);
         return false;
       }
     }
@@ -752,7 +786,7 @@ export class NarrationService {
   }
 
   startSpeech(index = this.currentIndex, existingSession = null) {
-    if (!this.speechSupported) {
+    if (this.recordedAudioOnly || !this.speechSupported) {
       this.setStatus(this.hasAudioPlaylist() ? 'error' : 'unsupported');
       return false;
     }
@@ -787,7 +821,7 @@ export class NarrationService {
     }
     const requestedIndex = Math.min(Math.max(Number(index) || 0, 0), this.chunks.length - 1);
     if (this.hasAudioPlaylist()) return this.startAudio(requestedIndex);
-    if (!this.speechSupported) {
+    if (this.recordedAudioOnly || !this.speechSupported) {
       this.setStatus('unsupported');
       return false;
     }
