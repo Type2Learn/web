@@ -1433,7 +1433,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const taskNarrationIsAvailable = () => Boolean(
     state.preferences.readAloud
     && state.view === 'course'
-    && (state.progress.phase === 'read' || isReviewingModule())
+    && (state.progress.phase === 'read' || state.progress.phase === 'type' || isReviewingModule())
   );
 
   const taskNarrationStatus = () => taskNarration.preludeActive
@@ -1955,6 +1955,46 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return playlist;
   };
 
+  // The next module stays a low-priority browser prefetch. It starts only
+  // when the current page is idle, so it cannot delay the recording that the
+  // learner can play right now.
+  const currentNarrationPreloads = new Set();
+  const preloadCurrentNarrationSources = (sources) => {
+    if (typeof document === 'undefined') return;
+    (Array.isArray(sources) ? sources : [])
+      .filter((source) => typeof source === 'string' && source)
+      .filter((source) => !currentNarrationPreloads.has(source))
+      .forEach((source) => {
+        currentNarrationPreloads.add(source);
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'audio';
+        link.href = source;
+        link.dataset.type2learnNarrationPreload = 'true';
+        document.head.append(link);
+      });
+  };
+  const scheduledNarrationPrefetches = new Set();
+  const preloadNextModuleNarration = () => {
+    const nextAudioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex() + 1];
+    const nextAssets = COURSE_AUDIO_MANIFEST.modules?.[nextAudioKey];
+    const sources = [nextAssets?.read, nextAssets?.simpleAddon]
+      .filter((source) => typeof source === 'string' && source)
+      .filter((source) => !scheduledNarrationPrefetches.has(source));
+    if (!sources.length || typeof document === 'undefined') return;
+    sources.forEach((source) => scheduledNarrationPrefetches.add(source));
+    const warm = () => sources.forEach((source) => {
+      const link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.as = 'audio';
+      link.href = source;
+      link.dataset.type2learnNextNarration = 'true';
+      document.head.append(link);
+    });
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(warm, { timeout: 2500 });
+    else window.setTimeout(warm, 800);
+  };
+
   const narrationSectionValue = (value) => Array.isArray(value) ? value.join('; ') + '.' : String(value || '').trim();
 
   const taskNarrationReadingChunks = () => {
@@ -2072,7 +2112,71 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return [{ id: 'task', label: taskLabel(), text: [step.title, step.objective || step.hint || step.simple].filter(Boolean).join('. ') }];
   };
 
+  const TYPING_TTS_ROOT = '/assets/audio/typing-tts/';
+  const typingTtsSource = (voice, folder, filename) => TYPING_TTS_ROOT
+    + encodeURIComponent(voice === 'target' ? 'Male 1' : 'Female 1') + '/'
+    + (folder ? encodeURIComponent(folder) + '/' : '')
+    + encodeURIComponent(filename);
+
+  const typingCharacterClip = (voice, character) => {
+    const value = String(character || '');
+    const upper = value.toUpperCase();
+    if (/^[A-Z]$/.test(upper)) return typingTtsSource(voice, 'Alphabets', upper + '.mp3');
+    const names = {
+      '0': ['zero.mp3', 'Zero.mp3'], '1': ['one.mp3', 'One.mp3'], '2': ['two.mp3', 'Two.mp3'],
+      '3': ['three.mp3', 'Three.mp3'], '4': ['four.mp3', 'Four.mp3'], '5': ['five.mp3', 'Five.mp3'],
+      '6': ['six.mp3', 'Six.mp3'], '7': ['seven.mp3', 'Seven.mp3'], '8': ['eight.mp3', 'Eight.mp3'],
+      '9': ['nine.mp3', 'Nine.mp3'], ' ': ['space.mp3', 'Space.mp3'], ',': ['comma.mp3', 'Comma.mp3'],
+      '-': ['dash.mp3', 'Dash.mp3'], '.': ['Full stop.mp3', 'Full Stop.mp3'], '?': ['question mark.mp3', 'Question Mark.mp3'],
+      '!': ['Exclamation Mark.mp3', 'Exclamation Mark.mp3'], ';': ['semi colon.mp3', 'Semi Colon.mp3']
+    };
+    const filenames = names[value];
+    return filenames ? typingTtsSource(voice, 'Words', filenames[voice === 'target' ? 0 : 1]) : '';
+  };
+
+  const typingInstructionClip = () => typingTtsSource(
+    'target',
+    '',
+    courseUsesUrdu() ? 'Hindi_male_voice_1.mp3' : 'I will tell you what you need to type!...And I will tell you what you actually typed!...mp3'
+  );
+
+  const typingAudioNarrationPlan = () => {
+    const chunks = [];
+    const playlist = [];
+    const addTrack = (source, label) => {
+      if (!source) return;
+      const index = chunks.length;
+      const text = String(label || 'Typing audio');
+      chunks.push({ id: 'typing-audio-' + index, label: text, text });
+      playlist.push({
+        id: 'typing-audio-' + index,
+        src: source,
+        text,
+        chunkIndexes: [index],
+        chunkMap: [{ index, sourceStart: 0, sourceEnd: text.length }]
+      });
+    };
+
+    // The supplied non-English instruction file is named Hindi in the source
+    // archive. It is used for Urdu mode as requested; typing characters stay
+    // English because the keyboard exercise itself remains English.
+    addTrack(typingInstructionClip(), courseUsesUrdu() ? 'ٹائپنگ کی رہنمائی' : 'Typing guidance');
+    Array.from(activeTypingReference() || '').forEach((character) => addTrack(typingCharacterClip('target', character), character));
+    Array.from(state.progress.attempt.response || '').forEach((character) => addTrack(typingCharacterClip('response', character), character));
+    return { chunks, playlist };
+  };
+
+  const warmTypingAudioForCurrentResponse = () => {
+    if (state.view !== 'course' || state.progress.phase !== 'type' || narration.status === 'playing') return;
+    const service = ensureNarrationService();
+    const sources = Array.from(state.progress.attempt.response || '')
+      .map((character) => typingCharacterClip('response', character))
+      .filter(Boolean);
+    service.preloadAudioSources?.(sources);
+  };
+
   const taskNarrationPlan = () => {
+    if (state.progress.phase === 'type') return typingAudioNarrationPlan();
     const readingTask = state.progress.phase === 'read' || isReviewingModule();
     const language = courseUsesUrdu() ? 'ur' : 'en';
     const chunks = (readingTask ? taskNarrationReadingChunks() : taskNarrationGenericChunks())
@@ -3403,6 +3507,25 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       // This calls the service's page-level preloader even if Text-to-speech
       // is currently off, so the included Ava file is ready on demand.
       configureLocalAvaPlaylist(service, narration.chunks);
+      // Mapping deliberately refuses to play a full recording when the
+      // visible excerpt no longer matches it. That safety rule must not stop
+      // us from warming the verified module files for a later matching view.
+      const currentAudioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex()];
+      const currentAssets = COURSE_AUDIO_MANIFEST.modules?.[currentAudioKey];
+      if (!courseUsesUrdu()) {
+        const currentSources = [currentAssets?.read, currentAssets?.simpleAddon];
+        preloadCurrentNarrationSources(currentSources);
+        service.preloadAudioSources?.(currentSources);
+      }
+      preloadNextModuleNarration();
+    } else if (state.view === 'course' && state.progress.phase === 'type') {
+      const plan = typingAudioNarrationPlan();
+      narration.chunks = plan.chunks;
+      service.setChunks(narration.chunks);
+      // The expected characters warm as soon as the typing screen renders;
+      // response characters are added to this plan as the learner types.
+      service.setAudioPlaylist(plan.playlist);
+      preloadNextModuleNarration();
     } else {
       narration.chunks = [];
       service.setAudioPlaylist?.([]);
@@ -4850,6 +4973,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!usesAlternativeInput && !isComposition && (insertedLength > 24 || isUnexpectedInsertion)) state.progress.attempt.integrityNotice = true;
     state.progress.attempt.response = nextValue;
     state.progress.attempt.feedback = '';
+    warmTypingAudioForCurrentResponse();
     if (activeSupportMoment && ['response-needed', 'typing-incomplete'].includes(activeSupportMoment.kind)) {
       clearSupportMoment();
       app.querySelector('[data-support-moment]')?.remove();

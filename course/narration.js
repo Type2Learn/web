@@ -538,26 +538,31 @@ export class NarrationService {
 
   preloadAudioTrack(trackIndex) {
     const track = this.audioPlaylist[trackIndex];
-    if (!track?.src || !this.AudioConstructor || this.preloadedAudio.has(track.src)) return;
+    this.preloadAudioSource(track?.src);
+  }
+
+  preloadAudioSource(source) {
+    const safeSource = String(source || '').trim();
+    if (!safeSource || !this.AudioConstructor || this.preloadedAudio.has(safeSource)) return;
     try {
       // An explicit resource hint makes the browser fetch the recording while
       // the page is idle. Unlike an unattached Audio object, it is honoured
       // consistently by Chromium and remains usable by the later Audio call.
-      if (typeof document !== 'undefined' && !this.audioPreloadLinks.has(track.src)) {
+      if (typeof document !== 'undefined' && !this.audioPreloadLinks.has(safeSource)) {
         const link = document.createElement('link');
         link.rel = 'preload';
         link.as = 'audio';
-        link.href = track.src;
+        link.href = safeSource;
         link.dataset.type2learnNarrationPreload = 'true';
         document.head.append(link);
-        this.audioPreloadLinks.set(track.src, link);
+        this.audioPreloadLinks.set(safeSource, link);
       }
       const preload = new this.AudioConstructor();
       preload.preload = 'auto';
-      preload.src = track.src;
+      preload.src = safeSource;
       // Some browsers defer detached media elements until load() is explicit.
       preload.load?.();
-      this.preloadedAudio.set(track.src, preload);
+      this.preloadedAudio.set(safeSource, preload);
     } catch (_) {
       // Playback still loads directly if this optional warm-up fails.
     }
@@ -565,6 +570,10 @@ export class NarrationService {
 
   preloadAudioTracks() {
     this.audioPlaylist.forEach((_, index) => this.preloadAudioTrack(index));
+  }
+
+  preloadAudioSources(sources) {
+    (Array.isArray(sources) ? sources : []).forEach((source) => this.preloadAudioSource(source));
   }
 
   preloadNextAudioTrack(trackIndex) {

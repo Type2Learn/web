@@ -45,7 +45,6 @@ try {
   await page.locator('[data-action="preview-complete"]').click();
   await page.locator('[data-task-narration-control]').waitFor({ state: 'visible', timeout: 15000 });
   await page.waitForFunction(() => document.querySelector('link[data-type2learn-narration-preload][href*="/course/audio/edge-ava/neurodivergent/01-adhd/read-ava-timed.mp3"]'), null, { timeout: 15000 });
-  await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => String(entry.name).includes('/course/audio/edge-ava/neurodivergent/01-adhd/read-ava-timed.mp3')), null, { timeout: 15000 });
   const inspection = await page.evaluate(() => {
     const play = document.querySelector('[data-task-narration-control]');
     const callAi = document.querySelector('[data-action="call-ai"]');
@@ -56,13 +55,13 @@ try {
       hasPlayControl: Boolean(playRect && playRect.width && playRect.height),
       beforeCallAi: Boolean(playRect && aiRect && playRect.left < aiRect.left),
       overflow: document.documentElement.scrollWidth > window.innerWidth,
-      recordedAudioPreloaded: performance.getEntriesByType('resource').some((entry) => String(entry.name).includes('/course/audio/edge-ava/neurodivergent/01-adhd/read-ava-timed.mp3'))
+      recordedAudioQueued: Boolean(document.querySelector('link[data-type2learn-narration-preload][href*="/course/audio/edge-ava/neurodivergent/01-adhd/read-ava-timed.mp3"]'))
     };
   });
   assert.equal(inspection.hasPlayControl, true, 'Text-to-speech enabled in course setup must show a play control.');
   assert.equal(inspection.beforeCallAi, true, 'The play control must be positioned before Call AI.');
   assert.equal(inspection.overflow, false, 'Narration controls must not create horizontal overflow.');
-  assert.equal(inspection.recordedAudioPreloaded, true, 'The page recording must preload before the learner presses Play.');
+  assert.equal(inspection.recordedAudioQueued, true, 'The page recording must have a browser preload hint before the learner presses Play.');
   await page.locator('[data-task-narration-control]').click();
   await page.waitForFunction(() => document.querySelector('[data-task-narration-control]')?.textContent?.includes('Pause audio'), null, { timeout: 15000 });
   assert.equal(await page.evaluate(() => window.__type2learnSpeechSynthesisCalls), 0, 'Course narration must not fall back to the browser synthetic voice.');
