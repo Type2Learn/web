@@ -1172,6 +1172,14 @@ body[data-course-direction="rtl"] .course-settings-menu {
   opacity: .73;
 }
 
+/* In Urdu, the catalogue copy reads from the right. Reserve the left edge
+   for the locked-course marker instead of placing it over that copy. */
+html[dir="rtl"] .course-catalogue-card--locked .course-catalogue-card-copy,
+body[data-course-direction="rtl"] .course-catalogue-card--locked .course-catalogue-card-copy {
+  box-sizing: border-box;
+  padding-inline-end: clamp(144px, 17vw, 184px);
+}
+
 .course-catalogue-lock {
   position: absolute;
   z-index: 2;
@@ -1212,6 +1220,12 @@ body[data-course-direction="rtl"] .course-settings-menu {
 }
 
 .course-catalogue-lock span { margin-bottom: 1px; }
+
+html[dir="rtl"] .course-catalogue-lock,
+body[data-course-direction="rtl"] .course-catalogue-lock {
+  right: auto;
+  left: clamp(26px, 5vw, 56px);
+}
 
 .course-visually-hidden {
   position: absolute;
@@ -2301,6 +2315,8 @@ body.course-stable-layout *::after { transition-duration: .01ms; }
     min-height: 190px;
   }
   .course-catalogue-lock { right: 24px; }
+  html[dir="rtl"] .course-catalogue-lock,
+  body[data-course-direction="rtl"] .course-catalogue-lock { right: auto; left: 24px; }
   .course-secondary-actions { grid-template-columns: 1fr; }
   .course-secondary-actions button { min-height: 80px; grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; }
   .course-secondary-actions span { grid-row: 1 / 3; }

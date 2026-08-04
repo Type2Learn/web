@@ -1220,49 +1220,65 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     {
       title: 'Introduction to Touch Typing',
       description: 'Build steady keyboard confidence with finger placement, accuracy, and practical typing habits.',
+      urduTitle: 'ٹچ ٹائپنگ کا تعارف',
+      urduDescription: 'انگلیوں کی درست جگہ، درستگی اور عملی ٹائپنگ کی عادتوں کے ساتھ کی بورڈ پر پُراعتماد ہونا سیکھیں۔',
       urduMode: false
     },
     {
       title: 'Introduction to English Language',
       description: 'Practise reading, vocabulary, and written expression through short active-learning tasks.',
+      urduTitle: 'انگریزی زبان کا تعارف',
+      urduDescription: 'مختصر عملی سرگرمیوں کے ذریعے پڑھنے، ذخیرۂ الفاظ اور تحریری اظہار کی مشق کریں۔',
       urduMode: false
     },
     {
       title: 'Introduction to Python Programming',
       description: 'Learn core programming ideas by reading, predicting, and writing small Python programs.',
+      urduTitle: 'پائتھن پروگرامنگ کا تعارف',
+      urduDescription: 'پڑھنے، پیش گوئی کرنے اور پائتھن کے مختصر پروگرام لکھنے سے پروگرامنگ کے بنیادی تصورات سیکھیں۔',
       urduMode: true
     },
     {
       title: 'Introduction to C++ Programming',
       description: 'Explore programming foundations, syntax, and problem-solving with C++.',
+      urduTitle: 'سی پلس پلس پروگرامنگ کا تعارف',
+      urduDescription: 'سی پلس پلس کے ساتھ پروگرامنگ کی بنیادیں، نحو اور مسئلہ حل کرنے کے طریقے جانیں۔',
       urduMode: true
     },
     {
       title: 'Introduction to C Programming',
       description: 'Learn fundamental programming concepts and how C programs are built step by step.',
+      urduTitle: 'سی پروگرامنگ کا تعارف',
+      urduDescription: 'پروگرامنگ کے بنیادی تصورات اور سی پروگرام مرحلہ وار کیسے بنتے ہیں، یہ سیکھیں۔',
       urduMode: true
     },
     {
       title: 'Introduction to ARM Assembly',
       description: 'Explore registers, instructions, and simple programs for ARM-based systems.',
+      urduTitle: 'اے آر ایم اسمبلی کا تعارف',
+      urduDescription: 'اے آر ایم نظاموں کے لیے رجسٹرز، ہدایات اور مختصر پروگرام جانیں۔',
       urduMode: true
     }
   ];
 
   const availableCourseCard = () => {
     const preferencesReady = coursePreferencesAreSaved();
-    return '<section class="course-catalogue-card course-catalogue-card--available" aria-labelledby="available-course-title"><div><p class="course-eyebrow">Available course</p><h2 id="available-course-title">' + escapeHtml(COURSE.title) + '</h2><p class="course-catalogue-setup">' + (preferencesReady
-      ? 'Your course choices are ready. You can change them anytime from the profile picture in the top-right corner.'
-      : 'Choose this course, then set up the learning options that fit this course.') + '</p><p class="course-catalogue-description">Explore respectful language, everyday experiences, and practical ways to support accessible participation.</p><p class="course-catalogue-language">Urdu mode planned</p></div><button class="course-primary-button" type="button" data-action="course-preferences">Choose this course <span aria-hidden="true">→</span></button></section>';
+    return '<section class="course-catalogue-card course-catalogue-card--available" aria-labelledby="available-course-title"><div><p class="course-eyebrow">' + courseUi('Available course', 'دستیاب کورس') + '</p><h2 id="available-course-title">' + escapeHtml(courseUi(COURSE.title, COURSE_URDU.title)) + '</h2><p class="course-catalogue-setup">' + (preferencesReady
+      ? courseUi('Your course choices are ready. You can change them anytime from the profile picture in the top-right corner.', 'آپ کے کورس کے انتخاب تیار ہیں۔ آپ انہیں اوپر دائیں جانب پروفائل تصویر سے کسی بھی وقت تبدیل کر سکتے ہیں۔')
+      : courseUi('Choose this course, then set up the learning options that fit this course.', 'یہ کورس منتخب کریں، پھر اس کے مطابق سیکھنے کے اختیارات ترتیب دیں۔')) + '</p><p class="course-catalogue-description">' + courseUi('Explore respectful language, everyday experiences, and practical ways to support accessible participation.', 'باعزت زبان، روزمرہ تجربات اور قابلِ رسائی شرکت میں مدد کے عملی طریقوں کے بارے میں جانیں۔') + '</p><p class="course-catalogue-language">' + courseUi('Urdu is available', 'اردو دستیاب ہے') + '</p></div><button class="course-primary-button" type="button" data-action="course-preferences">' + courseUi('Choose this course', 'یہ کورس منتخب کریں') + ' <span aria-hidden="true">' + courseUi('→', '←') + '</span></button></section>';
   };
 
-  const lockedCourseCard = (course) => '<article class="course-catalogue-card course-catalogue-card--locked" aria-label="' + escapeHtml(course.title) + ' is planned and not available yet."><div class="course-catalogue-card-copy"><p class="course-eyebrow">Planned course</p><h2>' + escapeHtml(course.title) + '</h2><p class="course-catalogue-description">' + escapeHtml(course.description) + '</p>' + (course.urduMode ? '<p class="course-catalogue-language">Urdu mode planned</p>' : '') + '</div><div class="course-catalogue-lock" aria-hidden="true"><span>Not available yet</span></div><span class="course-visually-hidden">This planned course is not available yet.</span></article>';
+  const lockedCourseCard = (course) => {
+    const title = courseUi(course.title, course.urduTitle);
+    const description = courseUi(course.description, course.urduDescription);
+    return '<article class="course-catalogue-card course-catalogue-card--locked" aria-label="' + escapeHtml(courseUi(course.title + ' is planned and not available yet.', course.urduTitle + ' منصوبہ بند ہے اور ابھی دستیاب نہیں ہے۔')) + '"><div class="course-catalogue-card-copy"><p class="course-eyebrow">' + courseUi('Planned course', 'منصوبہ بند کورس') + '</p><h2>' + escapeHtml(title) + '</h2><p class="course-catalogue-description">' + escapeHtml(description) + '</p>' + (course.urduMode ? '<p class="course-catalogue-language">' + courseUi('Urdu mode planned', 'اردو موڈ منصوبہ بند ہے') + '</p>' : '') + '</div><div class="course-catalogue-lock" aria-hidden="true"><span>' + courseUi('Not available yet', 'ابھی دستیاب نہیں') + '</span></div><span class="course-visually-hidden">' + courseUi('This planned course is not available yet.', 'یہ منصوبہ بند کورس ابھی دستیاب نہیں ہے۔') + '</span></article>';
+  };
 
-  const courseCatalogue = () => '<section class="course-catalogue" aria-label="Course selection">' + availableCourseCard() + '<div class="course-catalogue-grid">' + PLANNED_COURSES.map(lockedCourseCard).join('') + '</div></section>';
+  const courseCatalogue = () => '<section class="course-catalogue" aria-label="' + courseUi('Course selection', 'کورس کا انتخاب') + '">' + availableCourseCard() + '<div class="course-catalogue-grid">' + PLANNED_COURSES.map(lockedCourseCard).join('') + '</div></section>';
 
-  const renderDashboard = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<header class="course-dashboard-header"><p class="course-eyebrow">Your learning space</p><h1>One small step at a time.</h1><p>Choose one course to begin. You can set up the learning options for that course before you start.</p></header>' + courseCatalogue(), 'dashboard') + '</main>';
+  const renderDashboard = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<header class="course-dashboard-header"><p class="course-eyebrow">' + courseUi('Your learning space', 'آپ کی سیکھنے کی جگہ') + '</p><h1>' + courseUi('One small step at a time.', 'ایک وقت میں ایک مختصر مرحلہ') + '</h1><p>' + courseUi('Choose one course to begin. You can set up the learning options for that course before you start.', 'شروع کرنے کے لیے ایک کورس منتخب کریں۔ اس کورس کے سیکھنے کے اختیارات شروع کرنے سے پہلے ترتیب دیے جا سکتے ہیں۔') + '</p></header>' + courseCatalogue(), 'dashboard') + '</main>';
 
-  const renderBrowse = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<div class="course-panel-page"><button class="course-back-button" type="button" data-action="dashboard">← Back to learning overview</button><p class="course-eyebrow">Browse courses</p><h1>One course is ready for this prototype.</h1><p class="course-lead">Keeping the next choice small helps this experience stay task-focused. More courses can appear here once their content is reviewed.</p><article class="course-listing"><div><span class="course-status">Prototype course</span><h2>' + escapeHtml(COURSE.title) + '</h2><p>' + COURSE.steps.length + ' short, non-diagnostic modules about general experiences, respectful language, and accessible participation.</p></div><button class="course-primary-button" type="button" data-action="course-preferences">Choose this course <span aria-hidden="true">→</span></button></article></div>', 'browse') + '</main>';
+  const renderBrowse = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<div class="course-panel-page"><button class="course-back-button" type="button" data-action="dashboard">' + courseUi('← Back to learning overview', 'سیکھنے کے خلاصے پر واپس جائیں ←') + '</button><p class="course-eyebrow">' + courseUi('Browse courses', 'کورسز دیکھیں') + '</p><h1>' + courseUi('One course is ready for this prototype.', 'اس نمونے کے لیے ایک کورس تیار ہے۔') + '</h1><p class="course-lead">' + courseUi('Keeping the next choice small helps this experience stay task-focused. More courses can appear here once their content is reviewed.', 'اگلے انتخاب کو محدود رکھنے سے توجہ موجودہ کام پر رہتی ہے۔ مواد کا جائزہ مکمل ہونے پر مزید کورسز یہاں آ سکتے ہیں۔') + '</p><article class="course-listing"><div><span class="course-status">' + courseUi('Prototype course', 'نمونہ کورس') + '</span><h2>' + escapeHtml(courseUi(COURSE.title, COURSE_URDU.title)) + '</h2><p>' + courseUi(COURSE.steps.length + ' short, non-diagnostic modules about general experiences, respectful language, and accessible participation.', COURSE.steps.length + ' مختصر، غیر تشخیصی ماڈیولز: روزمرہ تجربات، باعزت زبان اور قابلِ رسائی شرکت میں مدد کے بارے میں۔') + '</p></div><button class="course-primary-button" type="button" data-action="course-preferences">' + courseUi('Choose this course', 'یہ کورس منتخب کریں') + ' <span aria-hidden="true">' + courseUi('→', '←') + '</span></button></article></div>', 'browse') + '</main>';
 
 
   const moduleProgressItem = (step, index, includeFinalExam = false) => {
@@ -1357,7 +1373,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return '<main class="course-learning" id="course-main"><div class="' + shellClass + '">' + (focused ? '' : courseModuleStripWithFinalExam()) + '<section class="course-workspace course-workspace--' + layout + '">' + context + renderTask() + taskProgress + '</section>' + courseMascotMarkup('lesson') + '</div></main>' + renderModal();
   };
 
-  const renderSavedWithFinalExam = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<div class="course-panel-page"><button class="course-back-button" type="button" data-action="dashboard">&larr; Back to learning overview</button><p class="course-eyebrow">Saved lessons</p><h1>Your learning is waiting in one clear place.</h1><p class="course-lead">The course returns to the current small task, along with your response and support choices in this browser.</p><article class="saved-card"><span class="course-status">Saved locally</span><h2>' + escapeHtml(COURSE.title) + '</h2><p>' + escapeHtml(courseReturnLocation()) + '</p><div><button class="course-primary-button" type="button" data-action="continue-course">Return to this step <span aria-hidden="true">→</span></button></div></article></div>', 'saved') + '</main>';
+  const renderSavedWithFinalExam = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<div class="course-panel-page"><button class="course-back-button" type="button" data-action="dashboard">' + courseUi('← Back to learning overview', 'سیکھنے کے خلاصے پر واپس جائیں ←') + '</button><p class="course-eyebrow">' + courseUi('Saved lessons', 'محفوظ سبق') + '</p><h1>' + courseUi('Your learning is waiting in one clear place.', 'آپ کا سیکھنے کا کام ایک واضح جگہ پر محفوظ ہے۔') + '</h1><p class="course-lead">' + courseUi('The course returns to the current small task, along with your response and support choices in this browser.', 'کورس اسی براؤزر میں آپ کے جواب اور مدد کے انتخاب کے ساتھ موجودہ مختصر کام پر واپس آتا ہے۔') + '</p><article class="saved-card"><span class="course-status">' + courseUi('Saved locally', 'مقامی طور پر محفوظ ہے') + '</span><h2>' + escapeHtml(courseUi(COURSE.title, COURSE_URDU.title)) + '</h2><p>' + escapeHtml(courseReturnLocation()) + '</p><div><button class="course-primary-button" type="button" data-action="continue-course">' + courseUi('Return to this step', 'اس مرحلے پر واپس جائیں') + ' <span aria-hidden="true">' + courseUi('→', '←') + '</span></button></div></article></div>', 'saved') + '</main>';
 
   const readingSections = () => {
     const content = currentStep().content;
@@ -3376,9 +3392,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     else clearSupportMoment();
     save(message);
     render();
-    if (view === 'course') window.requestAnimationFrame(() => {
+    if (['course', 'dashboard', 'browse', 'saved'].includes(view)) window.requestAnimationFrame(() => {
       window.scrollTo?.({ left: 0, top: 0, behavior: 'auto' });
-      (document.getElementById('course-course-title') || document.getElementById('course-task-heading'))?.focus?.({ preventScroll: true });
+      if (view === 'course') {
+        (document.getElementById('course-course-title') || document.getElementById('course-task-heading'))?.focus?.({ preventScroll: true });
+      }
     });
   };
 
@@ -3766,6 +3784,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'stuck': state.helpOption = ''; openCourseModal('help', element, '[data-action="stuck"]'); break;
       case 'close-modal': closeCourseModal(); break;
       case 'save-exit':
+        window.requestAnimationFrame(() => window.scrollTo?.({ left: 0, top: 0, behavior: 'auto' }));
         state.modal = '';
         modalReturnFocusSelector = '';
         state.reviewModuleIndex = null;
