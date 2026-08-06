@@ -129,7 +129,10 @@ const safePathname = (pathname) => {
 };
 
 const serveStatic = async (request, response, pathname) => {
-  let target = safePathname(pathname);
+  // Make the public origin unambiguous. Some reverse proxies preserve `/` as a
+  // special request, while `/index.html` is a normal static-file request.
+  // Serving this file explicitly keeps the custom domain's homepage reliable.
+  let target = pathname === '/' ? path.join(root, 'index.html') : safePathname(pathname);
   if (!target) return send(response, 404, 'Not found', { ...securityHeaders(pathname), 'Content-Type': 'text/plain; charset=utf-8' });
   try {
     const details = await stat(target);
