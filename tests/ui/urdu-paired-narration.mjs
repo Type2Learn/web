@@ -50,10 +50,10 @@ try {
   });
   await page.goto(`${baseUrl}/course/?course=${courseId}&start=course`, { waitUntil: 'networkidle' });
   await page.locator('[data-action="preview-complete"]').click();
-  await page.waitForFunction(() => document.querySelector('link[data-type2learn-narration-preload][href*="/01-adhd/urdu/title-ava.mp3"]'), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('link[data-type2learn-narration-preload][href*="/01-adhd/urdu-pk/title-ava.mp3"]'), null, { timeout: 15000 });
   const inspection = await page.evaluate(() => ({
     direction: document.documentElement.dir,
-    hasUrduPreload: Boolean(document.querySelector('link[data-type2learn-narration-preload][href*="/01-adhd/urdu/title-ava.mp3"]')),
+    hasUrduPreload: Boolean(document.querySelector('link[data-type2learn-narration-preload][href*="/01-adhd/urdu-pk/title-ava.mp3"]')),
     overflow: document.documentElement.scrollWidth > window.innerWidth
   }));
   assert.equal(inspection.direction, 'rtl', 'Urdu reading must preserve right-to-left layout.');
@@ -63,11 +63,11 @@ try {
   await page.waitForFunction(() => window.__urduNarrationTracks.length >= 6, null, { timeout: 15000 });
   const tracks = await page.evaluate(() => window.__urduNarrationTracks.slice(0, 6));
   assert.equal(tracks[0].includes('/01-adhd/read-ava-timed.mp3'), true, 'Narration must begin with the English title recording.');
-  assert.equal(tracks[1].includes('/01-adhd/urdu/title-ava.mp3'), true, 'The Urdu title must follow the English title.');
+  assert.equal(tracks[1].includes('/01-adhd/urdu-pk/title-ava.mp3'), true, 'The Urdu title must follow the English title.');
   assert.equal(tracks[2].includes('/01-adhd/read-ava-timed.mp3'), true, 'The English heading must follow its Urdu title translation.');
-  assert.equal(tracks[3].includes('/01-adhd/urdu/section-1-heading-ava.mp3'), true, 'The Urdu heading must follow the English heading.');
+  assert.equal(tracks[3].includes('/01-adhd/urdu-pk/section-1-heading-ava.mp3'), true, 'The Urdu heading must follow the English heading.');
   assert.equal(tracks[4].includes('/01-adhd/read-ava-timed.mp3'), true, 'The English explanation must follow its heading translation.');
-  assert.equal(tracks[5].includes('/01-adhd/urdu/section-1-answer-ava.mp3'), true, 'The Urdu explanation must follow the English explanation.');
+  assert.equal(tracks[5].includes('/01-adhd/urdu-pk/section-1-answer-ava.mp3'), true, 'The Urdu explanation must follow the English explanation.');
   assert.equal(await page.evaluate(() => window.__urduNarrationSpeechCalls), 0, 'Urdu narration must use recorded audio, never browser speech synthesis.');
   await context.close();
   process.stdout.write('checked paired Urdu narration\n');

@@ -57,16 +57,15 @@ try {
   const intro = await first.page.evaluate(() => window.__typingGuidancePlays.slice());
   assert.deepEqual(intro.map((source) => source.split('/').slice(-2).join('/')), [
     'guidance/male-instruction-en.mp3',
-    'guidance/female-instruction-en.mp3',
     'guidance/click-inside-box-en.mp3'
-  ], 'Guidance must introduce the male target voice, female typed voice, then the click instruction.');
+  ], 'Guidance must introduce the male target voice, then the click instruction.');
   await first.page.locator('[data-typing-input]').focus();
   await first.page.waitForTimeout(75);
   assert.equal(await first.page.evaluate(() => window.__typingGuidancePlays.some((source) => source.endsWith('/Male%201/Alphabets/A.mp3'))), true, 'Focusing the typing box must prompt the first expected character.');
   await first.page.locator('[data-typing-input]').fill('B');
   await first.page.waitForTimeout(130);
   const typoPlays = await first.page.evaluate(() => window.__typingGuidancePlays.slice());
-  assert.equal(typoPlays.some((source) => source.endsWith('/Female%201/Alphabets/B.mp3')), true, 'The female voice must say the learner’s wrong character.');
+  assert.equal(typoPlays.some((source) => source.includes('/Female%201/')), false, 'Typing guidance must not narrate the learner’s typed characters.');
   assert.equal(typoPlays.filter((source) => source.endsWith('/Male%201/Alphabets/A.mp3')).length >= 2, true, 'The male voice must repeat the expected character after a slow typo.');
   assert.equal(await first.page.evaluate(() => window.__typingGuidanceSpeechCalls), 0, 'Typing guidance must never use browser speech synthesis.');
   await first.context.close();
@@ -78,8 +77,7 @@ try {
   await fast.page.locator('[data-typing-input]').type('AD', { delay: 0 });
   await fast.page.waitForTimeout(230);
   const fastPlays = await fast.page.evaluate(() => window.__typingGuidancePlays.slice());
-  assert.equal(fastPlays.some((source) => source.endsWith('/Female%201/Alphabets/A.mp3')), true, 'Fast typing must retain female feedback for the first typed character.');
-  assert.equal(fastPlays.some((source) => source.endsWith('/Female%201/Alphabets/D.mp3')), true, 'Fast typing must retain female feedback for following characters.');
+  assert.equal(fastPlays.some((source) => source.includes('/Female%201/')), false, 'Fast typing must not add female typed-character feedback.');
   assert.equal(fastPlays.some((source) => source.endsWith('/Male%201/Alphabets/D.mp3')), false, 'Fast typing must suppress the next male prompt.');
   await fast.context.close();
 
@@ -90,7 +88,7 @@ try {
   await fastError.page.locator('[data-typing-input]').type('XB', { delay: 0 });
   await fastError.page.waitForTimeout(180);
   const fastErrorPlays = await fastError.page.evaluate(() => window.__typingGuidancePlays.slice());
-  assert.equal(fastErrorPlays.some((source) => source.endsWith('/Female%201/Alphabets/B.mp3')), false, 'Fast wrong input must not queue stale female feedback.');
+  assert.equal(fastErrorPlays.some((source) => source.includes('/Female%201/')), false, 'Fast wrong input must not add female feedback.');
   assert.equal(fastErrorPlays.some((source) => source.endsWith('/Male%201/Alphabets/D.mp3')), true, 'Fast wrong input must say the expected character with the male voice.');
   await fastError.context.close();
   process.stdout.write('checked guided typing narration behaviour\n');

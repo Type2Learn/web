@@ -57,7 +57,7 @@ try {
       visible: Boolean(controlRect && controlRect.width && controlRect.height),
       beforeCallAi: Boolean(controlRect && aiRect && controlRect.left < aiRect.left),
       expectedPreloaded: Boolean(document.querySelector('link[data-type2learn-narration-preload][href*="/assets/audio/typing-tts/Male%201/Alphabets/A.mp3"]')),
-      responsePreloaded: Boolean(document.querySelector('link[data-type2learn-narration-preload][href*="/assets/audio/typing-tts/Female%201/Alphabets/A.mp3"]')),
+      femaleResponsePreloaded: Boolean(document.querySelector('link[data-type2learn-narration-preload][href*="/assets/audio/typing-tts/Female%201/Alphabets/A.mp3"]')),
       nextModuleQueued: Boolean(document.querySelector('link[data-type2learn-next-narration][href*="02-dyslexia/read-ava-timed.mp3"]')),
       overflow: document.documentElement.scrollWidth > window.innerWidth
     };
@@ -65,7 +65,7 @@ try {
   assert.equal(beforePlay.visible, true, 'Typing must show the same audio button.');
   assert.equal(beforePlay.beforeCallAi, true, 'Typing audio control must sit before Call AI.');
   assert.equal(beforePlay.expectedPreloaded, true, 'Expected typing characters must preload before playback.');
-  assert.equal(beforePlay.responsePreloaded, true, 'The matching female response clips must preload before typing begins.');
+  assert.equal(beforePlay.femaleResponsePreloaded, false, 'Typing must not preload unused female response clips.');
   assert.equal(beforePlay.nextModuleQueued, true, 'The next module recording must queue after current-page audio is warm.');
   assert.equal(beforePlay.overflow, false, 'Typing narration controls must not overflow the page.');
   await page.locator('[data-task-narration-control]').click();

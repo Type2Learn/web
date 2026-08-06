@@ -2690,6 +2690,11 @@ body[data-course-spacing="relaxed"] .course-final-exam .course-check-options { g
   outline-offset: 2px;
 }
 
+.typing-tester-surface {
+  position: relative;
+  min-height: 132px;
+}
+
 .typing-tester-overlay,
 .typing-tester-input {
   width: 100%;
@@ -2744,6 +2749,50 @@ textarea.typing-tester-input::-webkit-scrollbar { width: 0; height: 0; }
   min-height: 132px;
   margin: 0;
   padding: 14px 30px 14px 14px;
+}
+
+/* When typing focus moves away, keep the exercise visible but make the
+   next action unmistakable. The prompt is a real button so keyboard and
+   screen-reader users can return to the field as easily as mouse users. */
+.typing-focus-curtain {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  color: var(--course-ink);
+  background: color-mix(in srgb, var(--course-paper) 74%, transparent);
+  backdrop-filter: blur(2px);
+  cursor: text;
+  font: inherit;
+  text-align: center;
+}
+
+.typing-focus-curtain[hidden] { display: none; }
+
+.typing-focus-curtain > span {
+  max-width: min(100%, 32rem);
+  padding: 10px 14px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 8px;
+  background: var(--course-paper);
+  box-shadow: 0 6px 18px rgba(24, 60, 105, .12);
+  color: var(--course-ink-soft);
+  font-size: .92rem;
+  font-weight: 780;
+  line-height: 1.35;
+}
+
+.typing-focus-curtain:focus-visible {
+  outline: 3px solid var(--course-blue);
+  outline-offset: -5px;
 }
 
 .typing-character.is-correct {
@@ -2823,7 +2872,10 @@ body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changi
   -webkit-text-fill-color: var(--course-ink);
 }
 
+.typing-tester.is-free-response .typing-tester-surface { min-height: 94px; }
+
 .typing-tester.is-lesson-section,
+.typing-tester.is-lesson-section .typing-tester-surface,
 .typing-tester.is-lesson-section .typing-tester-overlay,
 .typing-tester.is-lesson-section textarea.typing-tester-input {
   min-height: var(--lesson-typing-height, 160px);

@@ -24,6 +24,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     preludeTimer: null,
     preludeContinue: null
   };
+  const PERIODIC_SAVE_INTERVAL_MS = 7000;
+  const TYPING_AUTO_ACCEPT_ACCURACY = 85;
+  let periodicSaveTimer = null;
+  let typingAutoSubmitTimer = null;
   // Typing narration is deliberately a separate state machine. A normal
   // playlist cannot wait for, react to, or correct individual keystrokes.
   const typingGuidance = {
@@ -38,8 +42,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     fastMode: false,
     expectedIndex: 0,
     lastValue: '',
-    currentRole: '',
-    feedbackQueue: []
+    currentRole: ''
   };
   const BACKGROUND_NOISE_SOURCES = {
     pink: '/assets/audio/background-noise/pink-noise-loop.mp3',
@@ -1382,6 +1385,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
   };
 
+  const beginPeriodicSave = () => {
+    if (periodicSaveTimer !== null) window.clearInterval(periodicSaveTimer);
+    periodicSaveTimer = window.setInterval(() => {
+      if (authenticatedUser && storageKeys.course && state) save();
+    }, PERIODIC_SAVE_INTERVAL_MS);
+  };
+
   const isReviewingModule = () => Number.isInteger(state.reviewModuleIndex)
     && state.reviewModuleIndex >= 0
     && state.reviewModuleIndex < COURSE.steps.length;
@@ -2030,7 +2040,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const narrationSectionValue = (value) => Array.isArray(value) ? value.join('; ') + '.' : String(value || '').trim();
 
   const urduReadingAudioSource = (audioKey, filename) => '/course/audio/edge-ava/neurodivergent/'
-    + encodeURIComponent(audioKey) + '/urdu/' + encodeURIComponent(filename);
+    + encodeURIComponent(audioKey) + '/urdu-pk/' + encodeURIComponent(filename);
 
   const taskNarrationReadingChunks = () => {
     const step = currentStep();
@@ -2197,53 +2207,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return filenames ? typingTtsSource(voice, 'Words', filenames[voice === 'target' ? 0 : 1]) : '';
   };
 
-  const typingInstructionClip = () => typingTtsSource(
-    'target',
-    '',
-    courseUsesUrdu() ? 'Hindi_male_voice_1.mp3' : 'I will tell you what you need to type!...And I will tell you what you actually typed!...mp3'
-  );
-
-  const legacyTypingAudioNarrationPlan = () => {
-    const chunks = [];
-    const playlist = [];
-    const addTrack = (source, label) => {
-      if (!source) return;
-      const index = chunks.length;
-      const text = String(label || 'Typing audio');
-      chunks.push({ id: 'typing-audio-' + index, label: text, text });
-      playlist.push({
-        id: 'typing-audio-' + index,
-        src: source,
-        text,
-        chunkIndexes: [index],
-        chunkMap: [{ index, sourceStart: 0, sourceEnd: text.length }]
-      });
-    };
-
-    // The supplied non-English instruction file is named Hindi in the source
-    // archive. It is used for Urdu mode as requested; typing characters stay
-    // English because the keyboard exercise itself remains English.
-    addTrack(typingInstructionClip(), courseUsesUrdu() ? 'ٹائپنگ کی رہنمائی' : 'Typing guidance');
-    Array.from(activeTypingReference() || '').forEach((character) => addTrack(typingCharacterClip('target', character), character));
-    Array.from(state.progress.attempt.response || '').forEach((character) => addTrack(typingCharacterClip('response', character), character));
-    return { chunks, playlist };
-  };
-
-  const warmTypingAudioForCurrentResponse = () => {
-    if (state.view !== 'course' || state.progress.phase !== 'type' || narration.status === 'playing') return;
-    const service = ensureNarrationService();
-    const sources = Array.from(state.progress.attempt.response || '')
-      .map((character) => typingCharacterClip('response', character))
-      .filter(Boolean);
-    service.preloadAudioSources?.(sources);
-  };
-
   const TYPING_GUIDANCE_ROOT = TYPING_TTS_ROOT + 'guidance/';
   const typingGuidanceClip = (name) => TYPING_GUIDANCE_ROOT
     + encodeURIComponent(name + '-' + (courseUsesUrdu() ? 'ur' : 'en') + '.mp3');
   const typingGuidanceIntroSources = () => [
     typingGuidanceClip('male-instruction'),
-    typingGuidanceClip('female-instruction'),
     typingGuidanceClip('click-inside-box')
   ];
 
@@ -2251,16 +2219,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const referenceCharacters = [...new Set(Array.from(activeTypingReference() || ''))];
     return [...new Set([
       ...typingGuidanceIntroSources(),
-      ...referenceCharacters.flatMap((character) => [
-        typingCharacterClip('target', character),
-        typingCharacterClip('response', character)
-      ])
+      ...referenceCharacters.map((character) => typingCharacterClip('target', character))
     ].filter(Boolean))];
   };
 
   // A normal narration playlist cannot wait for, react to, or correct an
-  // individual keystroke. This controller keeps the recorded male and female
-  // clips on one audio channel and never lets them overlap.
+  // individual keystroke. This controller uses only the target voice and
+  // keeps every prompt on one audio channel, so no clips can overlap.
   const typingAudioNarrationPlan = () => ({ chunks: [], playlist: [], sources: typingGuidanceAssetSources() });
 
   const clearTypingGuidanceTimers = () => {
@@ -2289,7 +2254,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     typingGuidance.active = false;
     typingGuidance.paused = false;
     typingGuidance.phase = 'finished';
-    typingGuidance.feedbackQueue = [];
     syncTaskNarrationControl();
   };
 
@@ -2302,7 +2266,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     typingGuidance.fastMode = false;
     typingGuidance.lastInputAt = 0;
     typingGuidance.lastValue = '';
-    typingGuidance.feedbackQueue = [];
   };
 
   const typingGuidanceInputIsFocused = () => document.activeElement?.matches?.('[data-typing-input]');
@@ -2367,30 +2330,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     });
   };
 
-  const playQueuedTypingFeedback = () => {
-    if (!typingGuidance.active || typingGuidance.paused || typingGuidance.audio) return;
-    const next = typingGuidance.feedbackQueue.shift();
-    if (!next) {
-      typingGuidance.phase = 'waiting';
-      syncTaskNarrationControl();
-      return;
-    }
-    playTypingGuidanceSource(typingCharacterClip('response', next), 'response', playQueuedTypingFeedback);
-  };
-
-  const queueTypingFeedback = (character) => {
-    const source = typingCharacterClip('response', character);
-    if (!source) return;
-    if (typingGuidance.audio) {
-      // Keep recent speech useful during fast typing instead of making the
-      // learner wait through an ever-growing queue of old letters.
-      if (typingGuidance.feedbackQueue.length >= 3) typingGuidance.feedbackQueue.splice(0, typingGuidance.feedbackQueue.length - 2);
-      typingGuidance.feedbackQueue.push(character);
-      return;
-    }
-    playTypingGuidanceSource(source, 'response', playQueuedTypingFeedback);
-  };
-
   const resumeTypingGuidance = () => {
     if (!typingGuidance.active) return;
     typingGuidance.paused = false;
@@ -2430,7 +2369,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       if (!typingGuidance.active || typingGuidance.paused) return;
       const source = intro[introIndex++];
       if (source) {
-        playTypingGuidanceSource(source, introIndex === 1 ? 'target' : 'response', playNextIntro);
+        playTypingGuidanceSource(source, 'target', playNextIntro);
         return;
       }
       typingGuidance.phase = 'waiting';
@@ -2486,7 +2425,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
     if (typingGuidance.fastMode) {
       if (!correct) {
-        typingGuidance.feedbackQueue = [];
         stopTypingGuidanceAudio();
         typingGuidance.expectedIndex = position;
         typingGuidance.phase = 'correction';
@@ -2496,25 +2434,20 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
             syncTaskNarrationControl();
           }
         });
-      } else {
-        queueTypingFeedback(character);
       }
       return;
     }
 
-    typingGuidance.feedbackQueue = [];
     stopTypingGuidanceAudio();
     typingGuidance.expectedIndex = correct ? position + 1 : position;
-    typingGuidance.phase = 'feedback';
-    playTypingGuidanceSource(typingCharacterClip('response', character), 'response', () => {
+    typingGuidance.phase = 'waiting';
+    // Do not narrate what the learner typed. A brief hand-off keeps the next
+    // target letter clear without making normal typing feel delayed.
+    window.setTimeout(() => {
       if (!typingGuidance.active || typingGuidance.paused) return;
-      if (typingGuidance.fastMode) {
-        playQueuedTypingFeedback();
-        return;
-      }
       if ((state.progress.attempt.response || '') !== nextValue) return;
-      promptExpectedTypingCharacter(correct ? position + 1 : position);
-    });
+      promptExpectedTypingCharacter(typingGuidance.expectedIndex);
+    }, 120);
   };
 
   const taskNarrationPlan = () => {
@@ -3048,6 +2981,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (input.selectionStart !== end || input.selectionEnd !== end) input.setSelectionRange(end, end);
   };
 
+  const syncTypingFocusCurtain = (input) => {
+    const surface = input?.closest('.typing-tester-surface');
+    const curtain = surface?.querySelector('[data-typing-focus-curtain]');
+    if (!curtain) return;
+    const inputIsActive = document.activeElement === input;
+    curtain.hidden = inputIsActive;
+    curtain.setAttribute('aria-hidden', inputIsActive ? 'true' : 'false');
+  };
+
   const buildTypingTester = () => {
     if (state.view !== 'course' || state.progress.phase !== 'type') return;
     const practice = app.querySelector('.typing-practice');
@@ -3093,13 +3035,18 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       prompt.className = 'typing-tester-prompt';
       prompt.textContent = typing.reference || typing.prompt;
       field.append(prompt);
-    } else {
+    }
+
+    const surface = document.createElement('div');
+    surface.className = 'typing-tester-surface';
+    field.append(surface);
+    if (!freeResponse) {
       const overlay = document.createElement('div');
       overlay.className = 'typing-tester-overlay';
       overlay.dataset.typingOverlay = '';
       overlay.setAttribute('aria-hidden', 'true');
       overlay.innerHTML = renderTypingCharacters(reference, textarea.value);
-      field.append(overlay);
+      surface.append(overlay);
     }
 
     const phraseLabel = sectionTyping
@@ -3116,7 +3063,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const typingHelp = practice.querySelector('#typing-help');
     if (typingHelp && !typingHelp.textContent.includes('Press Enter to check this response.')) typingHelp.textContent += ' Press Enter to check this response. Use Shift+Enter for a new line.';
     label.insertAdjacentElement('afterend', field);
-    field.append(textarea);
+    surface.append(textarea);
+    const focusCurtain = document.createElement('button');
+    focusCurtain.type = 'button';
+    focusCurtain.className = 'typing-focus-curtain';
+    focusCurtain.dataset.typingFocusCurtain = '';
+    focusCurtain.setAttribute('aria-label', courseUi('Click in the typing box to continue', 'لکھنا جاری رکھنے کے لیے ٹائپنگ باکس میں کلک کریں'));
+    focusCurtain.innerHTML = '<span>' + escapeHtml(courseUi('Click in the typing box to continue', 'لکھنا جاری رکھنے کے لیے ٹائپنگ باکس میں کلک کریں')) + '</span>';
+    surface.append(focusCurtain);
     if (voiceInputAvailable) {
       const controls = document.createElement('div');
       controls.className = 'typing-tester-controls';
@@ -3138,6 +3092,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     textarea.dataset.typingPreviousValue = textarea.value;
     syncTypingTester(textarea);
     keepGuidedTypingCursorAtEnd(textarea);
+    syncTypingFocusCurtain(textarea);
   };
 
   const voiceRecognitionConstructor = () => window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -4656,6 +4611,18 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const normaliseText = (value) => value.trim().replace(/\s+/g, ' ').replace(/[“”]/g, '"').replace(/[’]/g, "'");
   const normaliseTypingMatch = (value) => normaliseText(value).toLowerCase().replace(/[.,!?;:]/g, '');
+  const typingAccuracy = (target, response) => {
+    const expected = Array.from(normaliseText(target).toLocaleLowerCase());
+    const actual = Array.from(normaliseText(response).toLocaleLowerCase());
+    const comparedLength = Math.max(expected.length, actual.length, 1);
+    const matches = expected.reduce((total, character, index) => total + (character === actual[index] ? 1 : 0), 0);
+    return (matches / comparedLength) * 100;
+  };
+  const clearTypingAutoSubmit = () => {
+    if (typingAutoSubmitTimer === null) return;
+    window.clearTimeout(typingAutoSubmitTimer);
+    typingAutoSubmitTimer = null;
+  };
 
   const focusCurrentTask = (selector = '#course-task-heading') => {
     window.requestAnimationFrame(() => app.querySelector(selector)?.focus?.());
@@ -4859,6 +4826,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const checkTyping = () => {
+    clearTypingAutoSubmit();
     const typing = currentStep().typing;
     const sectionTyping = usesLessonSectionTyping();
     const activeSection = sectionTyping ? activeLessonTypingSection() : null;
@@ -4889,7 +4857,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       : typing.level === 'Guided typing'
         ? typing.phrases[Math.min(state.progress.attempt.guidedIndex, typing.phrases.length - 1)]
         : typing.target;
-    if (normaliseTypingMatch(target) !== normaliseTypingMatch(response)) {
+    const acceptedAccuracy = typingAccuracy(target, state.progress.attempt.response);
+    if (normaliseTypingMatch(target) !== normaliseTypingMatch(response) && acceptedAccuracy < TYPING_AUTO_ACCEPT_ACCURACY) {
       state.progress.attempt.feedback = recordSupportMoment('typing-incomplete', { result: 'typing' });
       save();
       render();
@@ -4915,6 +4884,23 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     save();
     render();
     showCurrentTaskFromStart();
+  };
+
+  const scheduleTypingAutoSubmit = (input) => {
+    clearTypingAutoSubmit();
+    if (state.view !== 'course' || state.progress.phase !== 'type' || currentStep().typing.level === 'Recall typing') return;
+    const target = activeTypingReference();
+    const response = input?.value || '';
+    if (!target || Array.from(response).length < Array.from(target).length) return;
+    const accuracy = typingAccuracy(target, response);
+    const delay = accuracy >= TYPING_AUTO_ACCEPT_ACCURACY ? 300 : 5000;
+    typingAutoSubmitTimer = window.setTimeout(() => {
+      typingAutoSubmitTimer = null;
+      if (state.view !== 'course' || state.progress.phase !== 'type') return;
+      const currentInput = app.querySelector('[data-typing-input]');
+      if (!currentInput || currentInput.value !== response) return;
+      checkTyping();
+    }, delay);
   };
 
   const speakCurrentTask = () => {
@@ -5332,7 +5318,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     state.progress.attempt.response = nextValue;
     state.progress.attempt.feedback = '';
     handleTypingGuidanceInput(nextValue);
-    warmTypingAudioForCurrentResponse();
     if (activeSupportMoment && ['response-needed', 'typing-incomplete'].includes(activeSupportMoment.kind)) {
       clearSupportMoment();
       app.querySelector('[data-support-moment]')?.remove();
@@ -5341,18 +5326,32 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       && (event.inputType === 'insertText' || event.inputType === 'insertCompositionText');
     syncTypingTester(input, isSingleTypedCharacter);
     keepGuidedTypingCursorAtEnd(input);
+    scheduleTypingAutoSubmit(input);
     save();
   });
 
   app.addEventListener('focusin', (event) => {
     if (!event.target.matches?.('[data-typing-input]')) return;
+    syncTypingFocusCurtain(event.target);
     window.requestAnimationFrame(() => keepGuidedTypingCursorAtEnd(event.target));
     if (typingGuidance.active && !typingGuidance.paused && typingGuidance.phase !== 'intro') {
       window.requestAnimationFrame(() => promptExpectedTypingCharacter(Array.from(state.progress.attempt.response || '').length));
     }
   });
 
+  app.addEventListener('focusout', (event) => {
+    if (!event.target.matches?.('[data-typing-input]')) return;
+    window.requestAnimationFrame(() => syncTypingFocusCurtain(event.target));
+  });
+
   app.addEventListener('click', (event) => {
+    const focusCurtain = event.target.closest?.('[data-typing-focus-curtain]');
+    if (focusCurtain) {
+      event.preventDefault();
+      const input = focusCurtain.closest('.typing-tester-surface')?.querySelector('[data-typing-input]');
+      input?.focus?.();
+      return;
+    }
     const input = event.target.closest?.('[data-typing-input]');
     if (!input) return;
     window.requestAnimationFrame(() => keepGuidedTypingCursorAtEnd(input));
@@ -5489,6 +5488,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       learnerId: rawLearnerId
     };
     state = loadState();
+    beginPeriodicSave();
     const entry = new URL(window.location.href).searchParams;
     const startSelectedCourse = entry.get('course') === COURSE.id && entry.get('start') === 'course';
     if (startSelectedCourse) {
@@ -5523,6 +5523,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   window.addEventListener('pagehide', () => {
+    clearTypingAutoSubmit();
+    if (periodicSaveTimer !== null) {
+      window.clearInterval(periodicSaveTimer);
+      periodicSaveTimer = null;
+    }
+    if (authenticatedUser) save();
     cancelNarrationAutoScroll();
     stopTaskNarration({ silent: true });
     narration.service?.destroy();
