@@ -48,6 +48,27 @@ test('production runtime never loads the local secret file and caps cannot be ra
   }
 });
 
+test('zero-valued AI allowance variables fall back to the bounded working defaults', async () => {
+  const config = await loadRuntimeConfig({
+    environment: {
+      NODE_ENV: 'production',
+      OPENAI_MONTHLY_APP_USD_CAP: '0',
+      OPENAI_MONTHLY_USER_USD_CAP: '0',
+      OPENAI_MONTHLY_APP_INPUT_TOKEN_CAP: '0',
+      OPENAI_MONTHLY_APP_OUTPUT_TOKEN_CAP: '0',
+      OPENAI_MONTHLY_USER_INPUT_TOKEN_CAP: '0',
+      OPENAI_MONTHLY_USER_OUTPUT_TOKEN_CAP: '0'
+    }
+  });
+
+  assert.equal(config.openAiAppCapUsd, 14);
+  assert.equal(config.openAiUserCapUsd, 2);
+  assert.equal(config.openAiAppInputTokenCap, 11200000);
+  assert.equal(config.openAiAppOutputTokenCap, 5600000);
+  assert.equal(config.openAiUserInputTokenCap, 1000000);
+  assert.equal(config.openAiUserOutputTokenCap, 500000);
+});
+
 test('development aliases accept a constrained Azure Responses endpoint without changing the approved model', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'type2learn-azure-config-'));
   await mkdir(path.join(root, 'security'));

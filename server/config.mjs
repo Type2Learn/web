@@ -122,12 +122,15 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // deployment variable is always the explicit SPEECHMATICS_API_KEY name.
     speechmaticsApiKey: value('SPEECHMATICS_API_KEY', 'speech'),
     openAiModel: APPROVED_OPENAI_MODEL,
-    openAiAppCapUsd: numberFrom(value('OPENAI_MONTHLY_APP_USD_CAP'), 14, { min: 0, max: 14 }),
-    openAiUserCapUsd: numberFrom(value('OPENAI_MONTHLY_USER_USD_CAP'), 2, { min: 0, max: 2 }),
-    openAiAppInputTokenCap: numberFrom(value('OPENAI_MONTHLY_APP_INPUT_TOKEN_CAP'), 11200000, { min: 0, max: 11200000 }),
-    openAiAppOutputTokenCap: numberFrom(value('OPENAI_MONTHLY_APP_OUTPUT_TOKEN_CAP'), 5600000, { min: 0, max: 5600000 }),
-    openAiUserInputTokenCap: numberFrom(value('OPENAI_MONTHLY_USER_INPUT_TOKEN_CAP'), 1000000, { min: 0, max: 1000000 }),
-    openAiUserOutputTokenCap: numberFrom(value('OPENAI_MONTHLY_USER_OUTPUT_TOKEN_CAP'), 500000, { min: 0, max: 500000 }),
+    // A zero cap makes every first request look as though the monthly budget
+    // was spent. Treat accidental zero-valued deployment variables as absent
+    // and retain the deliberately bounded defaults instead.
+    openAiAppCapUsd: numberFrom(value('OPENAI_MONTHLY_APP_USD_CAP'), 14, { min: 0.01, max: 14 }),
+    openAiUserCapUsd: numberFrom(value('OPENAI_MONTHLY_USER_USD_CAP'), 2, { min: 0.01, max: 2 }),
+    openAiAppInputTokenCap: numberFrom(value('OPENAI_MONTHLY_APP_INPUT_TOKEN_CAP'), 11200000, { min: 1, max: 11200000 }),
+    openAiAppOutputTokenCap: numberFrom(value('OPENAI_MONTHLY_APP_OUTPUT_TOKEN_CAP'), 5600000, { min: 1, max: 5600000 }),
+    openAiUserInputTokenCap: numberFrom(value('OPENAI_MONTHLY_USER_INPUT_TOKEN_CAP'), 1000000, { min: 1, max: 1000000 }),
+    openAiUserOutputTokenCap: numberFrom(value('OPENAI_MONTHLY_USER_OUTPUT_TOKEN_CAP'), 500000, { min: 1, max: 500000 }),
     openAiInputUsdPerMillion: numberFrom(value('OPENAI_INPUT_USD_PER_MILLION_TOKENS'), 0.25, { min: 0, max: 0.25 }),
     openAiOutputUsdPerMillion: numberFrom(value('OPENAI_OUTPUT_USD_PER_MILLION_TOKENS'), 2, { min: 0, max: 2 }),
     openAiMaxOutputTokens: numberFrom(value('OPENAI_MAX_OUTPUT_TOKENS'), 320, { min: 32, max: 320 }),
