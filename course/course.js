@@ -3,6 +3,7 @@ import { COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
 import { askCourseAi, getCourseAiStatus, loadCourseProgress, saveCourseProgress, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260806-cloud1';
+import { canonicaliseSpokenTyping, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt1';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
 
@@ -105,7 +106,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     restartCount: 0,
     stopRequested: false,
     sessionId: 0,
-    lastError: ''
+    lastError: '',
+    fallbackMessage: ''
   };
   // AI chat is intentionally session-only. It never enters the course progress
   // record or local storage, so a learner's questions disappear on close,
@@ -122,12 +124,18 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     requestController: null,
     dictation: {
       recorder: null,
+      recognition: null,
       stream: null,
       chunks: [],
       startedAt: 0,
       timer: null,
       session: 0,
-      stopping: false
+      stopping: false,
+      mode: '',
+      fallback: false,
+      initialDraft: '',
+      finalTranscript: '',
+      finalResultIndexes: new Set()
     },
     audio: { controller: null, element: null, url: '', messageIndex: -1, loadingIndex: -1, error: '' }
   };
@@ -1037,12 +1045,21 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (dictation.recorder && dictation.recorder.state !== 'inactive') {
       try { dictation.recorder.stop(); } catch (_) { /* Stopping a recorder is best-effort. */ }
     }
+    if (dictation.recognition) {
+      try { dictation.recognition.abort(); } catch (_) { /* Stopping recognition is best-effort. */ }
+    }
     dictation.stream?.getTracks?.().forEach((track) => track.stop());
     dictation.recorder = null;
+    dictation.recognition = null;
     dictation.stream = null;
     dictation.chunks = [];
     dictation.startedAt = 0;
     dictation.stopping = false;
+    dictation.mode = '';
+    dictation.fallback = false;
+    dictation.initialDraft = '';
+    dictation.finalTranscript = '';
+    dictation.finalResultIndexes = new Set();
   };
 
   const resetAiChat = ({ close = true } = {}) => {
@@ -1074,6 +1091,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     && aiChat.connection.aiAudio
   );
 
+  const browserSpeechRecognitionAvailable = () => Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+
   const aiMessagesMarkup = () => {
     const messages = aiChat.messages.length ? aiChat.messages : [{ role: 'assistant', content: aiInitialMessage(), initial: true }];
     return messages.map((message, index) => {
@@ -1096,7 +1115,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const aiChatStatusMarkup = () => {
     if (aiChat.status === 'checking') return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('Checking the assistant connection…', 'مددگار کے کنکشن کی جانچ ہو رہی ہے…')) + '</p>';
     if (aiChat.status === 'sending') return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('The course helper is thinking…', 'کورس مددگار غور کر رہا ہے…')) + '</p>';
-    if (aiChat.status === 'recording') return '<p class="course-ai-chat-status is-recording" role="status">' + escapeHtml(aiCopy('Listening. Choose Stop speaking when you are finished.', 'سن رہا ہے۔ مکمل ہونے پر بولنا بند کریں منتخب کریں۔')) + '</p>';
+    if (aiChat.status === 'recording') {
+      const browserFallback = aiChat.dictation.mode === 'browser';
+      return '<p class="course-ai-chat-status is-recording" role="status">' + escapeHtml(browserFallback
+        ? (aiChat.dictation.fallback
+            ? aiCopy('Speechmatics could not transcribe that recording. Browser speech recognition is listening now; please repeat your question.', 'Speechmatics ریکارڈنگ کو متن میں نہیں بدل سکا۔ براؤزر وائس ان پٹ اب سن رہا ہے؛ براہ کرم اپنا سوال دوبارہ کہیں۔')
+            : aiCopy('Browser speech recognition is listening. Choose Stop speaking when you are finished.', 'براؤزر وائس ان پٹ سن رہا ہے۔ مکمل ہونے پر بولنا بند کریں۔'))
+        : aiCopy('Listening. Choose Stop speaking when you are finished.', 'سن رہا ہے۔ مکمل ہونے پر بولنا بند کریں منتخب کریں۔')) + '</p>';
+    }
     if (aiChat.status === 'transcribing') return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('Turning your recording into editable text…', 'آپ کی ریکارڈنگ کو قابلِ ترمیم متن میں بدلا جا رہا ہے…')) + '</p>';
     if (aiChat.error) return '<p class="course-ai-chat-status is-error" role="status">' + escapeHtml(aiChat.error) + '</p>';
     if (aiChat.connection.checked && !aiChat.connection.ai) return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('AI chat is being set up. The course support on this page is still available.', 'AI چیٹ ترتیب دی جا رہی ہے۔ اس صفحے کی کورس مدد اب بھی دستیاب ہے۔')) + '</p>';
@@ -1106,7 +1132,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const courseAiChatMarkup = (surface) => {
     const busy = ['checking', 'sending', 'recording', 'transcribing'].includes(aiChat.status);
     const canSend = signedInLearner() && aiChat.connection.checked && aiChat.connection.ai && !busy && Boolean(aiChat.draft.trim());
-    const canSpeak = signedInLearner() && aiChat.connection.checked && aiChat.connection.speech && !busy;
+    const canSpeak = signedInLearner() && aiChat.connection.checked && (aiChat.connection.speech || browserSpeechRecognitionAvailable()) && !busy;
     const closeLabel = aiCopy('Close AI chat', 'AI چیٹ بند کریں');
     const backLabel = aiCopy('Back to course', 'کورس پر واپس جائیں');
     const heading = aiCopy('Course AI', 'کورس AI');
@@ -1267,6 +1293,107 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((type) => window.MediaRecorder.isTypeSupported(type)) || '';
   };
 
+  const browserRecognitionLanguage = () => aiLanguage() === 'ur' ? 'ur-PK' : 'en-US';
+
+  const appendAiDictationTranscript = (transcript, initialDraft = aiChat.dictation.initialDraft) => {
+    const cleanTranscript = normaliseText(transcript);
+    aiChat.draft = [initialDraft, cleanTranscript].filter(Boolean).join(initialDraft && cleanTranscript ? ' ' : '');
+  };
+
+  // The browser recogniser cannot transcribe a recording that has already
+  // finished, so a failed Speechmatics request switches straight into a fresh
+  // live browser session and clearly asks the learner to repeat the question.
+  const startBrowserAiDictation = ({ fallback = false } = {}) => {
+    if (!aiChatIsVisible()) return false;
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) return false;
+    let recognition;
+    try {
+      recognition = new Recognition();
+    } catch (_) {
+      return false;
+    }
+    const dictation = aiChat.dictation;
+    const session = ++dictation.session;
+    clearAiChatTimer();
+    dictation.recorder = null;
+    dictation.recognition = recognition;
+    dictation.stream?.getTracks?.().forEach((track) => track.stop());
+    dictation.stream = null;
+    dictation.chunks = [];
+    dictation.startedAt = window.performance.now();
+    dictation.stopping = false;
+    dictation.mode = 'browser';
+    dictation.fallback = fallback;
+    dictation.initialDraft = aiChat.draft.trim();
+    dictation.finalTranscript = '';
+    dictation.finalResultIndexes = new Set();
+    recognition.lang = browserRecognitionLanguage();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      if (session !== dictation.session || dictation.recognition !== recognition) return;
+      let finalTranscript = dictation.finalTranscript;
+      let interimTranscript = '';
+      const resultStart = Math.max(0, Number(event.resultIndex) || 0);
+      Array.from(event.results || []).slice(resultStart).forEach((result, offset) => {
+        const resultIndex = resultStart + offset;
+        const transcript = result[0]?.transcript || '';
+        if (result.isFinal) {
+          if (!dictation.finalResultIndexes.has(resultIndex)) {
+            dictation.finalResultIndexes.add(resultIndex);
+            finalTranscript = [finalTranscript, transcript].filter(Boolean).join(' ').trim();
+          }
+        } else interimTranscript += transcript + ' ';
+      });
+      dictation.finalTranscript = finalTranscript;
+      appendAiDictationTranscript([finalTranscript, interimTranscript.trim()].filter(Boolean).join(' '));
+      aiChat.error = '';
+      if (aiChatIsVisible()) render();
+    };
+    recognition.onerror = (event) => {
+      if (session !== dictation.session || dictation.recognition !== recognition) return;
+      const code = String(event?.error || 'unknown');
+      dictation.recognition = null;
+      clearAiChatTimer();
+      aiChat.status = 'idle';
+      aiChat.error = code === 'not-allowed' || code === 'service-not-allowed'
+        ? aiCopy('Allow microphone access to speak, or type your question instead.', 'بولنے کے لیے مائیکروفون کی اجازت دیں، یا سوال ٹائپ کریں۔')
+        : code === 'language-not-supported'
+          ? aiCopy('Browser speech recognition does not support this language on this device. You can type your question instead.', 'اس آلے پر براؤزر وائس ان پٹ اس زبان کو سپورٹ نہیں کرتا۔ آپ سوال ٹائپ کر سکتے ہیں۔')
+          : aiCopy('Browser speech recognition could not continue. You can type your question instead.', 'براؤزر وائس ان پٹ جاری نہیں رہ سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
+      if (aiChatIsVisible()) {
+        render();
+        focusAiInput();
+      }
+    };
+    recognition.onend = () => {
+      if (session !== dictation.session || dictation.recognition !== recognition) return;
+      dictation.recognition = null;
+      clearAiChatTimer();
+      if (aiChat.status === 'recording') aiChat.status = 'idle';
+      if (aiChatIsVisible()) {
+        render();
+        focusAiInput();
+      }
+    };
+    aiChat.status = 'recording';
+    aiChat.error = '';
+    clearAiChatTimer();
+    aiChat.dictation.timer = window.setTimeout(() => stopAiDictation(), 45000);
+    try {
+      recognition.start();
+      if (aiChatIsVisible()) render();
+      return true;
+    } catch (_) {
+      if (dictation.recognition === recognition) dictation.recognition = null;
+      clearAiChatTimer();
+      aiChat.status = 'idle';
+      return false;
+    }
+  };
+
   const finishAiDictation = async (session) => {
     const dictation = aiChat.dictation;
     if (session !== dictation.session || !aiChatIsVisible()) return;
@@ -1294,9 +1421,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const result = await transcribeCourseAudio({ user: authenticatedUser, audio: recording, durationMs: elapsed, language: aiLanguage(), purpose: 'chat' });
       if (session !== dictation.session || !aiChatIsVisible()) return;
       const transcript = String(result?.transcript || '').trim();
-      aiChat.draft = [aiChat.draft.trim(), transcript].filter(Boolean).join(aiChat.draft.trim() ? ' ' : '');
+      appendAiDictationTranscript(transcript);
     } catch (error) {
       if (session !== dictation.session) return;
+      if (browserSpeechRecognitionAvailable() && startBrowserAiDictation({ fallback: true })) return;
       aiChat.error = error?.message || aiCopy('Voice input could not continue. You can type your question instead.', 'آواز کے ذریعے ان پٹ جاری نہیں رہ سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
     } finally {
       if (session === dictation.session && aiChatIsVisible()) {
@@ -1308,8 +1436,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const startAiDictation = async () => {
-    if (!aiChat.connection.speech || aiChat.status !== 'idle') return;
+    if (aiChat.status !== 'idle') return;
+    if (!aiChat.connection.speech) {
+      if (startBrowserAiDictation()) return;
+      aiChat.error = aiCopy('Voice input is unavailable right now. You can type your question instead.', 'وائس ان پٹ اس وقت دستیاب نہیں ہے۔ آپ سوال ٹائپ کر سکتے ہیں۔');
+      render();
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      if (startBrowserAiDictation({ fallback: true })) return;
       aiChat.error = aiCopy('This browser cannot record a short voice message. You can type your question instead.', 'یہ براؤزر مختصر صوتی پیغام ریکارڈ نہیں کر سکتا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
       render();
       return;
@@ -1323,7 +1458,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const session = ++aiChat.dictation.session;
       const mimeType = supportedRecorderMimeType();
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      aiChat.dictation = { ...aiChat.dictation, recorder, stream, chunks: [], startedAt: window.performance.now(), stopping: false, session };
+      aiChat.dictation = { ...aiChat.dictation, recorder, recognition: null, stream, chunks: [], startedAt: window.performance.now(), stopping: false, mode: 'speechmatics', fallback: false, initialDraft: aiChat.draft.trim(), finalTranscript: '', finalResultIndexes: new Set(), session };
       recorder.addEventListener('dataavailable', (event) => {
         if (session === aiChat.dictation.session && event.data?.size) aiChat.dictation.chunks.push(event.data);
       });
@@ -1336,6 +1471,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       render();
     } catch (error) {
       aiChat.status = 'idle';
+      if (error?.name !== 'NotAllowedError' && startBrowserAiDictation({ fallback: true })) return;
       aiChat.error = error?.name === 'NotAllowedError'
         ? aiCopy('Allow microphone access to speak, or type your question instead.', 'بولنے کے لیے مائیکروفون کی اجازت دیں، یا سوال ٹائپ کریں۔')
         : aiCopy('Voice input could not start. You can type your question instead.', 'آواز کے ذریعے ان پٹ شروع نہیں ہو سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
@@ -1345,10 +1481,17 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const stopAiDictation = () => {
     const recorder = aiChat.dictation.recorder;
-    if (!recorder || recorder.state === 'inactive' || aiChat.dictation.stopping) return;
+    const recognition = aiChat.dictation.recognition;
+    if (aiChat.dictation.stopping) return;
     aiChat.dictation.stopping = true;
     clearAiChatTimer();
-    try { recorder.stop(); } catch (_) { discardAiDictation(); }
+    if (recognition) {
+      try { recognition.stop(); } catch (_) { discardAiDictation(); }
+      return;
+    }
+    if (recorder && recorder.state !== 'inactive') {
+      try { recorder.stop(); } catch (_) { discardAiDictation(); }
+    }
   };
 
   const mascotScene = () => {
@@ -3252,7 +3395,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const controls = document.createElement('div');
       controls.className = 'typing-tester-controls';
       controls.dataset.voiceInputControls = '';
-      const supported = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+      const supported = Boolean(browserCanRecordVoice() || voiceRecognitionConstructor());
       controls.innerHTML = '<button class="course-secondary-button typing-mic-button" type="button" data-action="start-voice-input" aria-label="Use microphone to speak your response" aria-describedby="course-voice-input-status"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-5-3v.5a5 5 0 0 0 10 0v-.5M12 17v4M8.5 21h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span data-voice-input-button-label>Speak</span></button><button class="course-secondary-button typing-mic-stop" type="button" data-action="stop-voice-input" aria-describedby="course-voice-input-status" hidden>Stop</button>';
       surface.append(controls);
       const status = document.createElement('p');
@@ -3336,6 +3479,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.finalResultIndexes = new Set();
     voiceInput.restartCount = 0;
     voiceInput.lastError = '';
+    voiceInput.fallbackMessage = '';
     if (recognition) {
       try { recognition.stop(); } catch (_) { /* Stopping is best-effort. */ }
     }
@@ -3360,6 +3504,28 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }, delay);
   };
 
+  const placeBrowserSpeechTranscript = (transcript) => {
+    const input = app.querySelector('[data-typing-input]');
+    const target = typingIsAccuracyObjective() ? activeTypingReference() : '';
+    const canonical = target ? canonicaliseSpokenTyping(transcript, target) : { value: normaliseText(transcript), corrected: false };
+    const nextValue = target
+      ? canonical.value
+      : [voiceInput.initialResponse, canonical.value].filter(Boolean).join(' ');
+    state.progress.attempt.response = nextValue;
+    state.progress.attempt.feedback = '';
+    state.progress.attempt.inputMethod = 'voice';
+    state.progress.attempt.alternativeInput = true;
+    if (input) {
+      input.value = nextValue;
+      syncTypingTester(input);
+      scheduleTypingAutoSubmit(input);
+    }
+    save(canonical.corrected
+      ? 'A close spoken match was placed as the visible course sentence.'
+      : 'Voice input added to your response.');
+    return canonical;
+  };
+
   const beginVoiceRecognitionCycle = (sessionId) => {
     if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
     const Recognition = voiceRecognitionConstructor();
@@ -3373,7 +3539,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.recognition = recognition;
     voiceInput.finalResultIndexes = new Set();
     voiceInput.lastError = '';
-    recognition.lang = document.documentElement.lang || 'en-US';
+    recognition.lang = browserRecognitionLanguage();
     // Browsers can end a recognition object after a short pause even in
     // continuous mode. A fresh object is created for each retry because some
     // implementations will not reliably restart an object that has ended.
@@ -3387,7 +3553,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       voiceInput.lastError = '';
       state.progress.attempt.inputMethod = 'voice';
       state.progress.attempt.alternativeInput = true;
-      renderVoiceInputState('listening');
+      renderVoiceInputState('listening', voiceInput.fallbackMessage);
       announce('Microphone input is listening.');
     };
     recognition.onresult = (event) => {
@@ -3415,15 +3581,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       voiceInput.restartCount = 0;
       const transcript = [finalTranscript, interimTranscript.trim()].filter(Boolean).join(' ').trim();
       if (!transcript) return;
-      const input = app.querySelector('[data-typing-input]');
-      const nextValue = [voiceInput.initialResponse, transcript].filter(Boolean).join(' ');
-      state.progress.attempt.response = nextValue;
-      state.progress.attempt.feedback = '';
-      if (input) {
-        input.value = nextValue;
-        syncTypingTester(input);
-      }
-      save('Voice input added to your response.');
+      placeBrowserSpeechTranscript(transcript);
     };
     recognition.onerror = (event) => {
       if (sessionId !== voiceInput.sessionId || voiceInput.recognition !== recognition || voiceInput.stopRequested) return;
@@ -3466,7 +3624,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
   };
 
-  const startBrowserVoiceInput = () => {
+  const startBrowserVoiceInput = (detail = '') => {
     if (!typingAllowsVoiceInput()) {
       announce(typingIsConceptResponse()
         ? 'Enable Voice input and speech-to-text in Learning settings before using the microphone.'
@@ -3484,12 +3642,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.stopRequested = false;
     voiceInput.restartCount = 0;
     voiceInput.lastError = '';
+    voiceInput.fallbackMessage = detail;
     voiceInput.sessionId += 1;
     const sessionId = voiceInput.sessionId;
     voiceInput.initialResponse = state.progress.attempt.response.trim();
     voiceInput.finalTranscript = '';
     voiceInput.finalResultIndexes = new Set();
-    renderVoiceInputState('listening', 'Starting microphone input. Speak when your browser shows that it is listening. Typing stays available.');
+    renderVoiceInputState('listening', detail || 'Starting microphone input. Speak when your browser shows that it is listening. Typing stays available.');
     beginVoiceRecognitionCycle(sessionId);
   };
 
@@ -3557,6 +3716,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         : 'Your recording is now editable in the response field.');
     } catch (error) {
       if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
+      if (voiceRecognitionConstructor()) {
+        startBrowserVoiceInput('Speechmatics could not transcribe that recording. Browser speech recognition is ready; please repeat your response.');
+        return;
+      }
       renderVoiceInputState('error', error?.message || 'Voice input could not continue. Your response is still here, and typing stays available.');
     }
   };
@@ -3620,7 +3783,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       await startSpeechmaticsTypingInput();
       return;
     }
-    renderVoiceInputState('error', 'Speechmatics voice input is unavailable right now. Your typing stays available.');
+    if (voiceRecognitionConstructor()) {
+      startBrowserVoiceInput('Speechmatics voice input is unavailable right now. Browser speech recognition is ready instead.');
+      return;
+    }
+    renderVoiceInputState('error', 'Voice input is unavailable right now. Your typing stays available.');
   };
 
   const addTypingSupportControls = () => {
@@ -4793,41 +4960,6 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     });
   };
 
-  const normaliseText = (value) => value.trim().replace(/\s+/g, ' ').replace(/[“”]/g, '"').replace(/[’]/g, "'");
-  const normaliseTypingMatch = (value) => normaliseText(value).toLowerCase().replace(/[.,!?;:]/g, '');
-  const speechComparableText = (value) => normaliseTypingMatch(value)
-    .replace(/\ba\s*d\s*h\s*d\b/g, 'adhd')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const editDistance = (left, right) => {
-    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-    for (let row = 1; row <= left.length; row += 1) {
-      const current = [row];
-      for (let column = 1; column <= right.length; column += 1) {
-        current[column] = Math.min(
-          previous[column] + 1,
-          current[column - 1] + 1,
-          previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1)
-        );
-      }
-      previous.splice(0, previous.length, ...current);
-    }
-    return previous[right.length];
-  };
-  // This is intentionally not an AI correction. It accepts only a very close
-  // transcription of the one visible reference and then inserts that authored
-  // reference, preserving the existing green-character feedback exactly.
-  const canonicaliseSpokenTyping = (transcript, target) => {
-    const spoken = speechComparableText(transcript);
-    const expected = speechComparableText(target);
-    if (!spoken || !expected) return { value: transcript, corrected: false };
-    if (spoken === expected) return { value: target, corrected: true };
-    const length = Math.max(spoken.length, expected.length, 1);
-    const similarity = 1 - (editDistance(spoken, expected) / length);
-    if (spoken.length >= expected.length * 0.72 && similarity >= 0.92) return { value: target, corrected: true };
-    return { value: transcript, corrected: false };
-  };
   const typingAccuracy = (target, response) => {
     const expected = Array.from(normaliseText(target).toLocaleLowerCase());
     const actual = Array.from(normaliseText(response).toLocaleLowerCase());
