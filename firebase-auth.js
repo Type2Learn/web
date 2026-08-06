@@ -4,6 +4,7 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
   createUserWithEmailAndPassword,
+  getRedirectResult,
   getAuth,
   isSignInWithEmailLink,
   onAuthStateChanged,
@@ -12,7 +13,7 @@ import {
   setPersistence,
   signInWithEmailAndPassword,
   signInWithEmailLink,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
@@ -34,15 +35,19 @@ const errorMessages = {
   'auth/email-already-in-use': 'An account already uses this email. Sign in or reset the password instead.',
   'auth/expired-action-code': 'This email link has expired. Request a new one and try again.',
   'auth/invalid-action-code': 'This email link is invalid or has already been used. Request a new one and try again.',
+  'auth/invalid-api-key': 'Account sign-in is not configured correctly yet. Please try again shortly.',
   'auth/invalid-credential': 'The email or password was not recognized. Check both fields and try again.',
+  'auth/internal-error': 'Google sign-in could not finish. Try again, or use the email sign-in link instead.',
   'auth/invalid-email': 'Enter a valid email address.',
   'auth/network-request-failed': 'The connection was interrupted. Check your internet connection and try again.',
   'auth/operation-not-allowed': 'This sign-in method still needs to be enabled in the Firebase console.',
   'auth/popup-blocked': 'Your browser blocked the Google sign-in window. Allow popups for Type2Learn and try again.',
   'auth/popup-closed-by-user': 'Google sign-in was closed before it finished.',
+  'auth/operation-not-supported-in-this-environment': 'This browser is blocking secure account sign-in. Try a regular browser window, or use the email sign-in link.',
   'auth/too-many-requests': 'Too many attempts were made. Wait a moment before trying again.',
   'auth/unauthorized-continue-uri': 'This sign-in link is not configured for this website yet. Please contact Type2Learn support.',
   'auth/unauthorized-domain': 'This domain needs to be added to Firebase Authentication authorized domains.',
+  'auth/web-storage-unsupported': 'This browser is blocking the storage needed to keep you signed in. Allow site data for Type2Learn and try again.',
   'auth/user-disabled': 'This account has been disabled. Contact Type2Learn support.',
   'auth/weak-password': 'Choose a stronger password with at least eight characters.'
 };
@@ -259,6 +264,24 @@ export const setupFirebaseAuth = ({ setStatus }) => {
     }
   });
 
+  // Google redirect sign-in is more dependable than popups in browsers that
+  // block a new window or isolate third-party sign-in windows.
+  const finishGoogleRedirect = async () => {
+    const form = loginForm || document.querySelector('[data-auth-form="login"]');
+    try {
+      const result = await getRedirectResult(auth);
+      if (!result?.user) return;
+      clearType2LearnGuest();
+      redirectAfterAuth();
+    } catch (error) {
+      setStatus(form, messageFor(error), 'error');
+    } finally {
+      setBusy(form, false);
+    }
+  };
+
+  void finishGoogleRedirect();
+
   document.querySelectorAll('[data-google-auth]').forEach((button) => {
     button.addEventListener('click', async () => {
       const form = button.closest('form');
@@ -266,11 +289,9 @@ export const setupFirebaseAuth = ({ setStatus }) => {
       setStatus(form, 'Opening secure Google sign-in…', 'working');
       try {
         const persistence = rememberEmail?.checked ? browserLocalPersistence : browserSessionPersistence;
-        provider.setCustomParameters({ prompt: 'select_account' });
-        await signInWithPopup(auth, provider);
         await setPersistence(auth, persistence);
-        clearType2LearnGuest();
-        redirectAfterAuth();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        await signInWithRedirect(auth, provider);
       } catch (error) {
         setStatus(form, messageFor(error), 'error');
       } finally {

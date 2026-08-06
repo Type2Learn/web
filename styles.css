@@ -5,7 +5,8 @@
   src: url("/assets/fonts/manrope-latin-wght-normal.woff2") format("woff2-variations");
   font-style: normal;
   font-weight: 200 800;
-  font-display: optional;
+  /* Avoid keeping a first visit permanently in a fallback font. */
+  font-display: swap;
 }
 
 @font-face {
@@ -13,7 +14,7 @@
   src: url("/assets/fonts/cormorant-garamond-latin-wght-normal.woff2") format("woff2-variations");
   font-style: normal;
   font-weight: 300 700;
-  font-display: optional;
+  font-display: swap;
 }
 
 :root {
@@ -2729,8 +2730,9 @@ body {
   white-space: nowrap;
   opacity: 1;
   transform: none;
-  animation: hero-line-rise .8s var(--ease-out) forwards;
-  animation-delay: calc(150ms + var(--line-index) * 115ms);
+  /* The main heading is orientation content, not decoration. Rendering it
+     immediately avoids a partially faded headline on the first page paint. */
+  animation: none;
 }
 
 @keyframes hero-line-rise {
