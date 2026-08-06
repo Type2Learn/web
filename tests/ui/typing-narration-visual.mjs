@@ -46,9 +46,8 @@ try {
   await page.locator('[data-action="read-complete"]').click();
   await page.locator('[data-typing-input]').waitFor({ state: 'visible', timeout: 15000 });
   await page.waitForFunction(() => document.querySelector('link[data-type2learn-next-narration][href*="02-dyslexia/read-ava-timed.mp3"]'), null, { timeout: 15000 });
-  await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => String(entry.name).includes('/assets/audio/typing-tts/Male%201/I%20will%20tell%20you%20what%20you%20need%20to%20type!...And%20I%20will%20tell%20you%20what%20you%20actually%20typed!...mp3')), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('link[data-type2learn-narration-preload][href*="/assets/audio/typing-tts/guidance/male-instruction-en.mp3"]'), null, { timeout: 15000 });
   await page.locator('[data-typing-input]').fill('A');
-  await page.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => String(entry.name).includes('/assets/audio/typing-tts/Female%201/Alphabets/A.mp3')), null, { timeout: 15000 });
   const beforePlay = await page.evaluate(() => {
     const control = document.querySelector('[data-task-narration-control]');
     const callAi = document.querySelector('[data-action="call-ai"]');
@@ -57,8 +56,8 @@ try {
     return {
       visible: Boolean(controlRect && controlRect.width && controlRect.height),
       beforeCallAi: Boolean(controlRect && aiRect && controlRect.left < aiRect.left),
-      expectedPreloaded: performance.getEntriesByType('resource').some((entry) => String(entry.name).includes('/assets/audio/typing-tts/Male%201/Alphabets/A.mp3')),
-      responsePreloaded: performance.getEntriesByType('resource').some((entry) => String(entry.name).includes('/assets/audio/typing-tts/Female%201/Alphabets/A.mp3')),
+      expectedPreloaded: Boolean(document.querySelector('link[data-type2learn-narration-preload][href*="/assets/audio/typing-tts/Male%201/Alphabets/A.mp3"]')),
+      responsePreloaded: Boolean(document.querySelector('link[data-type2learn-narration-preload][href*="/assets/audio/typing-tts/Female%201/Alphabets/A.mp3"]')),
       nextModuleQueued: Boolean(document.querySelector('link[data-type2learn-next-narration][href*="02-dyslexia/read-ava-timed.mp3"]')),
       overflow: document.documentElement.scrollWidth > window.innerWidth
     };
@@ -66,7 +65,7 @@ try {
   assert.equal(beforePlay.visible, true, 'Typing must show the same audio button.');
   assert.equal(beforePlay.beforeCallAi, true, 'Typing audio control must sit before Call AI.');
   assert.equal(beforePlay.expectedPreloaded, true, 'Expected typing characters must preload before playback.');
-  assert.equal(beforePlay.responsePreloaded, true, 'Typed characters must warm immediately after input.');
+  assert.equal(beforePlay.responsePreloaded, true, 'The matching female response clips must preload before typing begins.');
   assert.equal(beforePlay.nextModuleQueued, true, 'The next module recording must queue after current-page audio is warm.');
   assert.equal(beforePlay.overflow, false, 'Typing narration controls must not overflow the page.');
   await page.locator('[data-task-narration-control]').click();
@@ -90,7 +89,7 @@ try {
   await urduPage.locator('[data-action="preview-complete"]').click();
   await urduPage.locator('[data-action="read-complete"]').click();
   await urduPage.locator('[data-task-narration-control]').waitFor({ state: 'visible', timeout: 15000 });
-  await urduPage.waitForFunction(() => performance.getEntriesByType('resource').some((entry) => String(entry.name).includes('/assets/audio/typing-tts/Male%201/Hindi_male_voice_1.mp3')), null, { timeout: 15000 });
+  await urduPage.waitForFunction(() => document.querySelector('link[data-type2learn-narration-preload][href*="/assets/audio/typing-tts/guidance/male-instruction-ur.mp3"]'), null, { timeout: 15000 });
   const urduInspection = await urduPage.evaluate(() => ({
     direction: document.documentElement.dir,
     hasControl: Boolean(document.querySelector('[data-task-narration-control]')),

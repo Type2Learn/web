@@ -24,6 +24,23 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     preludeTimer: null,
     preludeContinue: null
   };
+  // Typing narration is deliberately a separate state machine. A normal
+  // playlist cannot wait for, react to, or correct individual keystrokes.
+  const typingGuidance = {
+    active: false,
+    paused: false,
+    phase: 'idle',
+    audio: null,
+    audioToken: 0,
+    repeatTimer: null,
+    fastTimer: null,
+    lastInputAt: 0,
+    fastMode: false,
+    expectedIndex: 0,
+    lastValue: '',
+    currentRole: '',
+    feedbackQueue: []
+  };
   const BACKGROUND_NOISE_SOURCES = {
     pink: '/assets/audio/background-noise/pink-noise-loop.mp3',
     white: '/assets/audio/background-noise/white-noise-loop.mp3',
@@ -1436,9 +1453,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     && (state.progress.phase === 'read' || state.progress.phase === 'type' || isReviewingModule())
   );
 
-  const taskNarrationStatus = () => taskNarration.preludeActive
-    ? (taskNarration.preludePaused ? 'paused' : 'playing')
-    : narration.status;
+  const taskNarrationStatus = () => {
+    if (state.progress.phase === 'type' && typingGuidance.active) return typingGuidance.paused ? 'paused' : 'playing';
+    return taskNarration.preludeActive
+      ? (taskNarration.preludePaused ? 'paused' : 'playing')
+      : narration.status;
+  };
 
   const taskNarrationControlCopy = () => {
     const status = taskNarrationStatus();
@@ -1975,10 +1995,22 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       });
   };
   const scheduledNarrationPrefetches = new Set();
+  const moduleUrduReadingSources = (audioKey) => [
+    'title-ava.mp3',
+    ...Array.from({ length: 5 }, (_, index) => [
+      'section-' + (index + 1) + '-heading-ava.mp3',
+      'section-' + (index + 1) + '-answer-ava.mp3'
+    ]).flat()
+  ].map((filename) => urduReadingAudioSource(audioKey, filename));
+
   const preloadNextModuleNarration = () => {
     const nextAudioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex() + 1];
     const nextAssets = COURSE_AUDIO_MANIFEST.modules?.[nextAudioKey];
-    const sources = [nextAssets?.read, nextAssets?.simpleAddon]
+    const sources = [
+      nextAssets?.read,
+      nextAssets?.simpleAddon,
+      ...(courseUsesUrdu() && nextAudioKey ? moduleUrduReadingSources(nextAudioKey) : [])
+    ]
       .filter((source) => typeof source === 'string' && source)
       .filter((source) => !scheduledNarrationPrefetches.has(source));
     if (!sources.length || typeof document === 'undefined') return;
@@ -1997,27 +2029,47 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const narrationSectionValue = (value) => Array.isArray(value) ? value.join('; ') + '.' : String(value || '').trim();
 
+  const urduReadingAudioSource = (audioKey, filename) => '/course/audio/edge-ava/neurodivergent/'
+    + encodeURIComponent(audioKey) + '/urdu/' + encodeURIComponent(filename);
+
   const taskNarrationReadingChunks = () => {
     const step = currentStep();
     const sections = visibleReadingSections();
     const useUrdu = courseUsesUrdu();
-    const chunks = [{
-      id: 'task-title',
-      label: useUrdu ? (urduStep()?.title || step.title) : step.title,
-      text: useUrdu ? (urduStep()?.title || step.title) : step.title
-    }];
-    sections.forEach((section, index) => {
-      const heading = useUrdu ? section.urduHeading : section.heading;
-      const value = useUrdu ? section.urduValue : section.value;
-      const answer = narrationSectionValue(value);
-      if (heading) chunks.push({ id: 'task-question-' + index, label: heading, text: heading });
-      if (answer) chunks.push({ id: 'task-answer-' + index, label: heading || 'Lesson answer', text: answer });
+    if (!useUrdu) {
+      const chunks = [{ id: 'task-title', label: step.title, text: step.title }];
+      sections.forEach((section, index) => {
+        const answer = narrationSectionValue(section.value);
+        if (section.heading) chunks.push({ id: 'task-question-' + index, label: section.heading, text: section.heading });
+        if (answer) chunks.push({ id: 'task-answer-' + index, label: section.heading || 'Lesson answer', text: answer });
+      });
+      return chunks.filter((chunk) => chunk.text);
+    }
+
+    // Urdu mode deliberately preserves both lines shown in the lesson: every
+    // English thought is spoken first, followed immediately by its Urdu
+    // translation. The numbered Urdu MP3s match the authored section order.
+    const translation = urduStep() || {};
+    const chunks = [
+      { id: 'task-title-en', label: step.title, text: step.title, audioLanguage: 'en' },
+      { id: 'task-title-ur', label: translation.title || step.title, text: translation.title || step.title, audioLanguage: 'ur', urduAudioFile: 'title-ava.mp3' }
+    ];
+    sections.forEach((section, visibleIndex) => {
+      const sourceIndex = Math.max(0, readingSections().indexOf(section));
+      const urduHeading = section.urduHeading || section.heading;
+      const englishAnswer = narrationSectionValue(section.value);
+      const urduAnswer = narrationSectionValue(section.urduValue || section.value);
+      const prefix = 'section-' + (sourceIndex + 1);
+      if (section.heading) chunks.push({ id: 'task-question-en-' + visibleIndex, label: section.heading, text: section.heading, audioLanguage: 'en' });
+      if (urduHeading) chunks.push({ id: 'task-question-ur-' + visibleIndex, label: urduHeading, text: urduHeading, audioLanguage: 'ur', urduAudioFile: prefix + '-heading-ava.mp3' });
+      if (englishAnswer) chunks.push({ id: 'task-answer-en-' + visibleIndex, label: section.heading || 'Lesson answer', text: englishAnswer, audioLanguage: 'en' });
+      if (urduAnswer) chunks.push({ id: 'task-answer-ur-' + visibleIndex, label: urduHeading || 'Lesson answer', text: urduAnswer, audioLanguage: 'ur', urduAudioFile: prefix + '-answer-ava.mp3' });
     });
     return chunks.filter((chunk) => chunk.text);
   };
 
   const taskNarrationReadingPlaylist = (chunks) => {
-    if (courseUsesUrdu() || !usesLocalAvaNarration() || !chunks.length) return [];
+    if (!usesLocalAvaNarration() || !chunks.length) return [];
     const audioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex()];
     const assets = COURSE_AUDIO_MANIFEST.modules?.[audioKey];
     const step = currentStep();
@@ -2054,7 +2106,18 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
     for (let index = 0; index < chunks.length; index += 1) {
       const chunk = chunks[index];
-      if (!addAvaExcerpt(index, chunk.text)) return [];
+      if (chunk.audioLanguage === 'ur') {
+        if (!chunk.urduAudioFile) return [];
+        const src = urduReadingAudioSource(audioKey, chunk.urduAudioFile);
+        playlist.push({
+          id: 'urdu-' + index,
+          src,
+          text: chunk.text,
+          chunkIndexes: [index],
+          chunkMap: [{ index, sourceStart: 0, sourceEnd: Math.max(1, chunk.text.length) }],
+          advanceOnStop: true
+        });
+      } else if (!addAvaExcerpt(index, chunk.text)) return [];
     }
     return playlist;
   };
@@ -2140,7 +2203,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     courseUsesUrdu() ? 'Hindi_male_voice_1.mp3' : 'I will tell you what you need to type!...And I will tell you what you actually typed!...mp3'
   );
 
-  const typingAudioNarrationPlan = () => {
+  const legacyTypingAudioNarrationPlan = () => {
     const chunks = [];
     const playlist = [];
     const addTrack = (source, label) => {
@@ -2175,12 +2238,291 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     service.preloadAudioSources?.(sources);
   };
 
+  const TYPING_GUIDANCE_ROOT = TYPING_TTS_ROOT + 'guidance/';
+  const typingGuidanceClip = (name) => TYPING_GUIDANCE_ROOT
+    + encodeURIComponent(name + '-' + (courseUsesUrdu() ? 'ur' : 'en') + '.mp3');
+  const typingGuidanceIntroSources = () => [
+    typingGuidanceClip('male-instruction'),
+    typingGuidanceClip('female-instruction'),
+    typingGuidanceClip('click-inside-box')
+  ];
+
+  const typingGuidanceAssetSources = () => {
+    const referenceCharacters = [...new Set(Array.from(activeTypingReference() || ''))];
+    return [...new Set([
+      ...typingGuidanceIntroSources(),
+      ...referenceCharacters.flatMap((character) => [
+        typingCharacterClip('target', character),
+        typingCharacterClip('response', character)
+      ])
+    ].filter(Boolean))];
+  };
+
+  // A normal narration playlist cannot wait for, react to, or correct an
+  // individual keystroke. This controller keeps the recorded male and female
+  // clips on one audio channel and never lets them overlap.
+  const typingAudioNarrationPlan = () => ({ chunks: [], playlist: [], sources: typingGuidanceAssetSources() });
+
+  const clearTypingGuidanceTimers = () => {
+    if (typingGuidance.repeatTimer !== null) window.clearTimeout(typingGuidance.repeatTimer);
+    if (typingGuidance.fastTimer !== null) window.clearTimeout(typingGuidance.fastTimer);
+    typingGuidance.repeatTimer = null;
+    typingGuidance.fastTimer = null;
+  };
+
+  const stopTypingGuidanceAudio = () => {
+    typingGuidance.audioToken += 1;
+    const audio = typingGuidance.audio;
+    typingGuidance.audio = null;
+    typingGuidance.currentRole = '';
+    if (!audio) return;
+    audio.onended = null;
+    audio.onerror = null;
+    try { audio.pause?.(); } catch (_) { /* Best-effort audio cleanup. */ }
+    try { audio.removeAttribute?.('src'); } catch (_) { /* Best-effort audio cleanup. */ }
+    try { audio.load?.(); } catch (_) { /* Best-effort audio cleanup. */ }
+  };
+
+  const finishTypingGuidance = () => {
+    clearTypingGuidanceTimers();
+    stopTypingGuidanceAudio();
+    typingGuidance.active = false;
+    typingGuidance.paused = false;
+    typingGuidance.phase = 'finished';
+    typingGuidance.feedbackQueue = [];
+    syncTaskNarrationControl();
+  };
+
+  const stopTypingGuidance = () => {
+    clearTypingGuidanceTimers();
+    stopTypingGuidanceAudio();
+    typingGuidance.active = false;
+    typingGuidance.paused = false;
+    typingGuidance.phase = 'idle';
+    typingGuidance.fastMode = false;
+    typingGuidance.lastInputAt = 0;
+    typingGuidance.lastValue = '';
+    typingGuidance.feedbackQueue = [];
+  };
+
+  const typingGuidanceInputIsFocused = () => document.activeElement?.matches?.('[data-typing-input]');
+
+  const playTypingGuidanceSource = (source, role, after = () => {}) => {
+    if (!typingGuidance.active || typingGuidance.paused || !source || typeof window.Audio !== 'function') {
+      after();
+      return;
+    }
+    stopTypingGuidanceAudio();
+    const token = ++typingGuidance.audioToken;
+    const audio = new window.Audio();
+    let settled = false;
+    const complete = () => {
+      if (settled || token !== typingGuidance.audioToken) return;
+      settled = true;
+      typingGuidance.audio = null;
+      typingGuidance.currentRole = '';
+      after();
+    };
+    audio.preload = 'auto';
+    audio.src = source;
+    audio.volume = Math.min(1, Math.max(0, Number(state.preferences.narrationVolume) || 1));
+    audio.playbackRate = Math.min(1.25, Math.max(0.85, Number(state.preferences.narrationSpeed) || 1));
+    audio.onended = complete;
+    audio.onerror = complete;
+    typingGuidance.audio = audio;
+    typingGuidance.currentRole = role;
+    Promise.resolve(audio.play()).catch(complete);
+    syncTaskNarrationControl();
+  };
+
+  const nextSpeakableTypingIndex = (fromIndex) => {
+    const reference = Array.from(activeTypingReference() || '');
+    for (let index = Math.max(0, Number(fromIndex) || 0); index < reference.length; index += 1) {
+      if (typingCharacterClip('target', reference[index])) return index;
+    }
+    return -1;
+  };
+
+  const promptExpectedTypingCharacter = (fromIndex, repeatCount = 0) => {
+    if (!typingGuidance.active || typingGuidance.paused || !typingGuidanceInputIsFocused()) return;
+    const index = nextSpeakableTypingIndex(fromIndex);
+    if (index < 0) {
+      finishTypingGuidance();
+      return;
+    }
+    const responseAtPrompt = state.progress.attempt.response || '';
+    const source = typingCharacterClip('target', Array.from(activeTypingReference() || '')[index]);
+    typingGuidance.expectedIndex = index;
+    typingGuidance.phase = 'prompting';
+    playTypingGuidanceSource(source, 'target', () => {
+      if (!typingGuidance.active || typingGuidance.paused || typingGuidance.fastMode) return;
+      if (!typingGuidanceInputIsFocused() || typingGuidance.expectedIndex !== index || (state.progress.attempt.response || '') !== responseAtPrompt) return;
+      if (repeatCount >= 3) {
+        finishTypingGuidance();
+        return;
+      }
+      typingGuidance.phase = 'waiting';
+      typingGuidance.repeatTimer = window.setTimeout(() => promptExpectedTypingCharacter(index, repeatCount + 1), 2000);
+      syncTaskNarrationControl();
+    });
+  };
+
+  const playQueuedTypingFeedback = () => {
+    if (!typingGuidance.active || typingGuidance.paused || typingGuidance.audio) return;
+    const next = typingGuidance.feedbackQueue.shift();
+    if (!next) {
+      typingGuidance.phase = 'waiting';
+      syncTaskNarrationControl();
+      return;
+    }
+    playTypingGuidanceSource(typingCharacterClip('response', next), 'response', playQueuedTypingFeedback);
+  };
+
+  const queueTypingFeedback = (character) => {
+    const source = typingCharacterClip('response', character);
+    if (!source) return;
+    if (typingGuidance.audio) {
+      // Keep recent speech useful during fast typing instead of making the
+      // learner wait through an ever-growing queue of old letters.
+      if (typingGuidance.feedbackQueue.length >= 3) typingGuidance.feedbackQueue.splice(0, typingGuidance.feedbackQueue.length - 2);
+      typingGuidance.feedbackQueue.push(character);
+      return;
+    }
+    playTypingGuidanceSource(source, 'response', playQueuedTypingFeedback);
+  };
+
+  const resumeTypingGuidance = () => {
+    if (!typingGuidance.active) return;
+    typingGuidance.paused = false;
+    if (typingGuidance.audio) {
+      Promise.resolve(typingGuidance.audio.play()).catch(() => finishTypingGuidance());
+    } else if (typingGuidanceInputIsFocused()) {
+      promptExpectedTypingCharacter(Array.from(state.progress.attempt.response || '').length);
+    } else {
+      typingGuidance.phase = 'waiting';
+    }
+    syncTaskNarrationControl();
+  };
+
+  const pauseTypingGuidance = () => {
+    if (!typingGuidance.active) return;
+    clearTypingGuidanceTimers();
+    typingGuidance.paused = true;
+    try { typingGuidance.audio?.pause?.(); } catch (_) { /* Best-effort pause. */ }
+    syncTaskNarrationControl();
+  };
+
+  const startTypingGuidance = () => {
+    const service = ensureNarrationService();
+    stopTypingGuidance();
+    service.stop({ silent: true });
+    const sources = typingGuidanceAssetSources();
+    preloadCurrentNarrationSources(sources);
+    service.preloadAudioSources?.(sources);
+    typingGuidance.active = true;
+    typingGuidance.paused = false;
+    typingGuidance.phase = 'intro';
+    typingGuidance.lastValue = state.progress.attempt.response || '';
+    typingGuidance.expectedIndex = Array.from(typingGuidance.lastValue).length;
+    const intro = typingGuidanceIntroSources();
+    let introIndex = 0;
+    const playNextIntro = () => {
+      if (!typingGuidance.active || typingGuidance.paused) return;
+      const source = intro[introIndex++];
+      if (source) {
+        playTypingGuidanceSource(source, introIndex === 1 ? 'target' : 'response', playNextIntro);
+        return;
+      }
+      typingGuidance.phase = 'waiting';
+      syncTaskNarrationControl();
+      if (typingGuidanceInputIsFocused()) promptExpectedTypingCharacter(typingGuidance.expectedIndex);
+    };
+    playNextIntro();
+  };
+
+  const toggleTypingGuidance = () => {
+    if (!typingGuidance.active) {
+      startTypingGuidance();
+      return;
+    }
+    if (typingGuidance.paused) resumeTypingGuidance();
+    else pauseTypingGuidance();
+  };
+
+  const handleTypingGuidanceInput = (nextValue) => {
+    if (!typingGuidance.active || typingGuidance.paused || typingGuidance.phase === 'intro') {
+      typingGuidance.lastValue = nextValue;
+      return;
+    }
+    const now = Date.now();
+    const interval = typingGuidance.lastInputAt ? now - typingGuidance.lastInputAt : Number.POSITIVE_INFINITY;
+    typingGuidance.lastInputAt = now;
+    if (interval < 600) typingGuidance.fastMode = true;
+    if (typingGuidance.fastTimer !== null) window.clearTimeout(typingGuidance.fastTimer);
+    typingGuidance.fastTimer = window.setTimeout(() => { typingGuidance.fastMode = false; }, 1250);
+    const previous = Array.from(typingGuidance.lastValue || '');
+    const response = Array.from(nextValue || '');
+    typingGuidance.lastValue = nextValue;
+    if (typingGuidance.repeatTimer !== null) window.clearTimeout(typingGuidance.repeatTimer);
+    typingGuidance.repeatTimer = null;
+
+    if (response.length < previous.length) {
+      stopTypingGuidanceAudio();
+      typingGuidance.expectedIndex = response.length;
+      typingGuidance.phase = 'waiting';
+      if (typingGuidanceInputIsFocused()) window.setTimeout(() => promptExpectedTypingCharacter(response.length), 120);
+      return;
+    }
+    if (response.length <= previous.length) return;
+
+    const character = response[response.length - 1];
+    const position = response.length - 1;
+    const expected = Array.from(activeTypingReference() || '')[position];
+    const correct = character === expected;
+
+    // Any incoming character invalidates a prompt for the previous position.
+    // This lets a learner move past an ignored typo instead of getting stuck.
+    if (typingGuidance.currentRole === 'target') stopTypingGuidanceAudio();
+
+    if (typingGuidance.fastMode) {
+      if (!correct) {
+        typingGuidance.feedbackQueue = [];
+        stopTypingGuidanceAudio();
+        typingGuidance.expectedIndex = position;
+        typingGuidance.phase = 'correction';
+        playTypingGuidanceSource(typingCharacterClip('target', expected), 'target', () => {
+          if (typingGuidance.active && !typingGuidance.paused) {
+            typingGuidance.phase = 'waiting';
+            syncTaskNarrationControl();
+          }
+        });
+      } else {
+        queueTypingFeedback(character);
+      }
+      return;
+    }
+
+    typingGuidance.feedbackQueue = [];
+    stopTypingGuidanceAudio();
+    typingGuidance.expectedIndex = correct ? position + 1 : position;
+    typingGuidance.phase = 'feedback';
+    playTypingGuidanceSource(typingCharacterClip('response', character), 'response', () => {
+      if (!typingGuidance.active || typingGuidance.paused) return;
+      if (typingGuidance.fastMode) {
+        playQueuedTypingFeedback();
+        return;
+      }
+      if ((state.progress.attempt.response || '') !== nextValue) return;
+      promptExpectedTypingCharacter(correct ? position + 1 : position);
+    });
+  };
+
   const taskNarrationPlan = () => {
     if (state.progress.phase === 'type') return typingAudioNarrationPlan();
     const readingTask = state.progress.phase === 'read' || isReviewingModule();
     const language = courseUsesUrdu() ? 'ur' : 'en';
     const chunks = (readingTask ? taskNarrationReadingChunks() : taskNarrationGenericChunks())
-      .map((chunk) => ({ ...chunk, lang: language }));
+      .map((chunk) => ({ ...chunk, lang: chunk.lang || chunk.audioLanguage || language }));
     return { chunks, playlist: readingTask ? taskNarrationReadingPlaylist(chunks) : [] };
   };
 
@@ -2205,6 +2547,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const stopTaskNarration = ({ silent = true } = {}) => {
     taskNarration.session += 1;
     clearTaskNarrationPrelude();
+    stopTypingGuidance();
     try { window.speechSynthesis?.cancel?.(); } catch (_) { /* Best-effort cancellation. */ }
     narration.service?.stop({ silent });
     narration.activeIndex = -1;
@@ -2215,6 +2558,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const startTaskNarration = () => {
     if (!taskNarrationIsAvailable()) return;
+    if (state.progress.phase === 'type') {
+      toggleTypingGuidance();
+      return;
+    }
     const service = ensureNarrationService();
     if (taskNarration.preludeActive) {
       try {
@@ -3501,18 +3848,26 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     service.stop({ silent: true });
     const readingTask = state.view === 'course' && (state.progress.phase === 'read' || isReviewingModule());
     if (readingTask) {
-      narration.chunks = renderedNarrationChunks();
-      if (!narration.chunks.length) narration.chunks = readingNarrationChunks();
-      service.setChunks(narration.chunks);
-      // This calls the service's page-level preloader even if Text-to-speech
-      // is currently off, so the included Ava file is ready on demand.
-      configureLocalAvaPlaylist(service, narration.chunks);
-      // Mapping deliberately refuses to play a full recording when the
-      // visible excerpt no longer matches it. That safety rule must not stop
-      // us from warming the verified module files for a later matching view.
       const currentAudioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex()];
       const currentAssets = COURSE_AUDIO_MANIFEST.modules?.[currentAudioKey];
-      if (!courseUsesUrdu()) {
+      if (courseUsesUrdu()) {
+        const plan = taskNarrationPlan();
+        narration.chunks = plan.chunks;
+        service.setChunks(narration.chunks);
+        service.setAudioPlaylist(plan.playlist);
+        const currentSources = [...new Set(plan.playlist.map((track) => track.src).filter(Boolean))];
+        preloadCurrentNarrationSources(currentSources);
+        service.preloadAudioSources?.(currentSources);
+      } else {
+        narration.chunks = renderedNarrationChunks();
+        if (!narration.chunks.length) narration.chunks = readingNarrationChunks();
+        service.setChunks(narration.chunks);
+        // This calls the service's page-level preloader even if Text-to-speech
+        // is currently off, so the included Ava file is ready on demand.
+        configureLocalAvaPlaylist(service, narration.chunks);
+        // Mapping deliberately refuses to play a full recording when the
+        // visible excerpt no longer matches it. That safety rule must not stop
+        // us from warming the verified module files for a later matching view.
         const currentSources = [currentAssets?.read, currentAssets?.simpleAddon];
         preloadCurrentNarrationSources(currentSources);
         service.preloadAudioSources?.(currentSources);
@@ -3522,9 +3877,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const plan = typingAudioNarrationPlan();
       narration.chunks = plan.chunks;
       service.setChunks(narration.chunks);
-      // The expected characters warm as soon as the typing screen renders;
-      // response characters are added to this plan as the learner types.
+      // Guided typing manages one character at a time rather than using a
+      // sequential playlist. Its intro plus both voices for every required
+      // character warm before the learner presses Play.
       service.setAudioPlaylist(plan.playlist);
+      preloadCurrentNarrationSources(plan.sources);
+      service.preloadAudioSources?.(plan.sources);
       preloadNextModuleNarration();
     } else {
       narration.chunks = [];
@@ -4973,6 +5331,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!usesAlternativeInput && !isComposition && (insertedLength > 24 || isUnexpectedInsertion)) state.progress.attempt.integrityNotice = true;
     state.progress.attempt.response = nextValue;
     state.progress.attempt.feedback = '';
+    handleTypingGuidanceInput(nextValue);
     warmTypingAudioForCurrentResponse();
     if (activeSupportMoment && ['response-needed', 'typing-incomplete'].includes(activeSupportMoment.kind)) {
       clearSupportMoment();
@@ -4988,6 +5347,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   app.addEventListener('focusin', (event) => {
     if (!event.target.matches?.('[data-typing-input]')) return;
     window.requestAnimationFrame(() => keepGuidedTypingCursorAtEnd(event.target));
+    if (typingGuidance.active && !typingGuidance.paused && typingGuidance.phase !== 'intro') {
+      window.requestAnimationFrame(() => promptExpectedTypingCharacter(Array.from(state.progress.attempt.response || '').length));
+    }
   });
 
   app.addEventListener('click', (event) => {
