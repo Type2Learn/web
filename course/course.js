@@ -2,7 +2,7 @@ import { COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { askCourseAi, getCourseAiStatus, transcribeCourseAudio } from './ai-client.js?v=20260804-ai2';
+import { askCourseAi, getCourseAiStatus, loadCourseProgress, saveCourseProgress, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260806-cloud1';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
 
@@ -28,6 +28,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const TYPING_AUTO_ACCEPT_ACCURACY = 85;
   let periodicSaveTimer = null;
   let typingAutoSubmitTimer = null;
+  const cloudProgress = {
+    ready: false,
+    saving: false,
+    queued: false,
+    timer: null,
+    status: 'local',
+    error: ''
+  };
   // Typing narration is deliberately a separate state machine. A normal
   // playlist cannot wait for, react to, or correct individual keystrokes.
   const typingGuidance = {
@@ -110,7 +118,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     draft: '',
     status: 'idle',
     error: '',
-    connection: { checked: false, checking: false, ai: false, speech: false },
+    connection: { checked: false, checking: false, ai: false, speech: false, aiAudio: false },
     requestController: null,
     dictation: {
       recorder: null,
@@ -120,7 +128,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       timer: null,
       session: 0,
       stopping: false
-    }
+    },
+    audio: { controller: null, element: null, url: '', messageIndex: -1, loadingIndex: -1, error: '' }
   };
   // A modal render replaces the triggering control, so remember its stable
   // action selector rather than a stale DOM reference. This lets keyboard and
@@ -406,6 +415,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     reviewModuleIndex: null,
     settingsMenu: false,
     storageAvailable: true
+    ,
+    coursePaused: false,
+    updatedAtMs: 0
   });
 
   const normaliseState = (saved, sharedSettings) => {
@@ -465,6 +477,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     fresh.manualExampleVisible = Boolean(saved.manualExampleVisible);
     fresh.showSimple = Boolean(saved.showSimple);
     fresh.readingSectionIndex = Math.max(0, Number(saved.readingSectionIndex) || 0);
+    fresh.coursePaused = Boolean(saved.coursePaused);
+    fresh.updatedAtMs = Math.max(0, Number(saved.updatedAtMs) || 0);
     return fresh;
   };
 
@@ -1001,6 +1015,21 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     aiChat.requestController = null;
   };
 
+  const stopAiReplyAudio = () => {
+    const audio = aiChat.audio;
+    audio.controller?.abort?.();
+    audio.controller = null;
+    if (audio.element) {
+      audio.element.pause();
+      audio.element.src = '';
+    }
+    audio.element = null;
+    if (audio.url) URL.revokeObjectURL(audio.url);
+    audio.url = '';
+    audio.messageIndex = -1;
+    audio.loadingIndex = -1;
+  };
+
   const discardAiDictation = () => {
     const dictation = aiChat.dictation;
     dictation.session += 1;
@@ -1018,6 +1047,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const resetAiChat = ({ close = true } = {}) => {
     abortAiRequest();
+    stopAiReplyAudio();
     discardAiDictation();
     aiChat.messages = [];
     aiChat.draft = '';
@@ -1037,9 +1067,30 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const aiChatIsVisible = () => aiChat.open || state.modal === 'ai-chat';
 
+  const aiReplyCanSpeak = () => Boolean(
+    signedInLearner()
+    && aiLanguage() === 'en'
+    && state.preferences.readAloud
+    && aiChat.connection.aiAudio
+  );
+
   const aiMessagesMarkup = () => {
     const messages = aiChat.messages.length ? aiChat.messages : [{ role: 'assistant', content: aiInitialMessage(), initial: true }];
-    return messages.map((message) => '<article class="course-ai-message course-ai-message--' + (message.role === 'user' ? 'user' : 'assistant') + (message.initial ? ' is-initial' : '') + '"><span>' + escapeHtml(message.role === 'user' ? aiCopy('You', 'آپ') : aiCopy('Course helper', 'کورس مددگار')) + '</span><p>' + escapeHtml(message.content) + '</p></article>').join('');
+    return messages.map((message, index) => {
+      const speakable = message.role === 'assistant' && !message.initial && aiReplyCanSpeak();
+      const speaking = aiChat.audio.messageIndex === index;
+      const loading = aiChat.audio.loadingIndex === index;
+      const audioControl = speakable
+        ? '<button class="course-ai-message-speak" type="button" data-action="ai-speak-message" data-ai-message-index="' + index + '"' + (loading ? ' disabled' : '') + '>' + escapeHtml(loading ? 'Loading audio…' : speaking ? 'Stop audio' : 'Listen') + '</button>'
+        : '';
+      return '<article class="course-ai-message course-ai-message--' + (message.role === 'user' ? 'user' : 'assistant') + (message.initial ? ' is-initial' : '') + '"><span>' + escapeHtml(message.role === 'user' ? aiCopy('You', 'آپ') : aiCopy('Course helper', 'کورس مددگار')) + '</span><p>' + escapeHtml(message.content) + '</p>' + audioControl + '</article>';
+    }).join('');
+  };
+
+  const syncAiComposerState = () => {
+    const busy = ['checking', 'sending', 'recording', 'transcribing'].includes(aiChat.status);
+    const canSend = signedInLearner() && aiChat.connection.checked && aiChat.connection.ai && !busy && Boolean(aiChat.draft.trim());
+    app.querySelectorAll('[data-action="ai-send"]').forEach((button) => { button.disabled = !canSend; });
   };
 
   const aiChatStatusMarkup = () => {
@@ -1054,8 +1105,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const courseAiChatMarkup = (surface) => {
     const busy = ['checking', 'sending', 'recording', 'transcribing'].includes(aiChat.status);
-    const canSend = aiChat.connection.checked && aiChat.connection.ai && !busy && Boolean(aiChat.draft.trim());
-    const canSpeak = aiChat.connection.checked && aiChat.connection.speech && !busy;
+    const canSend = signedInLearner() && aiChat.connection.checked && aiChat.connection.ai && !busy && Boolean(aiChat.draft.trim());
+    const canSpeak = signedInLearner() && aiChat.connection.checked && aiChat.connection.speech && !busy;
     const closeLabel = aiCopy('Close AI chat', 'AI چیٹ بند کریں');
     const backLabel = aiCopy('Back to course', 'کورس پر واپس جائیں');
     const heading = aiCopy('Course AI', 'کورس AI');
@@ -1083,7 +1134,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     try {
       const status = await getCourseAiStatus();
       if (contextKey !== aiChat.contextKey) return;
-      aiChat.connection = { checked: true, checking: false, ai: Boolean(status?.ai?.available), speech: Boolean(status?.speechToText?.available) };
+      aiChat.connection = { checked: true, checking: false, ai: Boolean(status?.ai?.available), speech: Boolean(status?.speechToText?.available), aiAudio: Boolean(status?.speechToText?.textToSpeech?.available) };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
       if (aiChatIsVisible()) {
         render();
@@ -1091,7 +1142,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       }
     } catch (_) {
       if (contextKey !== aiChat.contextKey) return;
-      aiChat.connection = { checked: true, checking: false, ai: false, speech: false };
+      aiChat.connection = { checked: true, checking: false, ai: false, speech: false, aiAudio: false };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
       if (aiChatIsVisible()) {
         render();
@@ -1101,6 +1152,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const openCourseAi = (trigger) => {
+    if (!signedInLearner()) {
+      announce('Log in required to use Course AI.');
+      return;
+    }
     syncAiChatContext();
     if (!aiChat.open) {
       aiChat.open = true;
@@ -1143,7 +1198,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const sendAiMessage = async () => {
     const message = aiChat.draft.trim();
-    if (!message || !aiChat.connection.ai || aiChat.status !== 'idle') return;
+    if (!signedInLearner() || !message || !aiChat.connection.ai || aiChat.status !== 'idle') return;
     const history = aiChat.messages.filter((entry) => !entry.initial).slice(-6).map((entry) => ({ role: entry.role, content: entry.content }));
     aiChat.messages.push({ role: 'user', content: message });
     aiChat.draft = '';
@@ -1169,6 +1224,41 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
           focusAiInput();
         }
       }
+    }
+  };
+
+  const speakAiMessage = async (index) => {
+    const message = aiChat.messages[index];
+    if (!aiReplyCanSpeak() || !message || message.role !== 'assistant' || message.initial) return;
+    if (aiChat.audio.messageIndex === index) {
+      stopAiReplyAudio();
+      if (aiChatIsVisible()) render();
+      return;
+    }
+    stopAiReplyAudio();
+    const controller = new AbortController();
+    aiChat.audio.controller = controller;
+    aiChat.audio.loadingIndex = index;
+    aiChat.audio.error = '';
+    render();
+    try {
+      const blob = await synthesiseCourseAiReply({ user: authenticatedUser, text: message.content, language: 'en', signal: controller.signal });
+      if (controller.signal.aborted || !aiChatIsVisible()) return;
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      aiChat.audio = { controller: null, element: audio, url, messageIndex: index, loadingIndex: -1, error: '' };
+      audio.addEventListener('ended', () => {
+        if (aiChat.audio.element !== audio) return;
+        stopAiReplyAudio();
+        if (aiChatIsVisible()) render();
+      }, { once: true });
+      await audio.play();
+      if (aiChatIsVisible()) render();
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      stopAiReplyAudio();
+      aiChat.error = error?.message || 'Audio for this AI reply could not be played.';
+      if (aiChatIsVisible()) render();
     }
   };
 
@@ -1355,6 +1445,97 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (liveRegion) liveRegion.textContent = message;
   };
 
+  const signedInLearner = () => Boolean(authenticatedUser && !authenticatedUser.isGuest && typeof authenticatedUser.getIdToken === 'function');
+  const requestTimeoutSignal = (milliseconds) => (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+    ? AbortSignal.timeout(milliseconds)
+    : undefined);
+
+  const localCourseSnapshot = () => ({
+    version: 1,
+    view: state.view,
+    previousView: state.previousView,
+    progress: state.progress,
+    manualExampleVisible: state.manualExampleVisible,
+    showSimple: state.showSimple,
+    readingSectionIndex: state.readingSectionIndex,
+    coursePaused: state.coursePaused,
+    updatedAtMs: state.updatedAtMs
+  });
+
+  const cloudProgressSnapshot = () => ({
+    courseId: COURSE.id,
+    state: localCourseSnapshot(),
+    settings: state.settings,
+    choices: learningChoices()
+  });
+
+  const updateSaveStatus = (message) => {
+    const saveStatus = document.querySelector('[data-save-status]');
+    if (saveStatus) saveStatus.textContent = message;
+  };
+
+  const flushCloudProgress = async () => {
+    if (!cloudProgress.ready || !signedInLearner()) return;
+    if (cloudProgress.saving) {
+      cloudProgress.queued = true;
+      return;
+    }
+    cloudProgress.saving = true;
+    cloudProgress.queued = false;
+    try {
+      await saveCourseProgress({ user: authenticatedUser, snapshot: cloudProgressSnapshot(), signal: requestTimeoutSignal(10000) });
+      cloudProgress.status = 'account';
+      cloudProgress.error = '';
+      updateSaveStatus('Saved to your account');
+    } catch (error) {
+      cloudProgress.status = 'local';
+      cloudProgress.error = error?.message || 'Account saving is temporarily unavailable.';
+      // The browser copy is intentionally kept and remains the source of
+      // truth until a future signed-in save succeeds.
+      updateSaveStatus('Saved on this device');
+    } finally {
+      cloudProgress.saving = false;
+      if (cloudProgress.queued) {
+        cloudProgress.queued = false;
+        queueCloudProgressSave();
+      }
+    }
+  };
+
+  const queueCloudProgressSave = () => {
+    if (!cloudProgress.ready || !signedInLearner()) return;
+    cloudProgress.queued = true;
+    if (cloudProgress.timer !== null) return;
+    cloudProgress.timer = window.setTimeout(() => {
+      cloudProgress.timer = null;
+      void flushCloudProgress();
+    }, 900);
+  };
+
+  const restoreCloudProgress = async () => {
+    if (!signedInLearner()) return;
+    try {
+      const result = await loadCourseProgress({ user: authenticatedUser, courseId: COURSE.id, signal: requestTimeoutSignal(6000) });
+      const remote = result?.snapshot;
+      if (remote?.state && Number(remote.updatedAtMs) > Number(state.updatedAtMs || 0)) {
+        if (remote.settings && typeof remote.settings === 'object') {
+          saveLearnerSettings(storageKeys.learnerId, createSettingsState(remote.settings));
+        }
+        if (remote.choices && typeof remote.choices === 'object') saveLearningChoices(remote.choices);
+        localStorage.setItem(storageKeys.course, JSON.stringify(remote.state));
+        state = loadState();
+        cloudProgress.status = 'account';
+      } else if (remote) {
+        cloudProgress.status = 'account';
+      }
+    } catch (error) {
+      cloudProgress.status = 'local';
+      cloudProgress.error = error?.message || 'Account saving is temporarily unavailable.';
+    } finally {
+      cloudProgress.ready = true;
+    }
+  };
+
   const save = (message) => {
     try {
       if (!storageKeys.preferences || !storageKeys.course) throw new Error('Learner storage is not ready.');
@@ -1362,25 +1543,17 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         version: 2,
         settingsMigrationVersion: LEGACY_COURSE_SETTINGS_MIGRATION_VERSION
       }));
-      localStorage.setItem(storageKeys.course, JSON.stringify({
-        version: 1,
-        view: state.view,
-        previousView: state.previousView,
-        progress: state.progress,
-        manualExampleVisible: state.manualExampleVisible,
-        showSimple: state.showSimple,
-        readingSectionIndex: state.readingSectionIndex
-      }));
+      state.updatedAtMs = Date.now();
+      localStorage.setItem(storageKeys.course, JSON.stringify(localCourseSnapshot()));
       state.settings = saveLearnerSettings(storageKeys.learnerId, state.settings);
       state.storageAvailable = true;
-      const saveStatus = document.querySelector('[data-save-status]');
-      if (saveStatus) saveStatus.textContent = message || 'Saved locally';
+      updateSaveStatus(message || (signedInLearner() && cloudProgress.status === 'account' ? 'Saved to your account' : 'Saved on this device'));
+      queueCloudProgressSave();
       if (message) announce(message);
     } catch (_) {
       state.storageAvailable = false;
       if (state.view === 'course') recordSupportMoment('system-error', { result: 'saving' });
-      const saveStatus = document.querySelector('[data-save-status]');
-      if (saveStatus) saveStatus.textContent = 'Saving is unavailable in this browser session.';
+      updateSaveStatus('Saving is unavailable in this browser session.');
       announce('Saving is unavailable in this browser session.');
     }
   };
@@ -1493,7 +1666,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   // keep that area for support instead, so no duration is presented as a
   // requirement or expectation.
   const taskHeaderControls = (paceCopy = taskTime()) => {
-    const explain = '<button class="course-task-explain" type="button" data-action="call-ai">' + (courseUsesUrdu() ? 'AI کو بلائیں' : 'Call AI') + '</button>';
+    const explainLabel = courseUsesUrdu() ? 'AI کو بلائیں' : 'Call AI';
+    const explain = signedInLearner()
+      ? '<button class="course-task-explain" type="button" data-action="call-ai">' + explainLabel + '</button>'
+      : '<span class="course-ai-login-gate" tabindex="0" data-tooltip="Log in required"><button class="course-task-explain" type="button" data-action="call-ai" disabled aria-disabled="true">' + explainLabel + '</button></span>';
     const narrationControl = taskNarrationControlMarkup();
     const showPace = learningChoices().layout === 'open' || Boolean(narrationControl);
     return '<span class="course-task-header-controls">' + narrationControl + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + explain + '</span>';
@@ -1580,11 +1756,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const typingAllowsAlternativeResponse = () => typingIsConceptResponse() && Boolean(state.preferences.alternativeResponses);
   const availableInputMethods = () => getAvailableInputMethods(state.settings);
   const activeInputMethod = () => availableInputMethods().includes(state.settings.activeInputMethod) ? state.settings.activeInputMethod : 'keyboard';
-  // Speech input is always a deliberate button press and only appears after the
-  // learner enables Speech-to-text in their shared learning settings. Recall
-  // responses are concept responses; Key idea and Guided activities retain
-  // typing as their stated learning objective and never show a microphone.
-  const typingAllowsVoiceInput = () => typingIsConceptResponse() && Boolean(state.preferences.speechToText) && activeInputMethod() === 'voice';
+  // Speech input is always a deliberate button press. It is available to a
+  // signed-in learner in both a concept response and the lesson-section
+  // typing activity; the latter lets Speechmatics place a close transcription
+  // against the authored reference without using the AI model.
+  const typingAllowsVoiceInput = () => signedInLearner() && (typingIsConceptResponse() || usesLessonSectionTyping());
   const usingAlternativeInput = () => Boolean(
     typingIsConceptResponse()
       && ((state.progress.attempt.inputMethod === 'voice' && state.preferences.speechToText)
@@ -1758,7 +1934,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const courseHeaderMarkup = (layout) => {
     const isBalanced = layout === 'balanced';
     const eyebrow = isReviewingModule() ? (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label) : isFinalExamPhase() ? (courseUsesUrdu() ? 'کورس کا آخری امتحان' : 'Course final exam') : (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label);
-    return '<button class="course-back-button" type="button" data-action="dashboard">&larr; Back to learning overview</button><header class="course-heading"><div><p class="course-eyebrow">' + escapeHtml(eyebrow) + '</p><h1 id="course-course-title" tabindex="-1">' + escapeHtml(courseUsesUrdu() ? COURSE_URDU.title : COURSE.title) + '</h1>' + (isBalanced ? '' : '<p class="course-step-meta">' + currentStepSummary() + '</p>') + '</div>' + (isBalanced ? '' : '<span class="course-saved-status" data-save-status>' + (state.storageAvailable ? 'Saved locally' : 'Saving unavailable') + '</span>') + '</header>';
+    const savedLabel = signedInLearner() && cloudProgress.status === 'account' ? 'Saved to your account' : 'Saved on this device';
+    return '<div class="course-course-header-actions"><button class="course-back-button" type="button" data-action="dashboard">&larr; Back to learning overview</button><button class="course-skip-button" type="button" data-action="skip-course">Skip course for now</button></div><header class="course-heading"><div><p class="course-eyebrow">' + escapeHtml(eyebrow) + '</p><h1 id="course-course-title" tabindex="-1">' + escapeHtml(courseUsesUrdu() ? COURSE_URDU.title : COURSE.title) + '</h1>' + (isBalanced ? '' : '<p class="course-step-meta">' + currentStepSummary() + '</p>') + '</div>' + (isBalanced ? '' : '<span class="course-saved-status" data-save-status>' + (state.storageAvailable ? savedLabel : 'Saving unavailable') + '</span>') + '</header>';
   };
 
   const courseNowPanelMarkup = () => '<section class="course-now-panel"><div><span>What am I doing?</span><strong>' + escapeHtml(taskLabel()) + '</strong></div><div><span>What is next?</span><strong>' + escapeHtml(courseNextStepCopy()) + '</strong></div><div><span>Can I pause?</span><strong>Use Pause &amp; save in the top bar.</strong></div></section>';
@@ -3014,7 +3191,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     const reference = activeTypingReference();
     const field = document.createElement('div');
-    field.className = 'typing-tester' + (freeResponse ? ' is-free-response' : '') + (sectionTyping ? ' is-lesson-section' : '');
+    field.className = 'typing-tester' + (freeResponse ? ' is-free-response' : '') + (sectionTyping ? ' is-lesson-section' : '') + (voiceInputAvailable ? ' has-voice-input' : '');
     if (sectionTyping) {
       const explicitLines = reference.split('\n').length;
       const wrappedLines = Math.ceil(Array.from(reference).length / 64);
@@ -3075,9 +3252,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const controls = document.createElement('div');
       controls.className = 'typing-tester-controls';
       controls.dataset.voiceInputControls = '';
-      const supported = Boolean(voiceRecognitionConstructor()) || Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+      const supported = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
       controls.innerHTML = '<button class="course-secondary-button typing-mic-button" type="button" data-action="start-voice-input" aria-label="Use microphone to speak your response" aria-describedby="course-voice-input-status"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-5-3v.5a5 5 0 0 0 10 0v-.5M12 17v4M8.5 21h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span data-voice-input-button-label>Speak</span></button><button class="course-secondary-button typing-mic-stop" type="button" data-action="stop-voice-input" aria-describedby="course-voice-input-status" hidden>Stop</button>';
-      field.append(controls);
+      surface.append(controls);
       const status = document.createElement('p');
       status.className = 'typing-voice-input-status';
       status.id = 'course-voice-input-status';
@@ -3360,7 +3537,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const transcript = String(result?.transcript || '').trim();
       if (!transcript) throw new Error('No transcript');
       const input = app.querySelector('[data-typing-input]');
-      const nextValue = [voiceInput.initialResponse, transcript].filter(Boolean).join(' ');
+      const target = typingIsAccuracyObjective() ? activeTypingReference() : '';
+      const canonical = target ? canonicaliseSpokenTyping(transcript, target) : { value: transcript, corrected: false };
+      const nextValue = target ? canonical.value : [voiceInput.initialResponse, canonical.value].filter(Boolean).join(' ');
       state.progress.attempt.response = nextValue;
       state.progress.attempt.feedback = '';
       state.progress.attempt.inputMethod = 'voice';
@@ -3368,9 +3547,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       if (input) {
         input.value = nextValue;
         syncTypingTester(input);
+        scheduleTypingAutoSubmit(input);
       }
-      save('Voice input added to your response. You can edit it before checking.');
-      renderVoiceInputState('stopped', 'Your recording is now editable in the response field.');
+      save(canonical.corrected
+        ? 'A close spoken match was placed as the visible course sentence.'
+        : 'Voice input added to your response. You can edit it before checking.');
+      renderVoiceInputState('stopped', canonical.corrected
+        ? 'A close spoken match was aligned with the visible course sentence.'
+        : 'Your recording is now editable in the response field.');
     } catch (error) {
       if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
       renderVoiceInputState('error', error?.message || 'Voice input could not continue. Your response is still here, and typing stays available.');
@@ -3427,16 +3611,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const startVoiceInput = async () => {
     if (!typingAllowsVoiceInput()) {
-      announce(typingIsConceptResponse()
-        ? 'Enable Voice input and speech-to-text in Learning settings before using the microphone.'
-        : 'This is a typing-only activity, so microphone input is not shown.');
+      announce(signedInLearner()
+        ? 'Voice input is not available for this activity.'
+        : 'Log in required to use Speechmatics voice input.');
       return;
     }
     if (await speechmaticsTypingIsReady()) {
       await startSpeechmaticsTypingInput();
       return;
     }
-    startBrowserVoiceInput();
+    renderVoiceInputState('error', 'Speechmatics voice input is unavailable right now. Your typing stays available.');
   };
 
   const addTypingSupportControls = () => {
@@ -4611,6 +4795,39 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const normaliseText = (value) => value.trim().replace(/\s+/g, ' ').replace(/[“”]/g, '"').replace(/[’]/g, "'");
   const normaliseTypingMatch = (value) => normaliseText(value).toLowerCase().replace(/[.,!?;:]/g, '');
+  const speechComparableText = (value) => normaliseTypingMatch(value)
+    .replace(/\ba\s*d\s*h\s*d\b/g, 'adhd')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const editDistance = (left, right) => {
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+    for (let row = 1; row <= left.length; row += 1) {
+      const current = [row];
+      for (let column = 1; column <= right.length; column += 1) {
+        current[column] = Math.min(
+          previous[column] + 1,
+          current[column - 1] + 1,
+          previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1)
+        );
+      }
+      previous.splice(0, previous.length, ...current);
+    }
+    return previous[right.length];
+  };
+  // This is intentionally not an AI correction. It accepts only a very close
+  // transcription of the one visible reference and then inserts that authored
+  // reference, preserving the existing green-character feedback exactly.
+  const canonicaliseSpokenTyping = (transcript, target) => {
+    const spoken = speechComparableText(transcript);
+    const expected = speechComparableText(target);
+    if (!spoken || !expected) return { value: transcript, corrected: false };
+    if (spoken === expected) return { value: target, corrected: true };
+    const length = Math.max(spoken.length, expected.length, 1);
+    const similarity = 1 - (editDistance(spoken, expected) / length);
+    if (spoken.length >= expected.length * 0.72 && similarity >= 0.92) return { value: target, corrected: true };
+    return { value: transcript, corrected: false };
+  };
   const typingAccuracy = (target, response) => {
     const expected = Array.from(normaliseText(target).toLocaleLowerCase());
     const actual = Array.from(normaliseText(response).toLocaleLowerCase());
@@ -4986,7 +5203,20 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         if (coursePreferencesAreSaved()) goTo('course', 'Your course choices are ready.');
         else openCoursePreferences();
         break;
-      case 'continue-course': goTo('course', 'You are back at your saved small step.'); break;
+      case 'continue-course':
+        state.coursePaused = false;
+        goTo('course', 'You are back at your saved small step.');
+        break;
+      case 'skip-course':
+        state.modal = '';
+        modalReturnFocusSelector = '';
+        state.reviewModuleIndex = null;
+        state.coursePaused = true;
+        state.view = 'dashboard';
+        save('This course is paused for now. You can continue from the same step whenever you are ready.');
+        render();
+        window.requestAnimationFrame(() => window.scrollTo?.({ left: 0, top: 0, behavior: 'auto' }));
+        break;
       case 'toggle-settings-menu':
         state.settingsMenu = !state.settingsMenu;
         render();
@@ -5024,6 +5254,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'call-ai': openCourseAi(element); break;
       case 'close-ai-chat': closeCourseAi(); break;
       case 'ai-send': void sendAiMessage(); break;
+      case 'ai-speak-message': void speakAiMessage(Number(element.dataset.aiMessageIndex)); break;
       case 'ai-dictation-toggle':
         if (aiChat.status === 'recording') stopAiDictation();
         else void startAiDictation();
@@ -5304,6 +5535,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     if (event.target.matches('[data-ai-chat-input]')) {
       aiChat.draft = event.target.value.slice(0, 900);
+      syncAiComposerState();
       return;
     }
     if (!event.target.matches('[data-typing-input]')) return;
@@ -5488,7 +5720,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       learnerId: rawLearnerId
     };
     state = loadState();
+    await restoreCloudProgress();
     beginPeriodicSave();
+    queueCloudProgressSave();
     const entry = new URL(window.location.href).searchParams;
     const startSelectedCourse = entry.get('course') === COURSE.id && entry.get('start') === 'course';
     if (startSelectedCourse) {
@@ -5524,11 +5758,18 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   window.addEventListener('pagehide', () => {
     clearTypingAutoSubmit();
+    if (cloudProgress.timer !== null) {
+      window.clearTimeout(cloudProgress.timer);
+      cloudProgress.timer = null;
+    }
     if (periodicSaveTimer !== null) {
       window.clearInterval(periodicSaveTimer);
       periodicSaveTimer = null;
     }
-    if (authenticatedUser) save();
+    if (authenticatedUser) {
+      save();
+      void flushCloudProgress();
+    }
     cancelNarrationAutoScroll();
     stopTaskNarration({ silent: true });
     narration.service?.destroy();

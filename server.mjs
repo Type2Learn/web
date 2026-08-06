@@ -8,6 +8,7 @@ import { publicError, apiError } from './server/errors.mjs';
 import { createFirebaseRuntime } from './server/firebase-runtime.mjs';
 import { createSpeechService } from './server/speech-service.mjs';
 import { createUsageLedger } from './server/usage-ledger.mjs';
+import { createCourseProgressService } from './server/course-progress-service.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -160,12 +161,13 @@ const buildRuntime = async () => {
   return {
     config,
     ai: createAiService({ config, firebase, ledger }),
-    speech: createSpeechService({ config, firebase, ledger })
+    speech: createSpeechService({ config, firebase, ledger }),
+    courseProgress: createCourseProgressService({ firebase })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, speech } = runtime;
+  const { config, ai, speech, courseProgress } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -173,6 +175,7 @@ const handleApi = async (request, response, pathname, runtime) => {
     return sendJson(response, 200, {
       ai: ai.status(),
       speechToText: speech.status(),
+      courseProgress: courseProgress.status(),
       model: config.openAiModel
     });
   }
@@ -182,6 +185,22 @@ const handleApi = async (request, response, pathname, runtime) => {
     }
     if (request.method === 'POST' && pathname === '/api/v1/speech/transcribe') {
       return sendJson(response, 200, await speech.transcribe({ authorization: request.headers.authorization, form: await readForm(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/speech/synthesise') {
+      const result = await speech.synthesise({ authorization: request.headers.authorization, body: await readJson(request) });
+      return send(response, 200, result.audio, {
+        ...securityHeaders('/api', { api: true }),
+        'Content-Type': result.contentType,
+        'Content-Length': result.audio.length
+      });
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-progress') {
+      const courseId = new URL(request.url || '/', 'http://localhost').searchParams.get('courseId') || '';
+      return sendJson(response, 200, await courseProgress.load({ authorization: request.headers.authorization, courseId }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-progress') {
+      const body = await readJson(request);
+      return sendJson(response, 200, await courseProgress.save({ authorization: request.headers.authorization, courseId: String(body?.courseId || ''), body }));
     }
     return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'This API route does not exist.' } });
   } catch (error) {

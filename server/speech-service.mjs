@@ -5,6 +5,8 @@ import { speechUsageCaps } from './usage-ledger.mjs';
 const MAX_AUDIO_BYTES = 6 * 1024 * 1024;
 const MAX_AUDIO_MILLISECONDS = 45 * 1000;
 const MAX_TRANSCRIPT_CHARACTERS = 2400;
+const MAX_TTS_CHARACTERS = 1200;
+const TTS_VOICE_ID = 'sarah';
 const supportedTypes = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/x-wav']);
 const identifierHash = (value) => createHash('sha256').update(String(value)).digest('hex');
 const bounded = (value, maximum) => String(value || '').replace(/\u0000/g, '').trim().slice(0, maximum);
@@ -29,7 +31,54 @@ const validateAudio = (form) => {
 
 export const createSpeechService = ({ config, firebase, ledger }) => {
   const available = () => Boolean(config.speechmaticsApiKey && firebase.available && ledger);
-  const status = () => ({ available: available(), requiresSignIn: true, purposes: ['chat', 'typing'] });
+  const ttsAvailable = () => Boolean(config.speechmaticsApiKey && firebase.available);
+  const ttsCache = new Map();
+  const ttsRecentRequests = new Map();
+  const status = () => ({ available: available(), requiresSignIn: true, purposes: ['chat', 'typing'], textToSpeech: { available: ttsAvailable(), language: 'en', voice: TTS_VOICE_ID } });
+
+  const pruneTtsCache = (now) => {
+    for (const [key, item] of ttsCache.entries()) if (item.expiresAt <= now) ttsCache.delete(key);
+    while (ttsCache.size > 80) ttsCache.delete(ttsCache.keys().next().value);
+  };
+
+  const checkTtsRate = (userHash, now) => {
+    const recent = (ttsRecentRequests.get(userHash) || []).filter((time) => time > now - 60000);
+    if (recent.length >= 6) throw apiError(429, 'AI_AUDIO_RATE_LIMITED', 'Please wait a moment before listening to another AI reply.');
+    recent.push(now);
+    ttsRecentRequests.set(userHash, recent);
+  };
+
+  const synthesise = async ({ authorization, body }) => {
+    if (!config.speechmaticsApiKey || !firebase.available) throw apiError(503, 'AI_AUDIO_NOT_CONFIGURED', 'Audio for AI replies is not connected yet.');
+    if (body?.language !== 'en') throw apiError(400, 'AI_AUDIO_LANGUAGE_UNSUPPORTED', 'Audio for AI replies is currently available in English only.');
+    const text = bounded(body?.text, MAX_TTS_CHARACTERS);
+    if (!text) throw apiError(400, 'EMPTY_AI_AUDIO', 'There is no AI reply to read aloud.');
+    const learner = await firebase.verifyBearer(authorization);
+    const now = Date.now();
+    const userHash = identifierHash(learner.uid);
+    checkTtsRate(userHash, now);
+    const key = createHash('sha256').update(TTS_VOICE_ID + '\n' + text).digest('hex');
+    pruneTtsCache(now);
+    const cached = ttsCache.get(key);
+    if (cached) return cached;
+    let response;
+    try {
+      response = await fetch(`https://preview.tts.speechmatics.com/generate/${TTS_VOICE_ID}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${config.speechmaticsApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: AbortSignal.timeout(30000)
+      });
+    } catch {
+      throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not start.');
+    }
+    if (!response.ok) throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not be created.');
+    const audio = Buffer.from(await response.arrayBuffer());
+    if (!audio.length || audio.length > 3 * 1024 * 1024) throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not be created.');
+    const result = { audio, contentType: response.headers.get('content-type') || 'audio/wav' };
+    ttsCache.set(key, { ...result, expiresAt: now + 15 * 60 * 1000 });
+    return result;
+  };
 
   const transcribe = async ({ authorization, form }) => {
     if (!config.speechmaticsApiKey) throw apiError(503, 'SPEECH_NOT_CONFIGURED', 'Voice input is not connected yet. You can type instead.');
@@ -37,13 +86,21 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     const learner = await firebase.verifyBearer(authorization);
     const { audio, language, durationMs } = validateAudio(form);
     const estimatedCredits = Math.ceil((durationMs / 60000) * config.speechmaticsCreditsPerMinute * 100) / 100;
-    const reservation = await ledger.reserve({
-      kind: 'speechmatics',
-      userHash: identifierHash(learner.uid),
-      usage: { usd: 0, inputTokens: 0, outputTokens: 0, credits: estimatedCredits },
-      caps: speechUsageCaps(config),
-      requestsPerMinute: config.speechmaticsRequestsPerMinute
-    });
+    let reservation;
+    try {
+      reservation = await ledger.reserve({
+        kind: 'speechmatics',
+        userHash: identifierHash(learner.uid),
+        usage: { usd: 0, inputTokens: 0, outputTokens: 0, credits: estimatedCredits },
+        caps: speechUsageCaps(config),
+        requestsPerMinute: config.speechmaticsRequestsPerMinute
+      });
+    } catch (error) {
+      if (String(error?.code || '').includes('PERMISSION_DENIED') || /Firestore API/i.test(String(error?.message || ''))) {
+        throw apiError(503, 'SPEECH_USAGE_PROTECTION_UNAVAILABLE', 'Voice input is being set up safely. You can type instead.');
+      }
+      throw error;
+    }
     let jobId = '';
     let settled = false;
     try {
@@ -102,5 +159,5 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     }
   };
 
-  return { status, transcribe };
+  return { status, transcribe, synthesise };
 };

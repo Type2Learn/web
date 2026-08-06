@@ -701,6 +701,48 @@ body[data-course-direction="rtl"] .course-settings-menu {
 .course-task-explain:hover,
 .course-task-explain:focus-visible { background: var(--course-blue-pale); }
 
+.course-ai-login-gate { position: relative; display: inline-flex; }
+.course-ai-login-gate::after {
+  position: absolute;
+  z-index: 12;
+  inset-inline-end: 0;
+  inset-block-start: calc(100% + 7px);
+  width: max-content;
+  max-width: min(220px, 70vw);
+  padding: 7px 9px;
+  border-radius: 7px;
+  color: #fff;
+  background: var(--course-ink);
+  box-shadow: 0 6px 16px rgba(18, 52, 83, .16);
+  content: attr(data-tooltip);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.course-ai-login-gate:hover::after,
+.course-ai-login-gate:focus-visible::after { opacity: 1; transform: translateY(0); }
+.course-task-explain:disabled { border-color: var(--course-line-strong); color: var(--course-muted); background: var(--course-cloud); cursor: not-allowed; }
+
+.course-course-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 9px; }
+.course-skip-button {
+  min-height: 32px;
+  border: 1px solid var(--course-line-strong);
+  border-radius: 999px;
+  padding: 6px 11px;
+  color: var(--course-ink-soft);
+  background: var(--course-paper);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.course-skip-button:hover,
+.course-skip-button:focus-visible { border-color: var(--course-blue); background: var(--course-blue-pale); }
+
 .course-task-narration-button {
   min-height: 30px;
   display: inline-flex;
@@ -2445,6 +2487,22 @@ body.course-stable-layout *::after { transition-duration: .01ms; }
 .course-ai-message--user { justify-self: end; border-color: #9ad8bb; border-inline-end: 3px solid var(--course-green); background: var(--course-green-pale); }
 .course-ai-message > span { display: block; color: var(--course-muted); font-size: 10px; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
 .course-ai-message p { margin: 4px 0 0; color: var(--course-ink); font-size: 13px; font-weight: 600; line-height: 1.52; white-space: pre-wrap; unicode-bidi: plaintext; }
+.course-ai-message-speak {
+  min-height: 28px;
+  margin-top: 8px;
+  border: 1px solid var(--course-green);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: #087d34;
+  background: var(--course-green-pale);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.course-ai-message-speak:hover:not(:disabled),
+.course-ai-message-speak:focus-visible { background: #d6f7e1; }
+.course-ai-message-speak:disabled { color: var(--course-muted); border-color: var(--course-line); background: var(--course-cloud); cursor: wait; }
 
 .course-ai-composer {
   border-top: 1px solid var(--course-line);
@@ -2886,8 +2944,17 @@ body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changi
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  position: absolute;
+  z-index: 4;
+  inset-block-start: 9px;
+  inset-inline-start: 9px;
+  margin: 0;
 }
+
+.typing-tester.has-voice-input .typing-tester-overlay,
+.typing-tester.has-voice-input .typing-tester-input,
+.typing-tester.has-voice-input textarea.typing-tester-input { padding-top: 53px; }
+.typing-tester.has-voice-input.is-free-response textarea.typing-tester-input { padding-top: 46px; }
 
 .typing-mic-button {
   border-color: var(--course-green);

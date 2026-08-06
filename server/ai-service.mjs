@@ -88,7 +88,9 @@ export const createAiService = ({ config, firebase, ledger }) => {
     const instructions = assistantInstructions(context);
     const input = conversationInput(history, message);
     const estimatedInputTokens = estimateTokens(instructions + input);
-    const reservation = await ledger.reserve({
+    let reservation;
+    try {
+      reservation = await ledger.reserve({
       kind: 'openai',
       userHash: identifierHash(learner.uid),
       usage: {
@@ -99,7 +101,13 @@ export const createAiService = ({ config, firebase, ledger }) => {
       },
       caps: openAiUsageCaps(config),
       requestsPerMinute: config.openAiRequestsPerMinute
-    });
+      });
+    } catch (error) {
+      if (String(error?.code || '').includes('PERMISSION_DENIED') || /Firestore API/i.test(String(error?.message || ''))) {
+        throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
+      }
+      throw error;
+    }
     let settled = false;
     try {
       let response;

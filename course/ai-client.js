@@ -34,24 +34,63 @@ const request = async (path, options = {}) => {
   return payload;
 };
 
+const authenticatedRequest = async (user, path, options = {}) => {
+  const token = await requireToken(user);
+  return request(path, {
+    ...options,
+    headers: { Authorization: `Bearer ${token}`, ...(options.headers || {}) }
+  });
+};
+
 export const getCourseAiStatus = () => request('/api/v1/health');
 
 export const askCourseAi = async ({ user, message, history, courseId, page, language, signal }) => {
-  const token = await requireToken(user);
-  return request('/api/v1/ai/chat', {
+  return authenticatedRequest(user, '/api/v1/ai/chat', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, history, courseId, page, language }),
     signal
   });
 };
 
 export const transcribeCourseAudio = async ({ user, audio, durationMs, language, purpose, signal }) => {
-  const token = await requireToken(user);
   const form = new FormData();
   form.append('audio', audio, 'type2learn-voice.webm');
   form.append('durationMs', String(Math.round(durationMs)));
   form.append('language', language === 'ur' ? 'ur' : 'en');
   form.append('purpose', purpose);
-  return request('/api/v1/speech/transcribe', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: form, signal });
+  return authenticatedRequest(user, '/api/v1/speech/transcribe', { method: 'POST', body: form, signal });
+};
+
+export const loadCourseProgress = async ({ user, courseId, signal }) => {
+  const encodedCourseId = encodeURIComponent(courseId);
+  return authenticatedRequest(user, '/api/v1/course-progress?courseId=' + encodedCourseId, { signal });
+};
+
+export const saveCourseProgress = async ({ user, snapshot, signal }) => authenticatedRequest(user, '/api/v1/course-progress', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(snapshot),
+  signal
+});
+
+export const synthesiseCourseAiReply = async ({ user, text, language, signal }) => {
+  const token = await requireToken(user);
+  let response;
+  try {
+    response = await fetch(apiBase() + '/api/v1/speech/synthesise', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, language }),
+      signal,
+      cache: 'no-store'
+    });
+  } catch {
+    throw new CourseAiError('Audio for this AI reply is not connected right now.', 'AI_AUDIO_OFFLINE');
+  }
+  if (!response.ok) {
+    const payload = await readJson(response);
+    throw new CourseAiError(payload?.error?.message || 'Audio for this AI reply could not be created.', payload?.error?.code || 'AI_AUDIO_FAILED');
+  }
+  return response.blob();
 };
