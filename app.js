@@ -1578,7 +1578,7 @@
     };
     registerPassword?.addEventListener('input', validatePasswordMatch);
     registerConfirm?.addEventListener('input', validatePasswordMatch);
-    import('/firebase-auth.js?v=20260806-google-redirect1')
+    import('/firebase-auth.js?v=20260807-google-popup2')
       .then(({ setupFirebaseAuth }) => setupFirebaseAuth({ setStatus: setAuthStatus }))
       .catch(() => {
         if (integrationNote?.lastChild) integrationNote.lastChild.textContent = 'Account services could not connect';

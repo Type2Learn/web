@@ -5275,7 +5275,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       return;
     }
     try {
-      const { signOutType2LearnUser } = await import('/firebase-auth.js?v=20260801-courseflow1');
+      const { signOutType2LearnUser } = await import('/firebase-auth.js?v=20260807-google-popup2');
       await signOutType2LearnUser();
       window.location.assign('/');
     } catch (_) {
@@ -5835,7 +5835,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     app.innerHTML = renderAuthChecking();
     let user = getType2LearnGuest();
     if (!user) {
-      user = await import('/firebase-auth.js?v=20260801-courseflow1')
+      user = await import('/firebase-auth.js?v=20260807-google-popup2')
         .then(({ waitForType2LearnUser }) => waitForType2LearnUser())
         .catch(() => null);
     }

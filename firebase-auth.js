@@ -4,7 +4,6 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
   createUserWithEmailAndPassword,
-  getRedirectResult,
   getAuth,
   isSignInWithEmailLink,
   onAuthStateChanged,
@@ -13,7 +12,7 @@ import {
   setPersistence,
   signInWithEmailAndPassword,
   signInWithEmailLink,
-  signInWithRedirect,
+  signInWithPopup,
   signOut,
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
@@ -264,24 +263,6 @@ export const setupFirebaseAuth = ({ setStatus }) => {
     }
   });
 
-  // Google redirect sign-in is more dependable than popups in browsers that
-  // block a new window or isolate third-party sign-in windows.
-  const finishGoogleRedirect = async () => {
-    const form = loginForm || document.querySelector('[data-auth-form="login"]');
-    try {
-      const result = await getRedirectResult(auth);
-      if (!result?.user) return;
-      clearType2LearnGuest();
-      redirectAfterAuth();
-    } catch (error) {
-      setStatus(form, messageFor(error), 'error');
-    } finally {
-      setBusy(form, false);
-    }
-  };
-
-  void finishGoogleRedirect();
-
   document.querySelectorAll('[data-google-auth]').forEach((button) => {
     button.addEventListener('click', async () => {
       const form = button.closest('form');
@@ -291,7 +272,9 @@ export const setupFirebaseAuth = ({ setStatus }) => {
         const persistence = rememberEmail?.checked ? browserLocalPersistence : browserSessionPersistence;
         await setPersistence(auth, persistence);
         provider.setCustomParameters({ prompt: 'select_account' });
-        await signInWithRedirect(auth, provider);
+        await signInWithPopup(auth, provider);
+        clearType2LearnGuest();
+        redirectAfterAuth();
       } catch (error) {
         setStatus(form, messageFor(error), 'error');
       } finally {
