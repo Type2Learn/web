@@ -14,13 +14,18 @@ const jobIdFrom = (payload) => payload?.id || payload?.job?.id || payload?.jobs?
 const jobStatusFrom = (payload) => String(payload?.status || payload?.job?.status || payload?.jobs?.[0]?.status || '').toLowerCase();
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-const validateAudio = (form) => {
+// MediaRecorder correctly reports its codec with the MIME type (for example
+// `audio/webm;codecs=opus`).  The codec parameter is not a different file
+// format, so compare the media type itself rather than rejecting it.
+export const normaliseAudioMimeType = (value) => String(value || '').toLowerCase().split(';', 1)[0].trim();
+
+export const validateCourseAudio = (form) => {
   const audio = form.get('audio');
   const purpose = String(form.get('purpose') || '');
   const language = form.get('language') === 'ur' ? 'ur' : 'en';
   const durationMs = Number(form.get('durationMs'));
   if (!['chat', 'typing'].includes(purpose)) throw apiError(400, 'INVALID_SPEECH_PURPOSE', 'Voice input is only available for chat or an eligible typing activity.');
-  if (!audio || typeof audio.arrayBuffer !== 'function' || !supportedTypes.has(String(audio.type || '').toLowerCase()) || Number(audio.size) > MAX_AUDIO_BYTES) {
+  if (!audio || typeof audio.arrayBuffer !== 'function' || !supportedTypes.has(normaliseAudioMimeType(audio.type)) || Number(audio.size) > MAX_AUDIO_BYTES) {
     throw apiError(400, 'INVALID_AUDIO', 'Use a short WebM, Ogg, MP4, MP3, or WAV recording under 6 MB.');
   }
   if (!Number.isFinite(durationMs) || durationMs < 300 || durationMs > MAX_AUDIO_MILLISECONDS) {
@@ -84,7 +89,7 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     if (!config.speechmaticsApiKey) throw apiError(503, 'SPEECH_NOT_CONFIGURED', 'Voice input is not connected yet. You can type instead.');
     if (!firebase.available || !ledger) throw apiError(503, 'SPEECH_USAGE_PROTECTION_UNAVAILABLE', 'Voice input is being set up safely. You can type instead.');
     const learner = await firebase.verifyBearer(authorization);
-    const { audio, language, durationMs } = validateAudio(form);
+    const { audio, language, durationMs } = validateCourseAudio(form);
     const estimatedCredits = Math.ceil((durationMs / 60000) * config.speechmaticsCreditsPerMinute * 100) / 100;
     let reservation;
     try {

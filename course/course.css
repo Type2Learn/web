@@ -2944,17 +2944,14 @@ body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changi
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  position: absolute;
-  z-index: 4;
-  inset-block-start: 9px;
-  inset-inline-start: 9px;
-  margin: 0;
+  justify-content: flex-end;
+  margin: 8px 0;
 }
 
-.typing-tester.has-voice-input .typing-tester-overlay,
-.typing-tester.has-voice-input .typing-tester-input,
-.typing-tester.has-voice-input textarea.typing-tester-input { padding-top: 53px; }
-.typing-tester.has-voice-input.is-free-response textarea.typing-tester-input { padding-top: 46px; }
+.typing-tester.has-voice-input.is-voice-active .typing-tester-overlay,
+.typing-tester.has-voice-input.is-voice-active .typing-tester-input,
+.typing-tester.has-voice-input.is-voice-active textarea.typing-tester-input { padding-top: 53px; }
+.typing-tester.has-voice-input.is-voice-active.is-free-response textarea.typing-tester-input { padding-top: 46px; }
 
 .typing-mic-button {
   border-color: var(--course-green);
@@ -2974,7 +2971,31 @@ body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changi
   flex: 0 0 auto;
 }
 
-.typing-mic-stop { min-width: 72px; }
+.typing-voice-live-control {
+  position: absolute;
+  z-index: 4;
+  inset-block-start: 9px;
+  inset-inline-end: 9px;
+}
+
+.typing-voice-pause-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid #68c89c;
+  border-radius: 8px;
+  color: #075f2c;
+  background: #effbf4;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.typing-voice-pause-button:hover { background: #e0f7e9; }
+.typing-voice-pause-button:focus-visible { outline: 3px solid var(--course-blue); outline-offset: 2px; }
+.typing-voice-pause-button svg { width: 17px; height: 17px; flex: 0 0 auto; }
 
 .typing-voice-input-status {
   grid-column: 1 / -1;
@@ -2984,15 +3005,13 @@ body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changi
   line-height: 1.45;
 }
 
-.typing-tester-controls[data-voice-input-state="listening"] + .typing-voice-input-status,
-.typing-tester-controls[data-voice-input-state="recognising"] + .typing-voice-input-status { color: #075f2c; font-weight: 750; }
-.typing-tester-controls[data-voice-input-state="permission-denied"] + .typing-voice-input-status,
-.typing-tester-controls[data-voice-input-state="error"] + .typing-voice-input-status { color: #9d2536; font-weight: 750; }
+.typing-voice-input-status { color: var(--course-muted); }
+.typing-tester.is-voice-active .typing-voice-input-status { color: #075f2c; font-weight: 750; }
 .typing-tester-controls[data-voice-input-state="unsupported"] .typing-mic-button { border-color: var(--course-line-strong); color: var(--course-muted); background: var(--course-cloud); }
 
 @media (max-width: 760px) {
   .course-preset-settings .course-primary-button { width: 100%; }
-  .typing-tester-controls > button { flex: 1 1 auto; }
+  .typing-tester-controls > button { flex: 0 1 auto; }
   .typing-tester-overlay,
   .typing-tester-input { padding-right: 22px; }
   .typing-tester textarea.typing-tester-input { padding-right: 22px; }

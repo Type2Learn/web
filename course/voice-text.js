@@ -48,3 +48,25 @@ export const canonicaliseSpokenTyping = (transcript, target) => {
   if (spoken.length >= expected.length * 0.72 && similarity >= 0.92) return { value: target, corrected: true };
   return { value: normaliseText(transcript), corrected: false };
 };
+
+// Live browser recognition emits a growing transcript. When that transcript
+// is an exact spoken prefix of the authored reference, return the matching
+// authored characters (including an initialism such as "ADHD") so the normal
+// character-by-character display can acknowledge each correct spoken word.
+// If speech diverges, leave the recognised text visible for normal red/green
+// feedback rather than silently changing what the learner said.
+export const canonicaliseSpokenTypingPrefix = (transcript, target) => {
+  const spoken = speechComparableText(transcript);
+  const expected = speechComparableText(target);
+  if (!spoken || !expected.startsWith(spoken)) return { value: normaliseText(transcript), aligned: false };
+  let authoredPrefix = '';
+  for (let index = 1; index <= target.length; index += 1) {
+    const candidate = target.slice(0, index);
+    const comparable = speechComparableText(candidate);
+    if (!spoken.startsWith(comparable)) break;
+    if (comparable === spoken) authoredPrefix = candidate;
+  }
+  return authoredPrefix
+    ? { value: authoredPrefix, aligned: true }
+    : { value: normaliseText(transcript), aligned: false };
+};

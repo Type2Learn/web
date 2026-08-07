@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canonicaliseSpokenTyping, normaliseText } from '../../course/voice-text.js';
+import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText } from '../../course/voice-text.js';
 
 test('deterministic speech fixer restores the authored visible typing reference', () => {
   const target = 'ADHD is a neurodevelopmental condition.';
@@ -15,4 +15,11 @@ test('deterministic speech fixer does not invent a target from an unrelated tran
     corrected: false
   });
   assert.equal(normaliseText('  one\n\nclear   step  '), 'one clear step');
+});
+
+test('live spoken prefixes use authored characters so individual words turn green', () => {
+  const target = 'ADHD is a neurodevelopmental condition.';
+  assert.deepEqual(canonicaliseSpokenTypingPrefix('A D H D is a', target), { value: 'ADHD is a ', aligned: true });
+  assert.deepEqual(canonicaliseSpokenTypingPrefix('ADHD is a neurodevelopmental', target), { value: 'ADHD is a neurodevelopmental ', aligned: true });
+  assert.deepEqual(canonicaliseSpokenTypingPrefix('ADHD is a different thing', target), { value: 'ADHD is a different thing', aligned: false });
 });

@@ -3,7 +3,7 @@ import { COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
 import { askCourseAi, getCourseAiStatus, loadCourseProgress, saveCourseProgress, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260806-cloud1';
-import { canonicaliseSpokenTyping, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt1';
+import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
 
@@ -105,6 +105,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     restartTimer: null,
     restartCount: 0,
     stopRequested: false,
+    paused: false,
     sessionId: 0,
     lastError: '',
     fallbackMessage: ''
@@ -3306,8 +3307,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const curtain = surface?.querySelector('[data-typing-focus-curtain]');
     if (!curtain) return;
     const inputIsActive = document.activeElement === input;
-    curtain.hidden = inputIsActive;
-    curtain.setAttribute('aria-hidden', inputIsActive ? 'true' : 'false');
+    // A learner who is speaking is already actively entering their response.
+    // Do not place a typing-only curtain over the live transcript.
+    const voiceIsActive = voiceInput.listening;
+    curtain.hidden = inputIsActive || voiceIsActive;
+    curtain.setAttribute('aria-hidden', inputIsActive || voiceIsActive ? 'true' : 'false');
   };
 
   const buildTypingTester = () => {
@@ -3396,8 +3400,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       controls.className = 'typing-tester-controls';
       controls.dataset.voiceInputControls = '';
       const supported = Boolean(browserCanRecordVoice() || voiceRecognitionConstructor());
-      controls.innerHTML = '<button class="course-secondary-button typing-mic-button" type="button" data-action="start-voice-input" aria-label="Use microphone to speak your response" aria-describedby="course-voice-input-status"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-5-3v.5a5 5 0 0 0 10 0v-.5M12 17v4M8.5 21h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span data-voice-input-button-label>Speak</span></button><button class="course-secondary-button typing-mic-stop" type="button" data-action="stop-voice-input" aria-describedby="course-voice-input-status" hidden>Stop</button>';
-      surface.append(controls);
+      controls.innerHTML = '<button class="course-secondary-button typing-mic-button" type="button" data-action="start-voice-input" aria-label="Use microphone to speak your response" aria-describedby="course-voice-input-status"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0 3 3Zm-5-3v.5a5 5 0 0 0 10 0v-.5M12 17v4M8.5 21h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span data-voice-input-button-label>Speak</span></button>';
+      // This is deliberately a sibling of the typing box: Speak starts a
+      // voice-entry mode, rather than being part of the learner's text.
+      field.insertAdjacentElement('beforebegin', controls);
+      const liveControl = document.createElement('div');
+      liveControl.className = 'typing-voice-live-control';
+      liveControl.dataset.voiceInputLiveControl = '';
+      liveControl.hidden = true;
+      liveControl.innerHTML = '<button class="typing-voice-pause-button" type="button" data-action="toggle-voice-input-pause" aria-describedby="course-voice-input-status" aria-label="Pause speech recognition"><svg data-voice-input-live-icon viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.4"/></svg><span class="course-live-region" data-voice-input-live-label>Listening</span></button>';
+      surface.append(liveControl);
       const status = document.createElement('p');
       status.className = 'typing-voice-input-status';
       status.id = 'course-voice-input-status';
@@ -3419,8 +3431,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const voiceInputStateDefinition = (status) => ({
     ready: { name: 'Ready', button: 'Speak', active: false, disabled: false, label: 'Use microphone to speak your response', copy: 'Ready. Microphone input is optional. Typing stays available.' },
-    listening: { name: 'Listening', button: 'Listening', active: true, disabled: true, label: 'Listening for your response', copy: 'Listening. Speak in short phrases, then choose Stop when you are finished. Typing stays available.' },
+    listening: { name: 'Listening', button: 'Listening', active: true, disabled: true, label: 'Listening for your response', copy: 'Listening. Spoken words appear in the box as you speak.' },
     recognising: { name: 'Recognising', button: 'Recognising', active: true, disabled: true, label: 'Recognising your spoken response', copy: 'Recognising. Your words are being added to the response field. Typing stays available.' },
+    paused: { name: 'Paused', button: 'Paused', active: false, disabled: true, label: 'Use the play button in the typing box to resume speech recognition', copy: 'Paused. Use the play button in the typing box to resume, or click in the typing box to type.' },
     stopped: { name: 'Stopped', button: 'Speak again', active: false, disabled: false, label: 'Start microphone input again', copy: 'Stopped. Your response is still in the field, and typing stays available.' },
     unsupported: { name: 'Unsupported', button: 'Unsupported', active: false, disabled: true, label: 'Microphone input is unsupported in this browser', copy: 'Unsupported. This browser does not provide speech recognition. Type your response instead.' },
     'permission-denied': { name: 'Permission denied', button: 'Try again', active: false, disabled: false, label: 'Try microphone input again after changing permission', copy: 'Permission denied. Allow microphone access for this site, or type your response instead.' },
@@ -3442,11 +3455,26 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const label = button.querySelector('[data-voice-input-button-label]');
       if (label) label.textContent = definition.button;
     });
-    app.querySelectorAll('[data-action="stop-voice-input"]').forEach((button) => {
-      button.hidden = !definition.active;
+    const liveControlVisible = ['listening', 'recognising', 'paused'].includes(voiceInput.status);
+    app.querySelectorAll('[data-voice-input-live-control]').forEach((control) => {
+      control.hidden = !liveControlVisible;
+      const toggle = control.querySelector('[data-action="toggle-voice-input-pause"]');
+      const icon = control.querySelector('[data-voice-input-live-icon]');
+      const label = control.querySelector('[data-voice-input-live-label]');
+      const paused = voiceInput.status === 'paused';
+      if (toggle) toggle.setAttribute('aria-label', paused ? 'Resume speech recognition' : 'Pause speech recognition');
+      if (label) label.textContent = paused ? 'Resume' : 'Listening';
+      if (icon) icon.innerHTML = paused
+        ? '<path d="m9 5 10 7-10 7V5Z" fill="currentColor"/>'
+        : '<path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.4"/>';
     });
     const status = app.querySelector('[data-voice-input-status]');
     if (status) status.textContent = detail ? definition.name + '. ' + detail : definition.copy;
+    app.querySelectorAll('.typing-tester').forEach((field) => {
+      field.classList.toggle('is-voice-active', liveControlVisible);
+    });
+    const input = app.querySelector('[data-typing-input]');
+    if (input) syncTypingFocusCurtain(input);
   };
 
   const stopVoiceInput = (message = '', nextStatus = 'stopped') => {
@@ -3480,6 +3508,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.restartCount = 0;
     voiceInput.lastError = '';
     voiceInput.fallbackMessage = '';
+    voiceInput.paused = false;
     if (recognition) {
       try { recognition.stop(); } catch (_) { /* Stopping is best-effort. */ }
     }
@@ -3504,12 +3533,66 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }, delay);
   };
 
+  const pauseVoiceInput = () => {
+    if (voiceInput.recorder?.state === 'recording') {
+      // Speechmatics is only used as a compatibility fallback. A paused
+      // recorder remains locally held; browser recognition is the live path
+      // used by supported browsers so words can appear as they are spoken.
+      try { voiceInput.recorder.pause(); } catch (_) { /* Best effort. */ }
+      voiceInput.paused = true;
+      voiceInput.listening = false;
+      renderVoiceInputState('paused');
+      return;
+    }
+    const recognition = voiceInput.recognition;
+    if (!recognition || !voiceInput.listening) return;
+    voiceInput.stopRequested = true;
+    voiceInput.paused = true;
+    if (voiceInput.restartTimer) {
+      window.clearTimeout(voiceInput.restartTimer);
+      voiceInput.restartTimer = null;
+    }
+    voiceInput.recognition = null;
+    try { recognition.stop(); } catch (_) { /* Stopping is best-effort. */ }
+    renderVoiceInputState('paused');
+    announce('Speech recognition paused.');
+  };
+
+  const resumeVoiceInput = () => {
+    if (!voiceInput.paused) return;
+    if (voiceInput.recorder?.state === 'paused') {
+      try { voiceInput.recorder.resume(); } catch (_) { /* Best effort. */ }
+      voiceInput.paused = false;
+      renderVoiceInputState('listening');
+      return;
+    }
+    if (!voiceRecognitionConstructor()) {
+      renderVoiceInputState('error', 'Voice input cannot resume in this browser. You can type your response instead.');
+      return;
+    }
+    voiceInput.paused = false;
+    voiceInput.stopRequested = false;
+    voiceInput.restartCount = 0;
+    voiceInput.sessionId += 1;
+    const sessionId = voiceInput.sessionId;
+    renderVoiceInputState('listening', 'Resuming microphone input. Spoken words appear in the box as you speak.');
+    beginVoiceRecognitionCycle(sessionId);
+  };
+
+  const toggleVoiceInputPause = () => {
+    if (voiceInput.paused) resumeVoiceInput();
+    else pauseVoiceInput();
+  };
+
   const placeBrowserSpeechTranscript = (transcript) => {
     const input = app.querySelector('[data-typing-input]');
     const target = typingIsAccuracyObjective() ? activeTypingReference() : '';
     const canonical = target ? canonicaliseSpokenTyping(transcript, target) : { value: normaliseText(transcript), corrected: false };
+    const livePrefix = target && !canonical.corrected
+      ? canonicaliseSpokenTypingPrefix(transcript, target)
+      : { value: canonical.value, aligned: canonical.corrected };
     const nextValue = target
-      ? canonical.value
+      ? livePrefix.value
       : [voiceInput.initialResponse, canonical.value].filter(Boolean).join(' ');
     state.progress.attempt.response = nextValue;
     state.progress.attempt.feedback = '';
@@ -3522,8 +3605,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     save(canonical.corrected
       ? 'A close spoken match was placed as the visible course sentence.'
-      : 'Voice input added to your response.');
-    return canonical;
+      : livePrefix.aligned
+        ? 'Your spoken words are matching the visible course sentence.'
+        : 'Voice input added to your response.');
+    return { ...canonical, ...livePrefix };
   };
 
   const beginVoiceRecognitionCycle = (sessionId) => {
@@ -3558,12 +3643,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     };
     recognition.onresult = (event) => {
       if (sessionId !== voiceInput.sessionId || voiceInput.recognition !== recognition || voiceInput.stopRequested) return;
-      renderVoiceInputState('recognising');
-      if (voiceInput.statusTimer) window.clearTimeout(voiceInput.statusTimer);
-      voiceInput.statusTimer = window.setTimeout(() => {
-        voiceInput.statusTimer = null;
-        if (sessionId === voiceInput.sessionId && voiceInput.recognition === recognition && !voiceInput.stopRequested) renderVoiceInputState('listening');
-      }, 700);
+      // Keep the live state stable while interim results arrive. Updating the
+      // UI for every recognition event made the control look interrupted.
       let finalTranscript = voiceInput.finalTranscript;
       let interimTranscript = '';
       const resultStart = Math.max(0, Number(event.resultIndex) || 0);
@@ -3640,6 +3721,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     stopVoiceInput('', 'ready');
     voiceInput.stopRequested = false;
+    voiceInput.paused = false;
     voiceInput.restartCount = 0;
     voiceInput.lastError = '';
     voiceInput.fallbackMessage = detail;
@@ -3648,7 +3730,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.initialResponse = state.progress.attempt.response.trim();
     voiceInput.finalTranscript = '';
     voiceInput.finalResultIndexes = new Set();
-    renderVoiceInputState('listening', detail || 'Starting microphone input. Speak when your browser shows that it is listening. Typing stays available.');
+    renderVoiceInputState('listening', detail || 'Starting microphone input. Spoken words appear in the box as you speak.');
     beginVoiceRecognitionCycle(sessionId);
   };
 
@@ -3751,7 +3833,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       recorder.start(250);
       clearSpeechmaticsTypingTimer();
       voiceInput.recordingTimer = window.setTimeout(() => stopSpeechmaticsTypingInput(), 45000);
-      renderVoiceInputState('listening', 'Listening. Speak for up to 45 seconds, then choose Stop. Typing stays available.');
+      renderVoiceInputState('listening', 'Listening. This browser records a short response before it can add the text.');
       announce('Microphone input is listening.');
       return true;
     } catch (error) {
@@ -3779,12 +3861,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         : 'Log in required to use Speechmatics voice input.');
       return;
     }
-    if (await speechmaticsTypingIsReady()) {
-      await startSpeechmaticsTypingInput();
+    if (voiceRecognitionConstructor()) {
+      // Browser recognition is intentionally preferred for typing: it emits
+      // interim words, allowing the visible authored text to turn green while
+      // the learner speaks. Speechmatics receives a completed recording and
+      // therefore cannot offer that immediate feedback.
+      startBrowserVoiceInput();
       return;
     }
-    if (voiceRecognitionConstructor()) {
-      startBrowserVoiceInput('Speechmatics voice input is unavailable right now. Browser speech recognition is ready instead.');
+    if (await speechmaticsTypingIsReady()) {
+      await startSpeechmaticsTypingInput();
       return;
     }
     renderVoiceInputState('error', 'Voice input is unavailable right now. Your typing stays available.');
@@ -5439,6 +5525,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         showCurrentTaskFromStart();
         break;
       case 'start-voice-input': void startVoiceInput(); break;
+      case 'toggle-voice-input-pause': toggleVoiceInputPause(); break;
       case 'stop-voice-input':
         if (voiceInput.recorder?.state === 'recording') stopSpeechmaticsTypingInput();
         else stopVoiceInput('Microphone input stopped. Your response is still here.');
