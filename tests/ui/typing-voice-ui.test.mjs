@@ -16,3 +16,11 @@ test('typing selects browser live recognition before batch Speechmatics transcri
   const speechmaticsSecond = source.indexOf('if (await speechmaticsTypingIsReady())', source.indexOf('const startVoiceInput'));
   assert.ok(browserFirst >= 0 && speechmaticsSecond > browserFirst);
 });
+
+test('Speechmatics compatibility recording has a visible Finish control instead of making learners wait for a timeout', async () => {
+  const source = await readFile(new URL('../../course/course.js', import.meta.url), 'utf8');
+  assert.match(source, /recordingForSpeechmatics/);
+  assert.match(source, /Finish speaking and add text/);
+  assert.match(source, /Select Finish when you are done speaking to add your text/);
+  assert.match(source, /stopSpeechmaticsTypingInput\(\);[\s\S]*Finishing your recording/);
+});

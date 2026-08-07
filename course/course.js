@@ -3456,7 +3456,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     recognising: { name: 'Recognising', button: 'Recognising', active: true, disabled: true, label: 'Recognising your spoken response', copy: 'Recognising. Your words are being added to the response field. Typing stays available.' },
     paused: { name: 'Paused', button: 'Paused', active: false, disabled: true, label: 'Use the play button in the typing box to resume speech recognition', copy: 'Paused. Use the play button in the typing box to resume, or click in the typing box to type.' },
     stopped: { name: 'Stopped', button: 'Speak again', active: false, disabled: false, label: 'Start microphone input again', copy: 'Stopped. Your response is still in the field, and typing stays available.' },
-    unsupported: { name: 'Unsupported', button: 'Unsupported', active: false, disabled: true, label: 'Microphone input is unsupported in this browser', copy: 'Unsupported. This browser does not provide speech recognition. Type your response instead.' },
+    unsupported: { name: 'Unsupported', button: 'Unsupported', active: false, disabled: true, label: 'Microphone input is unsupported in this browser', copy: 'Unsupported. This browser cannot record microphone input for voice entry. Type your response instead.' },
     'permission-denied': { name: 'Permission denied', button: 'Try again', active: false, disabled: false, label: 'Try microphone input again after changing permission', copy: 'Permission denied. Allow microphone access for this site, or type your response instead.' },
     error: { name: 'Error', button: 'Try again', active: false, disabled: false, label: 'Try microphone input again', copy: 'Error. Microphone input could not continue. Your response is still here, and typing stays available.' }
   }[status] || null);
@@ -3476,23 +3476,36 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const label = button.querySelector('[data-voice-input-button-label]');
       if (label) label.textContent = definition.button;
     });
-    const liveControlVisible = ['listening', 'recognising', 'paused'].includes(voiceInput.status);
+    const liveControlVisible = ['listening', 'paused'].includes(voiceInput.status);
+    const voiceFocusActive = liveControlVisible || voiceInput.status === 'recognising';
+    // Speechmatics is a recording-and-transcribe fallback, rather than live
+    // browser recognition. It needs an explicit completion control: leaving a
+    // learner with only Pause would make them wait for the safety timeout.
+    const recordingForSpeechmatics = voiceInput.recorder?.state === 'recording';
     app.querySelectorAll('[data-voice-input-live-control]').forEach((control) => {
       control.hidden = !liveControlVisible;
+      control.dataset.voiceInputMode = recordingForSpeechmatics ? 'recording' : 'live';
       const toggle = control.querySelector('[data-action="toggle-voice-input-pause"]');
       const icon = control.querySelector('[data-voice-input-live-icon]');
       const label = control.querySelector('[data-voice-input-live-label]');
       const paused = voiceInput.status === 'paused';
-      if (toggle) toggle.setAttribute('aria-label', paused ? 'Resume speech recognition' : 'Pause speech recognition');
-      if (label) label.textContent = paused ? 'Resume' : 'Listening';
-      if (icon) icon.innerHTML = paused
-        ? '<path d="m9 5 10 7-10 7V5Z" fill="currentColor"/>'
-        : '<path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.4"/>';
+      if (toggle) toggle.setAttribute('aria-label', recordingForSpeechmatics
+        ? 'Finish speaking and add text'
+        : paused ? 'Resume speech recognition' : 'Pause speech recognition');
+      if (label) {
+        label.classList.toggle('course-live-region', !recordingForSpeechmatics);
+        label.textContent = recordingForSpeechmatics ? 'Finish' : paused ? 'Resume' : 'Listening';
+      }
+      if (icon) icon.innerHTML = recordingForSpeechmatics
+        ? '<path d="m5 12 4.2 4.2L19 6.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"/>'
+        : paused
+          ? '<path d="m9 5 10 7-10 7V5Z" fill="currentColor"/>'
+          : '<path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.4"/>';
     });
     const status = app.querySelector('[data-voice-input-status]');
     if (status) status.textContent = detail ? definition.name + '. ' + detail : definition.copy;
     app.querySelectorAll('.typing-tester').forEach((field) => {
-      field.classList.toggle('is-voice-active', liveControlVisible);
+      field.classList.toggle('is-voice-active', voiceFocusActive);
     });
     const input = app.querySelector('[data-typing-input]');
     if (input) syncTypingFocusCurtain(input);
@@ -3556,13 +3569,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const pauseVoiceInput = () => {
     if (voiceInput.recorder?.state === 'recording') {
-      // Speechmatics is only used as a compatibility fallback. A paused
-      // recorder remains locally held; browser recognition is the live path
-      // used by supported browsers so words can appear as they are spoken.
-      try { voiceInput.recorder.pause(); } catch (_) { /* Best effort. */ }
-      voiceInput.paused = true;
-      voiceInput.listening = false;
-      renderVoiceInputState('paused');
+      // Unlike browser recognition, the Speechmatics compatibility path sends
+      // an entire short recording. Finish it immediately so the learner gets
+      // their transcript rather than waiting for the 45-second safety stop.
+      stopSpeechmaticsTypingInput();
+      renderVoiceInputState('recognising', 'Finishing your recording and turning it into editable text.');
       return;
     }
     const recognition = voiceInput.recognition;
@@ -3854,7 +3865,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       recorder.start(250);
       clearSpeechmaticsTypingTimer();
       voiceInput.recordingTimer = window.setTimeout(() => stopSpeechmaticsTypingInput(), 45000);
-      renderVoiceInputState('listening', 'Listening. This browser records a short response before it can add the text.');
+      renderVoiceInputState('listening', 'Listening. Select Finish when you are done speaking to add your text.');
       announce('Microphone input is listening.');
       return true;
     } catch (error) {
@@ -3894,7 +3905,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       await startSpeechmaticsTypingInput();
       return;
     }
-    renderVoiceInputState('error', 'Voice input is unavailable right now. Your typing stays available.');
+    renderVoiceInputState('error', 'Live speech recognition is unavailable in this browser and the Speechmatics fallback is not ready. You can type your response instead.');
   };
 
   const addTypingSupportControls = () => {

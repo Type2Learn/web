@@ -2996,6 +2996,12 @@ body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changi
 .typing-voice-pause-button:focus-visible { outline: 3px solid var(--course-blue); outline-offset: 2px; }
 .typing-voice-pause-button svg { width: 17px; height: 17px; flex: 0 0 auto; }
 
+/* A non-live Speechmatics recording must have a clear completion action. */
+.typing-voice-live-control[data-voice-input-mode="recording"] .typing-voice-pause-button {
+  gap: 6px;
+  padding-inline: 10px;
+}
+
 .typing-voice-input-status {
   grid-column: 1 / -1;
   margin: 8px 0 0;
