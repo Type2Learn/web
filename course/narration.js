@@ -715,6 +715,11 @@ export class NarrationService {
     try { audio.preload = 'auto'; } catch (_) { /* Optional media hint. */ }
     try { audio.playbackRate = this.rate; } catch (_) { /* Media rate support is best-effort. */ }
     try { audio.volume = this.volume; } catch (_) { /* Media volume support is best-effort. */ }
+    // Some media implementations can surface both a natural completion and a
+    // late completion event while an aggressively preloaded source is being
+    // released. Advancing only once keeps a completed Urdu clip from starting
+    // the same playlist position again.
+    let completed = false;
     audio.onloadedmetadata = () => this.applyPendingAudioSeek(audio, track, activeSession);
     audio.oncanplay = () => this.applyPendingAudioSeek(audio, track, activeSession);
     audio.ontimeupdate = () => {
@@ -723,7 +728,8 @@ export class NarrationService {
       this.emitAudioPosition(track);
     };
     audio.onended = () => {
-      if (activeSession !== this.session || this.audio !== audio || this.status !== 'playing') return;
+      if (completed || activeSession !== this.session || this.audio !== audio || this.status !== 'playing') return;
+      completed = true;
       this.stopAudioPositionLoop();
       this.emitAudioPosition(track, { force: true });
       // A whole-module recording may have been intentionally bounded to the
@@ -738,7 +744,10 @@ export class NarrationService {
       if (this.status !== 'playing' || this.audio !== audio) return;
       this.advanceAudioTrack(trackIndex, activeSession);
     };
-    audio.onerror = () => this.handleAudioFailure(audio, activeSession, track, this.currentIndex);
+    audio.onerror = () => {
+      if (completed) return;
+      this.handleAudioFailure(audio, activeSession, track, this.currentIndex);
+    };
     if (!usePreloadedAudio) {
       try { audio.src = track.src; } catch (_) {
         this.handleAudioFailure(audio, activeSession, track, this.currentIndex);

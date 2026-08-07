@@ -18,8 +18,17 @@ const attemptsInstructionOverride = (message) => /(?:ignore|disregard|reveal|sho
 
 const assistantInstructions = (context) => {
   const languageRule = context.language === 'ur'
-    ? 'Reply in clear Urdu script. Keep unavoidable English course terms short.'
+    ? 'Reply only in clear, standard Urdu written in Urdu script. Do not use Latin letters, English sentences, or English abbreviations; write necessary course terms and names in Urdu script.'
     : 'Reply in clear English.';
+  const teamFacts = context.language === 'ur'
+    ? [
+      'ٹائپ ٹو لرن کے بانی اور مصنوعات کی سمت کے ذمہ دار محمد طٰہٰ بن زعیم ہیں۔',
+      'شریک بانی: محمد حامز بن کاشف (انجینئرنگ)، محمد فہد یونس (مصنوعی ذہانت)، ادریس بابر (تحقیق)، اور علیزے حسن (مصنوعات)۔'
+    ]
+    : [
+      'Type2Learn was founded by Muhammad Taha Bin Zaeem, Founder and Product Direction.',
+      'The co-founders are Muhammad Hamiz Bin Kashif (Engineering Lead), Muhammad Fahad Younus (AI Lead), Idrees Babar (Research Lead), and Alizay Hassan (Product Lead).'
+    ];
   const assessmentRule = ['type', 'check', 'apply', 'exam', 'exam-intro'].includes(context.phase)
     ? 'For typing, checks, practice, and exams, never supply exact target text, choose an option, reveal an answer, or write a response the learner can copy. Explain the relevant idea and a safe way to think through it instead.'
     : 'Help the learner understand the current page without moving them ahead automatically.';
@@ -33,8 +42,7 @@ const assistantInstructions = (context) => {
     `Current module: ${context.title}.`,
     `Current task phase: ${context.phase}.`,
     'Approved Type2Learn team facts, only for a question about the project or its team:',
-    'Type2Learn was founded by Muhammad Taha Bin Zaeem, Founder and Product Direction.',
-    'The co-founders are Muhammad Hamiz Bin Kashif (Engineering Lead), Muhammad Fahad Younus (AI Lead), Idrees Babar (Research Lead), and Alizay Hassan (Product Lead).',
+    ...teamFacts,
     `Approved page facts:\n${context.facts.map((fact) => `- ${fact}`).join('\n')}`
   ].join('\n\n');
 };

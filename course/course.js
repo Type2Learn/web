@@ -611,27 +611,39 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const supportLanguage = () => learningChoices()['learning-language'] === 'urdu' ? 'urdu' : 'english';
   const courseUsesUrdu = () => supportLanguage() === 'urdu';
-  const courseUi = (english, urdu) => courseUsesUrdu() ? urdu : english;
+  const urduScriptTerms = (value = '') => String(value)
+    .replace(/\bADHD\b/g, 'اے ڈی ایچ ڈی')
+    .replace(/\bDCD\b/g, 'ڈی سی ڈی')
+    .replace(/\bDyslexia\b/g, 'ڈسلیکسیہ')
+    .replace(/\bDysgraphia\b/g, 'ڈسگرافیا')
+    .replace(/\bDyspraxia\b/g, 'ڈس پراکسیا')
+    .replace(/\bDyscalculia\b/g, 'ڈس کیلکولیا')
+    .replace(/\bAutism Spectrum Disorder\b/g, 'آٹزم اسپیکٹرم کی کیفیت')
+    .replace(/\bAuditory Processing Disorder\b/g, 'سمعی عمل کاری کی کیفیت')
+    .replace(/\bDevelopmental Coordination Disorder\b/g, 'نشوونمائی ہم آہنگی کی کیفیت');
+  const courseUi = (english, urdu) => courseUsesUrdu() ? urduScriptTerms(urdu) : english;
   const urduStep = (step = currentStep()) => {
     const index = COURSE.steps.indexOf(step);
     return index >= 0 ? COURSE_URDU.steps[index] : null;
   };
   const urduFinalQuestion = (index) => COURSE_URDU.finalExam.questions[index] || null;
 
-  // Main learning cards deliberately keep the authored English alongside the
-  // Urdu translation. The paired blocks make a course readable in either
-  // language without changing the English keyboard-practice target.
+  // Urdu mode presents the course in Urdu only. The one deliberate exception
+  // is the authored keyboard-practice target, which remains English so the
+  // learner can practise the required English text.
   const bilingualCopy = (english, urdu, className = '') => {
-    if (!courseUsesUrdu() || !urdu) return escapeHtml(english);
-    return '<span class="course-bilingual-copy ' + className + '"><span class="course-english-copy" lang="en" dir="ltr">' + escapeHtml(english) + '</span><span class="course-urdu-copy" lang="ur" dir="rtl">' + escapeHtml(urdu) + '</span></span>';
+    if (!courseUsesUrdu()) return escapeHtml(english);
+    if (!urdu) return '';
+    return '<span class="course-urdu-only ' + className + '" lang="ur" dir="rtl">' + escapeHtml(urduScriptTerms(urdu)) + '</span>';
   };
   const bilingualReadingTextMarkup = (tagName, english, urdu, narrationState) => {
-    if (!courseUsesUrdu() || !urdu) return readingTextMarkup(tagName, english, narrationState);
+    if (!courseUsesUrdu()) return readingTextMarkup(tagName, english, narrationState);
+    if (!urdu) return '';
     const index = narrationState ? narrationState.index++ : -1;
-    const englishMarkup = narrationState
-      ? '<button class="course-narration-text" type="button" data-narration-text data-narration-index="' + index + '" aria-label="Start text to speech here: ' + escapeHtml(english) + '">' + escapeHtml(english) + '</button>'
-      : escapeHtml(english);
-    return '<' + tagName + ' class="course-bilingual-reading"><span class="course-english-copy" lang="en" dir="ltr">' + englishMarkup + '</span><span class="course-urdu-copy" lang="ur" dir="rtl">' + escapeHtml(urdu) + '</span></' + tagName + '>';
+    const urduMarkup = narrationState
+      ? '<button class="course-narration-text" type="button" data-narration-text data-narration-index="' + index + '" aria-label="یہاں سے آواز میں پڑھنا شروع کریں: ' + escapeHtml(urduScriptTerms(urdu)) + '">' + escapeHtml(urduScriptTerms(urdu)) + '</button>'
+      : escapeHtml(urduScriptTerms(urdu));
+    return '<' + tagName + ' class="course-urdu-reading" lang="ur" dir="rtl">' + urduMarkup + '</' + tagName + '>';
   };
   const selectedEncouragementLevel = () => {
     const level = learningChoices().encouragement;
@@ -798,11 +810,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const personalizedSupportCopy = (moment) => {
     if (!moment || moment.encouragementLevel === 'subtle') return null;
     const expressive = moment.encouragementLevel === 'expressive';
-    const moduleName = moment.module || currentStep?.()?.title || 'this module';
     const urdu = moment.language === 'urdu';
+    const moduleName = urdu
+      ? urduScriptTerms(urduStep()?.title || moment.module || '')
+      : (moment.module || currentStep?.()?.title || 'this module');
     const typingSections = typeof lessonTypingSections === 'function' ? lessonTypingSections() : [];
     const completedTypingIndex = Math.max(0, (Number(state.progress.attempt?.guidedIndex) || 0) - 1);
-    const completedHeading = typingSections[completedTypingIndex]?.heading || 'this lesson section';
+    const completedHeading = urdu
+      ? (readingSections?.()[completedTypingIndex]?.urduHeading || '')
+      : (typingSections[completedTypingIndex]?.heading || 'this lesson section');
 
     if (urdu) {
       if (moment.kind === 'task-entry') {
@@ -1141,13 +1157,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const browserFallback = aiChat.dictation.mode === 'browser';
       return '<p class="course-ai-chat-status is-recording" role="status">' + escapeHtml(browserFallback
         ? (aiChat.dictation.fallback
-            ? aiCopy('Speechmatics could not transcribe that recording. Browser speech recognition is listening now; please repeat your question.', 'Speechmatics ریکارڈنگ کو متن میں نہیں بدل سکا۔ براؤزر وائس ان پٹ اب سن رہا ہے؛ براہ کرم اپنا سوال دوبارہ کہیں۔')
+            ? aiCopy('Speechmatics could not transcribe that recording. Browser speech recognition is listening now; please repeat your question.', 'آواز کو متن میں بدلنے کی سروس ریکارڈنگ مکمل نہ کر سکی۔ براؤزر کا صوتی اِن پٹ اب سن رہا ہے؛ براہ کرم اپنا سوال دوبارہ کہیں۔')
             : aiCopy('Browser speech recognition is listening. Choose Stop speaking when you are finished.', 'براؤزر وائس ان پٹ سن رہا ہے۔ مکمل ہونے پر بولنا بند کریں۔'))
         : aiCopy('Listening. Choose Stop speaking when you are finished.', 'سن رہا ہے۔ مکمل ہونے پر بولنا بند کریں منتخب کریں۔')) + '</p>';
     }
     if (aiChat.status === 'transcribing') return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('Turning your recording into editable text…', 'آپ کی ریکارڈنگ کو قابلِ ترمیم متن میں بدلا جا رہا ہے…')) + '</p>';
     if (aiChat.error) return '<p class="course-ai-chat-status is-error" role="status">' + escapeHtml(aiChat.error) + '</p>';
-    if (aiChat.connection.checked && !aiChat.connection.ai) return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('AI chat is being set up. The course support on this page is still available.', 'AI چیٹ ترتیب دی جا رہی ہے۔ اس صفحے کی کورس مدد اب بھی دستیاب ہے۔')) + '</p>';
+    if (aiChat.connection.checked && !aiChat.connection.ai) return '<p class="course-ai-chat-status" role="status">' + escapeHtml(aiCopy('AI chat is being set up. The course support on this page is still available.', 'مصنوعی ذہانت کی گفتگو ترتیب دی جا رہی ہے۔ اس صفحے کی کورس مدد اب بھی دستیاب ہے۔')) + '</p>';
     return '<p class="course-ai-chat-status">' + escapeHtml(aiCopy('Ask about this page only. Do not include private information.', 'صرف اس صفحے کے بارے میں پوچھیں۔ ذاتی معلومات شامل نہ کریں۔')) + '</p>';
   };
 
@@ -1155,9 +1171,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const busy = ['checking', 'sending', 'recording', 'transcribing'].includes(aiChat.status);
     const canSend = signedInLearner() && aiChat.connection.checked && aiChat.connection.ai && !busy && Boolean(aiChat.draft.trim());
     const canSpeak = signedInLearner() && aiChat.connection.checked && (aiChat.connection.speech || browserSpeechRecognitionAvailable()) && !busy;
-    const closeLabel = aiCopy('Close AI chat', 'AI چیٹ بند کریں');
+    const closeLabel = aiCopy('Close AI chat', 'مصنوعی ذہانت کی گفتگو بند کریں');
     const backLabel = aiCopy('Back to course', 'کورس پر واپس جائیں');
-    const heading = aiCopy('Course AI', 'کورس AI');
+    const heading = aiCopy('Course AI', 'کورس کی مصنوعی ذہانت');
     const inputLabel = aiCopy('Ask about the current page', 'موجودہ صفحے کے بارے میں پوچھیں');
     const speechLabel = aiChat.status === 'recording'
       ? aiCopy('Stop speaking', 'بولنا بند کریں')
@@ -1262,7 +1278,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       aiChat.messages.push({ role: 'assistant', content: String(reply?.reply || '').trim() || aiCopy('I could not make a clear response. Please try a shorter question.', 'میں واضح جواب تیار نہیں کر سکا۔ براہ کرم مختصر سوال کریں۔') });
     } catch (error) {
       if (controller.signal.aborted || contextKey !== aiChat.contextKey) return;
-      aiChat.error = error?.message || aiCopy('The AI helper could not continue. Please try again later.', 'AI مددگار جاری نہیں رہ سکا۔ براہ کرم بعد میں دوبارہ کوشش کریں۔');
+      aiChat.error = aiLanguage() === 'ur'
+        ? 'مصنوعی ذہانت والا مددگار ابھی جواب نہیں دے سکا۔ براہ کرم بعد میں دوبارہ کوشش کریں۔'
+        : (error?.message || 'The AI helper could not continue. Please try again later.');
     } finally {
       if (aiChat.requestController === controller) aiChat.requestController = null;
       if (contextKey === aiChat.contextKey) {
@@ -1447,7 +1465,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     } catch (error) {
       if (session !== dictation.session) return;
       if (browserSpeechRecognitionAvailable() && startBrowserAiDictation({ fallback: true })) return;
-      aiChat.error = error?.message || aiCopy('Voice input could not continue. You can type your question instead.', 'آواز کے ذریعے ان پٹ جاری نہیں رہ سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
+      aiChat.error = aiLanguage() === 'ur'
+        ? 'آواز کے ذریعے اِن پٹ جاری نہیں رہ سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔'
+        : (error?.message || 'Voice input could not continue. You can type your question instead.');
     } finally {
       if (session === dictation.session && aiChatIsVisible()) {
         aiChat.status = 'idle';
@@ -1771,10 +1791,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const lessonTypingDuration = () => {
     const length = Array.from(activeLessonTypingSection().section.text || '').length;
-    return length > 220 ? 'About 2 minutes' : 'About 1 minute';
+    return courseUi(length > 220 ? 'About 2 minutes' : 'About 1 minute', length > 220 ? 'تقریباً 2 منٹ' : 'تقریباً 1 منٹ');
   };
 
-  const savedTaskLabel = () => ({
+  const savedTaskLabel = () => courseUi(({
     preview: 'Preview this small step',
     read: 'Read this short explanation',
     type: 'Type the current lesson section',
@@ -1784,14 +1804,25 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'exam-intro': 'Get ready for the final exam',
     exam: 'Answer one final exam question',
     'exam-results': 'Review your final exam results'
-  }[state.progress.phase] || 'Continue learning');
+  }[state.progress.phase] || 'Continue learning'), ({
+    preview: 'اس مختصر مرحلے کا پیش نظارہ',
+    read: 'یہ مختصر وضاحت پڑھیں',
+    type: 'سبق کا موجودہ حصہ ٹائپ کریں',
+    check: 'سمجھ جانچیں',
+    apply: 'خیال کو مختصر صورتحال میں استعمال کریں',
+    complete: 'ایک مختصر مرحلہ مکمل ہوا',
+    'exam-intro': 'آخری امتحان کے لیے تیار ہوں',
+    exam: 'آخری امتحان کے ایک سوال کا جواب دیں',
+    'exam-results': 'آخری امتحان کے نتائج دیکھیں'
+  }[state.progress.phase] || 'سیکھنا جاری رکھیں'));
 
   const taskLabel = () => isReviewingModule() ? 'Review a completed module' : savedTaskLabel();
 
+  const canSkipCurrentTask = () => ['preview', 'read', 'exam-intro'].includes(state.progress.phase);
   const taskTime = () => {
     const estimate = isReviewingModule()
-      ? (currentStep().duration || 'Ready when you are')
-      : ({ preview: 'You can skip this step', read: 'You can skip this step', type: lessonTypingDuration(), check: 'About 1 minute', apply: 'About 1 minute', complete: 'Ready when you are', 'exam-intro': 'You can skip this step', exam: 'One question at a time', 'exam-results': 'Ready when you are' }[state.progress.phase] || 'Ready when you are');
+      ? (courseUsesUrdu() ? urduStep()?.duration : currentStep().duration) || courseUi('Ready when you are', 'جب تیار ہوں')
+      : ({ preview: courseUi('You can skip this step', 'آپ یہ مرحلہ چھوڑ سکتے ہیں'), read: courseUi('You can skip this step', 'آپ یہ مرحلہ چھوڑ سکتے ہیں'), type: lessonTypingDuration(), check: courseUi('About 1 minute', 'تقریباً 1 منٹ'), apply: courseUi('About 1 minute', 'تقریباً 1 منٹ'), complete: courseUi('Ready when you are', 'جب تیار ہوں'), 'exam-intro': courseUi('You can skip this step', 'آپ یہ مرحلہ چھوڑ سکتے ہیں'), exam: courseUi('One question at a time', 'ایک وقت میں ایک سوال'), 'exam-results': courseUi('Ready when you are', 'جب تیار ہوں') }[state.progress.phase] || courseUi('Ready when you are', 'جب تیار ہوں'));
     return estimate;
   };
 
@@ -1831,10 +1862,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   // keep that area for support instead, so no duration is presented as a
   // requirement or expectation.
   const taskHeaderControls = (paceCopy = taskTime()) => {
-    const explainLabel = courseUsesUrdu() ? 'AI کو بلائیں' : 'Call AI';
+    const explainLabel = courseUi('Call AI', 'مصنوعی ذہانت سے پوچھیں');
     const explain = signedInLearner()
       ? '<button class="course-task-explain" type="button" data-action="call-ai">' + explainLabel + '</button>'
-      : '<span class="course-ai-login-gate" tabindex="0" data-tooltip="Log in required"><button class="course-task-explain" type="button" data-action="call-ai" disabled aria-disabled="true">' + explainLabel + '</button></span>';
+      : '<span class="course-ai-login-gate" tabindex="0" data-tooltip="' + escapeHtml(courseUi('Log in required', 'لاگ اِن ضروری ہے')) + '"><button class="course-task-explain" type="button" data-action="call-ai" disabled aria-disabled="true">' + explainLabel + '</button></span>';
     const narrationControl = taskNarrationControlMarkup();
     const showPace = learningChoices().layout === 'open' || Boolean(narrationControl);
     return '<span class="course-task-header-controls">' + narrationControl + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + explain + '</span>';
@@ -1855,6 +1886,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     document.body.dataset.courseDirection = courseChoices['learning-language'] === 'urdu' ? 'rtl' : 'ltr';
     document.documentElement.lang = courseChoices['learning-language'] === 'urdu' ? 'ur' : 'en';
     document.documentElement.dir = courseChoices['learning-language'] === 'urdu' ? 'rtl' : 'ltr';
+    const skipLink = document.querySelector('[data-course-skip-link]');
+    if (skipLink) {
+      skipLink.textContent = courseChoices['learning-language'] === 'urdu' ? 'موجودہ کام پر جائیں' : 'Skip to the current task';
+      skipLink.lang = courseChoices['learning-language'] === 'urdu' ? 'ur' : 'en';
+      skipLink.dir = courseChoices['learning-language'] === 'urdu' ? 'rtl' : 'ltr';
+    }
     document.body.dataset.courseUrduMode = courseChoices['urdu-mode'] === 'on' ? 'on' : 'off';
     if (effectiveAnimationLevel() === 'lively' && selectedEncouragementLevel() === 'expressive') warmRewardAssets();
     document.body.classList.toggle('course-fewer-distractions', Boolean(state.preferences.fewerDistractions));
@@ -1938,23 +1975,29 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const currentStepSummary = () => {
     if (isReviewingModule()) {
-      const reviewLabel = state.preferences.visibleProgress ? 'Reviewing module ' + (displayedModuleIndex() + 1) + ' of ' + COURSE.steps.length : 'Reviewing a completed module';
-      return '<span>' + escapeHtml(reviewLabel) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(currentStep().duration || 'Ready when you are') + '</span>';
+      const reviewLabel = state.preferences.visibleProgress
+        ? courseUi('Reviewing module ' + (displayedModuleIndex() + 1) + ' of ' + COURSE.steps.length, 'ماڈیول ' + (displayedModuleIndex() + 1) + ' از ' + COURSE.steps.length + ' کا جائزہ')
+        : courseUi('Reviewing a completed module', 'مکمل ماڈیول کا جائزہ');
+      const duration = courseUsesUrdu() ? urduStep()?.duration : currentStep().duration;
+      return '<span>' + escapeHtml(reviewLabel) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(duration || courseUi('Ready when you are', 'جب تیار ہوں')) + '</span>';
     }
     if (isFinalExamPhase()) {
       const exam = state.progress.finalExam;
       const detail = !state.preferences.visibleProgress
-        ? (state.progress.phase === 'exam-results' ? 'Results and review' : 'One question at a time')
+        ? courseUi(state.progress.phase === 'exam-results' ? 'Results and review' : 'One question at a time', state.progress.phase === 'exam-results' ? 'نتائج اور جائزہ' : 'ایک وقت میں ایک سوال')
         : state.progress.phase === 'exam'
-        ? 'Question ' + (exam.questionIndex + 1) + ' of ' + finalExamQuestionCount()
+        ? courseUi('Question ' + (exam.questionIndex + 1) + ' of ' + finalExamQuestionCount(), 'سوال ' + (exam.questionIndex + 1) + ' از ' + finalExamQuestionCount())
         : state.progress.phase === 'exam-results'
-          ? 'Results and review'
-          : finalExamQuestionCount() + ' questions';
-      return '<span>Final exam</span><i aria-hidden="true"></i><span>' + escapeHtml(detail) + '</span>';
+          ? courseUi('Results and review', 'نتائج اور جائزہ')
+          : courseUi(finalExamQuestionCount() + ' questions', finalExamQuestionCount() + ' سوالات');
+      return '<span>' + escapeHtml(courseUi('Final exam', 'آخری امتحان')) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(detail) + '</span>';
     }
     const stepNumber = state.progress.lessonIndex + 1;
-    const stepLabel = state.preferences.visibleProgress ? 'Step ' + stepNumber + ' of ' + COURSE.steps.length : currentStep().title;
-    return '<span>' + escapeHtml(stepLabel) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(currentStep().duration) + '</span>';
+    const stepLabel = state.preferences.visibleProgress
+      ? courseUi('Step ' + stepNumber + ' of ' + COURSE.steps.length, 'مرحلہ ' + stepNumber + ' از ' + COURSE.steps.length)
+      : courseUsesUrdu() ? (urduStep()?.title || '') : currentStep().title;
+    const duration = courseUsesUrdu() ? urduStep()?.duration : currentStep().duration;
+    return '<span>' + escapeHtml(urduScriptTerms(stepLabel)) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(duration || '') + '</span>';
   };
 
   const PLANNED_COURSES = [
@@ -2023,16 +2066,17 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
 
   const moduleProgressItem = (step, index, includeFinalExam = false) => {
+    const displayedTitle = courseUsesUrdu() ? (COURSE_URDU.steps[index]?.title || '') : step.title;
     const complete = state.progress.completedSteps.includes(index);
     const active = isReviewingModule()
       ? index === displayedModuleIndex()
       : (!includeFinalExam || !isFinalExamPhase()) && index === state.progress.lessonIndex;
     const status = active
-      ? (isReviewingModule() ? 'Reviewing now' : taskLabel())
-      : complete ? 'Completed · Review' : 'Available next';
+      ? (isReviewingModule() ? courseUi('Reviewing now', 'ابھی جائزہ لے رہے ہیں') : taskLabel())
+      : complete ? courseUi('Completed · Review', 'مکمل · جائزہ') : courseUi('Available next', 'اگلا دستیاب');
     const details = complete && !active
-      ? '<button type="button" data-action="review-module" data-module-index="' + index + '" aria-label="Review completed module ' + (index + 1) + ': ' + escapeHtml(step.title) + '"><strong>' + escapeHtml(step.title) + '</strong><small>' + escapeHtml(status) + '</small></button>'
-      : '<div><strong>' + escapeHtml(step.title) + '</strong><small>' + escapeHtml(status) + '</small></div>';
+      ? '<button type="button" data-action="review-module" data-module-index="' + index + '" aria-label="' + escapeHtml(courseUi('Review completed module ' + (index + 1) + ': ' + step.title, 'مکمل ماڈیول ' + (index + 1) + ' کا جائزہ: ' + displayedTitle)) + '"><strong>' + escapeHtml(urduScriptTerms(displayedTitle)) + '</strong><small>' + escapeHtml(status) + '</small></button>'
+      : '<div><strong>' + escapeHtml(urduScriptTerms(displayedTitle)) + '</strong><small>' + escapeHtml(status) + '</small></div>';
     return '<li class="' + (complete ? 'is-complete ' : '') + (active ? 'is-active ' : '') + (complete && !active ? 'is-reviewable' : '') + '"' + (active ? ' aria-current="step"' : '') + '><span>' + (complete ? '✓' : index + 1) + '</span>' + details + '</li>';
   };
 
@@ -2043,15 +2087,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const examStatus = examActive
       ? taskLabel()
       : examComplete
-        ? 'Completed'
+        ? courseUi('Completed', 'مکمل')
         : courseUi('Available after module ' + COURSE.steps.length, 'ماڈیول ' + COURSE.steps.length + ' کے بعد دستیاب');
-    const examItem = '<li class="course-module-exam ' + (examComplete ? 'is-complete ' : '') + (examActive ? 'is-active' : '') + '"><span>' + (examComplete ? '✓' : COURSE.steps.length + 1) + '</span><div><strong>' + escapeHtml(finalExam().title || 'Final exam') + '</strong><small>' + escapeHtml(examStatus) + '</small></div></li>';
-    return '<nav class="course-module-strip" aria-label="' + (state.preferences.visibleProgress ? 'Course progress' : 'Course module navigation') + '"><div class="course-module-strip-heading"><p class="course-eyebrow">' + (state.preferences.visibleProgress ? 'Course progress' : 'Course modules') + '</p><span>' + COURSE.steps.length + ' small modules · one final exam</span></div><ol class="course-module-list">' + modules + examItem + '</ol></nav>';
+    const examItem = '<li class="course-module-exam ' + (examComplete ? 'is-complete ' : '') + (examActive ? 'is-active' : '') + '"><span>' + (examComplete ? '✓' : COURSE.steps.length + 1) + '</span><div><strong>' + escapeHtml(courseUi(finalExam().title || 'Final exam', COURSE_URDU.finalExam?.title || 'آخری امتحان')) + '</strong><small>' + escapeHtml(examStatus) + '</small></div></li>';
+    return '<nav class="course-module-strip" aria-label="' + escapeHtml(courseUi(state.preferences.visibleProgress ? 'Course progress' : 'Course module navigation', state.preferences.visibleProgress ? 'کورس کی پیش رفت' : 'کورس ماڈیول کی رہنمائی')) + '"><div class="course-module-strip-heading"><p class="course-eyebrow">' + escapeHtml(courseUi(state.preferences.visibleProgress ? 'Course progress' : 'Course modules', state.preferences.visibleProgress ? 'کورس کی پیش رفت' : 'کورس ماڈیولز')) + '</p><span>' + escapeHtml(courseUi(COURSE.steps.length + ' small modules · one final exam', COURSE.steps.length + ' مختصر ماڈیولز · ایک آخری امتحان')) + '</span></div><ol class="course-module-list">' + modules + examItem + '</ol></nav>';
   };
 
   const courseNextStepCopy = () => {
-    if (isReviewingModule()) return 'Return to your saved current task';
-    return ({
+    if (isReviewingModule()) return courseUi('Return to your saved current task', 'اپنے محفوظ موجودہ کام پر واپس جائیں');
+    return courseUi(({
     preview: 'Read the short explanation',
     read: 'Type the first lesson section',
     type: 'Complete the lesson typing',
@@ -2063,7 +2107,19 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       ? state.progress.finalExam.questionIndex === finalExamQuestionCount() - 1 ? 'See your final results' : 'Move to the next question'
       : 'Submit your selected answer',
     'exam-results': 'Return to your learning overview'
-    }[state.progress.phase] || 'Continue learning');
+    }[state.progress.phase] || 'Continue learning'), ({
+    preview: 'مختصر وضاحت پڑھیں',
+    read: 'سبق کا پہلا حصہ ٹائپ کریں',
+    type: 'سبق کی ٹائپنگ مکمل کریں',
+    check: 'خیال کو مختصر صورتحال میں استعمال کریں',
+    apply: 'اس مرحلے کو مکمل نشان زد کریں',
+    complete: isLastStep() ? 'آخری امتحان شروع کریں' : 'اگلے مختصر مرحلے کا پیش نظارہ دیکھیں',
+    'exam-intro': 'امتحان کا پہلا سوال شروع کریں',
+    exam: state.progress.finalExam.submitted
+      ? state.progress.finalExam.questionIndex === finalExamQuestionCount() - 1 ? 'آخری نتائج دیکھیں' : 'اگلے سوال کی طرف جائیں'
+      : 'منتخب جواب جمع کریں',
+    'exam-results': 'سیکھنے کے خلاصے پر واپس جائیں'
+    }[state.progress.phase] || 'سیکھنا جاری رکھیں'));
   };
 
   const courseReturnLocation = () => {
@@ -2084,11 +2140,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const answered = exam.answers.filter((answer) => Number.isInteger(answer)).length;
     const progress = state.progress.phase === 'exam-results' ? total : state.progress.phase === 'exam' ? Math.min(exam.questionIndex + (exam.submitted ? 1 : 0), total) : 0;
     const status = state.progress.phase === 'exam-results'
-      ? 'Results are ready'
+      ? courseUi('Results are ready', 'نتائج تیار ہیں')
       : state.progress.phase === 'exam'
-        ? 'Question ' + (exam.questionIndex + 1) + ' of ' + total
-        : 'Ready when you are';
-    return '<section class="course-progress-panel" aria-label="Learning progress"><div><p>Course progress</p><strong>Final exam</strong><span>One calm question at a time</span></div><div class="course-progress-bars"><div><span>Final exam · ' + escapeHtml(status) + '</span><progress value="' + progress + '" max="' + total + '">' + progress + ' of ' + total + '</progress></div><div><span>Course modules · ' + state.progress.completedSteps.length + ' lessons completed</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + state.progress.completedSteps.length + ' of ' + COURSE.steps.length + '</progress></div><div><span>Answers saved · ' + answered + ' of ' + total + '</span><progress value="' + answered + '" max="' + total + '">' + answered + ' of ' + total + '</progress></div></div></section>';
+        ? courseUi('Question ' + (exam.questionIndex + 1) + ' of ' + total, 'سوال ' + (exam.questionIndex + 1) + ' از ' + total)
+        : courseUi('Ready when you are', 'جب تیار ہوں');
+    const progressFallback = (value, maximum) => courseUi(value + ' of ' + maximum, value + ' از ' + maximum);
+    return '<section class="course-progress-panel" aria-label="' + escapeHtml(courseUi('Learning progress', 'سیکھنے کی پیش رفت')) + '"><div><p>' + escapeHtml(courseUi('Course progress', 'کورس کی پیش رفت')) + '</p><strong>' + escapeHtml(courseUi('Final exam', 'آخری امتحان')) + '</strong><span>' + escapeHtml(courseUi('One calm question at a time', 'ایک وقت میں ایک پُرسکون سوال')) + '</span></div><div class="course-progress-bars"><div><span>' + escapeHtml(courseUi('Final exam · ', 'آخری امتحان · ') + status) + '</span><progress value="' + progress + '" max="' + total + '">' + progressFallback(progress, total) + '</progress></div><div><span>' + escapeHtml(courseUi('Course modules · ' + state.progress.completedSteps.length + ' lessons completed', 'کورس ماڈیولز · ' + state.progress.completedSteps.length + ' اسباق مکمل')) + '</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + progressFallback(state.progress.completedSteps.length, COURSE.steps.length) + '</progress></div><div><span>' + escapeHtml(courseUi('Answers saved · ' + answered + ' of ' + total, 'جوابات محفوظ · ' + answered + ' از ' + total)) + '</span><progress value="' + answered + '" max="' + total + '">' + progressFallback(answered, total) + '</progress></div></div></section>';
   };
 
   const selectedCourseLayout = () => {
@@ -2099,11 +2156,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const courseHeaderMarkup = (layout) => {
     const isBalanced = layout === 'balanced';
     const eyebrow = isReviewingModule() ? (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label) : isFinalExamPhase() ? (courseUsesUrdu() ? 'کورس کا آخری امتحان' : 'Course final exam') : (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label);
-    const savedLabel = signedInLearner() && cloudProgress.status === 'account' ? 'Saved to your account' : 'Saved on this device';
-    return '<div class="course-course-header-actions"><button class="course-back-button" type="button" data-action="dashboard">&larr; Back to learning overview</button></div><header class="course-heading"><div><p class="course-eyebrow">' + escapeHtml(eyebrow) + '</p><h1 id="course-course-title" tabindex="-1">' + escapeHtml(courseUsesUrdu() ? COURSE_URDU.title : COURSE.title) + '</h1>' + (isBalanced ? '' : '<p class="course-step-meta">' + currentStepSummary() + '</p>') + '</div>' + (isBalanced ? '' : '<span class="course-saved-status" data-save-status>' + (state.storageAvailable ? savedLabel : 'Saving unavailable') + '</span>') + '</header>';
+    const savedLabel = signedInLearner() && cloudProgress.status === 'account'
+      ? courseUi('Saved to your account', 'آپ کے اکاؤنٹ میں محفوظ ہے')
+      : courseUi('Saved on this device', 'اس آلے پر محفوظ ہے');
+    return '<div class="course-course-header-actions"><button class="course-back-button" type="button" data-action="dashboard">' + escapeHtml(courseUi('← Back to learning overview', 'سیکھنے کے خلاصے پر واپس جائیں ←')) + '</button></div><header class="course-heading"><div><p class="course-eyebrow">' + escapeHtml(urduScriptTerms(eyebrow)) + '</p><h1 id="course-course-title" tabindex="-1">' + escapeHtml(urduScriptTerms(courseUsesUrdu() ? COURSE_URDU.title : COURSE.title)) + '</h1>' + (isBalanced ? '' : '<p class="course-step-meta">' + currentStepSummary() + '</p>') + '</div>' + (isBalanced ? '' : '<span class="course-saved-status" data-save-status>' + escapeHtml(state.storageAvailable ? savedLabel : courseUi('Saving unavailable', 'محفوظ کرنا دستیاب نہیں')) + '</span>') + '</header>';
   };
 
-  const courseNowPanelMarkup = () => '<section class="course-now-panel"><div><span>What am I doing?</span><strong>' + escapeHtml(taskLabel()) + '</strong></div><div><span>What is next?</span><strong>' + escapeHtml(courseNextStepCopy()) + '</strong></div><div><span>Can I pause?</span><strong>Use Pause &amp; save in the top bar.</strong></div></section>';
+  const courseNowPanelMarkup = () => '<section class="course-now-panel"><div><span>' + escapeHtml(courseUi('What am I doing?', 'میں کیا کر رہا/رہی ہوں؟')) + '</span><strong>' + escapeHtml(taskLabel()) + '</strong></div><div><span>' + escapeHtml(courseUi('What is next?', 'اگلا کیا ہے؟')) + '</span><strong>' + escapeHtml(courseNextStepCopy()) + '</strong></div><div><span>' + escapeHtml(courseUi('Can I pause?', 'کیا میں وقفہ کر سکتا/سکتی ہوں؟')) + '</span><strong>' + escapeHtml(courseUi('Use Pause & save in the top bar.', 'اوپر والی پٹی میں وقفہ اور محفوظ کریں استعمال کریں۔')) + '</strong></div></section>';
 
   const renderCourseWithFinalExam = () => {
     const layout = selectedCourseLayout();
@@ -2119,7 +2178,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const readingSections = () => {
     const content = currentStep().content;
-    if (!content) return (currentStep().read || []).map((value, index) => ({ heading: index === 0 ? 'Key idea' : '', value }));
+    if (!content) return (currentStep().read || []).map((value, index) => ({ heading: index === 0 ? 'Key idea' : '', value, sourceIndex: index }));
     const urduContent = urduStep()?.content || {};
     return [
       { heading: content.definitionHeading, value: content.definition, urduHeading: urduContent.definitionHeading, urduValue: urduContent.definition },
@@ -2127,7 +2186,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       { heading: content.strengthsHeading, value: content.strengths, urduHeading: urduContent.strengthsHeading, urduValue: urduContent.strengths },
       { heading: content.challengesHeading, value: content.challenges, urduHeading: urduContent.challengesHeading, urduValue: urduContent.challenges },
       { heading: content.supportsHeading, value: content.supports, urduHeading: urduContent.supportsHeading, urduValue: urduContent.supports }
-    ].filter(({ heading, value }) => Boolean(heading && value));
+    ]
+      .filter(({ heading, value }) => Boolean(heading && value))
+      .map((section, sourceIndex) => ({ ...section, sourceIndex }));
   };
 
   const smallerSectionsAreActive = () => Boolean(
@@ -2180,7 +2241,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!smallerSectionsAreActive()) return '';
     const total = readingSections().length;
     const index = currentReadingSectionIndex();
-    return '<p class="course-reading-section-progress" aria-live="polite">Small section ' + (index + 1) + ' of ' + total + '. Finish this part, then choose the next section.</p>';
+    return '<p class="course-reading-section-progress" aria-live="polite">' + escapeHtml(courseUi(
+      'Small section ' + (index + 1) + ' of ' + total + '. Finish this part, then choose the next section.',
+      'مختصر حصہ ' + (index + 1) + ' از ' + total + '۔ یہ حصہ مکمل کریں، پھر اگلا حصہ منتخب کریں۔'
+    )) + '</p>';
   };
 
   const readingTaskActions = () => {
@@ -2398,23 +2462,21 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       return chunks.filter((chunk) => chunk.text);
     }
 
-    // Urdu mode deliberately preserves both lines shown in the lesson: every
-    // English thought is spoken first, followed immediately by its Urdu
-    // translation. The numbered Urdu MP3s match the authored section order.
+    // Urdu mode mirrors the visible lesson: it narrates Urdu only. The
+    // numbered recordings match the authored section order.
     const translation = urduStep() || {};
     const chunks = [
-      { id: 'task-title-en', label: step.title, text: step.title, audioLanguage: 'en' },
-      { id: 'task-title-ur', label: translation.title || step.title, text: translation.title || step.title, audioLanguage: 'ur', urduAudioFile: 'title-ava.mp3' }
+      { id: 'task-title-ur', label: translation.title || '', text: translation.title || '', audioLanguage: 'ur', urduAudioFile: 'title-ava.mp3' }
     ];
     sections.forEach((section, visibleIndex) => {
-      const sourceIndex = Math.max(0, readingSections().indexOf(section));
+      // `readingSections()` returns fresh objects on every call. Keep the
+      // authored index on the object instead of using object identity, which
+      // otherwise made every rendered section select section 1's Urdu clip.
+      const sourceIndex = Math.max(0, Number(section.sourceIndex) || 0);
       const urduHeading = section.urduHeading || section.heading;
-      const englishAnswer = narrationSectionValue(section.value);
-      const urduAnswer = narrationSectionValue(section.urduValue || section.value);
+      const urduAnswer = narrationSectionValue(section.urduValue);
       const prefix = 'section-' + (sourceIndex + 1);
-      if (section.heading) chunks.push({ id: 'task-question-en-' + visibleIndex, label: section.heading, text: section.heading, audioLanguage: 'en' });
       if (urduHeading) chunks.push({ id: 'task-question-ur-' + visibleIndex, label: urduHeading, text: urduHeading, audioLanguage: 'ur', urduAudioFile: prefix + '-heading-ava.mp3' });
-      if (englishAnswer) chunks.push({ id: 'task-answer-en-' + visibleIndex, label: section.heading || 'Lesson answer', text: englishAnswer, audioLanguage: 'en' });
       if (urduAnswer) chunks.push({ id: 'task-answer-ur-' + visibleIndex, label: urduHeading || 'Lesson answer', text: urduAnswer, audioLanguage: 'ur', urduAudioFile: prefix + '-answer-ava.mp3' });
     });
     return chunks.filter((chunk) => chunk.text);
@@ -2898,7 +2960,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       syncTaskNarrationControl();
     };
     taskNarration.preludeContinue = beginLesson;
-    const canSkipTask = taskTime() === 'You can skip this step';
+    const canSkipTask = canSkipCurrentTask();
     const prelude = courseUi(
       COURSE.title + (canSkipTask ? '. You can skip this step.' : '.'),
       COURSE_URDU.title + (canSkipTask ? '۔ آپ اس مرحلے کو چھوڑ سکتے ہیں۔' : '۔')
@@ -3029,11 +3091,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const typing = currentStep().typing;
     if (usesLessonSectionTyping()) {
       const { section, index, total } = activeLessonTypingSection();
-      return inputMethodSelector() + '<div class="guided-typing lesson-section-typing"><span>Section ' + (index + 1) + ' of ' + total + '</span><p class="typing-target">' + escapeHtml(section.text) + '</p></div>';
+      return inputMethodSelector() + '<div class="guided-typing lesson-section-typing"><span>' + escapeHtml(courseUi('Section ' + (index + 1) + ' of ' + total, 'حصہ ' + (index + 1) + ' از ' + total)) + '</span><p class="typing-target" lang="en" dir="ltr">' + escapeHtml(section.text) + '</p></div>';
     }
-    if (typing.level !== 'Guided typing') return inputMethodSelector() + '<p class="typing-target">' + escapeHtml(typing.target || '') + '</p>';
+    if (typing.level !== 'Guided typing') return inputMethodSelector() + '<p class="typing-target" lang="en" dir="ltr">' + escapeHtml(typing.target || '') + '</p>';
     const phraseIndex = Math.min(state.progress.attempt.guidedIndex, typing.phrases.length - 1);
-    return inputMethodSelector() + '<div class="guided-typing"><span>Phrase ' + (phraseIndex + 1) + ' of ' + typing.phrases.length + '</span><p class="typing-target">' + escapeHtml(typing.phrases[phraseIndex]) + '</p></div>';
+    return inputMethodSelector() + '<div class="guided-typing"><span>' + escapeHtml(courseUi('Phrase ' + (phraseIndex + 1) + ' of ' + typing.phrases.length, 'جملہ ' + (phraseIndex + 1) + ' از ' + typing.phrases.length)) + '</span><p class="typing-target" lang="en" dir="ltr">' + escapeHtml(typing.phrases[phraseIndex]) + '</p></div>';
   };
 
   // This is deliberately visual rather than an aria-live announcement: it can
@@ -3101,25 +3163,36 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const sectionTyping = usesLessonSectionTyping();
     const activeSection = sectionTyping ? activeLessonTypingSection() : null;
     const voiceInputAvailable = typingAllowsVoiceInput();
-    const responseLabel = voiceInputAvailable ? 'Type or speak your response' : 'Type your response';
+    const responseLabel = voiceInputAvailable
+      ? courseUi('Type or speak your response', 'اپنا جواب ٹائپ کریں یا بولیں')
+      : courseUi('Type your response', 'اپنا جواب ٹائپ کریں');
     const inputHelp = voiceInputAvailable
-      ? 'Use the microphone beside the response field to speak, or type your response. Speech input starts only when you choose the microphone.'
+      ? courseUi('Use the microphone beside the response field to speak, or type your response. Speech input starts only when you choose the microphone.', 'بولنے کے لیے جواب کے خانے کے پاس مائیکروفون استعمال کریں، یا اپنا جواب ٹائپ کریں۔ آواز کے ذریعے اِن پٹ صرف مائیکروفون منتخب کرنے پر شروع ہوتا ہے۔')
       : typing.level === 'Recall typing'
-        ? 'Use your own words. Your response is not ranked or scored for speed.'
-        : 'Paste is blocked in keyboard practice. Press Enter to check this response. Use Shift+Enter for a new line.';
+        ? courseUi('Use your own words. Your response is not ranked or scored for speed.', 'اپنے الفاظ استعمال کریں۔ آپ کے جواب کی رفتار کے لحاظ سے درجہ بندی یا اسکور نہیں دیا جاتا۔')
+        : courseUi('Paste is blocked in keyboard practice. Press Enter to check this response. Use Shift+Enter for a new line.', 'کی بورڈ مشق میں پیسٹ کرنا بند ہے۔ جواب جانچنے کے لیے Enter دبائیں۔ نئی سطر کے لیے Shift+Enter استعمال کریں۔');
     const feedback = attempt.feedback ? '<p class="typing-feedback" role="alert">' + escapeHtml(attempt.feedback) + '</p>' : '';
-    const integrity = attempt.integrityNotice ? '<p class="integrity-note">A large amount of text appeared at once. That is okay—this course will use a short understanding check rather than a speed score.</p>' : '';
-    const label = sectionTyping ? 'Lesson typing · section ' + (activeSection.index + 1) + ' of ' + activeSection.total : typing.level;
-    const title = sectionTyping ? activeSection.section.heading : 'Make one idea visible';
-    const prompt = sectionTyping ? 'Type the complete section below. Take the time you need.' : typing.prompt;
-    const note = sectionTyping ? 'This is one complete part of the lesson. It is not ranked or scored for speed.' : 'Use this space to show your thinking. It is not ranked or scored for speed.';
+    const integrity = attempt.integrityNotice ? '<p class="integrity-note">' + escapeHtml(courseUi('A large amount of text appeared at once. That is okay—this course will use a short understanding check rather than a speed score.', 'متن کی بڑی مقدار ایک ساتھ ظاہر ہوئی۔ یہ ٹھیک ہے—یہ کورس رفتار کے اسکور کے بجائے مختصر سمجھ جانچ استعمال کرے گا۔')) + '</p>' : '';
+    const urduTypingSection = sectionTyping ? readingSections()[activeSection.index] : null;
+    const label = sectionTyping
+      ? courseUi('Lesson typing · section ' + (activeSection.index + 1) + ' of ' + activeSection.total, 'سبق کی ٹائپنگ · حصہ ' + (activeSection.index + 1) + ' از ' + activeSection.total)
+      : courseUi(typing.level, 'ٹائپنگ کی مشق');
+    const title = sectionTyping
+      ? courseUi(activeSection.section.heading, urduTypingSection?.urduHeading || '')
+      : courseUi('Make one idea visible', 'اپنے خیال کو واضح کریں');
+    const prompt = sectionTyping
+      ? courseUi('Type the complete section below. Take the time you need.', 'نیچے پورا حصہ ٹائپ کریں۔ جتنا وقت درکار ہو لیں۔')
+      : courseUi(typing.prompt, 'اپنے خیال کو اپنے الفاظ میں لکھیں۔');
+    const note = sectionTyping
+      ? courseUi('This is one complete part of the lesson. It is not ranked or scored for speed.', 'یہ سبق کا ایک مکمل حصہ ہے۔ رفتار کے لحاظ سے نہ درجہ بندی ہوتی ہے اور نہ اسکور۔')
+      : courseUi('Use this space to show your thinking. It is not ranked or scored for speed.', 'اپنی سوچ ظاہر کرنے کے لیے یہ جگہ استعمال کریں۔ رفتار کے لحاظ سے نہ درجہ بندی ہوتی ہے اور نہ اسکور۔');
     const nextAction = sectionTyping && activeSection.index < activeSection.total - 1
-      ? 'Check this section'
+      ? courseUi('Check this section', 'اس حصے کو جانچیں')
       : sectionTyping
-        ? 'Continue to quick check'
+        ? courseUi('Continue to quick check', 'فوری جانچ کی طرف جائیں')
         : typing.level === 'Guided typing' && attempt.guidedIndex < typing.phrases.length - 1
-          ? 'Check this phrase'
-          : typing.level === 'Recall typing' ? 'Review my explanation' : 'Check my sentence';
+          ? courseUi('Check this phrase', 'اس جملے کو جانچیں')
+          : typing.level === 'Recall typing' ? courseUi('Review my explanation', 'میری وضاحت کا جائزہ لیں') : courseUi('Check my sentence', 'میرے جملے کو جانچیں');
     return '<article class="course-task-card course-typing-task"><div class="course-typing-body"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(label) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(title) + '</h2><p>' + escapeHtml(prompt) + '</p></div>' + taskHeaderControls() + '</div><div class="typing-practice"><p class="typing-note">' + escapeHtml(note) + '</p>' + typingMomentumMarkup() + typingTarget() + '<label class="course-input-label" for="course-typing-input">' + responseLabel + '</label><textarea id="course-typing-input" data-typing-input rows="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="' + escapeHtml(typing.placeholder || 'Type the visible section here…') + '" aria-describedby="typing-help">' + escapeHtml(attempt.response) + '</textarea><p id="typing-help" class="course-input-help">' + inputHelp + '</p>' + integrity + feedback + '</div></div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="check-typing">' + nextAction + ' <span aria-hidden="true">→</span></button></div></article>';
   };
 
@@ -3168,10 +3241,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const correct = submitted && selected === correctIndex;
     const feedback = submitted ? savedSupportMarkup(correct ? 'answer-correct' : 'answer-incorrect', { result: 'quick-check' }) : '';
     const actions = !submitted
-      ? '<button class="course-primary-button" type="button" data-action="submit-check"' + (selected === null ? ' disabled' : '') + '>Submit answer <span aria-hidden="true">→</span></button>'
+      ? '<button class="course-primary-button" type="button" data-action="submit-check"' + (selected === null ? ' disabled' : '') + '>' + escapeHtml(courseUi('Submit answer', 'جواب جمع کریں')) + ' <span aria-hidden="true">→</span></button>'
       : correct
-        ? '<button class="course-primary-button" type="button" data-action="continue-check">Continue <span aria-hidden="true">→</span></button>'
-        : '<button class="course-secondary-button" type="button" data-action="retry-question">Choose another answer</button><button class="course-secondary-button" type="button" data-action="return-to-read">Read this step again</button><button class="course-secondary-button" type="button" data-action="simple-read">Explain more simply</button>';
+        ? '<button class="course-primary-button" type="button" data-action="continue-check">' + escapeHtml(courseUi('Continue', 'جاری رکھیں')) + ' <span aria-hidden="true">→</span></button>'
+        : '<button class="course-secondary-button" type="button" data-action="retry-question">' + escapeHtml(courseUi('Choose another answer', 'دوسرا جواب منتخب کریں')) + '</button><button class="course-secondary-button" type="button" data-action="return-to-read">' + escapeHtml(courseUi('Read this step again', 'یہ مرحلہ دوبارہ پڑھیں')) + '</button><button class="course-secondary-button" type="button" data-action="simple-read">' + escapeHtml(courseUi('Explain more simply', 'زیادہ آسان الفاظ میں سمجھائیں')) + '</button>';
     return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Quick check', 'فوری جانچ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Check understanding', 'سمجھ جانچیں') + '</h2><p>' + bilingualCopy('Choose the answer that best matches the short explanation.', 'وہ جواب منتخب کریں جو مختصر وضاحت سے سب سے بہتر میل کھاتا ہو۔') + '</p></div>' + taskHeaderControls() + '</div>' + (state.progress.attempt.integrityNotice ? '<p class="integrity-note">' + bilingualCopy('This quick check keeps the focus on understanding, not on how text entered the box.', 'یہ فوری جانچ اس بات پر توجہ رکھتی ہے کہ آپ نے خیال کو سمجھا ہے، نہ کہ متن باکس میں کیسے داخل ہوا۔') + '</p>' : '') + '<fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + bilingualCopy(check.question, urduCheck.question) + '</legend>' + renderedTaskOptions(check.options, 'course-check', 'data-check-answer', urduCheck.options) + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
   };
 
@@ -3185,10 +3258,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const correct = submitted && selected === correctIndex;
     const feedback = submitted ? savedSupportMarkup(correct ? 'answer-correct' : 'answer-incorrect', { result: 'applied-practice' }) : '';
     const actions = !submitted
-      ? '<button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === null ? ' disabled' : '') + '>Submit answer <span aria-hidden="true">→</span></button>'
+      ? '<button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === null ? ' disabled' : '') + '>' + escapeHtml(courseUi('Submit answer', 'جواب جمع کریں')) + ' <span aria-hidden="true">→</span></button>'
       : correct
-        ? '<button class="course-primary-button" type="button" data-action="continue-apply">Complete this step <span aria-hidden="true">→</span></button>'
-        : '<button class="course-secondary-button" type="button" data-action="retry-question">Choose another answer</button>';
+        ? '<button class="course-primary-button" type="button" data-action="continue-apply">' + escapeHtml(courseUi('Complete this step', 'یہ مرحلہ مکمل کریں')) + ' <span aria-hidden="true">→</span></button>'
+        : '<button class="course-secondary-button" type="button" data-action="retry-question">' + escapeHtml(courseUi('Choose another answer', 'دوسرا جواب منتخب کریں')) + '</button>';
     return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Adapted practice', 'عملی مشق') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Use the idea in a small situation', 'خیال کو ایک مختصر صورتحال میں استعمال کریں') + '</h2><p>' + bilingualCopy('A learner is working on a similar task. Which response best uses the idea from this module?', 'ایک سیکھنے والا ملتے جلتے کام پر ہے۔ کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + bilingualCopy('Which response best uses the idea from this module?', 'کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</legend>' + renderedTaskOptions(choices, 'course-apply', 'data-apply-answer', urduChoices) + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
   };
 
@@ -3395,18 +3468,33 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
 
     const phraseLabel = sectionTyping
-      ? 'Section ' + (activeSection.index + 1) + ' of ' + activeSection.total + ' — type the complete visible section'
+      ? courseUi(
+        'Section ' + (activeSection.index + 1) + ' of ' + activeSection.total + ' — type the complete visible section',
+        'حصہ ' + (activeSection.index + 1) + ' از ' + activeSection.total + ' — نظر آنے والا پورا حصہ ٹائپ کریں'
+      )
       : typing.level === 'Guided typing'
-        ? 'Phrase ' + (state.progress.attempt.guidedIndex + 1) + ' of ' + typing.phrases.length + ' — type the visible phrase'
-      : (freeResponse ? 'Write your response in the field' : 'Type the visible text in the field');
-    label.textContent = voiceInputAvailable ? 'Type or speak your response' : phraseLabel;
+        ? courseUi(
+          'Phrase ' + (state.progress.attempt.guidedIndex + 1) + ' of ' + typing.phrases.length + ' — type the visible phrase',
+          'فقرہ ' + (state.progress.attempt.guidedIndex + 1) + ' از ' + typing.phrases.length + ' — نظر آنے والا فقرہ ٹائپ کریں'
+        )
+        : courseUi(
+          freeResponse ? 'Write your response in the field' : 'Type the visible text in the field',
+          freeResponse ? 'خانے میں اپنا جواب لکھیں' : 'خانے میں نظر آنے والا متن ٹائپ کریں'
+        );
+    label.textContent = voiceInputAvailable
+      ? courseUi('Type or speak your response', 'اپنا جواب ٹائپ کریں یا بولیں')
+      : phraseLabel;
     textarea.classList.add('typing-tester-input');
     textarea.removeAttribute('rows');
     textarea.removeAttribute('placeholder');
     textarea.setAttribute('aria-label', label.textContent);
     textarea.setAttribute('aria-describedby', 'typing-reference typing-help');
     const typingHelp = practice.querySelector('#typing-help');
-    if (typingHelp && !typingHelp.textContent.includes('Press Enter to check this response.')) typingHelp.textContent += ' Press Enter to check this response. Use Shift+Enter for a new line.';
+    const checkInstruction = courseUi(
+      'Press Enter to check this response. Use Shift+Enter for a new line.',
+      'جواب جانچنے کے لیے اِنٹر دبائیں۔ نئی سطر کے لیے شفٹ کے ساتھ اِنٹر استعمال کریں۔'
+    );
+    if (typingHelp && !typingHelp.textContent.includes(checkInstruction)) typingHelp.textContent += ' ' + checkInstruction;
     label.insertAdjacentElement('afterend', field);
     surface.append(textarea);
     const focusCurtain = document.createElement('button');
@@ -3917,29 +4005,29 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       objective.className = 'course-input-help course-typing-objective';
       objective.dataset.typingObjective = '';
       objective.textContent = typingIsAccuracyObjective()
-        ? 'This activity checks the visible typing practice sentence. It does not measure speed.'
-        : 'This activity checks your idea, not spelling or handwriting. You can use a typed, speech-to-text, or other valid response when the option is available.';
+        ? courseUi('This activity checks the visible typing practice sentence. It does not measure speed.', 'یہ سرگرمی نظر آنے والے ٹائپنگ مشق کے جملے کو جانچتی ہے۔ اس میں رفتار نہیں ناپی جاتی۔')
+        : courseUi('This activity checks your idea, not spelling or handwriting. You can use a typed, speech-to-text, or other valid response when the option is available.', 'یہ سرگرمی آپ کے خیال کو جانچتی ہے، ہجے یا لکھائی کو نہیں۔ جہاں اختیار دستیاب ہو وہاں ٹائپ کیا ہوا، آواز سے متن، یا دوسرا موزوں جواب استعمال کیا جا سکتا ہے۔');
       practice.querySelector('#typing-help')?.insertAdjacentElement('afterend', objective);
     }
     if (typingIsAccuracyObjective() && state.preferences.alternativeInput && !practice.querySelector('[data-typing-objective-note]')) {
       const note = document.createElement('p');
       note.className = 'course-input-help';
       note.dataset.typingObjectiveNote = '';
-      note.textContent = 'This is a keyboard typing practice, so the visible sentence stays the learning objective. Your device’s keyboard, switch, and one-handed input can still be used.';
+      note.textContent = courseUi('This is a keyboard typing practice, so the visible sentence stays the learning objective. Your device’s keyboard, switch, and one-handed input can still be used.', 'یہ کی بورڈ ٹائپنگ کی مشق ہے، اس لیے نظر آنے والا جملہ ہی سیکھنے کا مقصد رہتا ہے۔ آپ اپنے آلے کا کی بورڈ، سوئچ، اور ایک ہاتھ سے اِن پٹ پھر بھی استعمال کر سکتے ہیں۔');
       practice.querySelector('#typing-help')?.insertAdjacentElement('afterend', note);
     }
     if (typingAllowsAlternativeInput() && !practice.querySelector('[data-alternative-input-note]')) {
       const note = document.createElement('p');
       note.className = 'course-input-help';
       note.dataset.alternativeInputNote = '';
-      note.textContent = 'Alternative input changes how a response is entered, not what makes it valid. An authored input route appears beside the field only when this activity provides one.';
+      note.textContent = courseUi('Alternative input changes how a response is entered, not what makes it valid. An authored input route appears beside the field only when this activity provides one.', 'متبادل اِن پٹ صرف جواب درج کرنے کا طریقہ بدلتا ہے، اس کی درستی نہیں۔ جب سرگرمی میں اختیار موجود ہو تو جواب کے خانے کے پاس مناسب راستہ ظاہر ہوتا ہے۔');
       practice.querySelector('#typing-help')?.insertAdjacentElement('afterend', note);
     }
     if (typingAllowsAlternativeResponse() && !practice.querySelector('[data-alternative-response-note]')) {
       const note = document.createElement('p');
       note.className = 'course-input-help';
       note.dataset.alternativeResponseNote = '';
-      note.textContent = 'Alternative response formats change the form of an answer only when the learning objective and authored activity allow it. This activity still checks the same concept.';
+      note.textContent = courseUi('Alternative response formats change the form of an answer only when the learning objective and authored activity allow it. This activity still checks the same concept.', 'متبادل جواب کی صورت صرف اسی وقت بدلی جاتی ہے جب سیکھنے کا مقصد اور سرگرمی اس کی اجازت دیں۔ یہ سرگرمی پھر بھی اسی خیال کو جانچتی ہے۔');
       practice.querySelector('#typing-help')?.insertAdjacentElement('afterend', note);
     }
   };
@@ -3957,7 +4045,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const notice = document.createElement('p');
       notice.className = 'course-transition-notice';
       notice.dataset.transitionNotice = '';
-      notice.textContent = 'This screen keeps one task visible. Next: ' + courseNextStepCopy() + '.';
+      notice.textContent = courseUi(
+        'This screen keeps one task visible. Next: ' + courseNextStepCopy() + '.',
+        'اس اسکرین پر ایک کام نظر آتا ہے۔ اگلا: ' + courseNextStepCopy() + '۔'
+      );
       workspace.querySelector('.course-now-panel')?.insertAdjacentElement('afterend', notice);
     }
     if (state.preferences.literalInstructions) {
@@ -3966,7 +4057,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         const instruction = document.createElement('p');
         instruction.className = 'course-literal-instruction';
         instruction.dataset.literalInstruction = '';
-        instruction.innerHTML = '<strong>Do this:</strong> ' + escapeHtml(taskLabel()) + '. <strong>Finish when:</strong> ' + escapeHtml(courseNextStepCopy()) + '.';
+        instruction.innerHTML = courseUsesUrdu()
+          ? '<strong>یہ کریں:</strong> ' + escapeHtml(taskLabel()) + '۔ <strong>یہاں مکمل کریں:</strong> ' + escapeHtml(courseNextStepCopy()) + '۔'
+          : '<strong>Do this:</strong> ' + escapeHtml(taskLabel()) + '. <strong>Finish when:</strong> ' + escapeHtml(courseNextStepCopy()) + '.';
         top.append(instruction);
       }
     }
@@ -3975,7 +4068,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const hint = document.createElement('details');
       hint.className = 'course-extra-hint';
       hint.dataset.extraHint = '';
-      hint.innerHTML = '<summary>Optional hint</summary><p>' + escapeHtml(currentStep().hint) + '</p>';
+      const hintCopy = courseUsesUrdu() ? (urduStep()?.hint || '') : currentStep().hint;
+      hint.innerHTML = '<summary>' + escapeHtml(courseUi('Optional hint', 'اختیاری اشارہ')) + '</summary><p>' + escapeHtml(urduScriptTerms(hintCopy)) + '</p>';
       taskCard.querySelector('.course-task-top')?.insertAdjacentElement('afterend', hint);
     }
     if (taskCard && !taskCard.querySelector('[data-input-access-note]') && (state.preferences.switchInput || state.preferences.keyboardShortcuts)) {
@@ -3983,8 +4077,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       note.className = 'course-input-access-note';
       note.dataset.inputAccessNote = '';
       const messages = [];
-      if (state.preferences.switchInput) messages.push('Switch input is on: use Tab to move between controls, then Space or Enter to activate the focused control.');
-      if (state.preferences.keyboardShortcuts) messages.push('Keyboard shortcuts are on: Alt+P opens Pause and save; Alt+H opens I’m stuck.');
+      if (state.preferences.switchInput) messages.push(courseUi('Switch input is on: use Tab to move between controls, then Space or Enter to activate the focused control.', 'سوئچ اِن پٹ فعال ہے: کنٹرولز کے درمیان جانے کے لیے ٹیب استعمال کریں، پھر منتخب کنٹرول چلانے کے لیے اسپیس یا اِنٹر دبائیں۔'));
+      if (state.preferences.keyboardShortcuts) messages.push(courseUi('Keyboard shortcuts are on: Alt+P opens Pause and save; Alt+H opens I’m stuck.', 'کی بورڈ شارٹ کٹس فعال ہیں: آلٹ کے ساتھ پی سے وقفہ اور محفوظ کریں کھلتا ہے؛ آلٹ کے ساتھ ایچ سے مدد کھلتی ہے۔'));
       note.textContent = messages.join(' ');
       taskCard.querySelector('.course-task-top')?.insertAdjacentElement('afterend', note);
     }
@@ -4000,15 +4094,17 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         const note = document.createElement('p');
         note.className = 'course-written-access-note';
         note.dataset.writtenAccessNote = '';
-        note.textContent = 'Written lesson text stays visible while optional text to speech plays.';
+        note.textContent = courseUi('Written lesson text stays visible while optional text to speech plays.', 'اختیاری آواز چلتے وقت بھی سبق کا تحریری متن نظر آتا رہتا ہے۔');
         reading.insertAdjacentElement('beforebegin', note);
       }
     }
     app.querySelectorAll('.course-progress-panel').forEach((panel) => {
       if (!numericProgressIsReduced()) return;
-      panel.querySelector('strong')?.replaceChildren(document.createTextNode('One small step at a time'));
+      panel.querySelector('strong')?.replaceChildren(document.createTextNode(courseUi('One small step at a time', 'ایک وقت میں ایک مختصر مرحلہ')));
       panel.querySelectorAll('.course-progress-bars span').forEach((label, index) => {
-        label.textContent = index === 0 ? 'Current learning step' : (isFinalExamPhase() ? 'Saved course progress' : 'Course progress');
+        label.textContent = index === 0
+          ? courseUi('Current learning step', 'سیکھنے کا موجودہ مرحلہ')
+          : (isFinalExamPhase() ? courseUi('Saved course progress', 'محفوظ کورس کی پیش رفت') : courseUi('Course progress', 'کورس کی پیش رفت'));
       });
     });
     app.querySelectorAll('[data-action="show-example"]').forEach((button) => {
@@ -4096,7 +4192,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     if (state.view === 'course') {
       const moduleCopy = app.querySelector('.course-module-strip-heading > span');
-      if (moduleCopy) moduleCopy.textContent = COURSE.steps.length + ' small modules · one final exam';
+      if (moduleCopy) {
+        moduleCopy.textContent = courseUi(
+          COURSE.steps.length + ' small modules · one final exam',
+          COURSE.steps.length + ' مختصر ماڈیولز · ایک آخری امتحان'
+        );
+      }
     }
   };
 
@@ -4735,7 +4836,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     ? reviewModuleTask()
     : ({ preview: previewTask, read: readTask, type: typingTask, check: checkTaskWithFeedback, apply: applyTaskWithFeedback, complete: completionTask, 'exam-intro': finalExamIntroTask, exam: finalExamQuestionTask, 'exam-results': finalExamResultsTask }[state.progress.phase] || previewTask)();
 
-  const courseProgressBar = () => '<section class="course-progress-panel" aria-label="Learning progress"><div><p>Course progress</p><strong>Step ' + (state.progress.lessonIndex + 1) + ' of ' + COURSE.steps.length + '</strong><span>One small step at a time</span></div><div class="course-progress-bars"><div><span>Current step · Task ' + phaseNumber() + ' of 5</span><progress value="' + phaseNumber() + '" max="5">' + phaseNumber() + ' of 5</progress></div><div><span>Course · ' + state.progress.completedSteps.length + ' lessons completed</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + state.progress.completedSteps.length + ' of ' + COURSE.steps.length + '</progress></div></div></section>';
+  const courseProgressBar = () => '<section class="course-progress-panel" aria-label="' + escapeHtml(courseUi('Learning progress', 'سیکھنے کی پیش رفت')) + '"><div><p>' + escapeHtml(courseUi('Course progress', 'کورس کی پیش رفت')) + '</p><strong>' + escapeHtml(courseUi('Step ' + (state.progress.lessonIndex + 1) + ' of ' + COURSE.steps.length, 'مرحلہ ' + (state.progress.lessonIndex + 1) + ' از ' + COURSE.steps.length)) + '</strong><span>' + escapeHtml(courseUi('One small step at a time', 'ایک وقت میں ایک مختصر مرحلہ')) + '</span></div><div class="course-progress-bars"><div><span>' + escapeHtml(courseUi('Current step · Task ' + phaseNumber() + ' of 5', 'موجودہ مرحلہ · کام ' + phaseNumber() + ' از 5')) + '</span><progress value="' + phaseNumber() + '" max="5">' + escapeHtml(courseUi(phaseNumber() + ' of 5', phaseNumber() + ' از 5')) + '</progress></div><div><span>' + escapeHtml(courseUi('Course · ' + state.progress.completedSteps.length + ' lessons completed', 'کورس · ' + state.progress.completedSteps.length + ' اسباق مکمل')) + '</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + escapeHtml(courseUi(state.progress.completedSteps.length + ' of ' + COURSE.steps.length, state.progress.completedSteps.length + ' از ' + COURSE.steps.length)) + '</progress></div></div></section>';
 
   const helpDetail = () => {
     const step = currentStep();
@@ -4991,15 +5092,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach((node) => {
       const parent = node.parentElement;
-      if (!parent || parent.closest('.course-bilingual-copy, .course-typing-task')) return;
+      if (!parent || parent.closest('.typing-target, textarea, .typing-tester-overlay, #typing-reference')) return;
       const source = node.nodeValue.trim();
-      if (!source || !URDU_UI_COPY[source]) return;
-      node.nodeValue = node.nodeValue.replace(source, URDU_UI_COPY[source]);
+      if (!source) return;
+      const localized = URDU_UI_COPY[source] || urduScriptTerms(source);
+      node.nodeValue = node.nodeValue.replace(source, localized);
     });
     app.querySelectorAll('.course-module-list li').forEach((item, index) => {
       const step = COURSE_URDU.steps[index];
       const title = item.querySelector('strong');
-      if (step && title) title.textContent = step.title;
+      if (step && title) title.textContent = urduScriptTerms(step.title);
     });
     const stripSummary = app.querySelector('.course-module-strip-heading > span');
     if (stripSummary) stripSummary.textContent = COURSE.steps.length + ' مختصر ماڈیولز · ایک آخری امتحان';

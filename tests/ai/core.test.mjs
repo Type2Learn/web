@@ -152,6 +152,22 @@ test('Azure Responses calls use api-key, the exact approved model, and parse Azu
     assert.equal(settled.length, 1);
     assert.equal(settled[0].actual.inputTokens, 31);
     assert.equal(settled[0].actual.outputTokens, 7);
+
+    await service.chat({
+      authorization: 'Bearer test-token',
+      body: {
+        message: 'اس صفحے کا مرکزی خیال کیا ہے؟',
+        history: [],
+        courseId: COURSE_CONTENT.id,
+        page: { moduleIndex: 0, phase: 'read' },
+        language: 'ur'
+      }
+    });
+    const urduRequest = JSON.parse(calls[1].options.body);
+    assert.match(urduRequest.instructions, /Reply only in clear, standard Urdu written in Urdu script/);
+    const urduPageFacts = urduRequest.instructions.split('Approved page facts:\n')[1];
+    assert.match(urduPageFacts, /اے ڈی ایچ ڈی/);
+    assert.doesNotMatch(urduPageFacts, /\bADHD\b/);
   } finally {
     globalThis.fetch = previousFetch;
   }

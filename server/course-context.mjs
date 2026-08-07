@@ -6,6 +6,18 @@ const supportedPhases = new Set(['preview', 'read', 'type', 'check', 'apply', 'c
 
 const boundedText = (value, maximum = 1100) => String(value || '').replace(/\u0000/g, '').trim().slice(0, maximum);
 const listText = (value) => Array.isArray(value) ? value.filter(Boolean).join('; ') : boundedText(value);
+// The written Urdu experience must not fall back to Latin abbreviations merely
+// because an authored English course term appears in a translation source.
+const urduScriptTerms = (value = '') => String(value)
+  .replace(/\bADHD\b/g, 'اے ڈی ایچ ڈی')
+  .replace(/\bDCD\b/g, 'ڈی سی ڈی')
+  .replace(/\bDyslexia\b/g, 'ڈسلیکسیہ')
+  .replace(/\bDysgraphia\b/g, 'ڈسگرافیا')
+  .replace(/\bDyspraxia\b/g, 'ڈس پراکسیا')
+  .replace(/\bDyscalculia\b/g, 'ڈس کیلکولیا')
+  .replace(/\bAutism Spectrum Disorder\b/g, 'آٹزم اسپیکٹرم کی کیفیت')
+  .replace(/\bAuditory Processing Disorder\b/g, 'سمعی عمل کاری کی کیفیت')
+  .replace(/\bDevelopmental Coordination Disorder\b/g, 'نشوونمائی ہم آہنگی کی کیفیت');
 
 const readingFacts = (content = {}) => [
   content.definitionHeading && `${content.definitionHeading}: ${content.definition}`,
@@ -47,8 +59,8 @@ export const coursePageContext = (body) => {
   return {
     language,
     phase,
-    title: boundedText(step.title || fallback.title, 180),
-    facts: facts.slice(0, 6)
+    title: boundedText(language === 'ur' ? urduScriptTerms(step.title || fallback.title) : (step.title || fallback.title), 180),
+    facts: facts.slice(0, 6).map((fact) => language === 'ur' ? boundedText(urduScriptTerms(fact)) : fact)
   };
 };
 
