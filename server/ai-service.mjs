@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { APPROVED_OPENAI_MODEL } from './config.mjs';
 import { coursePageContext, normaliseConversation, normaliseLearnerMessage } from './course-context.mjs';
 import { apiError } from './errors.mjs';
 import { openAiUsageCaps, usageEstimate } from './usage-ledger.mjs';
@@ -87,7 +88,7 @@ export const createAiService = ({ config, firebase, ledger }) => {
 
   const chat = async ({ authorization, body }) => {
     if (!config.openAiApiKey || !config.openAiResponsesUrl) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
-    if (config.openAiModel !== 'gpt-5.1-codex-mini') throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
+    if (config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
     if (!firebase.available || !ledger) throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
     const learner = await firebase.verifyBearer(authorization);
     const message = normaliseLearnerMessage(body?.message);
@@ -132,7 +133,7 @@ export const createAiService = ({ config, firebase, ledger }) => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'gpt-5.1-codex-mini',
+            model: config.openAiModel,
             store: false,
             instructions,
             input,

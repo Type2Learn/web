@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { COURSE_CONTENT } from '../../course/course-content.js';
-import { APPROVED_OPENAI_MODEL, loadRuntimeConfig, parseEnvText } from '../../server/config.mjs';
+import { APPROVED_OPENAI_MODEL, RESERVED_TEST_GENERATION_MODEL, loadRuntimeConfig, parseEnvText } from '../../server/config.mjs';
 import { createAiService } from '../../server/ai-service.mjs';
 import { coursePageContext, normaliseConversation, normaliseLearnerMessage } from '../../server/course-context.mjs';
 import { usageEstimate } from '../../server/usage-ledger.mjs';
@@ -39,7 +39,7 @@ test('production runtime never loads the local secret file and caps cannot be ra
     assert.equal(production.openAiApiKey, '');
     assert.equal(production.openAiUserCapUsd, 2);
     assert.equal(production.openAiAppCapUsd, 14);
-    assert.equal(production.openAiModel, 'gpt-5.1-codex-mini');
+    assert.equal(production.openAiModel, 'gpt-5-nano');
 
     const development = await loadRuntimeConfig({ root, environment: { NODE_ENV: 'development' } });
     assert.equal(development.openAiApiKey, 'local-only-value');
@@ -194,8 +194,10 @@ test('learner chat input and history stay bounded', () => {
   assert.ok(history.every((entry) => entry.content.length === 650));
 });
 
-test('usage estimate uses the documented input and output price configuration', () => {
-  const estimate = usageEstimate(1000000, 500000, { openAiInputUsdPerMillion: 0.25, openAiOutputUsdPerMillion: 2 });
-  assert.equal(estimate, 1.25);
-  assert.equal(APPROVED_OPENAI_MODEL, 'gpt-5.1-codex-mini');
+test('usage estimate uses the documented Nano price configuration and keeps Mini reserved', () => {
+  const estimate = usageEstimate(1000000, 500000, { openAiInputUsdPerMillion: 0.05, openAiOutputUsdPerMillion: 0.4 });
+  assert.equal(estimate, 0.25);
+  assert.equal(APPROVED_OPENAI_MODEL, 'gpt-5-nano');
+  assert.equal(RESERVED_TEST_GENERATION_MODEL, 'gpt-5.1-codex-mini');
+  assert.notEqual(APPROVED_OPENAI_MODEL, RESERVED_TEST_GENERATION_MODEL);
 });

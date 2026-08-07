@@ -2,7 +2,15 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const APPROVED_OPENAI_MODEL = 'gpt-5.1-codex-mini';
+// Course AI is deliberately pinned to the low-cost model selected for normal
+// learner conversations. Do not introduce an automatic fallback: a model
+// availability problem must be visible rather than silently spending the
+// future assessment-generation budget.
+export const APPROVED_OPENAI_MODEL = 'gpt-5-nano';
+
+// Reserved for the future assessment/test-generation feature only. It is not
+// an approved Course AI chat model and must not be used as a chat fallback.
+export const RESERVED_TEST_GENERATION_MODEL = 'gpt-5.1-codex-mini';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repositoryRoot = path.resolve(here, '..');
@@ -131,8 +139,10 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     openAiAppOutputTokenCap: numberFrom(value('OPENAI_MONTHLY_APP_OUTPUT_TOKEN_CAP'), 5600000, { min: 1, max: 5600000 }),
     openAiUserInputTokenCap: numberFrom(value('OPENAI_MONTHLY_USER_INPUT_TOKEN_CAP'), 1000000, { min: 1, max: 1000000 }),
     openAiUserOutputTokenCap: numberFrom(value('OPENAI_MONTHLY_USER_OUTPUT_TOKEN_CAP'), 500000, { min: 1, max: 500000 }),
-    openAiInputUsdPerMillion: numberFrom(value('OPENAI_INPUT_USD_PER_MILLION_TOKENS'), 0.25, { min: 0, max: 0.25 }),
-    openAiOutputUsdPerMillion: numberFrom(value('OPENAI_OUTPUT_USD_PER_MILLION_TOKENS'), 2, { min: 0, max: 2 }),
+    // GPT-5 nano text-token pricing. Keep the limits below separate from these
+    // rates so a pricing change cannot expand the fixed application/user caps.
+    openAiInputUsdPerMillion: numberFrom(value('OPENAI_INPUT_USD_PER_MILLION_TOKENS'), 0.05, { min: 0, max: 0.05 }),
+    openAiOutputUsdPerMillion: numberFrom(value('OPENAI_OUTPUT_USD_PER_MILLION_TOKENS'), 0.4, { min: 0, max: 0.4 }),
     openAiMaxOutputTokens: numberFrom(value('OPENAI_MAX_OUTPUT_TOKENS'), 320, { min: 32, max: 320 }),
     openAiRequestsPerMinute: numberFrom(value('OPENAI_REQUESTS_PER_MINUTE'), 12, { min: 1, max: 12 }),
     speechmaticsMonthlyCreditCap: numberFrom(value('SPEECHMATICS_MONTHLY_CREDIT_CAP'), 180, { min: 0, max: 180 }),
