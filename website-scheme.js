@@ -5,14 +5,17 @@
   // layout, and encouragement controls. It changes the visual shell after a
   // learner signs in without changing their course, progress, or supports.
   const storageKey = 'type2learn-website-scheme';
-  const modes = Object.freeze(['balanced', 'playful', 'calm']);
+  const modes = Object.freeze(['calm', 'playful']);
   const themeColors = Object.freeze({
-    balanced: '#F5FAFF',
+    calm: '#F5FAFF',
     playful: '#8FDDF5',
-    calm: '#F4F0E8'
   });
 
-  const validMode = (value) => modes.includes(value) ? value : 'balanced';
+  // Existing learners chose "Balanced" before it was renamed Calm. Preserve
+  // that familiar, unchanged presentation while migrating the saved value.
+  const validMode = (value) => value === 'balanced'
+    ? 'calm'
+    : modes.includes(value) ? value : 'calm';
   const read = () => {
     try { return validMode(window.localStorage.getItem(storageKey)); } catch (_) { return 'balanced'; }
   };
@@ -35,6 +38,7 @@
   };
 
   // Run synchronously in the document head so the saved scheme does not flash
-  // back to Balanced while the authenticated app is starting.
-  apply(read(), false);
+  // back to Calm while the authenticated app is starting. Persisting here also
+  // converts the retired "balanced" value once, before either app renders.
+  apply(read(), true);
 })();

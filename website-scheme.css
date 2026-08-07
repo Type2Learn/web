@@ -1,8 +1,7 @@
 /*
-  Authenticated presentation themes. Balanced intentionally has no overrides:
-  it is the existing Type2Learn appearance. Playful and Calm only alter the
-  visual shell; every course control, layout, language, and support remains
-  available exactly as before.
+  Authenticated presentation themes. Calm is the established Type2Learn
+  presentation; Playful changes only the visual shell. Every course control,
+  layout, language, and support remains available exactly as before.
 */
 
 html[data-website-scheme="playful"] {
@@ -79,6 +78,52 @@ html[data-website-scheme="playful"] .course-module-strip {
   background-color: color-mix(in srgb, #F2FCFF 93%, white) !important;
 }
 
+/* Make the task itself feel welcoming too—not just the outer sky. The quiet
+   cream centre preserves a strong reading surface, while the blue, yellow,
+   and pink corners make the main box unmistakably playful. */
+html[data-website-scheme="playful"] .learning-settings,
+html[data-website-scheme="playful"] .learning-single-setting,
+html[data-website-scheme="playful"] .course-dashboard-primary,
+html[data-website-scheme="playful"] .course-task-card {
+  background-color: #FFFDF5 !important;
+  background-image:
+    radial-gradient(circle at -4% -6%, rgba(255, 215, 90, .30) 0 12%, transparent 12.4%),
+    radial-gradient(circle at 104% -6%, rgba(98, 207, 242, .24) 0 13%, transparent 13.4%),
+    radial-gradient(circle at 104% 106%, rgba(255, 159, 203, .20) 0 14%, transparent 14.4%),
+    linear-gradient(135deg, #FFFDF5 0%, #F4FCFF 55%, #FFF7D6 100%) !important;
+}
+
+/* These shells have no baseline card padding. Give heading, choices, and the
+   action row a protected interior so a playful border never cuts into text. */
+html[data-website-scheme="playful"] .learning-settings,
+html[data-website-scheme="playful"] .learning-single-setting,
+html[data-website-scheme="playful"] .learning-focused-settings {
+  box-sizing: border-box;
+  padding: clamp(24px, 4vw, 44px);
+}
+
+html[data-website-scheme="playful"] .learning-settings-action {
+  min-height: 54px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--scheme-line) 72%, transparent);
+}
+
+html[data-website-scheme="playful"] .course-reading-section:nth-of-type(3n + 1),
+html[data-website-scheme="playful"] .course-check-option:nth-of-type(3n + 1) {
+  background-color: #FFF8DB;
+}
+
+html[data-website-scheme="playful"] .course-reading-section:nth-of-type(3n + 2),
+html[data-website-scheme="playful"] .course-check-option:nth-of-type(3n + 2) {
+  background-color: #EAF9FF;
+}
+
+html[data-website-scheme="playful"] .course-reading-section:nth-of-type(3n),
+html[data-website-scheme="playful"] .course-check-option:nth-of-type(3n) {
+  background-color: #FFF0F7;
+}
+
 html[data-website-scheme="playful"] .learning-setting-chit,
 html[data-website-scheme="playful"] .learning-open-row,
 html[data-website-scheme="playful"] .course-reading-section,
@@ -134,9 +179,82 @@ html[data-website-scheme="playful"] .learning-settings-header p {
 
 html[data-website-scheme="playful"] .course-support-popup,
 html[data-website-scheme="playful"] .learning-encouragement-popup {
-  border-width: 2px;
-  border-inline-start-width: 8px;
-  box-shadow: 0 10px 0 rgba(23, 105, 168, .14), 0 22px 38px rgba(29, 105, 150, .16);
+  border: 3px solid #1D75AA !important;
+  border-inline-start: 10px solid #FFB82E !important;
+  color: #153B61;
+  background:
+    radial-gradient(circle at 93% 18%, rgba(255, 215, 90, .34) 0 12%, transparent 12.4%),
+    radial-gradient(circle at 9% 100%, rgba(255, 159, 203, .25) 0 17%, transparent 17.4%),
+    linear-gradient(135deg, #FFFDF3 0%, #E6F9FF 56%, #F7EDFF 100%) !important;
+  box-shadow: 0 9px 0 #216A96, 0 18px 34px rgba(29, 105, 150, .22) !important;
+}
+
+html[data-website-scheme="playful"] .course-support-popup .course-support-label,
+html[data-website-scheme="playful"] .learning-encouragement-popup .learning-encouragement-label {
+  color: #11855B;
+}
+
+html[data-website-scheme="playful"] .course-support-popup .course-support-symbol {
+  color: #153B61;
+  background: linear-gradient(135deg, #FFD75A 0%, #FF9FCB 45%, #62CFF2 100%) !important;
+  box-shadow: 0 4px 0 rgba(33, 106, 150, .2);
+}
+
+html[data-website-scheme="playful"] .course-support-popup .course-support-progress {
+  background: linear-gradient(90deg, #FFB82E, #39BF73 34%, #3BC8C1 65%, #FF9FCB) !important;
+}
+
+html[data-website-scheme="playful"] .course-support-popup .course-support-next--line {
+  border-top-color: #9AD4EB;
+}
+
+html[data-website-scheme="playful"] .course-support-moment:not(.course-support-popup) {
+  border: 2px solid #2B82B5;
+  border-inline-start: 8px solid #FFB82E;
+  border-radius: 20px;
+  background: linear-gradient(116deg, #FFF9DF 0%, #EAF9FF 55%, #FFF0F7 100%);
+  box-shadow: 0 7px 0 rgba(33, 106, 150, .14);
+}
+
+html[data-website-scheme="playful"] .course-support-moment:not(.course-support-popup) .course-support-symbol {
+  border: 0;
+  color: #153B61;
+  background: linear-gradient(135deg, #FFD75A, #FF9FCB 48%, #62CFF2);
+}
+
+html[data-website-scheme="playful"] body[data-course-encouragement="subtle"] .course-support-moment:not(.course-support-popup) {
+  border-width: 0 0 0 4px;
+  border-inline-start: 4px solid #FFB82E;
+  border-radius: 0;
+  padding-block: 6px;
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-website-scheme="playful"] body[data-course-encouragement="subtle"] .course-support-moment:not(.course-support-popup) .course-support-symbol {
+  color: #E07D27;
+  background: transparent;
+}
+
+html[data-website-scheme="playful"] .learning-encouragement-popup > span {
+  color: #153B61;
+  background: linear-gradient(135deg, #FFD75A, #FF9FCB 48%, #62CFF2) !important;
+  box-shadow: 0 4px 0 rgba(33, 106, 150, .2);
+}
+
+html[data-website-scheme="playful"] .learning-encouragement-popup > i {
+  background: linear-gradient(90deg, #FFB82E, #39BF73 34%, #3BC8C1 65%, #FF9FCB) !important;
+}
+
+@keyframes playful-support-pop {
+  0% { opacity: 0; transform: translate(-50%, calc(-50% + 18px)) rotate(-1deg) scale(.92); }
+  70% { opacity: 1; transform: translate(-50%, calc(-50% - 2px)) rotate(.45deg) scale(1.025); }
+  100% { opacity: 1; transform: translate(-50%, -50%) rotate(0) scale(1); }
+}
+
+html[data-website-scheme="playful"] body[data-course-animations="gentle"] .course-support-popup.is-support-entering,
+html[data-website-scheme="playful"] body[data-course-animations="lively"] .course-support-popup.is-support-entering {
+  animation: playful-support-pop 360ms cubic-bezier(.16, 1.15, .3, 1) both;
 }
 
 html[data-website-scheme="playful"] .course-dashboard-mascot-stage,
@@ -145,107 +263,98 @@ html[data-website-scheme="playful"] .learning-mascot-stage {
   filter: drop-shadow(0 12px 9px rgba(29, 105, 150, .14));
 }
 
-html[data-website-scheme="calm"] {
-  --scheme-calm-ink: #303B49;
-  --scheme-calm-soft: #5B6975;
-  --scheme-calm-paper: #FFFEFA;
-  --scheme-calm-cloud: #F4F0E8;
-  --scheme-calm-line: #CFC8BA;
-  --scheme-calm-green: #708D77;
-  --scheme-calm-blue: #74899D;
+/* Flat is a deliberately quieter, blue-filtered evening version of Playful.
+   It removes the colourful card washes and shadows while keeping the same
+   readable structure, including supportive feedback. */
+html[data-website-scheme="playful"][data-color-mode="flat"] body[data-app-route="afterlogin"],
+html[data-website-scheme="playful"][data-color-mode="flat"] body[data-app-route="course"] {
+  background-color: #385D7C !important;
+  background-image:
+    linear-gradient(rgba(14, 42, 76, .56), rgba(24, 57, 92, .66)),
+    url("/assets/schemes/playful-stickers.svg"),
+    url("/assets/schemes/playful-sky.svg") !important;
+  background-blend-mode: color, luminosity, normal;
 }
 
-html[data-website-scheme="calm"] body[data-app-route="afterlogin"],
-html[data-website-scheme="calm"] body[data-app-route="course"] {
-  background: var(--scheme-calm-cloud) !important;
+html[data-website-scheme="playful"][data-color-mode="flat"] body[data-app-route="course"] {
+  --course-ink: #163552;
+  --course-ink-soft: #385772;
+  --course-muted: #587187;
+  --course-paper: #EEF5FB;
+  --course-cloud: transparent;
+  --course-line: #9EB8CC;
+  --course-line-strong: #4E7595;
+  --course-green: #397C71;
+  --course-teal: #477C91;
+  --course-cyan: #5E94AD;
+  --course-blue: #285D8D;
+  --course-green-pale: #E6F1EE;
+  --course-blue-pale: #E5EFF8;
+  --course-teal-pale: #E7F0F4;
 }
 
-html[data-website-scheme="calm"] body[data-app-route="course"] {
-  --course-ink: var(--scheme-calm-ink);
-  --course-ink-soft: #4B5B68;
-  --course-muted: #6C7780;
-  --course-paper: var(--scheme-calm-paper);
-  --course-cloud: var(--scheme-calm-cloud);
-  --course-line: #DDD7CB;
-  --course-line-strong: var(--scheme-calm-line);
-  --course-green: var(--scheme-calm-green);
-  --course-teal: #7C9894;
-  --course-cyan: #879CA8;
-  --course-blue: var(--scheme-calm-blue);
-  --course-green-pale: #EFF4EE;
-  --course-blue-pale: #F0F3F3;
-  --course-teal-pale: #EEF4F2;
-  --course-amber-pale: #FBF3E5;
-  --course-radius: 10px;
-  --course-radius-small: 7px;
+html[data-website-scheme="playful"][data-color-mode="flat"] body[data-app-route="afterlogin"] {
+  --learn-ink: #163552;
+  --learn-soft: #385772;
+  --learn-muted: #587187;
+  --learn-paper: #EEF5FB;
+  --learn-cloud: transparent;
+  --learn-line: #9EB8CC;
+  --learn-line-strong: #4E7595;
+  --learn-green: #397C71;
+  --learn-teal: #477C91;
+  --learn-cyan: #5E94AD;
+  --learn-blue: #285D8D;
 }
 
-html[data-website-scheme="calm"] body[data-app-route="afterlogin"] {
-  --learn-ink: var(--scheme-calm-ink);
-  --learn-soft: #4B5B68;
-  --learn-muted: #6C7780;
-  --learn-cloud: var(--scheme-calm-cloud);
-  --learn-paper: var(--scheme-calm-paper);
-  --learn-line: #DDD7CB;
-  --learn-line-strong: var(--scheme-calm-line);
-  --learn-green: var(--scheme-calm-green);
-  --learn-teal: #7C9894;
-  --learn-cyan: #879CA8;
-  --learn-blue: var(--scheme-calm-blue);
+html[data-website-scheme="playful"][data-color-mode="flat"] .learning-settings,
+html[data-website-scheme="playful"][data-color-mode="flat"] .learning-single-setting,
+html[data-website-scheme="playful"][data-color-mode="flat"] .learning-focused-settings,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-dashboard-primary,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-panel-page,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-task-card,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-module-strip,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-settings-menu,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-ai-chat {
+  border-color: #4E7595;
+  background-color: #EEF5FB !important;
+  background-image: linear-gradient(135deg, #F4F8FC, #E5EFF8) !important;
+  box-shadow: none !important;
 }
 
-html[data-website-scheme="calm"] .learning-settings,
-html[data-website-scheme="calm"] .learning-single-setting,
-html[data-website-scheme="calm"] .learning-focused-settings,
-html[data-website-scheme="calm"] .course-dashboard-primary,
-html[data-website-scheme="calm"] .course-panel-page,
-html[data-website-scheme="calm"] .course-task-card,
-html[data-website-scheme="calm"] .course-module-strip,
-html[data-website-scheme="calm"] .course-settings-menu,
-html[data-website-scheme="calm"] .course-ai-chat {
-  border-color: var(--scheme-calm-line);
-  border-radius: 10px;
+html[data-website-scheme="playful"][data-color-mode="flat"] .learning-setting-chit,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-reading-section,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-check-option,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-content-notice,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-support-moment:not(.course-support-popup),
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-ai-message,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-ai-composer textarea,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-support-popup,
+html[data-website-scheme="playful"][data-color-mode="flat"] .learning-encouragement-popup {
+  border-color: #7898B0 !important;
+  background: #E7F0F8 !important;
+  box-shadow: none !important;
+}
+
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-support-symbol,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-support-progress,
+html[data-website-scheme="playful"][data-color-mode="flat"] .learning-encouragement-popup > span,
+html[data-website-scheme="playful"][data-color-mode="flat"] .learning-encouragement-popup > i {
+  color: #EAF4FB;
+  background: #39718B !important;
+}
+
+html[data-website-scheme="playful"][data-color-mode="flat"] .preference-options button,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-settings-choice-group button,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-secondary-button,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-back-button,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-task-explain,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-task-time,
+html[data-website-scheme="playful"][data-color-mode="flat"] .learning-continue,
+html[data-website-scheme="playful"][data-color-mode="flat"] .course-primary-button {
+  border-color: #39718B;
+  background: #E8F1F8;
   box-shadow: none;
-}
-
-html[data-website-scheme="calm"] .learning-setting-chit,
-html[data-website-scheme="calm"] .course-reading-section,
-html[data-website-scheme="calm"] .course-check-option,
-html[data-website-scheme="calm"] .course-content-notice,
-html[data-website-scheme="calm"] .course-ai-message,
-html[data-website-scheme="calm"] .course-ai-composer textarea {
-  border-radius: 7px;
-  box-shadow: none;
-}
-
-html[data-website-scheme="calm"] .learning-setting-chit {
-  border-inline-start-width: 3px;
-  box-shadow: none;
-}
-
-html[data-website-scheme="calm"] .learning-setting-chit::before,
-html[data-website-scheme="calm"] .learning-setting-chit::after,
-html[data-website-scheme="calm"] .course-dashboard-mascot-stage::before,
-html[data-website-scheme="calm"] .course-mascot-stage::before {
-  display: none;
-}
-
-html[data-website-scheme="calm"] .learning-continue,
-html[data-website-scheme="calm"] .course-primary-button,
-html[data-website-scheme="calm"] .preference-options button,
-html[data-website-scheme="calm"] .course-settings-choice-group button,
-html[data-website-scheme="calm"] .course-secondary-button,
-html[data-website-scheme="calm"] .course-back-button,
-html[data-website-scheme="calm"] .course-task-explain,
-html[data-website-scheme="calm"] .course-task-time {
-  border-radius: 7px;
-  box-shadow: none;
-}
-
-html[data-website-scheme="calm"] .course-support-popup,
-html[data-website-scheme="calm"] .learning-encouragement-popup {
-  border-inline-start-width: 4px;
-  box-shadow: 0 8px 24px rgba(47, 56, 66, .12);
 }
 
 @media (max-width: 720px) {

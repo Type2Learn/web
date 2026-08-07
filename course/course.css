@@ -1925,12 +1925,18 @@ body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .
 }
 
 .course-typing-task .course-task-top {
-  position: relative;
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
-.course-typing-task .course-task-top > div { max-width: 600px; }
-.course-typing-task .course-task-header-controls { position: absolute; top: 0; right: 0; }
+.course-typing-task .course-task-top > div { flex: 1 1 420px; max-width: 600px; }
+/* Header controls need their own flex lane. Absolute positioning put action
+   buttons over long headings on tighter desktop/tablet widths. */
+.course-typing-task .course-task-header-controls {
+  position: static;
+  margin-inline-start: auto;
+}
 .course-typing-task .typing-practice { max-width: none; }
 
 .typing-practice { max-width: 780px; margin-top: 23px; }
@@ -2923,9 +2929,14 @@ body[data-course-animations="lively"] .course-typing-momentum.is-momentum-changi
 
 .typing-tester-controls {
   display: flex;
+  width: 100%;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  /* The typing target stays English in Urdu mode. Keep this sibling control
+     physically at the top-right of that LTR field rather than allowing the
+     page's RTL flex direction to move it to the far left. */
+  direction: ltr;
   justify-content: flex-end;
   margin: 8px 0;
 }

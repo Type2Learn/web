@@ -218,7 +218,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const defaultLearningChoices = () => ({
     // `learning-language` is retained only as a migration source for older
     // saved preferences. Urdu mode is now the learner-facing language control.
-    'website-scheme': 'balanced',
+    'website-scheme': 'calm',
     colours: 'balanced',
     layout: 'balanced',
     encouragement: 'subtle',
@@ -235,10 +235,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'urdu-mode': 'off'
   });
 
-  const websiteSchemes = ['balanced', 'playful', 'calm'];
+  const websiteSchemes = ['calm', 'playful'];
+  const normaliseWebsiteScheme = (value) => value === 'balanced'
+    ? 'calm'
+    : websiteSchemes.includes(value) ? value : '';
   const learningChoices = () => {
     const saved = readLearningChoices();
-    const isLegacyLanguagePreference = !websiteSchemes.includes(saved['website-scheme']);
+    const savedWebsiteScheme = normaliseWebsiteScheme(saved['website-scheme']);
+    const isLegacyLanguagePreference = !savedWebsiteScheme;
     const urduMode = isLegacyLanguagePreference && saved['learning-language'] === 'urdu'
       ? 'on'
       : saved['urdu-mode'] === 'on'
@@ -249,7 +253,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return {
       ...defaultLearningChoices(),
       ...saved,
-      'website-scheme': websiteSchemes.includes(saved['website-scheme']) ? saved['website-scheme'] : 'balanced',
+      'website-scheme': savedWebsiteScheme || 'calm',
       'urdu-mode': urduMode
     };
   };
@@ -1029,7 +1033,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const mascotUnavailable = !mascotViewportQuery?.matches;
     const controls = preferencesSaved ? [
       '<div class="course-settings-menu-controls">',
-      settingsChoiceGroup('website-scheme', 'Website scheme', 'Choose the overall presentation for your learning space. Balanced keeps the current look; Playful is bright and kid-friendly; Calm is quieter and low-stimulation.', [['balanced', 'Balanced'], ['playful', 'Playful'], ['calm', 'Calm']], choices['website-scheme']),
+      settingsChoiceGroup('website-scheme', 'Website scheme', 'Choose the overall presentation for your learning space. Calm keeps the current look; Playful is bright, colourful, and kid-friendly.', [['calm', 'Calm'], ['playful', 'Playful']], choices['website-scheme']),
       settingsChoiceGroup('colours', 'Color style', 'Choose how much color appears around the task.', [['flat', 'Flat'], ['balanced', 'Balanced'], ['vivid', 'Vivid']], choices.colours),
       settingsChoiceGroup('layout', 'Page layout', 'Choose how much space sits around one task.', [['focused', 'Focused'], ['balanced', 'Balanced'], ['open', 'Open']], choices.layout),
       settingsChoiceGroup('encouragement', 'Encouragement', 'Choose how visible supportive moments feel.', [['subtle', 'Subtle'], ['balanced', 'Balanced'], ['expressive', 'Expressive']], choices.encouragement),
@@ -4620,7 +4624,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const [title, detail] = copy;
     const [symbol, metaLabel, nextStep] = supportMomentMeta(moment);
     const layout = ['focused', 'balanced', 'open'].includes(moment.layout) ? moment.layout : selectedCourseLayout();
-    const isPopup = moment.encouragementLevel !== 'subtle';
+    // Playful has its own friendly, illustrated encouragement panel inside
+    // the task. Keeping it in the reading flow gives the celebration a home
+    // without covering the course heading or the learner's next control.
+    const isPlayfulScheme = learningChoices()['website-scheme'] === 'playful';
+    const isPopup = moment.encouragementLevel !== 'subtle' && !isPlayfulScheme;
     const isOpenPopup = isPopup && layout === 'open';
     const isFocusedPopup = isPopup && layout === 'focused';
     const isBalancedPopup = isPopup && layout === 'balanced';
@@ -4710,7 +4718,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const markup = supportMomentMarkup(isNew);
     const celebrationMarkup = successCelebrationMarkup(moment, isNew);
     if (celebrationMarkup) app.insertAdjacentHTML('beforeend', celebrationMarkup);
-    const popupPresentation = moment.encouragementLevel !== 'subtle';
+    // The colourful Playful scheme deliberately uses the inline treatment:
+    // an acknowledgement should decorate the task, never float over it.
+    const popupPresentation = moment.encouragementLevel !== 'subtle'
+      && learningChoices()['website-scheme'] !== 'playful';
     if (markup && (!popupPresentation || isNew)) {
       // The central support moment replaces older one-off feedback strings for
       // the action that just occurred. Saved feedback still appears after a
@@ -5085,6 +5096,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'Sign out': 'سائن آؤٹ',
     'Starting language': 'ابتدائی زبان',
     'Choose the mascot language you would like to begin with.': 'وہ زبان منتخب کریں جس میں آپ آغاز کرنا چاہتے ہیں۔',
+    'Website scheme': 'ویب سائٹ کی پیشکش',
+    'Choose the overall presentation for your learning space. Calm keeps the current look; Playful is bright, colourful, and kid-friendly.': 'اپنی سیکھنے کی جگہ کے لیے ویب سائٹ کی پیشکش منتخب کریں۔ پُرسکون موجودہ انداز رکھتا ہے؛ کھیل کود رنگین اور بچوں کے لیے دوستانہ ہے۔',
+    'Calm': 'پُرسکون',
+    'Playful': 'کھیل کود',
     'Color style': 'رنگ کا انداز',
     'Choose how much color appears around the task.': 'منتخب کریں کہ کام کے گرد کتنا رنگ نظر آئے۔',
     'Page layout': 'صفحے کی ترتیب',

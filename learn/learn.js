@@ -41,7 +41,7 @@ const preferenceControls = [
 
 const defaultChoices = {
   ...Object.fromEntries(preferenceControls.map(({ id, choices }) => [id, id === 'colours' || id === 'layout' ? 'balanced' : id === 'animations' ? 'gentle' : choices[0][0]])),
-  'website-scheme': 'balanced',
+  'website-scheme': 'calm',
   'urdu-mode': 'off',
   'mascot-language': 'english',
   'mascot-language-explicit': false,
@@ -116,7 +116,7 @@ const setupCopy = (choices) => setupLanguage(choices) === 'urdu' ? {
   startingTitle: 'اپنی ویب سائٹ کی پیشکش منتخب کریں۔',
   startingIntro: 'یہ آپ کی پوری سیکھنے کی جگہ کا انداز بدلتی ہے۔ آپ اسے بعد میں بھی تبدیل کر سکتے ہیں۔',
   startingLabel: 'ویب سائٹ کی پیشکش',
-  startingDescription: 'متوازن موجودہ انداز رکھتا ہے؛ کھیل کود رنگین اور بچوں کے لیے دوستانہ ہے؛ پُرسکون کم تحریک کے ساتھ ہے۔',
+  startingDescription: 'پُرسکون موجودہ انداز رکھتا ہے؛ کھیل کود رنگین، بچوں کے لیے دوستانہ اور زیادہ دل چسپ ہے۔',
   useLanguage: 'یہ انداز استعمال کریں',
   preferences: 'سیکھنے کی ترجیحات',
   focused: 'توجہ کے ساتھ ترتیب',
@@ -140,7 +140,7 @@ const setupCopy = (choices) => setupLanguage(choices) === 'urdu' ? {
   startingTitle: 'Choose your website scheme.',
   startingIntro: 'This changes the presentation of your entire learning space. You can change it later from settings.',
   startingLabel: 'Website scheme',
-  startingDescription: 'Balanced keeps the current look. Playful is bright and kid-friendly. Calm is quieter and low-stimulation.',
+  startingDescription: 'Calm keeps the current look. Playful is bright, colourful, and kid-friendly.',
   useLanguage: 'Use this scheme',
   preferences: 'Learning preferences',
   focused: 'Focused setup',
@@ -345,8 +345,8 @@ const mascotMainClass = (choices) => choices.mascot === 'on' && mascotScreenIsSu
 const websiteSchemeOptions = (choices) => {
   const urdu = setupLanguage(choices) === 'urdu';
   const labels = urdu
-    ? [['balanced', 'متوازن'], ['playful', 'کھیل کود'], ['calm', 'پُرسکون']]
-    : [['balanced', 'Balanced'], ['playful', 'Playful'], ['calm', 'Calm']];
+    ? [['calm', 'پُرسکون'], ['playful', 'کھیل کود']]
+    : [['calm', 'Calm'], ['playful', 'Playful']];
   return labels.map(([value, label]) => '<button type="button" data-preference="website-scheme" data-value="' + value + '" aria-pressed="' + String(choices['website-scheme'] === value) + '">' + label + '</button>').join('');
 };
 
@@ -359,7 +359,7 @@ const schemeStageMarkup = (choices) => [
   '<span>' + setupCopy(choices).startingIntro + '</span>',
   '</header>',
   '<div class="learning-scheme-options">',
-  '<section class="learning-control" aria-labelledby="website-scheme-label"><h2 id="website-scheme-label">' + setupCopy(choices).startingLabel + '</h2><p>' + setupCopy(choices).startingDescription + '</p><div class="preference-options" style="--option-count:3" role="group" aria-label="' + setupCopy(choices).startingLabel + '">' + websiteSchemeOptions(choices) + '</div></section>',
+  '<section class="learning-control" aria-labelledby="website-scheme-label"><h2 id="website-scheme-label">' + setupCopy(choices).startingLabel + '</h2><p>' + setupCopy(choices).startingDescription + '</p><div class="preference-options" style="--option-count:2" role="group" aria-label="' + setupCopy(choices).startingLabel + '">' + websiteSchemeOptions(choices) + '</div></section>',
   '</div>',
   '<div class="learning-settings-action"><button class="learning-continue" type="button" data-advance-setup="scheme">' + setupCopy(choices).useLanguage + ' <span aria-hidden="true">→</span></button></div>',
   '</section>',
@@ -628,7 +628,11 @@ const boot = async () => {
   const savedChoices = saved?.choices || {};
   // Preserve an earlier language choice as a one-time migration to the now
   // functional Urdu mode switch. New saves no longer use learning-language.
-  const isLegacyLanguagePreference = !['balanced', 'playful', 'calm'].includes(savedChoices['website-scheme']);
+  const normaliseWebsiteScheme = (value) => value === 'balanced'
+    ? 'calm'
+    : ['calm', 'playful'].includes(value) ? value : '';
+  const savedWebsiteScheme = normaliseWebsiteScheme(savedChoices['website-scheme']);
+  const isLegacyLanguagePreference = !savedWebsiteScheme;
   const migratedUrduMode = isLegacyLanguagePreference && savedChoices['learning-language'] === 'urdu'
     ? 'on'
     : savedChoices['urdu-mode'] === 'on'
@@ -636,9 +640,7 @@ const boot = async () => {
     : savedChoices['urdu-mode'] === 'off'
       ? 'off'
       : 'off';
-  const savedScheme = ['balanced', 'playful', 'calm'].includes(savedChoices['website-scheme'])
-    ? savedChoices['website-scheme']
-    : window.Type2LearnWebsiteScheme?.get?.() || 'balanced';
+  const savedScheme = savedWebsiteScheme || window.Type2LearnWebsiteScheme?.get?.() || 'calm';
   const choices = {
     ...defaultChoices,
     colours: window.Type2LearnColorMode?.get?.() || 'balanced',
