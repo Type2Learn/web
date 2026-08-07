@@ -396,6 +396,18 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     inputMethod: 'keyboard'
   });
 
+  const MODULE_SNAPSHOT_PHASES = new Set(['preview', 'read', 'type', 'check', 'apply', 'complete']);
+  const normaliseModuleSnapshot = (snapshot) => {
+    if (!snapshot || typeof snapshot !== 'object' || !MODULE_SNAPSHOT_PHASES.has(snapshot.phase)) return null;
+    return {
+      phase: snapshot.phase,
+      attempt: { ...blankAttempt(), ...(snapshot.attempt && typeof snapshot.attempt === 'object' ? snapshot.attempt : {}) },
+      manualExampleVisible: Boolean(snapshot.manualExampleVisible),
+      showSimple: Boolean(snapshot.showSimple),
+      readingSectionIndex: Math.max(0, Number(snapshot.readingSectionIndex) || 0)
+    };
+  };
+
   const blankFinalExamAttempt = () => ({
     questionIndex: 0,
     answers: Array.from({ length: finalExamQuestionCount() }, () => null),
@@ -414,6 +426,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       phase: 'preview',
       completedSteps: [],
       attempt: blankAttempt(),
+      moduleSnapshots: {},
       finalExam: blankFinalExamAttempt()
     },
     modal: '',
@@ -453,6 +466,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       : [];
     const savedAttempt = savedProgress.attempt || {};
     fresh.progress.attempt = { ...blankAttempt(), ...savedAttempt };
+    const savedModuleSnapshots = savedProgress.moduleSnapshots && typeof savedProgress.moduleSnapshots === 'object'
+      ? savedProgress.moduleSnapshots
+      : {};
+    fresh.progress.moduleSnapshots = Object.fromEntries(
+      Object.entries(savedModuleSnapshots)
+        .map(([index, snapshot]) => [Number(index), normaliseModuleSnapshot(snapshot)])
+        .filter(([index, snapshot]) => Number.isInteger(index) && index >= 0 && index < COURSE.steps.length && snapshot)
+    );
     // A former one-line typing response cannot represent the new complete
     // section-by-section lesson flow. Start that changed task at section one
     // rather than resuming halfway through a mismatched activity.
@@ -2079,7 +2100,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const isBalanced = layout === 'balanced';
     const eyebrow = isReviewingModule() ? (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label) : isFinalExamPhase() ? (courseUsesUrdu() ? 'کورس کا آخری امتحان' : 'Course final exam') : (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label);
     const savedLabel = signedInLearner() && cloudProgress.status === 'account' ? 'Saved to your account' : 'Saved on this device';
-    return '<div class="course-course-header-actions"><button class="course-back-button" type="button" data-action="dashboard">&larr; Back to learning overview</button><button class="course-skip-button" type="button" data-action="skip-course">Skip course for now</button></div><header class="course-heading"><div><p class="course-eyebrow">' + escapeHtml(eyebrow) + '</p><h1 id="course-course-title" tabindex="-1">' + escapeHtml(courseUsesUrdu() ? COURSE_URDU.title : COURSE.title) + '</h1>' + (isBalanced ? '' : '<p class="course-step-meta">' + currentStepSummary() + '</p>') + '</div>' + (isBalanced ? '' : '<span class="course-saved-status" data-save-status>' + (state.storageAvailable ? savedLabel : 'Saving unavailable') + '</span>') + '</header>';
+    return '<div class="course-course-header-actions"><button class="course-back-button" type="button" data-action="dashboard">&larr; Back to learning overview</button></div><header class="course-heading"><div><p class="course-eyebrow">' + escapeHtml(eyebrow) + '</p><h1 id="course-course-title" tabindex="-1">' + escapeHtml(courseUsesUrdu() ? COURSE_URDU.title : COURSE.title) + '</h1>' + (isBalanced ? '' : '<p class="course-step-meta">' + currentStepSummary() + '</p>') + '</div>' + (isBalanced ? '' : '<span class="course-saved-status" data-save-status>' + (state.storageAvailable ? savedLabel : 'Saving unavailable') + '</span>') + '</header>';
   };
 
   const courseNowPanelMarkup = () => '<section class="course-now-panel"><div><span>What am I doing?</span><strong>' + escapeHtml(taskLabel()) + '</strong></div><div><span>What is next?</span><strong>' + escapeHtml(courseNextStepCopy()) + '</strong></div><div><span>Can I pause?</span><strong>Use Pause &amp; save in the top bar.</strong></div></section>';
@@ -4618,7 +4639,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'preview-complete', 'read-complete', 'next-reading-section',
     'check-typing', 'submit-check', 'continue-check', 'submit-apply',
     'continue-apply', 'next-step', 'start-final-exam', 'next-exam-question',
-    'return-course', 'return-to-read', 'simple-read', 'return-from-module-review'
+    'return-course', 'return-to-read', 'simple-read', 'return-from-module-review',
+    'guest-skip-module', 'guest-previous-module'
   ]);
 
   const routeMotionKind = (action) => {
@@ -4689,6 +4711,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     addSourceNotice();
     addCourseConclusion();
     updateCourseCopy();
+    addGuestModuleNavigation();
     buildTypingTester();
     applyRenderedSupportBehavior();
     prepareNarrationForRenderedTask();
@@ -5191,6 +5214,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const startNextStep = () => {
+    storeActiveGuestModuleSnapshot();
     if (isLastStep()) {
       state.view = 'course';
       state.progress.phase = 'exam-intro';
@@ -5212,6 +5236,98 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     save();
     render();
     showCurrentTaskFromStart();
+  };
+
+  const isGuestModuleNavigationAvailable = () => Boolean(
+    authenticatedUser?.isGuest
+    && state.view === 'course'
+    && !isReviewingModule()
+    && !isFinalExamPhase()
+  );
+
+  const storeActiveGuestModuleSnapshot = () => {
+    if (!isGuestModuleNavigationAvailable()) return;
+    state.progress.moduleSnapshots[state.progress.lessonIndex] = normaliseModuleSnapshot({
+      phase: state.progress.phase,
+      attempt: state.progress.attempt,
+      manualExampleVisible: state.manualExampleVisible,
+      showSimple: state.showSimple,
+      readingSectionIndex: state.readingSectionIndex
+    });
+  };
+
+  const restoreGuestModuleSnapshot = (moduleIndex) => {
+    const snapshot = normaliseModuleSnapshot(state.progress.moduleSnapshots[moduleIndex]);
+    state.progress.lessonIndex = moduleIndex;
+    state.progress.phase = snapshot?.phase || 'preview';
+    state.progress.attempt = snapshot?.attempt || blankAttempt();
+    state.manualExampleVisible = Boolean(snapshot?.manualExampleVisible);
+    state.showSimple = Boolean(snapshot?.showSimple);
+    state.readingSectionIndex = snapshot?.readingSectionIndex || 0;
+    state.reviewModuleIndex = null;
+    state.coursePaused = false;
+  };
+
+  const moveGuestModule = (direction) => {
+    if (!isGuestModuleNavigationAvailable()) return;
+    const currentIndex = state.progress.lessonIndex;
+    const nextIndex = currentIndex + direction;
+    if (!Number.isInteger(nextIndex) || nextIndex < 0 || nextIndex >= COURSE.steps.length) return;
+    const previousTitle = currentStep().title;
+    storeActiveGuestModuleSnapshot();
+    restoreGuestModuleSnapshot(nextIndex);
+    recordSupportMoment('task-entry', { result: direction > 0 ? 'module-skipped' : 'module-returned' });
+    const destinationTitle = currentStep().title;
+    save(direction > 0
+      ? previousTitle + ' was skipped for now. ' + destinationTitle + ' is ready.'
+      : 'Back to ' + destinationTitle + '. Your place in that module is ready.');
+    render();
+    showCurrentTaskFromStart();
+  };
+
+  const skipGuestModule = () => {
+    if (!isGuestModuleNavigationAvailable()) return;
+    if (isLastStep()) {
+      const skippedTitle = currentStep().title;
+      storeActiveGuestModuleSnapshot();
+      startNextStep();
+      announce(skippedTitle + ' was skipped for now. The final exam is ready when you are.');
+      return;
+    }
+    moveGuestModule(1);
+  };
+
+  const addGuestModuleNavigation = () => {
+    app.querySelectorAll('[data-guest-module-navigation]').forEach((element) => element.remove());
+    if (!isGuestModuleNavigationAvailable()) return;
+    const actions = app.querySelector('.course-task-card .course-task-actions');
+    if (!actions) return;
+    const currentIndex = state.progress.lessonIndex;
+    const moduleTitle = (index) => courseUsesUrdu()
+      ? COURSE_URDU.steps[index]?.title || COURSE.steps[index]?.title || ''
+      : COURSE.steps[index]?.title || '';
+    const navigation = document.createElement('div');
+    navigation.className = 'course-guest-module-navigation';
+    navigation.dataset.guestModuleNavigation = '';
+    if (currentIndex > 0) {
+      const previous = document.createElement('button');
+      previous.className = 'course-secondary-button';
+      previous.type = 'button';
+      previous.dataset.action = 'guest-previous-module';
+      previous.setAttribute('aria-label', courseUi('Return to the previous module: ' + moduleTitle(currentIndex - 1), 'پچھلے ماڈیول پر واپس جائیں: ' + moduleTitle(currentIndex - 1)));
+      previous.innerHTML = courseUi('<span aria-hidden="true">←</span> Previous module', 'پچھلا ماڈیول <span aria-hidden="true">←</span>');
+      navigation.append(previous);
+    }
+    const skip = document.createElement('button');
+    skip.className = 'course-secondary-button course-skip-module-button';
+    skip.type = 'button';
+    skip.dataset.action = 'guest-skip-module';
+    const destination = isLastStep() ? courseUi('the final exam', 'آخری امتحان') : moduleTitle(currentIndex + 1);
+    skip.setAttribute('aria-label', courseUi('Skip this module: ' + moduleTitle(currentIndex) + '. ' + destination + ' will open next.', 'اس ماڈیول کو چھوڑ دیں: ' + moduleTitle(currentIndex) + '۔ اگلا ' + destination + ' کھلے گا۔'));
+    skip.innerHTML = courseUi('Skip this module <span aria-hidden="true">→</span>', '<span aria-hidden="true">←</span> یہ ماڈیول چھوڑ دیں');
+    navigation.append(skip);
+    const primaryAction = actions.querySelector('.course-primary-button');
+    actions.insertBefore(navigation, primaryAction || null);
   };
 
   const finishCheck = () => {
@@ -5425,16 +5541,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         state.coursePaused = false;
         goTo('course', 'You are back at your saved small step.');
         break;
-      case 'skip-course':
-        state.modal = '';
-        modalReturnFocusSelector = '';
-        state.reviewModuleIndex = null;
-        state.coursePaused = true;
-        state.view = 'dashboard';
-        save('This course is paused for now. You can continue from the same step whenever you are ready.');
-        render();
-        window.requestAnimationFrame(() => window.scrollTo?.({ left: 0, top: 0, behavior: 'auto' }));
-        break;
+      case 'guest-skip-module': skipGuestModule(); break;
+      case 'guest-previous-module': moveGuestModule(-1); break;
       case 'toggle-settings-menu':
         state.settingsMenu = !state.settingsMenu;
         render();

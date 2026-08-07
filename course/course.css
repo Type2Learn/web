@@ -728,20 +728,6 @@ body[data-course-direction="rtl"] .course-settings-menu {
 .course-task-explain:disabled { border-color: var(--course-line-strong); color: var(--course-muted); background: var(--course-cloud); cursor: not-allowed; }
 
 .course-course-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 9px; }
-.course-skip-button {
-  min-height: 32px;
-  border: 1px solid var(--course-line-strong);
-  border-radius: 999px;
-  padding: 6px 11px;
-  color: var(--course-ink-soft);
-  background: var(--course-paper);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 750;
-  cursor: pointer;
-}
-.course-skip-button:hover,
-.course-skip-button:focus-visible { border-color: var(--course-blue); background: var(--course-blue-pale); }
 
 .course-task-narration-button {
   min-height: 30px;
@@ -1930,6 +1916,17 @@ body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .
   margin-top: 28px;
 }
 
+.course-guest-module-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.course-skip-module-button { border-color: var(--course-line-strong); }
+.course-skip-module-button:hover:not(:disabled),
+.course-skip-module-button:focus-visible { border-color: var(--course-blue); background: var(--course-blue-pale); }
+
 .course-typing-task {
   display: flex;
   flex-direction: column;
@@ -2360,6 +2357,8 @@ body.course-stable-layout *::after { transition-duration: .01ms; }
   .course-task-actions { align-items: stretch; justify-content: stretch; flex-direction: column; }
   .course-task-actions .course-primary-button,
   .course-task-actions .course-secondary-button { width: 100%; }
+  .course-guest-module-navigation { width: 100%; flex-direction: column; }
+  .course-guest-module-navigation .course-secondary-button { width: 100%; }
   .course-progress-panel { grid-template-columns: 1fr; gap: 18px; }
   .course-lesson-footer { align-items: stretch; flex-direction: column; }
   .course-lesson-footer > span { order: -1; }
