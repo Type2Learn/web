@@ -216,7 +216,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const defaultLearningChoices = () => ({
-    'learning-language': 'english',
+    // `learning-language` is retained only as a migration source for older
+    // saved preferences. Urdu mode is now the learner-facing language control.
+    'website-scheme': 'balanced',
     colours: 'balanced',
     layout: 'balanced',
     encouragement: 'subtle',
@@ -233,7 +235,24 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'urdu-mode': 'off'
   });
 
-  const learningChoices = () => ({ ...defaultLearningChoices(), ...readLearningChoices() });
+  const websiteSchemes = ['balanced', 'playful', 'calm'];
+  const learningChoices = () => {
+    const saved = readLearningChoices();
+    const isLegacyLanguagePreference = !websiteSchemes.includes(saved['website-scheme']);
+    const urduMode = isLegacyLanguagePreference && saved['learning-language'] === 'urdu'
+      ? 'on'
+      : saved['urdu-mode'] === 'on'
+      ? 'on'
+      : saved['urdu-mode'] === 'off'
+        ? 'off'
+        : 'off';
+    return {
+      ...defaultLearningChoices(),
+      ...saved,
+      'website-scheme': websiteSchemes.includes(saved['website-scheme']) ? saved['website-scheme'] : 'balanced',
+      'urdu-mode': urduMode
+    };
+  };
 
   const coursePreferencesAreSaved = () => {
     try {
@@ -280,9 +299,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         ? choices.encouragement
         : 'subtle',
       animations: effectiveAnimationLevel(),
-      language: choices['mascot-language'] === 'urdu'
-        ? 'urdu'
-        : choices['learning-language'] === 'urdu' ? 'urdu' : 'english',
+      language: choices['mascot-language'] === 'urdu' ? 'urdu' : supportLanguage(),
       voice: ['text', 'speech', 'both'].includes(choices['mascot-voice'])
         ? choices['mascot-voice']
         : 'text',
@@ -609,7 +626,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     });
   };
 
-  const supportLanguage = () => learningChoices()['learning-language'] === 'urdu' ? 'urdu' : 'english';
+  const supportLanguage = () => learningChoices()['urdu-mode'] === 'on' ? 'urdu' : 'english';
   const courseUsesUrdu = () => supportLanguage() === 'urdu';
   const urduScriptTerms = (value = '') => String(value)
     .replace(/\bADHD\b/g, 'اے ڈی ایچ ڈی')
@@ -1012,7 +1029,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const mascotUnavailable = !mascotViewportQuery?.matches;
     const controls = preferencesSaved ? [
       '<div class="course-settings-menu-controls">',
-      settingsChoiceGroup('learning-language', 'Starting language', 'Choose the mascot language you would like to begin with.', [['english', 'English'], ['urdu', 'اردو']], choices['learning-language']),
+      settingsChoiceGroup('website-scheme', 'Website scheme', 'Choose the overall presentation for your learning space. Balanced keeps the current look; Playful is bright and kid-friendly; Calm is quieter and low-stimulation.', [['balanced', 'Balanced'], ['playful', 'Playful'], ['calm', 'Calm']], choices['website-scheme']),
       settingsChoiceGroup('colours', 'Color style', 'Choose how much color appears around the task.', [['flat', 'Flat'], ['balanced', 'Balanced'], ['vivid', 'Vivid']], choices.colours),
       settingsChoiceGroup('layout', 'Page layout', 'Choose how much space sits around one task.', [['focused', 'Focused'], ['balanced', 'Balanced'], ['open', 'Open']], choices.layout),
       settingsChoiceGroup('encouragement', 'Encouragement', 'Choose how visible supportive moments feel.', [['subtle', 'Subtle'], ['balanced', 'Balanced'], ['expressive', 'Expressive']], choices.encouragement),
@@ -1021,10 +1038,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="35" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
       settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
       settingsSwitch('mascot', 'Mascot', mascotUnavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', choices.mascot === 'on', mascotUnavailable),
-      choices.mascot === 'on' ? settingsChoiceGroup('mascot-language', 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || choices['learning-language']) : '',
+      choices.mascot === 'on' ? settingsChoiceGroup('mascot-language', 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || supportLanguage()) : '',
       choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice', 'Mascot Speech', 'Choose how your mascot will communicate with you.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '',
       choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice-language', 'Mascot voice', 'Choose the language your mascot will speak.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-voice-language']) : '',
-      settingsSwitch('urdu-mode', 'Urdu mode', 'This switch is being prepared. It does not change this lesson language yet.', choices['urdu-mode'] === 'on'),
+      settingsSwitch('urdu-mode', 'Urdu mode', 'Show the course and Course AI in Urdu. The typing target stays in English.', choices['urdu-mode'] === 'on'),
       '</div>'
     ].join('') : '<p class="course-settings-menu-gate">Choose the available course first. Its personal learning settings will appear here after setup.</p>';
     return '<section class="course-settings-menu" id="course-settings-menu" role="dialog" aria-label="Learning settings"><header><span class="course-settings-profile">' + profileAvatar() + '<strong>' + escapeHtml(profileName()) + '</strong></span><button class="course-settings-close" type="button" data-action="close-settings-menu" aria-label="Close settings">×</button></header>' + controls + '<footer><button class="course-settings-signout" type="button" data-action="signout">Sign out</button></footer></section>';
@@ -1879,18 +1896,23 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (colorModes.includes(courseChoices.colours) && currentColorMode() !== courseChoices.colours) {
       window.Type2LearnColorMode?.set(courseChoices.colours, false);
     }
+    if (websiteSchemes.includes(courseChoices['website-scheme'])
+      && window.Type2LearnWebsiteScheme?.get?.() !== courseChoices['website-scheme']) {
+      window.Type2LearnWebsiteScheme?.set(courseChoices['website-scheme'], false);
+    }
     document.body.dataset.courseLayout = ['focused', 'balanced', 'open'].includes(courseChoices.layout) ? courseChoices.layout : 'focused';
     document.body.dataset.courseAnimations = effectiveAnimationLevel();
     document.body.dataset.courseAnimationPreference = savedAnimationLevel();
     document.body.dataset.courseEncouragement = selectedEncouragementLevel();
-    document.body.dataset.courseDirection = courseChoices['learning-language'] === 'urdu' ? 'rtl' : 'ltr';
-    document.documentElement.lang = courseChoices['learning-language'] === 'urdu' ? 'ur' : 'en';
-    document.documentElement.dir = courseChoices['learning-language'] === 'urdu' ? 'rtl' : 'ltr';
+    const urdu = courseUsesUrdu();
+    document.body.dataset.courseDirection = urdu ? 'rtl' : 'ltr';
+    document.documentElement.lang = urdu ? 'ur' : 'en';
+    document.documentElement.dir = urdu ? 'rtl' : 'ltr';
     const skipLink = document.querySelector('[data-course-skip-link]');
     if (skipLink) {
-      skipLink.textContent = courseChoices['learning-language'] === 'urdu' ? 'موجودہ کام پر جائیں' : 'Skip to the current task';
-      skipLink.lang = courseChoices['learning-language'] === 'urdu' ? 'ur' : 'en';
-      skipLink.dir = courseChoices['learning-language'] === 'urdu' ? 'rtl' : 'ltr';
+      skipLink.textContent = urdu ? 'موجودہ کام پر جائیں' : 'Skip to the current task';
+      skipLink.lang = urdu ? 'ur' : 'en';
+      skipLink.dir = urdu ? 'rtl' : 'ltr';
     }
     document.body.dataset.courseUrduMode = courseChoices['urdu-mode'] === 'on' ? 'on' : 'off';
     if (effectiveAnimationLevel() === 'lively' && selectedEncouragementLevel() === 'expressive') warmRewardAssets();
@@ -2067,6 +2089,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const moduleProgressItem = (step, index, includeFinalExam = false) => {
     const displayedTitle = courseUsesUrdu() ? (COURSE_URDU.steps[index]?.title || '') : step.title;
+    const visibleTitle = courseUsesUrdu() ? urduScriptTerms(displayedTitle) : displayedTitle;
     const complete = state.progress.completedSteps.includes(index);
     const active = isReviewingModule()
       ? index === displayedModuleIndex()
@@ -2075,8 +2098,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       ? (isReviewingModule() ? courseUi('Reviewing now', 'ابھی جائزہ لے رہے ہیں') : taskLabel())
       : complete ? courseUi('Completed · Review', 'مکمل · جائزہ') : courseUi('Available next', 'اگلا دستیاب');
     const details = complete && !active
-      ? '<button type="button" data-action="review-module" data-module-index="' + index + '" aria-label="' + escapeHtml(courseUi('Review completed module ' + (index + 1) + ': ' + step.title, 'مکمل ماڈیول ' + (index + 1) + ' کا جائزہ: ' + displayedTitle)) + '"><strong>' + escapeHtml(urduScriptTerms(displayedTitle)) + '</strong><small>' + escapeHtml(status) + '</small></button>'
-      : '<div><strong>' + escapeHtml(urduScriptTerms(displayedTitle)) + '</strong><small>' + escapeHtml(status) + '</small></div>';
+      ? '<button type="button" data-action="review-module" data-module-index="' + index + '" aria-label="' + escapeHtml(courseUi('Review completed module ' + (index + 1) + ': ' + step.title, 'مکمل ماڈیول ' + (index + 1) + ' کا جائزہ: ' + displayedTitle)) + '"><strong>' + escapeHtml(visibleTitle) + '</strong><small>' + escapeHtml(status) + '</small></button>'
+      : '<div><strong>' + escapeHtml(visibleTitle) + '</strong><small>' + escapeHtml(status) + '</small></div>';
     return '<li class="' + (complete ? 'is-complete ' : '') + (active ? 'is-active ' : '') + (complete && !active ? 'is-reviewable' : '') + '"' + (active ? ' aria-current="step"' : '') + '><span>' + (complete ? '✓' : index + 1) + '</span>' + details + '</li>';
   };
 
@@ -5608,13 +5631,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const saveCourseLearningChoice = (key, value) => {
     const choices = learningChoices();
     choices[key] = value;
-    // The companion follows the course language until the learner explicitly
-    // gives it a different language in the same menu.
-    if (key === 'learning-language' && !choices['mascot-language-explicit']) choices['mascot-language'] = value;
+    // The companion follows Urdu mode until the learner explicitly gives it a
+    // different language in the same menu.
+    if (key === 'urdu-mode' && !choices['mascot-language-explicit']) choices['mascot-language'] = value === 'on' ? 'urdu' : 'english';
     if (key === 'mascot-language') choices['mascot-language-explicit'] = true;
     saveLearningChoices(choices);
 
     if (key === 'colours' && colorModes.includes(value)) window.Type2LearnColorMode?.set(value, false);
+    if (key === 'website-scheme' && websiteSchemes.includes(value)) window.Type2LearnWebsiteScheme?.set(value);
     if (key === 'text-to-speech') setCourseSetting('readAloud', value === 'on');
 
     const shouldPreviewSupportMode = state.view === 'course'
@@ -5634,8 +5658,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
     if (key === 'urdu-mode') {
       announce(value === 'on'
-        ? 'Urdu mode is marked on. This course’s Urdu lesson text is still being prepared.'
-        : 'Urdu mode is marked off.');
+        ? 'Urdu mode is on. This course and Course AI are now in Urdu; typing stays in English.'
+        : 'Urdu mode is off.');
     } else {
       announce('Learning setting updated.');
     }

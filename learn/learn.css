@@ -357,15 +357,18 @@ a:focus-visible {
 .learning-single-setting .learning-settings-header,
 .learning-focused-settings .learning-settings-header { margin-bottom: 30px; }
 
-.learning-language-options {
+.learning-language-options,
+.learning-scheme-options {
   max-width: 590px;
   border-top: 1px solid var(--learn-line-strong);
   border-bottom: 1px solid var(--learn-line-strong);
   padding: 22px 0;
 }
 
-.learning-language-options .learning-control p { min-height: 0; font-size: 13px; }
-.learning-language-options .preference-options button { min-height: 47px; font-size: 13px; }
+.learning-language-options .learning-control p,
+.learning-scheme-options .learning-control p { min-height: 0; font-size: 13px; }
+.learning-language-options .preference-options button,
+.learning-scheme-options .preference-options button { min-height: 47px; font-size: 13px; }
 
 .learning-setting-chit {
   position: relative;

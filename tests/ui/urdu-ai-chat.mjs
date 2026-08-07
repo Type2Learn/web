@@ -12,7 +12,8 @@ const courseId = 'course-1-neurodivergent-conditions-v2';
 const screenshotDirectory = path.resolve('screenshots', 'urdu-ai-chat');
 const testUid = 'codex-urdu-ai-chat-20260807';
 const choices = {
-  'learning-language': 'urdu',
+  'website-scheme': 'balanced',
+  'urdu-mode': 'on',
   colours: 'balanced',
   layout: 'balanced',
   encouragement: 'subtle',

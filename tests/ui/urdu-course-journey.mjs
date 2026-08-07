@@ -13,7 +13,8 @@ const views = [
 ];
 
 const choices = (view) => ({
-  'learning-language': 'urdu',
+  'website-scheme': 'balanced',
+  'urdu-mode': 'on',
   colours: view.colours,
   layout: view.layout,
   encouragement: view.encouragement,

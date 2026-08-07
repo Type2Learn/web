@@ -20,7 +20,7 @@ let mascotAssetsWarmed = false;
 let mascotPreloadLinks = [];
 let mascotPreview = null;
 let mascotPreviewLoad = null;
-let setupStage = 'language';
+let setupStage = 'scheme';
 let focusedStepIndex = 0;
 let mascotLanguageExplicitlyChosen = false;
 let layoutBeforeFocused = 'balanced';
@@ -35,12 +35,14 @@ const preferenceControls = [
   { id: 'animations', label: 'Animations', description: 'How much supportive movement you would like to see.', choices: [['still', 'Still'], ['gentle', 'Gentle'], ['lively', 'Lively']] },
   { id: 'background-noise', label: 'Background noise', description: 'Optional looping sound, always off to start.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'text-to-speech', label: 'Text to speech', description: 'Optional read-aloud support.', choices: [['off', 'Off'], ['on', 'On']] },
+  { id: 'urdu-mode', label: 'Urdu mode', description: 'Show the course and Course AI in Urdu. The typing target stays in English.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'mascot', label: 'Mascot', description: 'A learning companion when you want one.', choices: [['off', 'Off'], ['on', 'On']] }
 ];
 
 const defaultChoices = {
   ...Object.fromEntries(preferenceControls.map(({ id, choices }) => [id, id === 'colours' || id === 'layout' ? 'balanced' : id === 'animations' ? 'gentle' : choices[0][0]])),
-  'learning-language': 'english',
+  'website-scheme': 'balanced',
+  'urdu-mode': 'off',
   'mascot-language': 'english',
   'mascot-language-explicit': false,
   'mascot-voice': 'text',
@@ -107,15 +109,15 @@ const releaseMascotAssets = () => {
   mascotPreviewLoad = null;
 };
 
-const setupLanguage = (choices) => choices['learning-language'] === 'urdu' ? 'urdu' : 'english';
+const setupLanguage = (choices) => choices['urdu-mode'] === 'on' ? 'urdu' : 'english';
 
 const setupCopy = (choices) => setupLanguage(choices) === 'urdu' ? {
   welcome: 'خوش آمدید',
-  startingTitle: 'اپنی ابتدائی زبان منتخب کریں۔',
-  startingIntro: 'میسکاٹ اس زبان میں شروع ہوگا۔ آپ بعد میں میسکاٹ کے لیے دوسری زبان منتخب کر سکتے ہیں۔',
-  startingLabel: 'ابتدائی زبان',
-  startingDescription: 'وہ زبان منتخب کریں جو آپ کے میسکاٹ کے لیے بطور ڈیفالٹ استعمال ہو۔',
-  useLanguage: 'یہ زبان استعمال کریں',
+  startingTitle: 'اپنی ویب سائٹ کی پیشکش منتخب کریں۔',
+  startingIntro: 'یہ آپ کی پوری سیکھنے کی جگہ کا انداز بدلتی ہے۔ آپ اسے بعد میں بھی تبدیل کر سکتے ہیں۔',
+  startingLabel: 'ویب سائٹ کی پیشکش',
+  startingDescription: 'متوازن موجودہ انداز رکھتا ہے؛ کھیل کود رنگین اور بچوں کے لیے دوستانہ ہے؛ پُرسکون کم تحریک کے ساتھ ہے۔',
+  useLanguage: 'یہ انداز استعمال کریں',
   preferences: 'سیکھنے کی ترجیحات',
   focused: 'توجہ کے ساتھ ترتیب',
   title: 'اپنی سیکھنے کی جگہ ترتیب دیں۔',
@@ -135,11 +137,11 @@ const setupCopy = (choices) => setupLanguage(choices) === 'urdu' ? {
   mascotUnavailable: 'میسکاٹ بڑی اسکرینوں پر دستیاب ہے۔ اس اسکرین پر یہ بند رہے گا۔'
 } : {
   welcome: 'Welcome',
-  startingTitle: 'Choose your starting language.',
-  startingIntro: 'Your mascot will begin in this language. You can choose a different mascot language later.',
-  startingLabel: 'Starting language',
-  startingDescription: 'Choose the language your mascot will use by default.',
-  useLanguage: 'Use this language',
+  startingTitle: 'Choose your website scheme.',
+  startingIntro: 'This changes the presentation of your entire learning space. You can change it later from settings.',
+  startingLabel: 'Website scheme',
+  startingDescription: 'Balanced keeps the current look. Playful is bright and kid-friendly. Calm is quieter and low-stimulation.',
+  useLanguage: 'Use this scheme',
   preferences: 'Learning preferences',
   focused: 'Focused setup',
   title: 'Set up your learning space.',
@@ -167,6 +169,7 @@ const localizedControls = {
     animations: { label: 'حرکت', description: 'مددگار حرکت کی مقدار جو آپ دیکھنا چاہیں۔', choices: [['still', 'بغیر حرکت'], ['gentle', 'نرم'], ['lively', 'زیادہ']] },
     'background-noise': { label: 'پس منظر کی آواز', description: 'اختیاری مسلسل آواز، شروع میں ہمیشہ بند۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     'text-to-speech': { label: 'متن سے آواز', description: 'اختیاری پڑھ کر سنانے کی مدد۔', choices: [['off', 'بند'], ['on', 'چالو']] },
+    'urdu-mode': { label: 'اردو موڈ', description: 'کورس اور کورس کی مصنوعی ذہانت اردو میں دکھائیں۔ ٹائپنگ کا متن انگریزی میں رہتا ہے۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     mascot: { label: 'میسکاٹ', description: 'جب آپ چاہیں ایک سیکھنے والا ساتھی۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     'mascot-language': { label: 'میسکاٹ کی زبان', description: 'یہ آپ کی ابتدائی زبان کے ساتھ شروع ہوتی ہے۔ آپ میسکاٹ کے لیے الگ زبان منتخب کر سکتے ہیں۔', choices: [['english', 'انگریزی'], ['urdu', 'اردو']] },
     'mascot-voice': { label: 'میسکاٹ کی گفتگو', description: 'منتخب کریں کہ میسکاٹ آپ سے کیسے بات کرے گا۔', choices: [['text', 'متن'], ['speech', 'آواز'], ['both', 'دونوں']] },
@@ -181,7 +184,7 @@ const localizedControl = (control, language) => localizedControls[language]?.[co
 const controlMarkup = (originalControl, selected, language = 'english') => {
   const { id, label, description, choices } = localizedControl(originalControl, language);
   const mascotUnavailable = id === 'mascot' && !mascotScreenIsSupported();
-  const copy = setupCopy({ 'learning-language': language });
+  const copy = setupCopy({ 'urdu-mode': language === 'urdu' ? 'on' : 'off' });
   return [
   '<section class="learning-control" aria-labelledby="' + id + '-label">',
   '<h2 id="' + id + '-label">' + label + '</h2>',
@@ -298,7 +301,7 @@ const backgroundNoiseMarkup = (choices) => {
 const controlById = (id) => preferenceControls.find((control) => control.id === id);
 
 const mascotDialogue = (choices) => {
-  const language = choices['mascot-language'] || choices['learning-language'];
+  const language = choices['mascot-language'] || setupLanguage(choices);
   return language === 'urdu'
     ? 'السلام علیکم! میں آپ کے ساتھ ایک وقت میں ایک انتخاب پر رہوں گا۔'
     : 'Hi! I can stay with you while you choose one setting at a time.';
@@ -307,7 +310,7 @@ const mascotDialogue = (choices) => {
 const mascotRailMarkup = (choices) => {
   if (choices.mascot !== 'on') return '';
   if (!mascotScreenIsSupported()) return '';
-  const language = choices['mascot-language'] || choices['learning-language'];
+  const language = choices['mascot-language'] || setupLanguage(choices);
   return '<aside class="learning-setup-mascot-rail" data-learning-mascot><div class="learning-mascot-stage" data-learning-mascot-stage aria-hidden="true"></div><p class="learning-mascot-dialogue" lang="' + (language === 'urdu' ? 'ur' : 'en') + '" dir="' + (language === 'urdu' ? 'rtl' : 'ltr') + '">' + mascotDialogue(choices) + '</p></aside>';
 };
 
@@ -316,7 +319,7 @@ const mascotLanguageControl = (choices) => controlMarkup({
   label: 'Mascot language',
   description: 'This starts with your learning language. You can choose a different one for the mascot.',
   choices: [['english', 'English'], ['urdu', 'اردو']]
-}, choices['mascot-language'] || choices['learning-language'], setupLanguage(choices));
+}, choices['mascot-language'] || setupLanguage(choices), setupLanguage(choices));
 
 const mascotSpeechControl = (choices) => controlMarkup({
   id: 'mascot-voice',
@@ -339,18 +342,26 @@ const mascotDetailsMarkup = (choices) => choices.mascot === 'on'
 const setupLanguageAttributes = (choices) => setupLanguage(choices) === 'urdu' ? ' lang="ur" dir="rtl"' : '';
 const mascotMainClass = (choices) => choices.mascot === 'on' && mascotScreenIsSupported() ? ' learn-main--with-mascot' : '';
 
-const languageStageMarkup = (choices) => [
-  '<main class="learn-main learn-main--single learn-main--language" id="learn-main"' + setupLanguageAttributes(choices) + '>',
-  '<section class="learning-single-setting learning-language-setting" aria-labelledby="learning-settings-title">',
+const websiteSchemeOptions = (choices) => {
+  const urdu = setupLanguage(choices) === 'urdu';
+  const labels = urdu
+    ? [['balanced', 'متوازن'], ['playful', 'کھیل کود'], ['calm', 'پُرسکون']]
+    : [['balanced', 'Balanced'], ['playful', 'Playful'], ['calm', 'Calm']];
+  return labels.map(([value, label]) => '<button type="button" data-preference="website-scheme" data-value="' + value + '" aria-pressed="' + String(choices['website-scheme'] === value) + '">' + label + '</button>').join('');
+};
+
+const schemeStageMarkup = (choices) => [
+  '<main class="learn-main learn-main--single learn-main--scheme" id="learn-main"' + setupLanguageAttributes(choices) + '>',
+  '<section class="learning-single-setting learning-scheme-setting" aria-labelledby="learning-settings-title">',
   '<header class="learning-settings-header">',
   '<p>' + setupCopy(choices).welcome + '</p>',
   '<h1 id="learning-settings-title">' + setupCopy(choices).startingTitle + '</h1>',
   '<span>' + setupCopy(choices).startingIntro + '</span>',
   '</header>',
-  '<div class="learning-language-options">',
-  '<section class="learning-control" aria-labelledby="learning-language-label"><h2 id="learning-language-label">' + setupCopy(choices).startingLabel + '</h2><p>' + setupCopy(choices).startingDescription + '</p><div class="preference-options" style="--option-count:2" role="group" aria-label="' + setupCopy(choices).startingLabel + '"><button type="button" data-preference="learning-language" data-value="english" aria-pressed="' + String(choices['learning-language'] === 'english') + '">English</button><button type="button" data-preference="learning-language" data-value="urdu" aria-pressed="' + String(choices['learning-language'] === 'urdu') + '" lang="ur" dir="rtl">اردو</button></div></section>',
+  '<div class="learning-scheme-options">',
+  '<section class="learning-control" aria-labelledby="website-scheme-label"><h2 id="website-scheme-label">' + setupCopy(choices).startingLabel + '</h2><p>' + setupCopy(choices).startingDescription + '</p><div class="preference-options" style="--option-count:3" role="group" aria-label="' + setupCopy(choices).startingLabel + '">' + websiteSchemeOptions(choices) + '</div></section>',
   '</div>',
-  '<div class="learning-settings-action"><button class="learning-continue" type="button" data-advance-setup="language">' + setupCopy(choices).useLanguage + ' <span aria-hidden="true">→</span></button></div>',
+  '<div class="learning-settings-action"><button class="learning-continue" type="button" data-advance-setup="scheme">' + setupCopy(choices).useLanguage + ' <span aria-hidden="true">→</span></button></div>',
   '</section>',
   '</main>'
 ].join('');
@@ -364,7 +375,7 @@ const focusedSteps = (choices) => {
     { id: 'background-noise' }
   ];
   if (choices['background-noise'] === 'on') steps.push({ id: 'noise-details' });
-  steps.push({ id: 'text-to-speech' }, { id: 'mascot' });
+  steps.push({ id: 'text-to-speech' }, { id: 'urdu-mode' }, { id: 'mascot' });
   if (choices.mascot === 'on') steps.push({ id: 'mascot-language' }, { id: 'mascot-voice' }, { id: 'mascot-voice-language' });
   return steps;
 };
@@ -383,7 +394,7 @@ const focusedStageMarkup = (choices) => {
   const step = steps[Math.min(focusedStepIndex, steps.length - 1)];
   const last = focusedStepIndex >= steps.length - 1;
   const backLabel = focusedStepIndex === 0
-    ? (setupLanguage(choices) === 'urdu' ? 'زبان پر واپس' : 'Back to language')
+    ? (setupLanguage(choices) === 'urdu' ? 'ویب سائٹ کی پیشکش پر واپس' : 'Back to website scheme')
     : (setupLanguage(choices) === 'urdu' ? 'واپس' : 'Back');
   return [
     '<main class="learn-main learn-main--focused' + mascotMainClass(choices) + '" id="learn-main"' + setupLanguageAttributes(choices) + '>',
@@ -418,7 +429,7 @@ const balancedStageMarkup = (choices) => {
   '<div class="learning-control-list" aria-label="' + copy.preferences + '">',
   preferenceControls.map((control) => controlMarkup(control, choices[control.id], setupLanguage(choices)) + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '') + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')).join(''),
   '</div>',
-  '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="language">' + (setupLanguage(choices) === 'urdu' ? 'زبان پر واپس' : 'Back to language') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
+  '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="scheme">' + (setupLanguage(choices) === 'urdu' ? 'ویب سائٹ کی پیشکش پر واپس' : 'Back to website scheme') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
   '</section>',
   mascotRailMarkup(choices),
   '</main>'
@@ -445,7 +456,7 @@ const openStageMarkup = (choices) => {
     '<div class="learning-control-list learning-control-list--open" aria-label="' + copy.preferences + '">',
     preferenceControls.map((control) => openControlRowMarkup(control, choices)).join(''),
     '</div>',
-    '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="language">' + (setupLanguage(choices) === 'urdu' ? 'زبان پر واپس' : 'Back to language') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
+    '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="scheme">' + (setupLanguage(choices) === 'urdu' ? 'ویب سائٹ کی پیشکش پر واپس' : 'Back to website scheme') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
     '</section>',
     mascotRailMarkup(choices),
     '</main>'
@@ -453,7 +464,7 @@ const openStageMarkup = (choices) => {
 };
 
 const mainContent = (choices) => {
-  if (setupStage === 'language') return languageStageMarkup(choices);
+  if (setupStage === 'scheme') return schemeStageMarkup(choices);
   if (setupStage === 'focused') return focusedStageMarkup(choices);
   if (choices.layout === 'open') return openStageMarkup(choices);
   return balancedStageMarkup(choices);
@@ -614,11 +625,31 @@ const boot = async () => {
   }
 
   const saved = readPreferences(user, selectedCourseId);
-
-  const choices = { ...defaultChoices, colours: window.Type2LearnColorMode?.get?.() || 'balanced', ...(saved?.choices || {}) };
+  const savedChoices = saved?.choices || {};
+  // Preserve an earlier language choice as a one-time migration to the now
+  // functional Urdu mode switch. New saves no longer use learning-language.
+  const isLegacyLanguagePreference = !['balanced', 'playful', 'calm'].includes(savedChoices['website-scheme']);
+  const migratedUrduMode = isLegacyLanguagePreference && savedChoices['learning-language'] === 'urdu'
+    ? 'on'
+    : savedChoices['urdu-mode'] === 'on'
+    ? 'on'
+    : savedChoices['urdu-mode'] === 'off'
+      ? 'off'
+      : 'off';
+  const savedScheme = ['balanced', 'playful', 'calm'].includes(savedChoices['website-scheme'])
+    ? savedChoices['website-scheme']
+    : window.Type2LearnWebsiteScheme?.get?.() || 'balanced';
+  const choices = {
+    ...defaultChoices,
+    colours: window.Type2LearnColorMode?.get?.() || 'balanced',
+    ...savedChoices,
+    'urdu-mode': migratedUrduMode,
+    'website-scheme': savedScheme
+  };
   // Do not keep or prefetch the optional 3D companion on a small screen.
   if (!mascotScreenIsSupported()) choices.mascot = 'off';
   window.Type2LearnColorMode?.set(choices.colours, false);
+  window.Type2LearnWebsiteScheme?.set(choices['website-scheme'], false);
   render(choices);
 
   const mascotScreenQuery = window.matchMedia?.('(min-width: 1181px)');
@@ -639,17 +670,16 @@ const boot = async () => {
       const previousValue = choices[preference];
       choices[preference] = value;
       applySetupPresentation(choices);
-      if (preference === 'learning-language' && !mascotLanguageExplicitlyChosen) choices['mascot-language'] = value;
+      if (preference === 'urdu-mode' && !mascotLanguageExplicitlyChosen) choices['mascot-language'] = value === 'on' ? 'urdu' : 'english';
       if (preference === 'mascot-language') {
         mascotLanguageExplicitlyChosen = true;
         choices['mascot-language-explicit'] = true;
       }
       if (preference === 'colours') window.Type2LearnColorMode?.set(value);
-      if (preference === 'learning-language') {
-        // Language is the first choice, so its direction and copy update on
-        // this same screen rather than only after the learner continues. Start
-        // warming both mascot animations now, before the preferences appear.
-        warmMascotAssets();
+      if (preference === 'website-scheme') window.Type2LearnWebsiteScheme?.set(value);
+      if (preference === 'urdu-mode') {
+        // Urdu mode updates direction and setup copy immediately. The English
+        // typing target remains a later course-level exception.
         render(choices);
         return;
       }
@@ -707,19 +737,20 @@ const boot = async () => {
 
     if (event.target.closest('[data-save-preferences]')) {
       savePreferences(user, selectedCourseId, choices);
+      window.Type2LearnWebsiteScheme?.set(choices['website-scheme']);
       if (choices.mascot !== 'on') releaseMascotAssets();
       window.location.assign('/course/?course=' + encodeURIComponent(selectedCourseId) + '&start=course');
     }
 
     const back = event.target.closest('[data-go-back]');
     if (back) {
-      if (back.dataset.goBack === 'language') {
-        setupStage = 'language';
+      if (back.dataset.goBack === 'scheme') {
+        setupStage = 'scheme';
       } else if (back.dataset.goBack === 'focused') {
         if (focusedStepIndex > 0) focusedStepIndex -= 1;
         else {
           choices.layout = layoutBeforeFocused;
-          setupStage = 'language';
+          setupStage = 'scheme';
         }
       }
       render(choices);
@@ -729,7 +760,7 @@ const boot = async () => {
     const advance = event.target.closest('[data-advance-setup]');
     if (advance) {
       const stage = advance.dataset.advanceSetup;
-      if (stage === 'language') {
+      if (stage === 'scheme') {
         warmMascotAssets();
         setupStage = 'balanced';
         render(choices);

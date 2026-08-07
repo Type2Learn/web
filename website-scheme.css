@@ -1,0 +1,277 @@
+/*
+  Authenticated presentation themes. Balanced intentionally has no overrides:
+  it is the existing Type2Learn appearance. Playful and Calm only alter the
+  visual shell; every course control, layout, language, and support remains
+  available exactly as before.
+*/
+
+html[data-website-scheme="playful"] {
+  --scheme-ink: #153B61;
+  --scheme-navy: #123D6B;
+  --scheme-sky: #BDEFFF;
+  --scheme-paper: #FFFDF7;
+  --scheme-line: #2571A5;
+  --scheme-green: #39BF73;
+  --scheme-yellow: #FFD75A;
+  --scheme-pink: #FF9FCB;
+  --scheme-radius: 28px;
+}
+
+html[data-website-scheme="playful"] body[data-app-route="afterlogin"],
+html[data-website-scheme="playful"] body[data-app-route="course"] {
+  background-color: var(--scheme-sky) !important;
+  background-image: url("/assets/schemes/playful-stickers.svg"), url("/assets/schemes/playful-sky.svg") !important;
+  background-position: left bottom, center top;
+  background-size: min(48vw, 620px) auto, cover;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
+}
+
+html[data-website-scheme="playful"] body[data-app-route="course"] {
+  --course-ink: var(--scheme-ink);
+  --course-ink-soft: #315E85;
+  --course-muted: #547896;
+  --course-paper: var(--scheme-paper);
+  --course-cloud: transparent;
+  --course-line: #9AD4EB;
+  --course-line-strong: var(--scheme-line);
+  --course-green: var(--scheme-green);
+  --course-teal: #3BC8C1;
+  --course-cyan: #62CFF2;
+  --course-blue: #2374C4;
+  --course-green-pale: #E8F9E9;
+  --course-blue-pale: #E5F7FF;
+  --course-teal-pale: #E6FCF7;
+  --course-radius: var(--scheme-radius);
+  --course-radius-small: 17px;
+}
+
+html[data-website-scheme="playful"] body[data-app-route="afterlogin"] {
+  --learn-ink: var(--scheme-ink);
+  --learn-soft: #315E85;
+  --learn-muted: #547896;
+  --learn-cloud: transparent;
+  --learn-paper: var(--scheme-paper);
+  --learn-line: #9AD4EB;
+  --learn-line-strong: var(--scheme-line);
+  --learn-green: var(--scheme-green);
+  --learn-teal: #3BC8C1;
+  --learn-cyan: #62CFF2;
+  --learn-blue: #2374C4;
+}
+
+html[data-website-scheme="playful"] .learning-settings,
+html[data-website-scheme="playful"] .learning-single-setting,
+html[data-website-scheme="playful"] .learning-focused-settings,
+html[data-website-scheme="playful"] .course-dashboard-primary,
+html[data-website-scheme="playful"] .course-panel-page,
+html[data-website-scheme="playful"] .course-task-card,
+html[data-website-scheme="playful"] .course-module-strip,
+html[data-website-scheme="playful"] .course-settings-menu,
+html[data-website-scheme="playful"] .course-ai-chat {
+  border: 2px solid var(--scheme-line);
+  border-radius: var(--scheme-radius);
+  background-color: color-mix(in srgb, var(--scheme-paper) 94%, white) !important;
+  box-shadow: 0 11px 0 rgba(23, 105, 168, .15), 0 21px 38px rgba(29, 105, 150, .12);
+}
+
+html[data-website-scheme="playful"] .course-module-strip {
+  background-color: color-mix(in srgb, #F2FCFF 93%, white) !important;
+}
+
+html[data-website-scheme="playful"] .learning-setting-chit,
+html[data-website-scheme="playful"] .learning-open-row,
+html[data-website-scheme="playful"] .course-reading-section,
+html[data-website-scheme="playful"] .course-check-option,
+html[data-website-scheme="playful"] .course-content-notice,
+html[data-website-scheme="playful"] .course-support-popup,
+html[data-website-scheme="playful"] .course-ai-message,
+html[data-website-scheme="playful"] .course-ai-composer textarea {
+  border-radius: 19px;
+}
+
+html[data-website-scheme="playful"] .learning-setting-chit {
+  border: 2px solid var(--scheme-line);
+  border-inline-start: 9px solid var(--scheme-yellow);
+  background-color: color-mix(in srgb, var(--scheme-paper) 94%, white);
+  box-shadow: 0 9px 0 rgba(23, 105, 168, .12);
+}
+
+html[data-website-scheme="playful"] .learning-setting-chit::before,
+html[data-website-scheme="playful"] .learning-setting-chit::after {
+  border-color: #8CCFEA;
+  border-radius: inherit;
+}
+
+html[data-website-scheme="playful"] .preference-options button,
+html[data-website-scheme="playful"] .course-settings-choice-group button,
+html[data-website-scheme="playful"] .course-secondary-button,
+html[data-website-scheme="playful"] .course-back-button,
+html[data-website-scheme="playful"] .course-task-explain,
+html[data-website-scheme="playful"] .course-task-time {
+  border-width: 2px;
+  border-radius: 999px;
+  box-shadow: 0 4px 0 rgba(23, 105, 168, .12);
+}
+
+html[data-website-scheme="playful"] .learning-continue,
+html[data-website-scheme="playful"] .course-primary-button {
+  border: 2px solid #20824e;
+  border-radius: 999px;
+  box-shadow: 0 6px 0 #168247, 0 12px 22px rgba(18, 88, 73, .16);
+}
+
+html[data-website-scheme="playful"] .learning-continue:active,
+html[data-website-scheme="playful"] .course-primary-button:active {
+  box-shadow: 0 2px 0 #168247;
+  transform: translateY(4px);
+}
+
+html[data-website-scheme="playful"] .course-eyebrow,
+html[data-website-scheme="playful"] .learning-settings-header p {
+  color: #18764A;
+}
+
+html[data-website-scheme="playful"] .course-support-popup,
+html[data-website-scheme="playful"] .learning-encouragement-popup {
+  border-width: 2px;
+  border-inline-start-width: 8px;
+  box-shadow: 0 10px 0 rgba(23, 105, 168, .14), 0 22px 38px rgba(29, 105, 150, .16);
+}
+
+html[data-website-scheme="playful"] .course-dashboard-mascot-stage,
+html[data-website-scheme="playful"] .course-mascot-stage,
+html[data-website-scheme="playful"] .learning-mascot-stage {
+  filter: drop-shadow(0 12px 9px rgba(29, 105, 150, .14));
+}
+
+html[data-website-scheme="calm"] {
+  --scheme-calm-ink: #303B49;
+  --scheme-calm-soft: #5B6975;
+  --scheme-calm-paper: #FFFEFA;
+  --scheme-calm-cloud: #F4F0E8;
+  --scheme-calm-line: #CFC8BA;
+  --scheme-calm-green: #708D77;
+  --scheme-calm-blue: #74899D;
+}
+
+html[data-website-scheme="calm"] body[data-app-route="afterlogin"],
+html[data-website-scheme="calm"] body[data-app-route="course"] {
+  background: var(--scheme-calm-cloud) !important;
+}
+
+html[data-website-scheme="calm"] body[data-app-route="course"] {
+  --course-ink: var(--scheme-calm-ink);
+  --course-ink-soft: #4B5B68;
+  --course-muted: #6C7780;
+  --course-paper: var(--scheme-calm-paper);
+  --course-cloud: var(--scheme-calm-cloud);
+  --course-line: #DDD7CB;
+  --course-line-strong: var(--scheme-calm-line);
+  --course-green: var(--scheme-calm-green);
+  --course-teal: #7C9894;
+  --course-cyan: #879CA8;
+  --course-blue: var(--scheme-calm-blue);
+  --course-green-pale: #EFF4EE;
+  --course-blue-pale: #F0F3F3;
+  --course-teal-pale: #EEF4F2;
+  --course-amber-pale: #FBF3E5;
+  --course-radius: 10px;
+  --course-radius-small: 7px;
+}
+
+html[data-website-scheme="calm"] body[data-app-route="afterlogin"] {
+  --learn-ink: var(--scheme-calm-ink);
+  --learn-soft: #4B5B68;
+  --learn-muted: #6C7780;
+  --learn-cloud: var(--scheme-calm-cloud);
+  --learn-paper: var(--scheme-calm-paper);
+  --learn-line: #DDD7CB;
+  --learn-line-strong: var(--scheme-calm-line);
+  --learn-green: var(--scheme-calm-green);
+  --learn-teal: #7C9894;
+  --learn-cyan: #879CA8;
+  --learn-blue: var(--scheme-calm-blue);
+}
+
+html[data-website-scheme="calm"] .learning-settings,
+html[data-website-scheme="calm"] .learning-single-setting,
+html[data-website-scheme="calm"] .learning-focused-settings,
+html[data-website-scheme="calm"] .course-dashboard-primary,
+html[data-website-scheme="calm"] .course-panel-page,
+html[data-website-scheme="calm"] .course-task-card,
+html[data-website-scheme="calm"] .course-module-strip,
+html[data-website-scheme="calm"] .course-settings-menu,
+html[data-website-scheme="calm"] .course-ai-chat {
+  border-color: var(--scheme-calm-line);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+html[data-website-scheme="calm"] .learning-setting-chit,
+html[data-website-scheme="calm"] .course-reading-section,
+html[data-website-scheme="calm"] .course-check-option,
+html[data-website-scheme="calm"] .course-content-notice,
+html[data-website-scheme="calm"] .course-ai-message,
+html[data-website-scheme="calm"] .course-ai-composer textarea {
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+html[data-website-scheme="calm"] .learning-setting-chit {
+  border-inline-start-width: 3px;
+  box-shadow: none;
+}
+
+html[data-website-scheme="calm"] .learning-setting-chit::before,
+html[data-website-scheme="calm"] .learning-setting-chit::after,
+html[data-website-scheme="calm"] .course-dashboard-mascot-stage::before,
+html[data-website-scheme="calm"] .course-mascot-stage::before {
+  display: none;
+}
+
+html[data-website-scheme="calm"] .learning-continue,
+html[data-website-scheme="calm"] .course-primary-button,
+html[data-website-scheme="calm"] .preference-options button,
+html[data-website-scheme="calm"] .course-settings-choice-group button,
+html[data-website-scheme="calm"] .course-secondary-button,
+html[data-website-scheme="calm"] .course-back-button,
+html[data-website-scheme="calm"] .course-task-explain,
+html[data-website-scheme="calm"] .course-task-time {
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+html[data-website-scheme="calm"] .course-support-popup,
+html[data-website-scheme="calm"] .learning-encouragement-popup {
+  border-inline-start-width: 4px;
+  box-shadow: 0 8px 24px rgba(47, 56, 66, .12);
+}
+
+@media (max-width: 720px) {
+  html[data-website-scheme="playful"] body[data-app-route="afterlogin"],
+  html[data-website-scheme="playful"] body[data-app-route="course"] {
+    background-size: 70vw auto, auto 100%;
+    background-attachment: scroll, scroll;
+  }
+
+  html[data-website-scheme="playful"] .learning-settings,
+  html[data-website-scheme="playful"] .learning-single-setting,
+  html[data-website-scheme="playful"] .learning-focused-settings,
+  html[data-website-scheme="playful"] .course-dashboard-primary,
+  html[data-website-scheme="playful"] .course-panel-page,
+  html[data-website-scheme="playful"] .course-task-card,
+  html[data-website-scheme="playful"] .course-module-strip,
+  html[data-website-scheme="playful"] .course-settings-menu,
+  html[data-website-scheme="playful"] .course-ai-chat {
+    border-radius: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-website-scheme="playful"] *,
+  html[data-website-scheme="playful"] *::before,
+  html[data-website-scheme="playful"] *::after {
+    scroll-behavior: auto !important;
+  }
+}
