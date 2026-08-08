@@ -121,7 +121,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     draft: '',
     status: 'idle',
     error: '',
-    connection: { checked: false, checking: false, ai: false, speech: false, aiAudio: false },
+    connection: { checked: false, checking: false, ai: false, localGuestPreview: false, speech: false, aiAudio: false },
     requestController: null,
     dictation: {
       recorder: null,
@@ -1231,7 +1231,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     try {
       const status = await getCourseAiStatus();
       if (contextKey !== aiChat.contextKey) return;
-      aiChat.connection = { checked: true, checking: false, ai: Boolean(status?.ai?.available), speech: Boolean(status?.speechToText?.available), aiAudio: Boolean(status?.speechToText?.textToSpeech?.available) };
+      const localGuestPreview = Boolean(status?.ai?.localGuestPreview);
+      aiChat.connection = {
+        checked: true,
+        checking: false,
+        ai: Boolean(status?.ai?.available) || Boolean(authenticatedUser?.isGuest && localGuestPreview),
+        localGuestPreview,
+        speech: Boolean(status?.speechToText?.available),
+        aiAudio: Boolean(status?.speechToText?.textToSpeech?.available)
+      };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
       if (aiChatIsVisible()) {
         render();
@@ -1239,7 +1247,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       }
     } catch (_) {
       if (contextKey !== aiChat.contextKey) return;
-      aiChat.connection = { checked: true, checking: false, ai: false, speech: false, aiAudio: false };
+      aiChat.connection = { checked: true, checking: false, ai: false, localGuestPreview: false, speech: false, aiAudio: false };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
       if (aiChatIsVisible()) {
         render();
@@ -1249,7 +1257,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const openCourseAi = (trigger) => {
-    if (!signedInLearner()) {
+    if (!signedInLearner() && !authenticatedUser?.isGuest) {
       announce('Log in required to use Course AI.');
       return;
     }
@@ -1295,7 +1303,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const sendAiMessage = async () => {
     const message = aiChat.draft.trim();
-    if (!signedInLearner() || !message || !aiChat.connection.ai || aiChat.status !== 'idle') return;
+    if ((!signedInLearner() && !authenticatedUser?.isGuest) || !message || !aiChat.connection.ai || aiChat.status !== 'idle') return;
     const history = aiChat.messages.filter((entry) => !entry.initial).slice(-6).map((entry) => ({ role: entry.role, content: entry.content }));
     aiChat.messages.push({ role: 'user', content: message });
     aiChat.draft = '';
@@ -5017,7 +5025,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         ['too-much-on-screen', 'There is too much on screen'],
         ['worried-about-wrong', 'I am worried about getting it wrong']
       ];
-    return '<div class="help-choice-grid course-barrier-choice-grid">' + options.map(([value, label]) => '<button type="button" data-action="adaptive-barrier" data-barrier="' + value + '"' + (adaptiveRecall.loading ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>').join('') + '</div>';
+    // ADAPTIVE LEARNING: a learner can choose a concrete barrier first, or
+    // open the bounded page-specific conversation when they would rather ask
+    // a question in their own words. Both paths keep the current task intact.
+    const talkToAi = '<button class="course-barrier-talk-ai" type="button" data-action="help-open-ai"' + (adaptiveRecall.loading ? ' disabled' : '') + '>' + escapeHtml(urdu ? 'کورس اے آئی سے بات کریں' : 'Talk to Course AI') + '</button>';
+    return '<div class="help-choice-grid course-barrier-choice-grid">' + options.map(([value, label]) => '<button type="button" data-action="adaptive-barrier" data-barrier="' + value + '"' + (adaptiveRecall.loading ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>').join('') + talkToAi + '</div>';
   };
 
   const stuckModalMarkup = () => {
@@ -5898,6 +5910,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
           barrier: String(element.dataset.barrier || ''),
           response: typingIsConceptResponse() ? String(state.progress.attempt.response || '') : ''
         });
+        break;
+      case 'help-open-ai':
+        openCourseAi(element);
         break;
       case 'close-modal': state.modal === 'ai-chat' ? closeCourseAi() : closeCourseModal(); break;
       case 'save-exit':

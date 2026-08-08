@@ -78,19 +78,30 @@ const upstreamError = async (response) => {
     : apiError(502, 'AI_UPSTREAM_ERROR', 'The AI helper could not answer right now. Please try again later.');
 };
 
-export const createAiService = ({ config, firebase, ledger }) => {
+export const createAiService = ({ config, firebase, ledger, provider = null }) => {
   const available = () => Boolean(config.openAiApiKey && config.openAiResponsesUrl && firebase.available && ledger);
+  // Local guest chat is intentionally narrower than the signed-in product
+  // route. It exists only for developer/Playwright preview when the explicit
+  // non-production flag is set; production always remains signed-in only.
+  const localGuestPreviewAvailable = () => Boolean(
+    config.allowLocalGuestAi
+    && firebase.available
+    && ledger
+    && provider?.status?.().available
+  );
   const status = () => ({
     available: available(),
     requiresSignIn: true,
+    localGuestPreview: localGuestPreviewAvailable(),
     model: config.openAiModel
   });
 
-  const chat = async ({ authorization, body }) => {
-    if (!config.openAiApiKey || !config.openAiResponsesUrl) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
-    if (config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
+  const chat = async ({ authorization, body, localGuest = null }) => {
+    const guestPreview = Boolean(localGuest?.isGuest && localGuestPreviewAvailable());
+    if (!guestPreview && (!config.openAiApiKey || !config.openAiResponsesUrl)) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
+    if (!guestPreview && config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
     if (!firebase.available || !ledger) throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
-    const learner = await firebase.verifyBearer(authorization);
+    const learner = guestPreview ? localGuest : await firebase.verifyBearer(authorization);
     const message = normaliseLearnerMessage(body?.message);
     if (!message) throw apiError(400, 'EMPTY_MESSAGE', 'Write a short question before sending it.');
     if (looksLikePrivateData(message)) throw apiError(400, 'PRIVATE_INFORMATION', 'Please remove private information and ask a course question instead.');
@@ -122,34 +133,50 @@ export const createAiService = ({ config, firebase, ledger }) => {
     }
     let settled = false;
     try {
-      let response;
-      try {
-        response = await fetch(config.openAiResponsesUrl, {
-          method: 'POST',
-          headers: {
-            ...(config.openAiProvider === 'azure-openai'
-              ? { 'api-key': config.openAiApiKey }
-              : { Authorization: `Bearer ${config.openAiApiKey}` }),
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: config.openAiModel,
-            store: false,
-            instructions,
-            input,
-            max_output_tokens: config.openAiMaxOutputTokens
-          }),
-          signal: AbortSignal.timeout(35000)
+      let reply = '';
+      let inputTokens = estimatedInputTokens;
+      let outputTokens = 0;
+      if (guestPreview) {
+        // Gemini-first rotation is handled exclusively by model-provider. The
+        // returned key slot and provider details remain server-only.
+        const generated = await provider.generate({
+          instructions,
+          input,
+          maxOutputTokens: config.openAiMaxOutputTokens
         });
-      } catch {
-        throw apiError(502, 'AI_UPSTREAM_ERROR', 'The AI helper could not answer right now. Please try again later.');
+        reply = String(generated.text || '').trim().slice(0, MAX_REPLY_CHARACTERS);
+        inputTokens = Number(generated?.usage?.inputTokens) || estimatedInputTokens;
+        outputTokens = Number(generated?.usage?.outputTokens) || 0;
+      } else {
+        let response;
+        try {
+          response = await fetch(config.openAiResponsesUrl, {
+            method: 'POST',
+            headers: {
+              ...(config.openAiProvider === 'azure-openai'
+                ? { 'api-key': config.openAiApiKey }
+                : { Authorization: `Bearer ${config.openAiApiKey}` }),
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: config.openAiModel,
+              store: false,
+              instructions,
+              input,
+              max_output_tokens: config.openAiMaxOutputTokens
+            }),
+            signal: AbortSignal.timeout(35000)
+          });
+        } catch {
+          throw apiError(502, 'AI_UPSTREAM_ERROR', 'The AI helper could not answer right now. Please try again later.');
+        }
+        if (!response.ok) throw await upstreamError(response);
+        const payload = await response.json().catch(() => ({}));
+        reply = outputText(payload).slice(0, MAX_REPLY_CHARACTERS);
+        inputTokens = Number(payload?.usage?.input_tokens) || estimatedInputTokens;
+        outputTokens = Number(payload?.usage?.output_tokens) || 0;
       }
-      if (!response.ok) throw await upstreamError(response);
-      const payload = await response.json().catch(() => ({}));
-      const reply = outputText(payload).slice(0, MAX_REPLY_CHARACTERS);
       if (!reply) throw apiError(502, 'EMPTY_AI_REPLY', 'The AI helper did not return a usable reply. Please try again.');
-      const inputTokens = Number(payload?.usage?.input_tokens) || estimatedInputTokens;
-      const outputTokens = Number(payload?.usage?.output_tokens) || 0;
       await ledger.settle({
         ...reservation,
         actual: {

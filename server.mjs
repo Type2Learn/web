@@ -219,7 +219,7 @@ const buildRuntime = async () => {
   return {
     config,
     modelProvider,
-    ai: createAiService({ config, firebase, ledger }),
+    ai: createAiService({ config, firebase, ledger, provider: modelProvider }),
     adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider }),
     speech: createSpeechService({ config, firebase, ledger }),
     courseProgress: createCourseProgressService({ firebase })
@@ -243,7 +243,11 @@ const handleApi = async (request, response, pathname, runtime) => {
   }
   try {
     if (request.method === 'POST' && pathname === '/api/v1/ai/chat') {
-      return sendJson(response, 200, await ai.chat({ authorization: request.headers.authorization, body: await readJson(request) }));
+      return sendJson(response, 200, await ai.chat({
+        authorization: request.headers.authorization,
+        body: await readJson(request),
+        localGuest: localGuestFromRequest(request, config)
+      }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/adaptive-recall') {
       return sendJson(response, 200, await adaptiveRecall.analyse({

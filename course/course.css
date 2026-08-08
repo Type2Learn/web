@@ -1026,6 +1026,21 @@ body[data-course-direction="rtl"] .course-settings-menu {
 .support-option:hover { border-color: var(--course-blue); }
 .support-option.is-selected { border-color: var(--course-green); background: var(--course-green-pale); }
 
+/* ADAPTIVE LEARNING: keep the optional free-form AI route visually distinct
+   from the six concrete barrier choices, without displacing them. */
+.course-barrier-choice-grid .course-barrier-talk-ai {
+  grid-column: 1 / -1;
+  border-color: var(--course-teal);
+  color: var(--course-ink);
+  background: linear-gradient(90deg, var(--course-green-pale), var(--course-blue-pale));
+}
+
+.course-barrier-choice-grid .course-barrier-talk-ai:hover,
+.course-barrier-choice-grid .course-barrier-talk-ai:focus-visible {
+  border-color: var(--course-blue);
+  background: var(--course-paper);
+}
+
 .support-option input {
   position: absolute;
   width: 1px;

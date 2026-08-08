@@ -45,12 +45,17 @@ const authenticatedRequest = async (user, path, options = {}) => {
 export const getCourseAiStatus = () => request('/api/v1/health');
 
 export const askCourseAi = async ({ user, message, history, courseId, page, language, signal }) => {
-  return authenticatedRequest(user, '/api/v1/ai/chat', {
+  const requestOptions = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, history, courseId, page, language }),
     signal
-  });
+  };
+  // Local guest chat is a development-only preview. The server accepts it
+  // solely with AI_ALLOW_GUESTS outside production, otherwise it fails closed.
+  return user?.isGuest
+    ? request('/api/v1/ai/chat', requestOptions)
+    : authenticatedRequest(user, '/api/v1/ai/chat', requestOptions);
 };
 
 // Adaptive recall is intentionally a distinct, structured endpoint instead
