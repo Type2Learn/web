@@ -13,9 +13,41 @@ import { createCourseProgressService } from './server/course-progress-service.mj
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
   ['/research', '/how-it-works/#evidence'],
-  ['/accessibility', '/trust/#accessibility'],
-  ['/security', '/trust/#security'],
-  ['/support', '/community/#support']
+  ['/research/', '/how-it-works/#evidence'],
+  ['/pathways', '/how-it-works/#pathways'],
+  ['/pathways/', '/how-it-works/#pathways'],
+  ['/learners', '/learning-together/#learner'],
+  ['/learners/', '/learning-together/#learner'],
+  ['/families', '/learning-together/#family'],
+  ['/families/', '/learning-together/#family'],
+  ['/schools', '/learning-together/#educators'],
+  ['/schools/', '/learning-together/#educators'],
+  ['/co-design', '/participation-trust/#participation-record'],
+  ['/co-design/', '/participation-trust/#participation-record'],
+  ['/community', '/participation-trust/#video-conversations'],
+  ['/community/', '/participation-trust/#video-conversations'],
+  ['/trust', '/participation-trust/#accessibility'],
+  ['/trust/', '/participation-trust/#accessibility'],
+  ['/accessibility', '/participation-trust/#accessibility'],
+  ['/accessibility/', '/participation-trust/#accessibility'],
+  ['/security', '/participation-trust/#security'],
+  ['/security/', '/participation-trust/#security'],
+  ['/support', '/participation-trust/#support'],
+  ['/support/', '/participation-trust/#support'],
+  ['/ur/pathways', '/ur/how-it-works/#pathways'],
+  ['/ur/pathways/', '/ur/how-it-works/#pathways'],
+  ['/ur/learners', '/ur/learning-together/#learner'],
+  ['/ur/learners/', '/ur/learning-together/#learner'],
+  ['/ur/families', '/ur/learning-together/#family'],
+  ['/ur/families/', '/ur/learning-together/#family'],
+  ['/ur/schools', '/ur/learning-together/#educators'],
+  ['/ur/schools/', '/ur/learning-together/#educators'],
+  ['/ur/co-design', '/ur/participation-trust/#participation-record'],
+  ['/ur/co-design/', '/ur/participation-trust/#participation-record'],
+  ['/ur/community', '/ur/participation-trust/#video-conversations'],
+  ['/ur/community/', '/ur/participation-trust/#video-conversations'],
+  ['/ur/trust', '/ur/participation-trust/#accessibility'],
+  ['/ur/trust/', '/ur/participation-trust/#accessibility']
 ]);
 const blockedTopLevel = new Set(['.git', '.githooks', 'cloudflare', 'node_modules', 'scripts', 'security', 'server', 'tests']);
 const blockedFiles = new Set(['.gitignore', 'package.json', 'package-lock.json', 'render.yaml', 'server.mjs']);
@@ -220,8 +252,9 @@ export const startServer = async () => {
     const pathname = url.pathname;
     try {
       if (pathname.startsWith('/api/')) return await handleApi(request, response, pathname, runtime);
-      const redirect = redirects.get(pathname);
-      if (redirect) return send(response, 302, '', { ...securityHeaders(pathname), Location: redirect });
+      const redirectPath = pathname.replace(/\/index\.html$/, '/');
+      const redirect = redirects.get(pathname) || redirects.get(redirectPath);
+      if (redirect) return send(response, 301, '', { ...securityHeaders(pathname), Location: redirect });
       if (!['GET', 'HEAD'].includes(request.method || 'GET')) return send(response, 405, 'Method not allowed', { ...securityHeaders(pathname), Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8' });
       return await serveStatic(request, response, pathname);
     } catch {
