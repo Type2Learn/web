@@ -375,6 +375,53 @@
 
   const participationCards = () => participationRecord.map((entry, index) => '<article class="participation-card participation-card-rich reveal" data-delay="' + index + '"><figure class="participation-mark"><img src="/assets/participation-marks/' + entry[1] + '" alt="" loading="lazy"></figure><div class="participation-card-copy"><div class="participation-card-top"><span class="participation-index">' + entry[0] + '</span><span class="participation-scope">' + entry[3] + '</span></div><p class="section-kicker">Contribution strand</p><h3>' + entry[2] + '</h3><p class="participation-format">' + entry[4] + '</p><p>' + entry[5] + '</p><ul class="participation-outcomes">' + entry[6].map((item) => '<li>' + item + '</li>').join('') + '</ul><a href="#video-conversations">See the evidence placement <span aria-hidden="true">↓</span></a></div></article>').join('');
 
+  const participationInterviewSection = () => {
+    const copy = isUrdu
+      ? {
+        kicker: 'گفتگو کا ریکارڈ', title: 'ایک وقت میں ایک گفتگو۔ ہر اندراج کے ساتھ واضح اگلا قدم۔', body: 'یہ عارضی ادارتی نوٹس ہیں، براہِ راست اقتباسات نہیں۔ منظور شدہ اقتباسات اور نقل موصول ہونے پر ان کی جگہ اصل الفاظ شامل کیے جائیں گے۔', record: 'عارضی ریکارڈ · براہِ راست اقتباس نہیں', prompt: 'جن نکات کو جانچا جا رہا ہے', professional: 'پیشہ ورانہ گفتگو', teachers: 'تدریسی گفتگو', open: 'مکمل گفتگو دیکھیں', temporary: 'عارضی لنک · منظور شدہ ویڈیو شامل کریں', position: 'نفسیات کی معلمہ، محقق اور معالجہ'
+      }
+      : {
+        kicker: 'Conversation record', title: 'One conversation at a time. A clear next step beside every record.', body: 'These are temporary editorial notes, not direct quotations. Approved extracts and transcripts will replace them once the contributors confirm the wording.', record: 'Working record · not a direct quote', prompt: 'What this conversation helps us check', professional: 'Professional conversation', teachers: 'Teaching conversation', open: 'Watch the full interview', temporary: 'Temporary link · add approved video', position: 'Psychology educator, researcher & therapist'
+      };
+    const interviews = isUrdu ? [
+      ['01', copy.professional, 'ڈاکٹر مائدہ', copy.position, 'dr-mayda-interview-spotlight.png', 'https://youtu.be/PDmPS4YJhoo', copy.open, ['نیورو ڈائیورسٹی کو کمی کے لیبل کے بجائے سیکھنے کے فرق کے طور پر سمجھنا۔', 'مدد سے کام تک رسائی آسان ہونی چاہیے، جواب کی قدر کم نہیں ہونی چاہیے۔', 'توجہ، حس اور ابلاغ کی ضرورت کے لیے پرسکون انتخاب اور واپسی کا راستہ درکار ہے۔', 'واضح زبان اور قابلِ پیش گوئی ترتیب سبق میں داخل ہونا آسان بناتی ہے۔', 'رفتار کا اسکور خود سیکھنے کی پوری وضاحت نہیں کرتا۔', 'پیشہ ورانہ تشریح اور حفاظت میں انسانی ذمہ داری باقی رہتی ہے۔', 'اجازت کی حد پہلے واضح ہو، پھر مواد یا میڈیا دکھایا جائے۔', 'Type2Learn کا اگلا قدم: کنٹرولز آزمائیں، تبدیلی درج کریں، اور حد عوامی کریں۔']],
+      ['02', copy.teachers + ' 01', 'استاد کا نام زیرِ تحفظ', 'کلاس روم کے عمل کی گفتگو', 'teacher-workflow-mark.png', '#video-conversations', copy.temporary, ['سبق کی ہدایات میں پہلے لمحے سے اگلا قدم نظر آنا چاہیے۔', 'سپورٹ کو طالب علم کے سامنے رکھیں، پوشیدہ تشخیص کے پیچھے نہیں۔', 'استاد کے لیے رپورٹ صرف اس وقت مفید ہے جب اس سے عملی فیصلہ نکلے۔', 'غلطی کے بعد دوبارہ داخل ہونا سزا نہیں، سیکھنے کا حصہ ہونا چاہیے۔', 'کلاس روم کے الفاظ اور مصنوعات کے الفاظ ایک دوسرے سے ملنے چاہییں۔', 'ہر تبدیلی کو اصل مسئلے اور بعد کی جانچ سے جوڑنا ضروری ہے۔', 'اجازت کے بغیر کلاس روم یا کسی فرد کی شناخت کا مواد شائع نہیں ہو گا۔', 'Type2Learn کا اگلا قدم: تدریسی پرامپٹس کی جانچ اور نظرِ ثانی۔']],
+      ['03', copy.teachers + ' 02', 'استاد کا نام زیرِ تحفظ', 'قابلِ رسائی تدریس کی گفتگو', 'educator-insight-mark.png', '#video-conversations', copy.temporary, ['ایک بامعنی کام مختلف راستوں سے شروع ہو سکتا ہے۔', 'تحریر، وقفہ اور دوبارہ کوشش کے لیے واضح جگہ سیکھنے کا وقت محفوظ رکھتی ہے۔', 'مدد کے کنٹرولز سے معیار کم نہیں ہونا چاہیے۔', 'نظر آنے والا مقصد استاد اور طالب علم دونوں کے لیے فائدہ مند ہے۔', 'رپورٹنگ میں اندازے نہیں، کام کا قابلِ فہم ثبوت ہونا چاہیے۔', 'رنگ، حرکت یا رفتار واحد معلوماتی راستہ نہیں ہونے چاہییں۔', 'پروفائل کے بجائے مسئلہ، تبدیلی اور نتیجہ عوامی ریکارڈ بنیں گے۔', 'Type2Learn کا اگلا قدم: رسائی کے اشاروں کو کلاس روم میں آزمائیں۔']],
+      ['04', copy.teachers + ' 03', 'استاد کا نام زیرِ تحفظ', 'تعلیمی بہاؤ کی گفتگو', 'teacher-workflow-mark.png', '#video-conversations', copy.temporary, ['نیا طریقہ کار پہلے سے موجود تعلیمی روٹین پر بوجھ نہیں بننا چاہیے۔', 'ایک واضح مقصد، اگلا قدم اور واپسی کا راستہ دھیان بکھرنے پر مدد دیتے ہیں۔', 'خاندان اور استاد کا کردار سیکھنے والے کی نجی جگہ پر قبضہ نہیں کرتا۔', 'لچک کا مطلب مبہم ہدایات یا کم معیار نہیں ہے۔', 'اچھی رائے مخصوص، بروقت اور استعمال کے قابل ہوتی ہے۔', 'کلاس روم میں تبدیلی کو دیکھنے کے لیے چھوٹے قابلِ جانچ اشارے درکار ہیں۔', 'کسی فرد کی آواز شامل کرنے سے پہلے اس کی اجازت اور تناظر لازمی ہے۔', 'Type2Learn کا اگلا قدم: عملی تبدیلیوں کا ریکارڈ اور دوبارہ جائزہ۔']]
+    ] : [
+      ['01', copy.professional, 'Dr. Mayda', copy.position, 'dr-mayda-interview-spotlight.png', 'https://youtu.be/PDmPS4YJhoo', copy.open, ['Treat neurodiversity as learning variation, not a deficit label.', 'Support should open a route into the task without lowering the value of the response.', 'Focus, sensory, and communication needs call for calm choices and return points.', 'Clear language and predictable sequence make a lesson easier to enter.', 'A speed score cannot explain the whole of learning.', 'Human professional judgement remains part of safeguarding and interpretation.', 'Agree the permission boundary before showing any material or media.', 'Type2Learn follow-up: test controls, record the change, and publish the boundary.']],
+      ['02', copy.teachers + ' 01', 'Teacher name withheld', 'Classroom workflow conversation', 'teacher-workflow-mark.png', '#video-conversations', copy.temporary, ['The next action needs to be visible from the first moment of a lesson.', 'Put support in front of the learner, not behind an invisible diagnosis.', 'A teacher-facing view helps only when it leads to a practical decision.', 'Returning after an error should be part of learning, not a punishment.', 'Classroom language and product language need to match.', 'Every revision should connect the problem to a later check.', 'No classroom material or individual identity is published without permission.', 'Type2Learn follow-up: test the teaching prompts and record the revision.']],
+      ['03', copy.teachers + ' 02', 'Teacher name withheld', 'Accessible teaching conversation', 'educator-insight-mark.png', '#video-conversations', copy.temporary, ['A meaningful task can have more than one way in.', 'A clear space to write, pause, and return protects learning time.', 'Support controls should not reduce the academic expectation.', 'A visible objective serves both learner and educator.', 'Reporting needs understandable evidence of work—not inferred traits.', 'Colour, motion, or speed cannot be the sole path to meaning.', 'The public record should show the issue, change, and outcome—not a profile.', 'Type2Learn follow-up: test access signals in a classroom context.']],
+      ['04', copy.teachers + ' 03', 'Teacher name withheld', 'Learning-flow conversation', 'teacher-workflow-mark.png', '#video-conversations', copy.temporary, ['A new workflow should not add unnecessary labour to an existing lesson routine.', 'One clear objective, next step, and return point help when attention shifts.', 'Family and teacher roles must not take over a learner’s private space.', 'Flexibility is not vague instruction or a lower standard.', 'Useful feedback is specific, timely, and actionable.', 'Small observable signals help a classroom evaluate a change.', 'Permission and context come before using anyone’s contribution publicly.', 'Type2Learn follow-up: record practical changes and review them again.']]
+    ];
+    return '<section class="page-section interview-record-section" id="interview-record"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">' + copy.kicker + '</p><h2>' + copy.title + '</h2><p>' + copy.body + '</p></div>' + status(isUrdu ? 'اجازت کے مطابق' : 'Permission-aware', 'teal') + '</div><div class="interview-carousel" data-interview-carousel aria-roledescription="carousel"><div class="interview-viewport"><div class="interview-track">' + interviews.map((entry, index) => '<article class="interview-card" data-interview-slide role="group" aria-roledescription="slide" aria-label="' + (index + 1) + ' / ' + interviews.length + '"><div class="interview-card-art">' + (entry[4] === 'dr-mayda-interview-spotlight.png' ? '<img src="/assets/interviews/' + entry[4] + '" alt="Dr. Mayda interview spotlight graphic" loading="lazy">' : '<img class="interview-mark-image" src="/assets/participation-marks/' + entry[4] + '" alt="" loading="lazy">') + '</div><div class="interview-card-copy"><div class="interview-card-meta"><span>' + entry[0] + '</span><p>' + entry[1] + '</p></div><h3>' + entry[2] + '</h3><p class="interview-byline">' + entry[3] + '</p><p class="interview-record-status">' + copy.record + '</p><ol class="interview-notes">' + entry[7].map((note) => '<li>' + note + '</li>').join('') + '</ol><a class="interview-video-link" href="' + entry[5] + '"' + (entry[5].startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + entry[6] + ' <span aria-hidden="true">↗</span></a></div></article>').join('') + '</div></div><div class="interview-carousel-controls"><button class="carousel-arrow" type="button" data-interview-previous aria-label="' + (isUrdu ? 'پچھلی گفتگو' : 'Previous conversation') + '"><span aria-hidden="true">←</span></button><p><span data-interview-position>1</span> / ' + interviews.length + ' · ' + copy.prompt + '</p><button class="carousel-arrow" type="button" data-interview-next aria-label="' + (isUrdu ? 'اگلی گفتگو' : 'Next conversation') + '"><span aria-hidden="true">→</span></button></div></div></div></section>';
+  };
+
+  const studentVoiceSection = () => {
+    const copy = isUrdu
+      ? { kicker: 'سیکھنے والوں کی آوازیں', title: 'پانچ آوازیں، ایک مشترک اصول: لوگ اپنی شناخت سے الگ نہیں ہوتے۔', body: 'اس مشترک ریکارڈ میں طلبہ کے نام، چہرے، نجی مسودے اور قابلِ شناخت تفصیل شامل نہیں۔ صرف اجازت کے مطابق متن یا آڈیو، اس کا سیکھنے سے تعلق، اور اگلا فیصلہ رکھا جائے گا۔', record: 'عارضی ادارتی نوٹ · براہِ راست اقتباس نہیں', notes: 'جو باتیں ہم جانچ رہے ہیں', link: 'انٹرویو دیکھیں', temp: 'عارضی لنک' }
+      : { kicker: 'Learner voices', title: 'Five voices, one shared standard: people are never reduced to their identity.', body: 'This shared record excludes student names, faces, private drafts, and identifying detail. It keeps only permissioned text or audio, its learning relevance, and the decision that follows.', record: 'Working editorial note · not a direct quote', notes: 'What the five contributions help us test', link: 'Watch interview', temp: 'Temporary link' };
+    const students = isUrdu ? [
+      ['01', 'سیکھنے والا 01', 'متنی رائے', 'https://youtu.be/Hxb2pmkuhGk', copy.link], ['02', 'سیکھنے والا 02', 'صرف آڈیو', '#video-conversations', copy.temp], ['03', 'سیکھنے والا 03', 'متنی رائے', '#video-conversations', copy.temp], ['04', 'سیکھنے والا 04', 'صرف آڈیو', '#video-conversations', copy.temp], ['05', 'سیکھنے والا 05', 'متنی رائے', '#video-conversations', copy.temp]
+    ] : [
+      ['01', 'Student 01', 'Text reflection', 'https://youtu.be/Hxb2pmkuhGk', copy.link], ['02', 'Student 02', 'Audio only', '#video-conversations', copy.temp], ['03', 'Student 03', 'Text reflection', '#video-conversations', copy.temp], ['04', 'Student 04', 'Audio only', '#video-conversations', copy.temp], ['05', 'Student 05', 'Text reflection', '#video-conversations', copy.temp]
+    ];
+    const notes = isUrdu ? ['سوال کے الفاظ طالب علم کے لیے معنی رکھتے ہیں۔', 'اگلا قدم دکھائی دینا شروع کرنا آسان بناتا ہے۔', 'وقفہ اور واپسی کے لیے واضح اختیار ضروری ہے۔', 'مدد کو سیکھنے والے کے اختیار میں رہنا چاہیے۔', 'نجی کام کو عوامی نمونہ نہیں بنایا جائے گا۔', 'رفتار سے زیادہ سمجھ اور کوشش کا تناظر اہم ہے۔', 'طلبہ کی رائے کو مصنوعات کے فیصلے سے جوڑا جانا چاہیے۔', 'ہر عوامی اندراج میں اجازت کی سطح واضح ہوگی۔'] : ['The words used in a question matter to a learner.', 'A visible next step makes it easier to begin.', 'A clear pause-and-return option is essential.', 'Support needs to remain under the learner’s control.', 'Private work will never become a public example.', 'Context around understanding and effort matters more than speed.', 'Student input needs to connect to a product decision.', 'Every public entry will state its permission level.'];
+    return '<section class="page-section is-pale student-voice-section" id="student-voices"><div class="content-wrap"><div class="student-voice-panel"><div class="student-voice-intro"><figure class="student-voice-mark" aria-hidden="true"><img src="/assets/participation-marks/student-voice-mark.png" alt="" loading="lazy"></figure><p class="section-kicker">' + copy.kicker + '</p><h2>' + copy.title + '</h2><p>' + copy.body + '</p><p class="student-voice-status">' + copy.record + '</p></div><div class="student-contribution-grid">' + students.map((student) => '<article class="student-contribution"><span>' + student[0] + '</span><h3>' + student[1] + '</h3><p>' + student[2] + '</p><a href="' + student[3] + '"' + (student[3].startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + student[4] + ' <span aria-hidden="true">↗</span></a></article>').join('') + '</div><div class="student-working-notes"><p>' + copy.notes + '</p><ol>' + notes.map((note) => '<li>' + note + '</li>').join('') + '</ol></div></div></div></section>';
+  };
+
+  const communityReviewSection = () => {
+    const copy = isUrdu
+      ? { kicker: 'عمومی رائے', title: 'لوگوں نے کیا دیکھا، اور ہم نے اسے کیسے سنا۔', body: 'یہ عام ویب سائٹ کے جائزوں کے اسکرین شاٹس ہیں۔ ہر جائزے میں مثبت اشارے اور بہتر بنانے کی مفید بات شامل ہے؛ یہ کلینیکل یا تعلیمی توثیق کا دعویٰ نہیں۔', previous: 'پچھلا جائزہ', next: 'اگلا جائزہ', supplied: 'WhatsApp کے ذریعے دیا گیا جائزہ', themes: 'اہم اشارے' }
+      : { kicker: 'General reviews', title: 'What people noticed—and how we are listening.', body: 'These are screenshots of general website reviews. Each carries both a positive signal and a useful improvement point; none is presented as clinical or educational validation.', previous: 'Previous review', next: 'Next review', supplied: 'Review supplied through WhatsApp', themes: 'What we are taking forward' };
+    const reviews = isUrdu ? [
+      ['ali-imran-whatsapp-review.jpeg', 'محمد علی عمران', '9 / 10', 'رسائی، حسبِ ضرورت تبدیلی، اور حقیقی نیورو ڈائیورس صارفین سے مسلسل رائے۔'], ['miray-fatima-whatsapp-review.jpeg', 'مرائے فاطمہ', 'عمومی جائزہ', 'سادہ ترتیب اور عملی ٹائپنگ مشق—مزید اصلاح کی گنجائش کے ساتھ۔'], ['minahil-fatima-whatsapp-review.jpeg', 'منہل فاطمہ', 'عمومی جائزہ', 'سیکھنے کا انداز قابلِ فہم ہے؛ معلومات ڈھونڈنا اور نیویگیشن مزید واضح ہونا چاہیے۔'], ['muhammad-mahd-whatsapp-review.jpeg', 'محمد مہد', 'عمومی جائزہ', 'سادہ زبان اور طالب علم دوست پیش کش اہم ہے۔']
+    ] : [
+      ['ali-imran-whatsapp-review.jpeg', 'Muhammad Ali Imran', '9 / 10', 'Accessibility, customisation, and continued feedback from neurodivergent users.'], ['miray-fatima-whatsapp-review.jpeg', 'Miray Fatima', 'General review', 'A clean interface and practical typing work, with room for continued refinement.'], ['minahil-fatima-whatsapp-review.jpeg', 'Minahil Fatima', 'General review', 'The learning approach feels clear; finding information and navigation should become easier.'], ['muhammad-mahd-whatsapp-review.jpeg', 'Muhammad Mahd', 'General review', 'Plain language and a student-friendly presentation matter.']
+    ];
+    return '<section class="page-section community-review-section" id="community-reviews"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">' + copy.kicker + '</p><h2>' + copy.title + '</h2><p>' + copy.body + '</p></div>' + status(isUrdu ? 'سننے کا ریکارڈ' : 'Listening record', 'blue') + '</div><div class="review-carousel" data-review-carousel aria-roledescription="carousel"><div class="review-viewport"><div class="review-track">' + reviews.map((review, index) => '<article class="review-slide" data-review-slide role="group" aria-roledescription="slide" aria-label="' + (index + 1) + ' / ' + reviews.length + '"><div class="review-screenshot"><img src="/assets/community-reviews/' + review[0] + '" alt="' + copy.supplied + ' from ' + review[1] + '" loading="lazy"></div><div class="review-copy"><p class="section-kicker">' + copy.supplied + '</p><h3>' + review[1] + '</h3><span class="review-rating">' + review[2] + '</span><p class="review-theme-label">' + copy.themes + '</p><p class="review-theme">' + review[3] + '</p></div></article>').join('') + '</div></div><div class="review-carousel-controls"><button class="carousel-arrow" type="button" data-review-previous aria-label="' + copy.previous + '"><span aria-hidden="true">←</span></button><p><span data-review-position>1</span> / ' + reviews.length + '</p><button class="carousel-arrow" type="button" data-review-next aria-label="' + copy.next + '"><span aria-hidden="true">→</span></button></div></div></div></section>';
+  };
+
   const participationTrust = () => shell(
     pageHero('Participation & trust', 'Participation should change the work. Trust should be visible.', 'This is the one public record for co-design, professional input, community participation, accessibility, privacy, security, and support boundaries. It replaces three overlapping sections with one accountable route.', 'Current status', 'The initial evidence ledger is being prepared for one professional, three teachers, and five students. It does not claim completed external co-design, clinical validation, or endorsement.') +
     '<section class="page-section participation-record-section" id="participation-record"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Participation record</p><h2>Who is represented—and how their contribution is protected.</h2><p>Every public entry needs a clear permission level, source format, learning, and product decision. Counts are visible; personal identities and images are not.</p></div>' + status('Permission-aware', 'teal') + '</div><div class="participation-summary" aria-label="Participant count"><span><b>01</b>Professional</span><span><b>03</b>Teachers</span><span><b>05</b>Students</span></div><div class="participation-grid">' + participationCards() + '</div></div></section>' +
@@ -896,6 +943,79 @@
       }
     }
 
+    if (routeKey === 'participation-trust') {
+      const evidenceSection = document.querySelector('.evidence-placement-section');
+      if (evidenceSection && !document.getElementById('interview-record')) {
+        evidenceSection.insertAdjacentHTML('beforebegin', participationInterviewSection() + studentVoiceSection());
+      }
+      const interviewRecord = document.getElementById('interview-record');
+      if (interviewRecord && !document.getElementById('professional-interview')) {
+        const studentPanel = document.querySelector('.student-voice-panel');
+        const studentMark = studentPanel?.querySelector('.student-voice-mark');
+        const studentContributions = studentPanel?.querySelector('.student-contribution-grid');
+        const studentNotes = studentPanel?.querySelector('.student-working-notes');
+        if (studentPanel && studentMark && studentContributions && studentNotes) {
+          const studentSide = document.createElement('div');
+          const studentBottom = document.createElement('div');
+          studentSide.className = 'student-record-side';
+          studentBottom.className = 'student-record-bottom';
+          studentBottom.append(studentMark, studentNotes);
+          studentSide.append(studentContributions, studentBottom);
+          studentPanel.append(studentSide);
+        }
+        const interviewTrack = interviewRecord.querySelector('.interview-track');
+        const professionalCard = interviewTrack?.querySelector('.interview-card');
+        if (professionalCard) {
+          const professionalSection = document.createElement('section');
+          professionalSection.className = 'page-section professional-record-section';
+          professionalSection.id = 'professional-interview';
+          professionalSection.innerHTML = isUrdu
+            ? '<div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">پیشہ ورانہ گفتگو</p><h2>ایک پیشہ ور۔ ایک مکمل، اجازت کے مطابق ریکارڈ۔</h2><p>ڈاکٹر مائدہ کا انٹرویو واحد پروفائلڈ پیشہ ورانہ گفتگو ہے۔ اس کے ساتھ مکمل ویڈیو کا لنک، عارضی ادارتی نوٹس، اور منظور شدہ اقتباسات کے لیے واضح جگہ موجود ہے۔</p></div>' + status('اجازت کے مطابق', 'teal') + '</div><div class="professional-interview-stage"></div></div>'
+            : '<div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Professional interview</p><h2>One professional. One complete, permission-aware record.</h2><p>Dr. Mayda’s interview is the single profiled professional conversation. It carries the full-video link, temporary editorial notes, and a clear place for approved excerpts.</p></div>' + status('Permission-aware', 'teal') + '</div><div class="professional-interview-stage"></div></div>';
+          interviewRecord.before(professionalSection);
+          professionalCard.classList.add('professional-interview-card');
+          professionalCard.removeAttribute('data-interview-slide');
+          professionalCard.removeAttribute('aria-roledescription');
+          professionalCard.removeAttribute('aria-label');
+          const professionalName = professionalCard.querySelector('h3');
+          const professionalImage = professionalCard.querySelector('.interview-card-art img');
+          if (professionalName) professionalName.textContent = 'Dr. Mayda';
+          if (professionalImage) professionalImage.alt = 'Dr. Mayda interview spotlight graphic';
+          professionalSection.querySelector('.professional-interview-stage')?.append(professionalCard);
+        }
+        const professorCards = Array.from(interviewRecord.querySelectorAll('.interview-card'));
+        professorCards.forEach((card, index) => {
+          card.classList.add('professor-interview-card');
+          card.querySelector('.interview-card-art')?.remove();
+          card.setAttribute('aria-label', (index + 1) + ' / ' + professorCards.length);
+          const label = card.querySelector('.interview-card-meta > p');
+          const heading = card.querySelector('h3');
+          if (label) label.textContent = isUrdu ? ('پروفیسر کی گفتگو ' + (index + 1)) : ('Professor conversation ' + (index + 1));
+          if (heading) heading.textContent = isUrdu ? ('پروفیسر شراکت دار ' + String(index + 1).padStart(2, '0')) : ('Professor contributor ' + String(index + 1).padStart(2, '0'));
+        });
+        const professorHeading = interviewRecord.querySelector('.section-heading-copy');
+        if (professorHeading) {
+          const kicker = professorHeading.querySelector('.section-kicker');
+          const title = professorHeading.querySelector('h2');
+          const body = professorHeading.querySelector('p:last-child');
+          if (kicker) kicker.textContent = isUrdu ? 'پروفیسر کی گفتگو' : 'Professor conversations';
+          if (title) title.textContent = isUrdu ? 'تین پروفیسر گفتگوئیں۔ ایک وقت میں ایک، بغیر تصاویر کے۔' : 'Three professor conversations. One at a time, with no portraits.';
+          if (body) body.textContent = isUrdu ? 'ہر ریکارڈ میں عارضی ادارتی نوٹس، آٹھ قابلِ جانچ نکات، اور منظور شدہ ویڈیو یا نقل شامل کرنے کے لیے جگہ موجود ہے۔' : 'Each record holds temporary editorial notes, eight testable considerations, and a clear place for an approved video or transcript.';
+        }
+        const professorControls = interviewRecord.querySelector('.interview-carousel-controls');
+        const professorCount = professorControls?.querySelector('p');
+        const professorPrevious = professorControls?.querySelector('[data-interview-previous]');
+        const professorNext = professorControls?.querySelector('[data-interview-next]');
+        if (professorCount) professorCount.innerHTML = '<span data-interview-position>1</span> / ' + professorCards.length + (isUrdu ? ' · پروفیسر کے قابلِ جانچ نکات' : ' · Professor considerations');
+        if (professorPrevious) professorPrevious.setAttribute('aria-label', isUrdu ? 'پچھلی پروفیسر گفتگو' : 'Previous professor conversation');
+        if (professorNext) professorNext.setAttribute('aria-label', isUrdu ? 'اگلی پروفیسر گفتگو' : 'Next professor conversation');
+      }
+      const commitmentsSection = document.querySelector('.trust-commitments');
+      if (commitmentsSection && !document.getElementById('community-reviews')) {
+        commitmentsSection.insertAdjacentHTML('beforebegin', communityReviewSection());
+      }
+    }
+
     if (document.querySelector('.legal-document, .auth-page')) return;
 
     if (isHomeRoute) {
@@ -948,19 +1068,6 @@
       if (collaboratorsSection) collaboratorsSection.remove();
     }
 
-    const sections = Array.from(document.querySelectorAll('#main-content > section:not(.builder-credit)'));
-    sections.forEach((section, index) => {
-      section.dataset.sectionIndex = String(index + 1).padStart(2, '0');
-      const wrap = section.querySelector(':scope > .content-wrap');
-      if (wrap && !section.matches('.hero, .page-hero, .site-cta')) {
-        const marker = document.createElement('span');
-        marker.className = 'section-marker';
-        marker.setAttribute('aria-hidden', 'true');
-        marker.textContent = section.dataset.sectionIndex;
-        wrap.prepend(marker);
-      }
-    });
-
     document.querySelectorAll('.page-section > .content-wrap > h2').forEach((heading) => {
       heading.dataset.animateWords = '';
       heading.classList.add('section-title');
@@ -977,6 +1084,12 @@
         step.dataset.stepIndex = String(index);
       });
     });
+
+    const requestedSectionId = window.location.hash ? decodeURIComponent(window.location.hash.slice(1)) : '';
+    const requestedSection = requestedSectionId && document.getElementById(requestedSectionId);
+    if (requestedSection) {
+      window.requestAnimationFrame(() => requestedSection.scrollIntoView({ behavior: 'auto', block: 'start' }));
+    }
   };
 
   const animateWords = () => {
@@ -1018,6 +1131,54 @@
       });
     }, { threshold: 0.45, rootMargin: '0px 0px -8% 0px' });
     document.querySelectorAll('[data-animate-words]').forEach((node) => headingObserver.observe(node));
+  };
+
+  const setupReviewCarousel = () => {
+    document.querySelectorAll('[data-review-carousel], [data-interview-carousel]').forEach((carousel) => {
+      const isInterview = carousel.hasAttribute('data-interview-carousel');
+      const prefix = isInterview ? 'interview' : 'review';
+      const track = carousel.querySelector('.' + prefix + '-track');
+      const slides = Array.from(carousel.querySelectorAll('[data-' + prefix + '-slide]'));
+      const previous = carousel.querySelector('[data-' + prefix + '-previous]');
+      const next = carousel.querySelector('[data-' + prefix + '-next]');
+      const position = carousel.querySelector('[data-' + prefix + '-position]');
+      if (!track || slides.length < 2 || !previous || !next) return;
+
+      let current = 0;
+      let timer = null;
+      const shouldAutoplay = () => !isInterview && !document.hidden && !document.body.classList.contains('motion-off') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const show = (index) => {
+        current = (index + slides.length) % slides.length;
+        track.style.transform = 'translate3d(' + (-current * 100) + '%, 0, 0)';
+        slides.forEach((slide, slideIndex) => {
+          const active = slideIndex === current;
+          slide.setAttribute('aria-hidden', String(!active));
+          slide.querySelectorAll('a, button').forEach((control) => { control.tabIndex = active ? 0 : -1; });
+        });
+        if (position) position.textContent = String(current + 1);
+      };
+      const stop = () => {
+        if (timer) window.clearInterval(timer);
+        timer = null;
+      };
+      const start = () => {
+        stop();
+        if (!shouldAutoplay()) return;
+        timer = window.setInterval(() => show(current + 1), 7200);
+      };
+      previous.addEventListener('click', () => { show(current - 1); start(); });
+      next.addEventListener('click', () => { show(current + 1); start(); });
+      carousel.addEventListener('mouseenter', stop);
+      carousel.addEventListener('mouseleave', start);
+      carousel.addEventListener('focusin', stop);
+      carousel.addEventListener('focusout', () => window.setTimeout(() => {
+        if (!carousel.contains(document.activeElement)) start();
+      }, 0));
+      document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });
+      window.addEventListener('type2learn:motion', start);
+      show(0);
+      start();
+    });
   };
 
   const setMotion = (off, persist = true) => {
@@ -1690,6 +1851,7 @@
   animateWords();
   setupReveals();
   setupControls();
+  setupReviewCarousel();
   setupAuthExperience();
   setupScrollExperience();
   setupSectionNavigation();
