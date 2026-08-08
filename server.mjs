@@ -102,9 +102,29 @@ const sendJson = (response, status, payload) => send(response, status, JSON.stri
 });
 
 const asOrigin = (request) => String(request.headers.origin || '').replace(/\/$/, '');
+const localGuestFromRequest = (request, config) => {
+  if (!config.allowLocalGuestAi) return null;
+  const cookie = String(request.headers.cookie || '');
+  const match = cookie.match(/(?:^|;\s*)type2learn_guest_id=([A-Za-z0-9_-]{20,96})(?:;|$)/);
+  if (!match) return null;
+  return { uid: 'guest-' + match[1], isGuest: true };
+};
+const isLoopbackOrigin = (origin) => {
+  try {
+    const hostname = new URL(origin).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  } catch {
+    return false;
+  }
+};
 const isAllowedOrigin = (request, config) => {
   const origin = asOrigin(request);
-  return !origin || config.allowedOrigins.has(origin);
+  // Local previews routinely use a different available port. Keep that
+  // developer workflow functional without widening the deployed service:
+  // production still accepts only explicitly configured origins.
+  return !origin
+    || config.allowedOrigins.has(origin)
+    || (!config.production && isLoopbackOrigin(origin));
 };
 
 const readBody = async (request, maximum) => {
@@ -214,7 +234,7 @@ const handleApi = async (request, response, pathname, runtime) => {
   if (request.method === 'GET' && pathname === '/api/v1/health') {
     return sendJson(response, 200, {
       ai: ai.status(),
-      adaptiveRecall: adaptiveRecall.status(),
+      adaptiveRecall: { ...adaptiveRecall.status(), localGuestPreview: config.allowLocalGuestAi },
       modelRouting: modelProvider.status(),
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
@@ -226,7 +246,11 @@ const handleApi = async (request, response, pathname, runtime) => {
       return sendJson(response, 200, await ai.chat({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/adaptive-recall') {
-      return sendJson(response, 200, await adaptiveRecall.analyse({ authorization: request.headers.authorization, body: await readJson(request) }));
+      return sendJson(response, 200, await adaptiveRecall.analyse({
+        authorization: request.headers.authorization,
+        body: await readJson(request),
+        localGuest: localGuestFromRequest(request, config)
+      }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/speech/transcribe') {
       return sendJson(response, 200, await speech.transcribe({ authorization: request.headers.authorization, form: await readForm(request) }));

@@ -58,12 +58,18 @@ export const askCourseAi = async ({ user, message, history, courseId, page, lang
 // attempt and current page identity; provider keys and model selection remain
 // server-only.
 export const requestAdaptiveRecall = async ({ user, courseId, page, language, response, previousResponse, barrier, signal }) => {
-  return authenticatedRequest(user, '/api/v1/adaptive-recall', {
+  const requestOptions = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ courseId, page, language, response, previousResponse, barrier }),
     signal
-  });
+  };
+  // Local guest AI is an explicitly enabled preview path. It has no token and
+  // the server accepts it only in non-production when AI_ALLOW_GUESTS is on;
+  // production guests keep the existing authored support fallback.
+  return user?.isGuest
+    ? request('/api/v1/adaptive-recall', requestOptions)
+    : authenticatedRequest(user, '/api/v1/adaptive-recall', requestOptions);
 };
 
 export const transcribeCourseAudio = async ({ user, audio, durationMs, language, purpose, signal }) => {

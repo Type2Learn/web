@@ -1664,6 +1664,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const signedInLearner = () => Boolean(authenticatedUser && !authenticatedUser.isGuest && typeof authenticatedUser.getIdToken === 'function');
+  // The API itself keeps guest AI disabled unless the local preview feature
+  // flag is enabled. This only lets a guest reach that guarded endpoint so
+  // Playwright/local preview can exercise the same "I’m stuck" UI path.
+  const canRequestAdaptiveRecall = () => Boolean(authenticatedUser && (authenticatedUser.isGuest || signedInLearner()));
   const requestTimeoutSignal = (milliseconds) => (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
     ? AbortSignal.timeout(milliseconds)
     : undefined);
@@ -3251,7 +3255,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     render();
     const fallback = adaptiveFallback(barrier);
     try {
-      if (!signedInLearner()) throw new Error(courseUi('Sign in to use the adaptive check. Current-step support is still available.', 'تطبیقی جانچ کے لیے لاگ اِن کریں۔ موجودہ مرحلے کی مدد پھر بھی دستیاب ہے۔'));
+      if (!canRequestAdaptiveRecall()) throw new Error(courseUi('Sign in to use the adaptive check. Current-step support is still available.', 'تطبیقی جانچ کے لیے لاگ اِن کریں۔ موجودہ مرحلے کی مدد پھر بھی دستیاب ہے۔'));
       const payload = await requestAdaptiveRecall({
         user: authenticatedUser,
         courseId: COURSE.id,

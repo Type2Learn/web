@@ -93,9 +93,12 @@ export const createAdaptiveRecallService = ({ config, firebase, ledger, provider
   const available = () => Boolean(firebase.available && ledger && provider?.status?.().available);
   const status = () => ({ available: available(), requiresSignIn: true, structuredOutput: true, fallback: 'authored-current-step support' });
 
-  const analyse = async ({ authorization, body }) => {
+  const analyse = async ({ authorization, body, localGuest = null }) => {
     if (!firebase.available || !ledger || !provider?.status?.().available) throw apiError(503, 'ADAPTIVE_RECALL_UNAVAILABLE', 'Adaptive recall is unavailable right now. The current-step support is still ready.');
-    const learner = await firebase.verifyBearer(authorization);
+    // A validated local guest identity can be supplied only by server.mjs
+    // when the non-production AI_ALLOW_GUESTS preview flag is enabled. All
+    // deployed requests continue to require a Firebase bearer token.
+    const learner = localGuest || await firebase.verifyBearer(authorization);
     const context = adaptiveRecallContext(body);
     if (context.barrier && !BARRIERS.has(context.barrier)) throw apiError(400, 'INVALID_BARRIER', 'Choose one of the available support options.');
     if (hasPrivateData(context.response) || hasPrivateData(context.previousResponse)) throw apiError(400, 'PRIVATE_INFORMATION', 'Please remove private information before requesting learning support.');

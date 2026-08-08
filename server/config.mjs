@@ -20,6 +20,11 @@ const numberFrom = (value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } 
   return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
 };
 
+const booleanFrom = (value, fallback = false) => {
+  if (value === undefined || value === null || String(value).trim() === '') return fallback;
+  return /^(?:1|true|yes|on)$/i.test(String(value).trim());
+};
+
 const unquote = (value) => {
   const trimmed = String(value || '').trim();
   if (trimmed.length >= 2 && ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'")))) {
@@ -140,6 +145,10 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     port: numberFrom(value('PORT'), 4173, { min: 1, max: 65535 }),
     host: value('HOST') || '0.0.0.0',
     allowedOrigins: new Set(configuredOrigins.length ? configuredOrigins : defaultOrigins),
+    // Guest AI exists only to make local preview/testing possible without a
+    // Firebase account. It is hard-disabled in production even when an
+    // environment variable is accidentally supplied there.
+    allowLocalGuestAi: !production && booleanFrom(value('AI_ALLOW_GUESTS')),
     firebaseProjectId: value('FIREBASE_PROJECT_ID') || 'type2learn-defcc',
     firebaseServiceAccountJson: value('FIREBASE_SERVICE_ACCOUNT_JSON'),
     openAiApiKey: value('OPENAI_API_KEY', 'openai', 'key'),
