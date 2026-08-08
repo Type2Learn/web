@@ -6083,3 +6083,191 @@ html[data-color-mode="vivid"] .site-cta-panel { border-color: #006BFF; backgroun
   .evidence-media-slot { min-height: 330px; }
   .evidence-media-slot strong { font-size: clamp(2rem, 12vw, 3.1rem); }
 }
+
+/* Public-route visual system: full photographic stages and authored evidence marks. */
+.page-hero::before {
+  inset: 0 !important;
+  background-position: var(--photo-position, 72% center) !important;
+  background-repeat: no-repeat;
+  background-size: cover !important;
+}
+
+.page-hero::after {
+  display: block !important;
+  background: linear-gradient(90deg, var(--cloud) 0%, rgba(245, 250, 255, .98) 29%, rgba(245, 250, 255, .82) 42%, rgba(245, 250, 255, .26) 62%, rgba(245, 250, 255, .03) 82%) !important;
+}
+
+.page-hero > .content-wrap { position: relative; z-index: 1; }
+
+.route-how-it-works .method-overview > .content-wrap { isolation: isolate; }
+.route-how-it-works .method-overview .section-marker {
+  z-index: 5;
+  top: clamp(-18px, -1vw, -4px);
+  right: clamp(12px, 3vw, 50px);
+  display: grid;
+  width: 72px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(245, 250, 255, .96);
+  box-shadow: 0 12px 28px rgba(10, 22, 48, .12);
+  color: var(--blue);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  line-height: 1;
+}
+
+.role-mark,
+.participation-mark {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 84% 15%, rgba(25, 197, 181, .16), transparent 30%),
+    linear-gradient(135deg, #f5fafc, #edf5ff);
+}
+
+.role-mark { height: 195px; }
+.role-mark img,
+.participation-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .6s var(--ease-spring);
+}
+
+.audience-role:hover .role-mark img,
+.participation-card:hover .participation-mark img { transform: scale(1.035); }
+
+.audience-role {
+  padding: 0 0 27px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--teal);
+  background: rgba(255, 255, 255, .72);
+  box-shadow: 0 18px 42px rgba(10, 22, 48, .055);
+}
+
+.audience-role > :not(.role-mark) { margin-right: 25px; margin-left: 25px; }
+.audience-role > span { display: block; margin-top: 22px; }
+.audience-role h3 { margin-top: 13px; }
+.audience-role p { margin-top: 15px; }
+.audience-role ul { margin-top: 21px; }
+
+.participation-card-rich {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--teal);
+  background: rgba(255, 255, 255, .78);
+  box-shadow: 0 18px 44px rgba(10, 22, 48, .06);
+}
+
+.participation-card-rich::before { display: none; }
+.participation-mark { height: 205px; }
+.participation-card-copy { padding: 24px 25px 26px; }
+.participation-card-top { display: flex; min-height: 48px; align-items: start; justify-content: space-between; gap: 17px; }
+.participation-card-rich .participation-index {
+  color: var(--blue);
+  font-size: 42px;
+  line-height: .82;
+}
+
+.participation-scope {
+  display: inline-flex;
+  max-width: 175px;
+  padding: 6px 9px;
+  justify-content: center;
+  border: 1px solid rgba(23, 105, 245, .25);
+  border-radius: 999px;
+  background: var(--pale-blue);
+  color: var(--blue);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  line-height: 1.28;
+  text-align: center;
+}
+
+.participation-card-rich .section-kicker { margin-top: 19px; }
+.participation-card-rich h3 { margin-top: 10px; }
+.participation-card-rich .participation-format {
+  margin-top: 15px !important;
+  color: var(--ink) !important;
+  font-size: 12px !important;
+  line-height: 1.5;
+}
+
+.participation-card-rich .participation-format + p { margin-top: 15px; }
+.participation-outcomes {
+  display: grid;
+  gap: 8px;
+  margin: 22px 0 0;
+  padding: 17px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.participation-outcomes li {
+  display: flex;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+.participation-outcomes li::before { color: var(--green); content: "✓"; }
+.participation-card-rich a { margin-top: 20px; }
+
+.trust-legal-links::after {
+  display: block;
+  flex: 1 0 100%;
+  min-height: clamp(175px, 18vw, 270px);
+  margin-top: 18px;
+  border: 1px solid var(--line-strong);
+  background-color: #f7fbff;
+  background-image:
+    url('/assets/participation-marks/professional-evidence-mark.png'),
+    url('/assets/participation-marks/teacher-workflow-mark.png'),
+    url('/assets/participation-marks/student-voice-mark.png');
+  background-position: 4% center, center center, 96% center;
+  background-repeat: no-repeat;
+  background-size: 30% auto, 33% auto, 30% auto;
+  box-shadow: inset 0 0 0 10px rgba(255, 255, 255, .42);
+  content: "";
+}
+
+.builder-credit .builder-monogram {
+  display: block;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(10, 22, 48, .10);
+  object-fit: contain;
+}
+
+@media (max-width: 1000px) and (min-width: 721px) {
+  .page-hero::before { inset: 0 !important; height: auto !important; }
+  .page-hero::after { background: linear-gradient(90deg, var(--cloud) 0%, rgba(245, 250, 255, .96) 44%, rgba(245, 250, 255, .38) 72%, rgba(245, 250, 255, .05) 100%) !important; }
+}
+
+@media (max-width: 720px) {
+  .page-hero::before { inset: 0 !important; background-position: 65% center !important; }
+  .page-hero::after { background: linear-gradient(0deg, var(--cloud) 0%, rgba(245, 250, 255, .96) 42%, rgba(245, 250, 255, .56) 64%, rgba(245, 250, 255, .05) 88%) !important; }
+  .route-how-it-works .method-overview .section-marker { top: -24px; right: 0; }
+  .role-mark { height: 180px; }
+  .participation-mark { height: 190px; }
+  .participation-card-top { gap: 12px; }
+  .participation-scope { max-width: 150px; font-size: 9px; }
+  .trust-legal-links::after { min-height: 235px; background-position: 0 center, center center, 100% center; background-size: 55% auto, 62% auto, 55% auto; }
+}
