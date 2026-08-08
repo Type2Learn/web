@@ -6435,7 +6435,6 @@ html[data-color-mode="vivid"] .site-cta-panel { border-color: #006BFF; backgroun
 /* Quiet public chrome: navigation owns the centre, controls stay icon-first. */
 .page-hero-aside { display: none !important; }
 .page-hero .page-hero-grid { grid-template-columns: minmax(0, 1fr) !important; }
-.section-marker { display: none !important; }
 
 @media (min-width: 1201px) {
   .header-inner {

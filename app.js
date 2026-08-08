@@ -948,6 +948,7 @@
       if (evidenceSection && !document.getElementById('interview-record')) {
         evidenceSection.insertAdjacentHTML('beforebegin', participationInterviewSection() + studentVoiceSection());
       }
+      evidenceSection?.remove();
       const interviewRecord = document.getElementById('interview-record');
       if (interviewRecord && !document.getElementById('professional-interview')) {
         const studentPanel = document.querySelector('.student-voice-panel');
@@ -1067,6 +1068,19 @@
       if (founderSection) founderSection.outerHTML = teamDeck();
       if (collaboratorsSection) collaboratorsSection.remove();
     }
+
+    const sections = Array.from(document.querySelectorAll('#main-content > section:not(.builder-credit)'));
+    sections.forEach((section, index) => {
+      section.dataset.sectionIndex = String(index + 1).padStart(2, '0');
+      const wrap = section.querySelector(':scope > .content-wrap');
+      if (wrap && !section.matches('.hero, .page-hero, .site-cta')) {
+        const marker = document.createElement('span');
+        marker.className = 'section-marker';
+        marker.setAttribute('aria-hidden', 'true');
+        marker.textContent = section.dataset.sectionIndex;
+        wrap.prepend(marker);
+      }
+    });
 
     document.querySelectorAll('.page-section > .content-wrap > h2').forEach((heading) => {
       heading.dataset.animateWords = '';
