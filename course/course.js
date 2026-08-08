@@ -2,7 +2,7 @@ import { COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { askCourseAi, getCourseAiStatus, loadCourseProgress, saveCourseProgress, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260806-cloud1';
+import { askCourseAi, getCourseAiStatus, loadCourseProgress, requestAdaptiveRecall, saveCourseProgress, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260808-adaptive1';
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
@@ -139,6 +139,18 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       finalResultIndexes: new Set()
     },
     audio: { controller: null, element: null, url: '', messageIndex: -1, loadingIndex: -1, error: '' }
+  };
+  // Adaptive recall is purpose-built evidence support, not a chat transcript.
+  // It is session-only: attempts are sent for this response only and no model
+  // output or learner prose is added to long-term course progress.
+  const adaptiveRecall = {
+    loading: false,
+    result: null,
+    error: '',
+    barrier: '',
+    firstAttempt: '',
+    revisionReviewed: false,
+    controller: null
   };
   // A modal render replaces the triggering control, so remember its stable
   // action selector rather than a stale DOM reference. This lets keyboard and
@@ -1883,10 +1895,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   // keep that area for support instead, so no duration is presented as a
   // requirement or expectation.
   const taskHeaderControls = (paceCopy = taskTime()) => {
-    const explainLabel = courseUi('Call AI', 'مصنوعی ذہانت سے پوچھیں');
-    const explain = signedInLearner()
-      ? '<button class="course-task-explain" type="button" data-action="call-ai">' + explainLabel + '</button>'
-      : '<span class="course-ai-login-gate" tabindex="0" data-tooltip="' + escapeHtml(courseUi('Log in required', 'لاگ اِن ضروری ہے')) + '"><button class="course-task-explain" type="button" data-action="call-ai" disabled aria-disabled="true">' + explainLabel + '</button></span>';
+    const explainLabel = courseUi('I’m stuck', 'مجھے مدد چاہیے');
+    const explain = '<button class="course-task-explain" type="button" data-action="stuck">' + explainLabel + '</button>';
     const narrationControl = taskNarrationControlMarkup();
     const showPace = learningChoices().layout === 'open' || Boolean(narrationControl);
     return '<span class="course-task-header-controls">' + narrationControl + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + explain + '</span>';
@@ -3184,6 +3194,88 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       : '';
   };
 
+  const adaptiveFallback = (barrier = '') => {
+    const urdu = courseUsesUrdu();
+    const next = {
+      instruction: urdu ? 'صرف موجودہ ہدایت کا پہلا حصہ دیکھیں۔' : 'Look at only the first part of the current instruction.',
+      'too-large': urdu ? 'ایک جملے یا ایک خیال سے آغاز کریں۔' : 'Start with one sentence or one idea.',
+      'difficult-words': urdu ? 'کلیدی خیال تلاش کریں؛ ہر مشکل لفظ حل کرنا ضروری نہیں۔' : 'Look for the key idea; you do not need every difficult word.',
+      starting: urdu ? 'اس جملے سے شروع کر سکتے ہیں: “اہم خیال یہ ہے کہ…”' : 'You can begin with: “The main idea is that…”',
+      'too-much-on-screen': urdu ? 'صرف موجودہ عنوان اور اس کے نیچے متن کو دیکھیں۔' : 'Look only at the current heading and the text beneath it.',
+      'worried-about-wrong': urdu ? 'اپنا پہلا خیال لکھیں؛ بعد میں اسے بدل سکتے ہیں۔' : 'Write a first thought; you can change it afterwards.'
+    }[barrier] || (urdu ? 'اپنے الفاظ میں ایک مرکزی خیال بیان کریں۔' : 'Name one main idea in your own words.');
+    return {
+      evidence_found: [],
+      missing_concept: urdu ? 'اس مرحلے کا مرکزی خیال' : 'the main idea in this step',
+      support_mode: 'hint',
+      feedback: urdu ? 'آپ کا کام موجود ہے۔ ایک واضح خیال سے آگے بڑھیں۔' : 'Your work is still here. Continue with one clear idea.',
+      next_prompt: next,
+      improvement: ''
+    };
+  };
+
+  const adaptiveResultMarkup = ({ compact = false } = {}) => {
+    const result = adaptiveRecall.result;
+    if (!result && !adaptiveRecall.loading && !adaptiveRecall.error) return '';
+    if (adaptiveRecall.loading) return '<aside class="course-adaptive-recall is-loading" role="status"><p class="course-eyebrow">Adaptive recall</p><strong>' + escapeHtml(courseUi('Looking at this one response…', 'اسی ایک جواب کو دیکھ رہے ہیں…')) + '</strong><p>' + escapeHtml(courseUi('The course is checking for one strength, one missing idea, and one useful next step.', 'کورس ایک مضبوط بات، ایک باقی خیال اور ایک مفید اگلا قدم دیکھ رہا ہے۔')) + '</p></aside>';
+    if (adaptiveRecall.error && !result) return '<aside class="course-adaptive-recall is-fallback" role="status"><p class="course-eyebrow">Current-step support</p><strong>' + escapeHtml(courseUi('Your response is ready to keep working with.', 'آپ کے جواب پر کام جاری رکھا جا سکتا ہے۔')) + '</strong><p>' + escapeHtml(adaptiveRecall.error) + '</p></aside>';
+    const evidence = result.evidence_found?.length
+      ? '<p><strong>' + escapeHtml(courseUi('You already showed:', 'آپ نے پہلے ہی یہ ظاہر کیا:')) + '</strong> ' + escapeHtml(result.evidence_found.join(' · ')) + '</p>'
+      : '';
+    const improvement = result.improvement
+      ? '<p><strong>' + escapeHtml(courseUi('What changed:', 'کیا بہتر ہوا:')) + '</strong> ' + escapeHtml(result.improvement) + '</p>'
+      : '';
+    const review = adaptiveRecall.error ? '<p class="course-adaptive-review">' + escapeHtml(adaptiveRecall.error) + '</p>' : '';
+    return '<aside class="course-adaptive-recall' + (adaptiveRecall.error ? ' is-fallback' : '') + (compact ? ' is-compact' : '') + '" data-adaptive-recall role="status"><p class="course-eyebrow">' + escapeHtml(courseUi('Adaptive recall', 'تطبیقی یادداشت')) + '</p><h3>' + escapeHtml(courseUi('Your thinking, made visible', 'آپ کی سوچ، نمایاں')) + '</h3><p>' + escapeHtml(result.feedback) + '</p>' + evidence + '<p><strong>' + escapeHtml(courseUi('One idea to add:', 'شامل کرنے کے لیے ایک خیال:')) + '</strong> ' + escapeHtml(result.missing_concept) + '</p>' + improvement + '<div class="course-adaptive-next"><span>' + escapeHtml(courseUi('Next prompt', 'اگلا سوال')) + '</span><p>' + escapeHtml(result.next_prompt) + '</p></div>' + review + '</aside>';
+  };
+
+  const clearAdaptiveRecall = () => {
+    adaptiveRecall.controller?.abort?.();
+    adaptiveRecall.loading = false;
+    adaptiveRecall.result = null;
+    adaptiveRecall.error = '';
+    adaptiveRecall.barrier = '';
+    adaptiveRecall.firstAttempt = '';
+    adaptiveRecall.revisionReviewed = false;
+    adaptiveRecall.controller = null;
+  };
+
+  const analyseAdaptiveRecall = async ({ barrier = '', response = '', previousResponse = '' } = {}) => {
+    const safeResponse = String(response || '').trim();
+    adaptiveRecall.barrier = barrier;
+    adaptiveRecall.loading = true;
+    adaptiveRecall.error = '';
+    const controller = new AbortController();
+    adaptiveRecall.controller?.abort?.();
+    adaptiveRecall.controller = controller;
+    render();
+    const fallback = adaptiveFallback(barrier);
+    try {
+      if (!signedInLearner()) throw new Error(courseUi('Sign in to use the adaptive check. Current-step support is still available.', 'تطبیقی جانچ کے لیے لاگ اِن کریں۔ موجودہ مرحلے کی مدد پھر بھی دستیاب ہے۔'));
+      const payload = await requestAdaptiveRecall({
+        user: authenticatedUser,
+        courseId: COURSE.id,
+        page: { moduleIndex: displayedModuleIndex(), phase: state.progress.phase },
+        language: courseUsesUrdu() ? 'ur' : 'en',
+        response: safeResponse,
+        previousResponse: String(previousResponse || '').trim(),
+        barrier,
+        signal: controller.signal
+      });
+      if (controller.signal.aborted) return;
+      adaptiveRecall.result = payload?.result || fallback;
+      adaptiveRecall.error = payload?.review ? courseUi('Result under review. You can continue with this current-step support.', 'نتیجہ زیرِ جائزہ ہے۔ آپ اس موجودہ مرحلے کی مدد کے ساتھ جاری رکھ سکتے ہیں۔') : '';
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      adaptiveRecall.result = fallback;
+      adaptiveRecall.error = error?.message || courseUi('Adaptive recall is unavailable right now. This current-step support is ready.', 'تطبیقی یادداشت ابھی دستیاب نہیں۔ موجودہ مرحلے کی مدد تیار ہے۔');
+    } finally {
+      if (adaptiveRecall.controller === controller) adaptiveRecall.controller = null;
+      adaptiveRecall.loading = false;
+      render();
+    }
+  };
+
   const typingTask = () => {
     const typing = currentStep().typing;
     const attempt = state.progress.attempt;
@@ -3220,7 +3312,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         : typing.level === 'Guided typing' && attempt.guidedIndex < typing.phrases.length - 1
           ? courseUi('Check this phrase', 'اس جملے کو جانچیں')
           : typing.level === 'Recall typing' ? courseUi('Review my explanation', 'میری وضاحت کا جائزہ لیں') : courseUi('Check my sentence', 'میرے جملے کو جانچیں');
-    return '<article class="course-task-card course-typing-task"><div class="course-typing-body"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(label) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(title) + '</h2><p>' + escapeHtml(prompt) + '</p></div>' + taskHeaderControls() + '</div><div class="typing-practice"><p class="typing-note">' + escapeHtml(note) + '</p>' + typingMomentumMarkup() + typingTarget() + '<label class="course-input-label" for="course-typing-input">' + responseLabel + '</label><textarea id="course-typing-input" data-typing-input rows="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="' + escapeHtml(typing.placeholder || 'Type the visible section here…') + '" aria-describedby="typing-help">' + escapeHtml(attempt.response) + '</textarea><p id="typing-help" class="course-input-help">' + inputHelp + '</p>' + integrity + feedback + '</div></div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="check-typing">' + nextAction + ' <span aria-hidden="true">→</span></button></div></article>';
+    const adaptive = typing.level === 'Recall typing' ? adaptiveResultMarkup() : '';
+    const recallAction = typing.level === 'Recall typing' && adaptiveRecall.result && !adaptiveRecall.revisionReviewed
+      ? courseUi('Review my updated explanation', 'میری بہتر وضاحت کا جائزہ لیں')
+      : nextAction;
+    return '<article class="course-task-card course-typing-task"><div class="course-typing-body"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(label) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(title) + '</h2><p>' + escapeHtml(prompt) + '</p></div>' + taskHeaderControls() + '</div><div class="typing-practice"><p class="typing-note">' + escapeHtml(note) + '</p>' + typingMomentumMarkup() + adaptive + typingTarget() + '<label class="course-input-label" for="course-typing-input">' + responseLabel + '</label><textarea id="course-typing-input" data-typing-input rows="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="' + escapeHtml(typing.placeholder || 'Type the visible section here…') + '" aria-describedby="typing-help">' + escapeHtml(attempt.response) + '</textarea><p id="typing-help" class="course-input-help">' + inputHelp + '</p>' + integrity + feedback + '</div></div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="check-typing"' + (adaptiveRecall.loading ? ' disabled' : '') + '>' + recallAction + ' <span aria-hidden="true">→</span></button></div></article>';
   };
 
   const checkTask = () => {
@@ -4899,6 +4995,36 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return '<div class="help-detail"><strong>' + escapeHtml(content[0]) + '</strong><p>' + escapeHtml(content[1]) + '</p>' + (option === 'break' ? '<button class="course-primary-button" type="button" data-action="save-exit">Save and exit</button>' : '') + '</div>';
   };
 
+  const stuckSupportChoices = () => {
+    const options = courseUsesUrdu()
+      ? [
+        ['instruction', 'میں ہدایت نہیں سمجھ رہا/رہی'],
+        ['too-large', 'یہ مرحلہ بہت بڑا لگ رہا ہے'],
+        ['difficult-words', 'الفاظ مشکل ہیں'],
+        ['starting', 'مجھے شروع کرنا نہیں آ رہا'],
+        ['too-much-on-screen', 'اسکرین پر بہت زیادہ ہے'],
+        ['worried-about-wrong', 'مجھے غلط ہونے کی فکر ہے']
+      ]
+      : [
+        ['instruction', 'I do not understand the instruction'],
+        ['too-large', 'The step feels too large'],
+        ['difficult-words', 'The words are difficult'],
+        ['starting', 'I do not know how to start'],
+        ['too-much-on-screen', 'There is too much on screen'],
+        ['worried-about-wrong', 'I am worried about getting it wrong']
+      ];
+    return '<div class="help-choice-grid course-barrier-choice-grid">' + options.map(([value, label]) => '<button type="button" data-action="adaptive-barrier" data-barrier="' + value + '"' + (adaptiveRecall.loading ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>').join('') + '</div>';
+  };
+
+  const stuckModalMarkup = () => {
+    const urdu = courseUsesUrdu();
+    const title = urdu ? 'مجھے مدد چاہیے' : 'I’m stuck';
+    const intro = urdu
+      ? 'ایک رکاوٹ منتخب کریں۔ مدد صرف اس موجودہ مرحلے کو آسان بنائے گی؛ آپ کا سبق تبدیل نہیں ہوگا۔'
+      : 'Choose what is getting in the way. Support will adapt only this current step; it will not change your lesson.';
+    return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal course-help-modal course-adaptive-help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title"' + (urdu ? ' lang="ur" dir="rtl"' : '') + '><button class="course-modal-close" type="button" data-action="close-modal" aria-label="' + escapeHtml(urdu ? 'مدد کا ڈائیلاگ بند کریں' : 'Close support dialog') + '">×</button><p class="course-eyebrow">' + escapeHtml(urdu ? 'موجودہ مرحلے کی مدد' : 'Current-step support') + '</p><h2 id="help-title" tabindex="-1">' + escapeHtml(title) + '</h2><p>' + escapeHtml(intro) + '</p>' + stuckSupportChoices() + adaptiveResultMarkup({ compact: true }) + '</section></div>';
+  };
+
   const explainStepDetails = () => {
     const step = currentStep();
     const phase = state.progress.phase;
@@ -4974,6 +5100,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       // course state or the bounded in-memory chat session.
       return '<div class="course-ai-page-backdrop" data-course-ai-page role="presentation"><section class="course-ai-page" role="dialog" aria-modal="true" aria-labelledby="course-ai-chat-title">' + courseAiChatMarkup('page') + '</section></div>';
     }
+    if (state.modal === 'help') return stuckModalMarkup();
     if (courseUsesUrdu()) {
       if (state.modal === 'pause') return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal" role="dialog" aria-modal="true" aria-labelledby="pause-title" lang="ur" dir="rtl"><button class="course-modal-close" type="button" data-action="close-modal" aria-label="وقفے کا ڈائیلاگ بند کریں">×</button><p class="course-eyebrow">وقفہ کریں اور محفوظ کریں</p><h2 id="pause-title" tabindex="-1">آپ کی پیش رفت محفوظ ہے۔</h2><p>جب آپ تیار ہوں واپس آ سکتے ہیں۔ آپ «' + escapeHtml(courseReturnLocation()) + '» پر واپس آئیں گے۔</p><div class="course-modal-actions"><button class="course-secondary-button" type="button" data-action="close-modal">سیکھتے رہیں</button><button class="course-primary-button" type="button" data-action="save-exit">محفوظ کریں اور باہر جائیں</button></div></section></div>';
       if (state.modal === 'explain') {
@@ -5083,7 +5210,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'Pause and save': 'وقفہ کریں اور محفوظ کریں',
     'Your progress is saved.': 'آپ کی پیش رفت محفوظ ہے۔',
     'Step support': 'مرحلے کی مدد',
-    'Call AI': 'AI کو بلائیں',
+    'I’m stuck': 'مجھے مدد چاہیے',
     'Support options': 'مدد کے اختیارات',
     'I’m stuck': 'میں رُک گیا/گئی ہوں',
     'Show an example': 'ایک مثال دکھائیں',
@@ -5546,6 +5673,26 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         render();
         return;
       }
+      if (!adaptiveRecall.firstAttempt) {
+        adaptiveRecall.firstAttempt = response;
+        adaptiveRecall.revisionReviewed = false;
+        void analyseAdaptiveRecall({ response });
+        return;
+      }
+      if (!adaptiveRecall.revisionReviewed) {
+        if (normaliseText(adaptiveRecall.firstAttempt) === response) {
+          state.progress.attempt.feedback = courseUi('Add or adjust one idea, then choose Review my updated explanation.', 'ایک خیال شامل یا تبدیل کریں، پھر اپنی بہتر وضاحت کا جائزہ لیں منتخب کریں۔');
+          save();
+          render();
+          return;
+        }
+        void analyseAdaptiveRecall({ response, previousResponse: adaptiveRecall.firstAttempt }).then(() => {
+          adaptiveRecall.revisionReviewed = true;
+          render();
+        });
+        return;
+      }
+      clearAdaptiveRecall();
       state.progress.phase = 'check';
       state.progress.attempt.feedback = '';
       recordSupportMoment('section-complete', { result: 'lesson-complete', phase: 'check' });
@@ -5737,7 +5884,17 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         if (aiChat.status === 'recording') stopAiDictation();
         else void startAiDictation();
         break;
-      case 'stuck': state.helpOption = ''; openCourseModal('help', element, '[data-action="stuck"]'); break;
+      case 'stuck':
+        state.helpOption = '';
+        clearAdaptiveRecall();
+        openCourseModal('help', element, '[data-action="stuck"]');
+        break;
+      case 'adaptive-barrier':
+        void analyseAdaptiveRecall({
+          barrier: String(element.dataset.barrier || ''),
+          response: typingIsConceptResponse() ? String(state.progress.attempt.response || '') : ''
+        });
+        break;
       case 'close-modal': state.modal === 'ai-chat' ? closeCourseAi() : closeCourseModal(); break;
       case 'save-exit':
         window.requestAnimationFrame(() => window.scrollTo?.({ left: 0, top: 0, behavior: 'auto' }));

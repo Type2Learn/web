@@ -522,3 +522,31 @@ body.locale-ur .codesign-route-art li i {
   }
   body.locale-ur .codesign-route-art ol { padding: 14px 18px; }
 }
+
+/* Consolidated public routes */
+body.locale-ur .method-link-list a::after { margin-right: 7px; margin-left: 0; content: "↙"; }
+body.locale-ur .product-view figcaption,
+body.locale-ur .evidence-steps li { grid-template-columns: 1fr 30px; }
+body.locale-ur .product-view figcaption > span,
+body.locale-ur .evidence-steps span { grid-column: 2; }
+body.locale-ur .product-view figcaption > div,
+body.locale-ur .evidence-steps li { text-align: right; }
+body.locale-ur .learning-action { border-right: 0; border-left: 1px solid var(--line); }
+body.locale-ur .learning-action:last-child { border-left: 0; }
+body.locale-ur .responsibility-table th,
+body.locale-ur .responsibility-table td { text-align: right; }
+body.locale-ur .participation-summary span { border-right: 0; border-left: 1px solid var(--line-strong); }
+body.locale-ur .participation-summary span:last-child { border-left: 0; }
+body.locale-ur .participation-card::before { right: 0; left: auto; }
+body.locale-ur .participation-format { flex-direction: row-reverse; justify-content: flex-end; }
+
+@media (max-width: 1100px) {
+  body.locale-ur .learning-action:nth-child(4) { border-left: 0; }
+}
+
+@media (max-width: 720px) {
+  body.locale-ur .learning-action:nth-child(even) { border-right: 0; border-left: 0; }
+  body.locale-ur .learning-action:nth-child(odd) { border-left: 1px solid var(--line); }
+  body.locale-ur .learning-action:nth-child(7) { border-left: 0; }
+  body.locale-ur .participation-summary span { border-left: 0; }
+}

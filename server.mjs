@@ -3,19 +3,53 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAiService } from './server/ai-service.mjs';
+import { createAdaptiveRecallService } from './server/adaptive-recall-service.mjs';
 import { loadRuntimeConfig } from './server/config.mjs';
 import { publicError, apiError } from './server/errors.mjs';
 import { createFirebaseRuntime } from './server/firebase-runtime.mjs';
 import { createSpeechService } from './server/speech-service.mjs';
 import { createUsageLedger } from './server/usage-ledger.mjs';
 import { createCourseProgressService } from './server/course-progress-service.mjs';
+import { createModelProvider } from './server/model-provider.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
   ['/research', '/how-it-works/#evidence'],
-  ['/accessibility', '/trust/#accessibility'],
-  ['/security', '/trust/#security'],
-  ['/support', '/community/#support']
+  ['/research/', '/how-it-works/#evidence'],
+  ['/pathways', '/how-it-works/#pathways'],
+  ['/pathways/', '/how-it-works/#pathways'],
+  ['/learners', '/learning-together/#learner'],
+  ['/learners/', '/learning-together/#learner'],
+  ['/families', '/learning-together/#family'],
+  ['/families/', '/learning-together/#family'],
+  ['/schools', '/learning-together/#educators'],
+  ['/schools/', '/learning-together/#educators'],
+  ['/co-design', '/participation-trust/#participation-record'],
+  ['/co-design/', '/participation-trust/#participation-record'],
+  ['/community', '/participation-trust/#video-conversations'],
+  ['/community/', '/participation-trust/#video-conversations'],
+  ['/trust', '/participation-trust/#accessibility'],
+  ['/trust/', '/participation-trust/#accessibility'],
+  ['/accessibility', '/participation-trust/#accessibility'],
+  ['/accessibility/', '/participation-trust/#accessibility'],
+  ['/security', '/participation-trust/#security'],
+  ['/security/', '/participation-trust/#security'],
+  ['/support', '/participation-trust/#support'],
+  ['/support/', '/participation-trust/#support'],
+  ['/ur/pathways', '/ur/how-it-works/#pathways'],
+  ['/ur/pathways/', '/ur/how-it-works/#pathways'],
+  ['/ur/learners', '/ur/learning-together/#learner'],
+  ['/ur/learners/', '/ur/learning-together/#learner'],
+  ['/ur/families', '/ur/learning-together/#family'],
+  ['/ur/families/', '/ur/learning-together/#family'],
+  ['/ur/schools', '/ur/learning-together/#educators'],
+  ['/ur/schools/', '/ur/learning-together/#educators'],
+  ['/ur/co-design', '/ur/participation-trust/#participation-record'],
+  ['/ur/co-design/', '/ur/participation-trust/#participation-record'],
+  ['/ur/community', '/ur/participation-trust/#video-conversations'],
+  ['/ur/community/', '/ur/participation-trust/#video-conversations'],
+  ['/ur/trust', '/ur/participation-trust/#accessibility'],
+  ['/ur/trust/', '/ur/participation-trust/#accessibility']
 ]);
 const blockedTopLevel = new Set(['.git', '.githooks', 'cloudflare', 'node_modules', 'scripts', 'security', 'server', 'tests']);
 const blockedFiles = new Set(['.gitignore', 'package.json', 'package-lock.json', 'render.yaml', 'server.mjs']);
@@ -161,22 +195,27 @@ const buildRuntime = async () => {
   const config = await loadRuntimeConfig();
   const firebase = createFirebaseRuntime(config);
   const ledger = firebase.available ? createUsageLedger(firebase.firestore) : null;
+  const modelProvider = createModelProvider(config);
   return {
     config,
+    modelProvider,
     ai: createAiService({ config, firebase, ledger }),
+    adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider }),
     speech: createSpeechService({ config, firebase, ledger }),
     courseProgress: createCourseProgressService({ firebase })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, speech, courseProgress } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
   if (request.method === 'GET' && pathname === '/api/v1/health') {
     return sendJson(response, 200, {
       ai: ai.status(),
+      adaptiveRecall: adaptiveRecall.status(),
+      modelRouting: modelProvider.status(),
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
       model: config.openAiModel
@@ -185,6 +224,9 @@ const handleApi = async (request, response, pathname, runtime) => {
   try {
     if (request.method === 'POST' && pathname === '/api/v1/ai/chat') {
       return sendJson(response, 200, await ai.chat({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/adaptive-recall') {
+      return sendJson(response, 200, await adaptiveRecall.analyse({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/speech/transcribe') {
       return sendJson(response, 200, await speech.transcribe({ authorization: request.headers.authorization, form: await readForm(request) }));
@@ -220,8 +262,9 @@ export const startServer = async () => {
     const pathname = url.pathname;
     try {
       if (pathname.startsWith('/api/')) return await handleApi(request, response, pathname, runtime);
-      const redirect = redirects.get(pathname);
-      if (redirect) return send(response, 302, '', { ...securityHeaders(pathname), Location: redirect });
+      const redirectPath = pathname.replace(/\/index\.html$/, '/');
+      const redirect = redirects.get(pathname) || redirects.get(redirectPath);
+      if (redirect) return send(response, 301, '', { ...securityHeaders(pathname), Location: redirect });
       if (!['GET', 'HEAD'].includes(request.method || 'GET')) return send(response, 405, 'Method not allowed', { ...securityHeaders(pathname), Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8' });
       return await serveStatic(request, response, pathname);
     } catch {

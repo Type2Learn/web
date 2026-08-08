@@ -6,14 +6,9 @@
   const routePairs = new Map([
     ["/", "/ur/"],
     ["/how-it-works/", "/ur/how-it-works/"],
-    ["/pathways/", "/ur/pathways/"],
-    ["/learners/", "/ur/learners/"],
-    ["/families/", "/ur/families/"],
-    ["/schools/", "/ur/schools/"],
-    ["/team/", "/ur/team/"],
-    ["/co-design/", "/ur/co-design/"],
-    ["/community/", "/ur/community/"],
-    ["/trust/", "/ur/trust/"]
+    ["/learning-together/", "/ur/learning-together/"],
+    ["/participation-trust/", "/ur/participation-trust/"],
+    ["/team/", "/ur/team/"]
   ]);
   const urduToEnglish = new Map([...routePairs].map(([english, urdu]) => [urdu, english]));
   const normalizedPath = url.pathname === "/index.html"

@@ -6,7 +6,8 @@ import test from 'node:test';
 import { COURSE_CONTENT } from '../../course/course-content.js';
 import { APPROVED_OPENAI_MODEL, RESERVED_TEST_GENERATION_MODEL, loadRuntimeConfig, parseEnvText } from '../../server/config.mjs';
 import { createAiService } from '../../server/ai-service.mjs';
-import { coursePageContext, normaliseConversation, normaliseLearnerMessage } from '../../server/course-context.mjs';
+import { createAdaptiveRecallService } from '../../server/adaptive-recall-service.mjs';
+import { adaptiveRecallContext, coursePageContext, normaliseConversation, normaliseLearnerMessage } from '../../server/course-context.mjs';
 import { usageEstimate } from '../../server/usage-ledger.mjs';
 
 test('environment parser keeps comments out and reads quoted local values', () => {
@@ -67,6 +68,18 @@ test('zero-valued AI allowance variables fall back to the bounded working defaul
   assert.equal(config.openAiAppOutputTokenCap, 5600000);
   assert.equal(config.openAiUserInputTokenCap, 1000000);
   assert.equal(config.openAiUserOutputTokenCap, 500000);
+});
+
+test('Gemini aliases and numbered keys are all retained for server-side rotation', async () => {
+  const config = await loadRuntimeConfig({
+    environment: {
+      NODE_ENV: 'production',
+      gemchat: 'test-gemini-key-one',
+      gemtext: 'test-gemini-key-two',
+      GEMINI_API_KEY_1: 'test-gemini-key-three'
+    }
+  });
+  assert.deepEqual(config.geminiApiKeys, ['test-gemini-key-one', 'test-gemini-key-two', 'test-gemini-key-three']);
 });
 
 test('development aliases accept a constrained Azure Responses endpoint without changing the approved model', async () => {
@@ -192,6 +205,68 @@ test('learner chat input and history stay bounded', () => {
   const history = normaliseConversation(Array.from({ length: 9 }, (_, index) => ({ role: index % 2 ? 'assistant' : 'user', content: long })));
   assert.equal(history.length, 6);
   assert.ok(history.every((entry) => entry.content.length === 650));
+});
+
+test('adaptive recall keeps evidence scoped to the current module and returns structured feedback', async () => {
+  const settled = [];
+  const service = createAdaptiveRecallService({
+    config: {
+      openAiInputUsdPerMillion: .05,
+      openAiOutputUsdPerMillion: .4,
+      openAiAppCapUsd: 14,
+      openAiAppInputTokenCap: 11200000,
+      openAiAppOutputTokenCap: 5600000,
+      openAiUserCapUsd: 2,
+      openAiUserInputTokenCap: 1000000,
+      openAiUserOutputTokenCap: 500000,
+      openAiRequestsPerMinute: 12
+    },
+    firebase: { available: true, verifyBearer: async () => ({ uid: 'adaptive-learner' }) },
+    ledger: {
+      reserve: async () => ({ month: '2026-08', reservationId: 'adaptive-test' }),
+      settle: async (details) => settled.push(details),
+      release: async () => assert.fail('successful adaptive response must not release its reservation')
+    },
+    provider: {
+      status: () => ({ available: true }),
+      generate: async () => ({
+        text: JSON.stringify({
+          evidence_found: ['mentions attention'],
+          missing_concept: 'planning can also be affected',
+          support_mode: 'hint',
+          feedback: 'You connected ADHD with attention. Add one idea about planning next.',
+          next_prompt: 'How could planning affect the first step of a task?',
+          improvement: ''
+        }),
+        usage: { inputTokens: 40, outputTokens: 32 }
+      })
+    }
+  });
+  const response = await service.analyse({
+    authorization: 'Bearer test-token',
+    body: {
+      courseId: COURSE_CONTENT.id,
+      page: { moduleIndex: 0, phase: 'type' },
+      language: 'en',
+      response: 'It can affect attention.'
+    }
+  });
+  assert.equal(response.source, 'adaptive-recall');
+  assert.equal(response.result.support_mode, 'hint');
+  assert.deepEqual(response.result.evidence_found, ['mentions attention']);
+  assert.equal(settled.length, 1);
+});
+
+test('adaptive recall context has no assessment answers or exact typing target', () => {
+  const context = adaptiveRecallContext({
+    courseId: COURSE_CONTENT.id,
+    page: { moduleIndex: 0, phase: 'type' },
+    language: 'en',
+    response: 'A learner response'
+  });
+  const supplied = context.outline.join(' ');
+  assert.equal(supplied.includes(COURSE_CONTENT.steps[0].typing.target), false);
+  assert.equal(supplied.includes(String(COURSE_CONTENT.steps[0].check.options[0][0])), false);
 });
 
 test('usage estimate uses the documented Nano price configuration and keeps Mini reserved', () => {
