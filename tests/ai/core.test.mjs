@@ -76,10 +76,12 @@ test('Gemini aliases and numbered keys are all retained for server-side rotation
       NODE_ENV: 'production',
       gemchat: 'test-gemini-key-one',
       gemtext: 'test-gemini-key-two',
-      GEMINI_API_KEY_1: 'test-gemini-key-three'
+      gemchat1: 'test-gemini-key-three',
+      gemtest1: 'test-gemini-key-four',
+      GEMINI_API_KEY_1: 'test-gemini-key-five'
     }
   });
-  assert.deepEqual(config.geminiApiKeys, ['test-gemini-key-one', 'test-gemini-key-two', 'test-gemini-key-three']);
+  assert.deepEqual(config.geminiApiKeys, ['test-gemini-key-one', 'test-gemini-key-two', 'test-gemini-key-three', 'test-gemini-key-four', 'test-gemini-key-five']);
 });
 
 test('development aliases accept a constrained Azure Responses endpoint without changing the approved model', async () => {

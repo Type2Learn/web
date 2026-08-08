@@ -112,7 +112,9 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     return '';
   };
   // Unlike ordinary single-value settings, every supplied Gemini key is
-  // meaningful: preserve all aliases so gemchat, gemtext, and numbered keys
+  // meaningful: preserve all aliases so gemchat, gemtext, gemtest, and their
+  // numbered variants participate in round-robin rotation instead of silently
+  // taking the first populated name.
   // participate in round-robin rotation instead of silently taking the first.
   const values = (...keys) => keys.flatMap((key) => [environment[key], local[key]])
     .filter((configured) => configured !== undefined && String(configured).trim())
@@ -129,6 +131,7 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
   const geminiApiKeys = Array.from(new Set([
     ...values('GEMINI_API_KEYS', 'GEMINI_API_KEY').flatMap(splitKeys),
     ...values('gemchat', 'gemtext', 'gemtest').flatMap(splitKeys),
+    ...Array.from({ length: 12 }, (_, index) => values(`gemchat${index + 1}`, `gemtext${index + 1}`, `gemtest${index + 1}`)).flatMap(splitKeys),
     ...Array.from({ length: 12 }, (_, index) => values(`GEMINI_API_KEY_${index + 1}`, `GEMINI_KEY_${index + 1}`)).flatMap(splitKeys)
   ]));
 

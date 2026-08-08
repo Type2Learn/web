@@ -64,7 +64,7 @@ export const createModelProvider = (config) => {
       const key = keys[index];
       if (Number(cooldowns.get(key) || 0) <= Date.now()) {
         nextKey = (index + 1) % keys.length;
-        return key;
+        return { key, index };
       }
     }
     return '';
@@ -73,8 +73,9 @@ export const createModelProvider = (config) => {
   const callGemini = async ({ instructions, input, maxOutputTokens, jsonSchema, heavy = false }) => {
     let lastError = null;
     for (let attempt = 0; attempt < keys.length; attempt += 1) {
-      const key = nextAvailableKey();
-      if (!key) break;
+      const keySlot = nextAvailableKey();
+      if (!keySlot) break;
+      const { key, index: keyIndex } = keySlot;
       const model = heavy ? config.geminiHeavyModel : config.geminiFastModel;
       try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
@@ -110,6 +111,10 @@ export const createModelProvider = (config) => {
           text,
           provider: 'gemini',
           model,
+          // This is deliberately server-only diagnostic metadata. It is not
+          // forwarded by any public API response, but lets deployment checks
+          // prove that a pool actually rotates without printing key material.
+          keySlot: keyIndex + 1,
           usage: {
             inputTokens: number(payload?.usageMetadata?.promptTokenCount, Math.ceil((instructions.length + input.length) / 3)),
             outputTokens: number(payload?.usageMetadata?.candidatesTokenCount, Math.ceil(text.length / 3))
