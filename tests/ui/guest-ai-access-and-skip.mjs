@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from '@playwright/test';
+import { chromium, firefox } from '@playwright/test';
 
 const baseUrl = process.env.TYPE2LEARN_TEST_URL || 'http://127.0.0.1:4173';
 const courseId = 'course-1-neurodivergent-conditions-v2';
@@ -22,7 +22,14 @@ const choices = (layout) => ({
 });
 
 await mkdir(screenshotDirectory, { recursive: true });
-const browser = await chromium.launch({ headless: true });
+// CI normally uses Playwright's managed browser. A locally supplied path lets
+// the same smoke test run on a workstation whose bundled browser revision is
+// already installed, without changing what production code loads.
+const browserEngine = process.env.TYPE2LEARN_PLAYWRIGHT_BROWSER === 'firefox' ? firefox : chromium;
+const browser = await browserEngine.launch({
+  headless: true,
+  ...(process.env.TYPE2LEARN_PLAYWRIGHT_EXECUTABLE ? { executablePath: process.env.TYPE2LEARN_PLAYWRIGHT_EXECUTABLE } : {})
+});
 try {
   for (const view of [
     { name: 'desktop-open', width: 1366, height: 820, layout: 'open' },

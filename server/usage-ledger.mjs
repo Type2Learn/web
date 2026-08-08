@@ -198,10 +198,37 @@ export const createUsageLedger = (firestore) => {
   return { reserve, settle, release };
 };
 
-export const usageEstimate = (inputTokens = 0, outputTokens = 0, config) => (
-  (nonNegative(inputTokens) / 1000000) * config.openAiInputUsdPerMillion
-  + (nonNegative(outputTokens) / 1000000) * config.openAiOutputUsdPerMillion
-);
+const pricedUsage = ({ inputTokens = 0, cachedInputTokens = 0, outputTokens = 0, inputRate = 0, cachedInputRate = inputRate, outputRate = 0 }) => {
+  const cached = Math.min(nonNegative(cachedInputTokens), nonNegative(inputTokens));
+  const uncached = Math.max(0, nonNegative(inputTokens) - cached);
+  return (uncached / 1000000) * nonNegative(inputRate)
+    + (cached / 1000000) * nonNegative(cachedInputRate)
+    + (nonNegative(outputTokens) / 1000000) * nonNegative(outputRate);
+};
+
+// Regular Course AI uses Nano. Cached input is billed at the supplied Nano
+// cached-input price when the provider reports it; otherwise the estimate is
+// deliberately conservative and treats input as uncached.
+export const usageEstimate = (inputTokens = 0, outputTokens = 0, config, cachedInputTokens = 0) => pricedUsage({
+  inputTokens,
+  cachedInputTokens,
+  outputTokens,
+  inputRate: config.openAiInputUsdPerMillion,
+  cachedInputRate: config.openAiCachedInputUsdPerMillion ?? config.openAiInputUsdPerMillion,
+  outputRate: config.openAiOutputUsdPerMillion
+});
+
+// Mini is allowed only for assessment-bank generation. Assessment reservations
+// use their own fixed ledger bucket, whose cap is part of the USD 25 product
+// budget; it cannot become a chat fallback.
+export const assessmentUsageEstimate = (inputTokens = 0, outputTokens = 0, config, cachedInputTokens = 0) => pricedUsage({
+  inputTokens,
+  cachedInputTokens,
+  outputTokens,
+  inputRate: config.openAiTestInputUsdPerMillion,
+  cachedInputRate: config.openAiTestCachedInputUsdPerMillion,
+  outputRate: config.openAiTestOutputUsdPerMillion
+});
 
 export const openAiUsageCaps = (config) => ({
   account: {
@@ -212,6 +239,32 @@ export const openAiUsageCaps = (config) => ({
   },
   user: {
     usd: config.openAiUserCapUsd,
+    inputTokens: config.openAiUserInputTokenCap,
+    outputTokens: config.openAiUserOutputTokenCap,
+    credits: Infinity
+  }
+});
+
+const tokenCaps = (config) => ({
+  inputTokens: config.openAiAppInputTokenCap,
+  outputTokens: config.openAiAppOutputTokenCap,
+  credits: Infinity
+});
+
+export const adaptiveUsageCaps = (config) => ({
+  account: { usd: config.adaptiveAppCapUsd, ...tokenCaps(config) },
+  user: {
+    usd: config.adaptiveUserCapUsd,
+    inputTokens: config.openAiUserInputTokenCap,
+    outputTokens: config.openAiUserOutputTokenCap,
+    credits: Infinity
+  }
+});
+
+export const assessmentUsageCaps = (config) => ({
+  account: { usd: config.assessmentAppCapUsd, ...tokenCaps(config) },
+  user: {
+    usd: config.assessmentUserCapUsd,
     inputTokens: config.openAiUserInputTokenCap,
     outputTokens: config.openAiUserOutputTokenCap,
     credits: Infinity

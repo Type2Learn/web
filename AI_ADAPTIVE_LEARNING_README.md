@@ -67,8 +67,10 @@ The current repository already has the pieces this work should extend:
   Firestore under a SHA-256 hash of the Firebase UID. Guest progress is local.
 - "server/usage-ledger.mjs" already handles account/per-user reservations,
   rate limits, expiry and settlement in Firestore.
-- "server/config.mjs" pins regular Course AI to "gpt-5-nano" and explicitly
-  reserves "gpt-5.1-codex-mini" for future test generation only.
+- "server/config.mjs" pins the Gemini-first route to "gemini-3.5-flash-lite"
+  for frequent text support and "gemini-3.6-flash" for rare heavy work. It
+  keeps "gpt-5-nano" and "gpt-5.1-codex-mini" as the corresponding OpenAI
+  fallbacks only.
 - "course/narration.js", the course audio manifest, voice library and
   Speechmatics path are the existing read-aloud/speech foundations.
 
@@ -268,7 +270,7 @@ setting. It never shows a score or diagnosis.
 ### 6.4 Better encouragements
 
 Current authored encouragements remain the guaranteed fallback. Near a module
-end, Nano may produce a brief personalised message from:
+end, the low-cost text route may produce a brief personalised message from:
 
 - module title;
 - completed task types;
@@ -349,44 +351,45 @@ the current task and returns to saved choices.
 
 ## 8. Model routing and budget
 
-The existing routing policy stays intact:
+The provider policy is Gemini-first with a controlled OpenAI fallback:
 
 | Job | Model | Boundary |
 | --- | --- | --- |
-| Existing Course AI chat | gpt-5-nano | Current page only, concise, signed-in, no automatic fallback |
-| Summary wording, proposal ranking, re-entry copy, encouragement, response classification | gpt-5-nano | Strict structured schema and low output cap |
-| New module/final assessment bank generation | gpt-5.1-codex-mini | Higher-complexity server-side generation only; never chat fallback |
+| Existing Course AI chat | Gemini 3.5 Flash-Lite | Current page only, concise, signed-in; rotate eligible Gemini chat keys before the OpenAI Nano fallback |
+| Summary wording, proposal ranking, re-entry copy, encouragement, response classification | Gemini 3.5 Flash-Lite | Strict structured schema and low output cap; gpt-5-nano only after every eligible Gemini key fails/is cooling down |
+| New module/final assessment bank generation and rare heavy reasoning | Gemini 3.6 Flash | At most once per hour per curriculum/bank work item; rotate Gemini heavy keys before the OpenAI Mini fallback |
 | Image generation | Disabled pending approval | Separate provider/model/moderation/object-store/shared-cost design |
 
-Use the Responses API, "store: false", strict Structured Outputs, bounded
-inputs, per-purpose timeouts and server validation. The browser receives only
-validated UI data, never a model instruction/command.
+Use the provider-specific API, structured JSON when required, bounded inputs,
+per-purpose timeouts and server validation. Gemini requests omit deprecated
+sampling controls. The browser receives only validated UI data, never a model
+instruction/command, provider key, or upstream error body.
 
-Official OpenAI references used for this routing:
-
-- [Responses API guide](https://developers.openai.com/api/docs/guides/migrate-to-responses)
-- [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs)
-- [Model catalogue](https://developers.openai.com/api/docs/models)
+Gemini key rotation is server-only. Deployment may use comma-separated
+`GEMINI_CHAT_API_KEYS` / `GEMINI_TEST_API_KEYS` or numbered key variables.
+Each request begins at the next healthy key. Auth, model, quota and temporary
+upstream failures cool that key down before the next rotation; only after the
+Gemini pool cannot answer may the matching OpenAI fallback be used.
 
 ### 8.1 Shared budget
 
-Product direction sets USD 15/month total and USD 2/month per user. This must
-be a single shared account ceiling across every AI kind, not separate limits
-that add up above USD 15.
+Product direction sets USD 25/month total. The USD 2/month per-user allowance
+belongs specifically to live Course AI chat; adaptive support and assessments
+have their own smaller per-user limits.
 
 | Reserve | Monthly application cap | Use |
 | --- | ---: | --- |
-| Live Nano support | USD 10 | chat, summaries, proposals, encouragements, response classification |
-| Mini assessment banks | USD 3 | cache by curriculum version/language, never per chat |
-| Safety/retry reserve | USD 2 | controlled retry/failure margin |
-| Total | **USD 15** | hard shared account cap |
+| Live text Course AI chat | USD 10 | Gemini-first; OpenAI Nano fallback only; USD 2/user cap |
+| Adaptive support | USD 7 | Gemini-first; OpenAI Nano fallback only; summaries, proposals, encouragements; USD 2/user cap |
+| Assessment banks | USD 8 | Gemini 3.6 Flash first; OpenAI Mini fallback only; cache by curriculum version/language; USD 4/user cap |
+| Total | **USD 25** | fixed application cap |
 
 Image generation cannot begin without explicitly reallocating this table or
 raising the product budget. Every call reserves maximum cost before provider
 access and settles actual use afterward. Existing per-user/per-minute limits
 apply to every added purpose.
 
-Mini generation must deduplicate by course, module, language, curriculum
+Heavy generation must deduplicate by course, module, language, curriculum
 version and bank version. Repeated learners receive a different validated item
 from a bank, not a new Mini call.
 
@@ -433,6 +436,17 @@ unsupported language, excessive output, answer leakage, unsafe language, or
 weak/no deterministic evidence. Use authored fallback.
 
 ## 9. AI assessment design
+
+### 9.0 Delivery resilience
+
+Assessment delivery is not dependent on a live model. The implementation ships
+an authored reserve of 32 questions per module (16 open-response prompts and
+16 MCQs, 352 module-bank prompts in total), selecting a small varied subset
+for each learner run. It also ships a 21-question final reserve (9 open
+responses and 12 MCQs): 373 authored assessment prompts in total. If a reviewed AI bank is unavailable, the learner is
+served from this reserve without any wait. If open-response evaluation cannot
+reach the model, the learner sees **“Result under review”** and can continue;
+no answer text is retained in the progress save.
 
 ### 9.1 Test mode differs from learning typing
 
@@ -528,7 +542,8 @@ separate evaluation evidence and explicit owner approval.
 | Module | Responsibility |
 | --- | --- |
 | "server/learning-analytics-service.mjs" | authenticate, validate, aggregate/store minimal summaries |
-| "server/adaptive-support-service.mjs" | deterministic policy, Nano proposal/encouragement, schema validation, cooldown/consent |
+| "server/model-provider.mjs" | Gemini-first model route, round-robin key health/cooldowns and narrow OpenAI fallback |
+| "server/adaptive-support-service.mjs" | deterministic policy, low-cost proposal/encouragement, schema validation, cooldown/consent |
 | "server/assessment-service.mjs" | bank lifecycle, item selection, response evaluation, retry/final state |
 | "server/assessment-schemas.mjs" | strict schemas, enums, objective validation |
 | "server/visual-explanation-service.mjs" | visual intent, moderation, cache/storage metadata; disabled until visual release |
@@ -545,6 +560,8 @@ POST /api/v1/adaptive/proposal/:id/decision
 POST /api/v1/assessment/start
 POST /api/v1/assessment/:runId/answer
 GET  /api/v1/assessment/:runId
+POST /api/v1/assessment/banks/draft
+POST /api/v1/assessment/banks/publish
 POST /api/v1/visual-explanations/offer
 POST /api/v1/privacy/adaptive-data-export
 DELETE /api/v1/privacy/adaptive-data
@@ -593,10 +610,16 @@ ADAPTIVE_LEARNING_ENABLED=false
 AI_ASSESSMENTS_ENABLED=false
 AI_VISUALS_ENABLED=false
 OPENAI_TEST_GENERATION_MODEL=gpt-5.1-codex-mini
-OPENAI_TOTAL_MONTHLY_APP_USD_CAP=15
-OPENAI_TOTAL_MONTHLY_USER_USD_CAP=2
-OPENAI_ASSESSMENT_MONTHLY_APP_USD_CAP=3
-OPENAI_ASSESSMENT_REQUESTS_PER_MINUTE=2
+OPENAI_MONTHLY_APP_USD_CAP=10
+OPENAI_MONTHLY_USER_USD_CAP=2
+ADAPTIVE_MONTHLY_APP_USD_CAP=7
+ADAPTIVE_MONTHLY_USER_USD_CAP=2
+OPENAI_ASSESSMENT_MONTHLY_APP_USD_CAP=8
+OPENAI_ASSESSMENT_MONTHLY_USER_USD_CAP=4
+ASSESSMENT_REQUESTS_PER_MINUTE=2
+GEMINI_CHAT_API_KEYS=<comma-separated server-only chat keys>
+GEMINI_TEST_API_KEYS=<comma-separated server-only heavy keys>
+ASSESSMENT_REVIEWER_UIDS=<comma-separated Firebase reviewer UIDs>
 LEARNING_ANALYTICS_RETENTION_DAYS=<approved value>
 FIREBASE_STORAGE_BUCKET=<approved bucket when visuals ship>
 ~~~
@@ -712,7 +735,7 @@ curriculum review; never a model self-review alone.
 
 1. Add Firestore summary service/consent-gated API.
 2. Add deterministic candidate policy and server validation.
-3. Add Nano structured proposals/encouragement.
+3. Add Gemini-first structured proposals/encouragement with the guarded OpenAI fallback.
 4. Add Yes/No proposal card and audit trail.
 5. Run signed-in, offline and failure screenshot QA.
 
@@ -727,10 +750,19 @@ curriculum review; never a model self-review alone.
 ### Phase E — AI assessments
 
 1. Build assessment state/UI independently from guided typing.
-2. Build Mini bank generation, validators and human-approval workflow.
-3. Add Nano/deterministic selection and scoped response evaluation.
+2. Build hourly Gemini-heavy bank generation, validators and human-approval workflow, with OpenAI Mini only as fallback.
+3. Add Gemini-lite/deterministic selection and scoped response evaluation.
 4. Add bounded review/retry/final flow.
 5. Validate no-score/no-answer-leakage guarantees.
+
+Current implementation note: the bank validator, reviewer-only draft/publish
+workflow, one-question run API and transient open-response evaluator are
+implemented behind `AI_ASSESSMENTS_ENABLED=false`. A generated bank remains
+`pending-human-review` until an explicitly configured reviewer publishes it.
+The learner endpoint never returns an answer guide, rubric, correct option,
+numeric score or stored raw response. The separate learner-facing assessment
+renderer should be enabled only after a reviewer publishes a bank and the
+passing/retry policy below is approved.
 
 ### Phase F — controlled rollout
 
@@ -763,25 +795,7 @@ These choices materially change the system and cannot be guessed safely:
 8. **Passing policy:** objective thresholds and final completion wording. The
    model must not invent thresholds.
 
-## 16. Research/design references
-
-The request named “Stanford NNEA.” I could not identify a source with that
-exact name in available results, so Type2Learn must not attribute these
-recommendations to a specific NNEA publication without a verified source.
-
-The requested directions broadly align with Stanford public student-support
-resources about task initiation, dyslexia reading strategies, visual learning,
-text-to-speech and adjustable reading presentation. They are design
-inspirations, not clinical validation of this product:
-
-- [Stanford Center for Teaching and Learning: Getting Started on Tasks](https://ctl.stanford.edu/students/getting-started-tasks)
-- [Stanford Student Learning Programs: Strategies for Managing Dyslexia](https://studentlearning.stanford.edu/strategies-managing-dyslexia)
-- [Stanford Center for Teaching and Learning: Navigating Stanford as a Neurodiverse Student](https://ctl.stanford.edu/navigating-stanford-neurodiverse-student)
-
-Before public evidence-based claims, Type2Learn needs independent curriculum
-review, accessibility review, appropriate study/evaluation and approved wording.
-
-## 17. Definition of done
+## 16. Definition of done
 
 This initiative is ready only when:
 

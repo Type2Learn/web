@@ -5897,3 +5897,78 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
   .course-support-popup::before,
   .course-task-card::after { display: none !important; }
 }
+
+/* Optional adaptive support stays in the document flow. It must never cover a
+   heading, task controls, a typing field, mascot dialogue, or a visual rail. */
+.course-adaptive-proposal,
+.course-task-initiation {
+  margin: 1.25rem 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--course-accent, #0aaf70) 52%, #b9d7cd);
+  border-left: .32rem solid var(--course-accent, #0aaf70);
+  border-radius: .85rem;
+  background: color-mix(in srgb, var(--course-panel, #fff) 90%, #e9fff4);
+  box-shadow: 0 .45rem 1.4rem rgba(15, 52, 82, .08);
+}
+
+.course-adaptive-proposal h3,
+.course-task-initiation strong { display: block; margin: 0 0 .35rem; color: var(--course-heading, #11294a); }
+.course-adaptive-proposal p,
+.course-task-initiation p { margin: .35rem 0 .85rem; max-width: 62ch; }
+.course-adaptive-proposal-actions,
+.course-task-initiation > div { display: flex; flex-wrap: wrap; gap: .65rem; align-items: center; }
+.course-adaptive-proposal details { margin-top: .75rem; }
+.course-adaptive-proposal summary { color: var(--course-link, #0b68d5); cursor: pointer; font-weight: 700; }
+.course-task-initiation { border-left-color: #2c8cdb; background: color-mix(in srgb, var(--course-panel, #fff) 88%, #e7f6ff); }
+
+html[data-website-scheme="playful"] .course-adaptive-proposal,
+html[data-website-scheme="playful"] .course-task-initiation {
+  border-width: 2px;
+  border-left-width: .42rem;
+  background: linear-gradient(135deg, #fffdf2, #ecfbff 55%, #effff3);
+  box-shadow: .24rem .28rem 0 color-mix(in srgb, #216caa 25%, transparent);
+}
+
+@media (max-width: 640px) {
+  .course-adaptive-proposal,
+  .course-task-initiation { padding: .9rem; }
+  .course-adaptive-proposal-actions,
+  .course-task-initiation > div { align-items: stretch; }
+  .course-adaptive-proposal-actions .course-primary-button,
+  .course-adaptive-proposal-actions .course-secondary-button,
+  .course-task-initiation .course-primary-button,
+  .course-task-initiation .course-secondary-button { width: 100%; justify-content: center; }
+}
+
+.course-visual-explanation {
+  margin: 1.25rem 0;
+  padding: clamp(1rem, 2vw, 1.4rem);
+  border: 2px solid color-mix(in srgb, var(--course-blue, #1369c7) 55%, #c9ddf3);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--course-panel, #fff) 93%, #eaf7ff);
+}
+.course-visual-explanation > header { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
+.course-visual-explanation h3 { margin: .1rem 0 .3rem; color: var(--course-heading, #11294a); }
+.course-visual-explanation header p { margin: 0; max-width: 54ch; }
+.course-visual-map { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; position: relative; }
+.course-visual-map::before { content: ''; position: absolute; inset: 25% 23%; border: 2px dashed color-mix(in srgb, var(--course-blue, #1369c7) 35%, transparent); border-radius: 50%; pointer-events: none; }
+.course-visual-node { position: relative; z-index: 1; min-height: 8.3rem; padding: .85rem; border: 1px solid #b5d3ee; border-radius: .8rem; background: #fff; }
+.course-visual-node span { color: #0b6a42; font-size: .72rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.course-visual-node p { margin: .45rem 0 0; line-height: 1.55; }
+.course-visual-node--2 { background: #f3fbff; }
+.course-visual-node--3 { background: #f4fff9; }
+.course-visual-node--4 { background: #fff9e9; }
+.course-visual-text-equivalent { margin-top: .85rem; }
+.course-visual-text-equivalent summary { color: var(--course-link, #0b68d5); cursor: pointer; font-weight: 700; }
+
+html[data-website-scheme="playful"] .course-visual-explanation { border-width: 3px; background: linear-gradient(130deg, #fefdf1, #e9faff 48%, #f0fff3); box-shadow: .32rem .32rem 0 #9dddf4; }
+html[data-website-scheme="playful"] .course-visual-node { border-width: 2px; box-shadow: .15rem .15rem 0 color-mix(in srgb, #2467a2 24%, transparent); }
+html[dir="rtl"] .course-visual-explanation { text-align: right; }
+
+@media (max-width: 700px) {
+  .course-visual-explanation > header { display: grid; }
+  .course-visual-explanation > header .course-secondary-button { width: 100%; }
+  .course-visual-map { grid-template-columns: 1fr; }
+  .course-visual-map::before { inset: 20% 45%; }
+  .course-visual-node { min-height: 0; }
+}
