@@ -9,13 +9,49 @@ import { createFirebaseRuntime } from './server/firebase-runtime.mjs';
 import { createSpeechService } from './server/speech-service.mjs';
 import { createUsageLedger } from './server/usage-ledger.mjs';
 import { createCourseProgressService } from './server/course-progress-service.mjs';
+import { createLearningAnalyticsService } from './server/learning-analytics-service.mjs';
+import { createAdaptiveSupportService } from './server/adaptive-support-service.mjs';
+import { createModelProvider } from './server/model-provider.mjs';
+import { createAssessmentService } from './server/assessment-service.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
   ['/research', '/how-it-works/#evidence'],
-  ['/accessibility', '/trust/#accessibility'],
-  ['/security', '/trust/#security'],
-  ['/support', '/community/#support']
+  ['/research/', '/how-it-works/#evidence'],
+  ['/pathways', '/how-it-works/#pathways'],
+  ['/pathways/', '/how-it-works/#pathways'],
+  ['/learners', '/learning-together/#learner'],
+  ['/learners/', '/learning-together/#learner'],
+  ['/families', '/learning-together/#family'],
+  ['/families/', '/learning-together/#family'],
+  ['/schools', '/learning-together/#educators'],
+  ['/schools/', '/learning-together/#educators'],
+  ['/co-design', '/participation-trust/#participation-record'],
+  ['/co-design/', '/participation-trust/#participation-record'],
+  ['/community', '/participation-trust/#video-conversations'],
+  ['/community/', '/participation-trust/#video-conversations'],
+  ['/trust', '/participation-trust/#accessibility'],
+  ['/trust/', '/participation-trust/#accessibility'],
+  ['/accessibility', '/participation-trust/#accessibility'],
+  ['/accessibility/', '/participation-trust/#accessibility'],
+  ['/security', '/participation-trust/#security'],
+  ['/security/', '/participation-trust/#security'],
+  ['/support', '/participation-trust/#support'],
+  ['/support/', '/participation-trust/#support'],
+  ['/ur/pathways', '/ur/how-it-works/#pathways'],
+  ['/ur/pathways/', '/ur/how-it-works/#pathways'],
+  ['/ur/learners', '/ur/learning-together/#learner'],
+  ['/ur/learners/', '/ur/learning-together/#learner'],
+  ['/ur/families', '/ur/learning-together/#family'],
+  ['/ur/families/', '/ur/learning-together/#family'],
+  ['/ur/schools', '/ur/learning-together/#educators'],
+  ['/ur/schools/', '/ur/learning-together/#educators'],
+  ['/ur/co-design', '/ur/participation-trust/#participation-record'],
+  ['/ur/co-design/', '/ur/participation-trust/#participation-record'],
+  ['/ur/community', '/ur/participation-trust/#video-conversations'],
+  ['/ur/community/', '/ur/participation-trust/#video-conversations'],
+  ['/ur/trust', '/ur/participation-trust/#accessibility'],
+  ['/ur/trust/', '/ur/participation-trust/#accessibility']
 ]);
 const blockedTopLevel = new Set(['.git', '.githooks', 'cloudflare', 'node_modules', 'scripts', 'security', 'server', 'tests']);
 const blockedFiles = new Set(['.gitignore', 'package.json', 'package-lock.json', 'render.yaml', 'server.mjs']);
@@ -161,16 +197,20 @@ const buildRuntime = async () => {
   const config = await loadRuntimeConfig();
   const firebase = createFirebaseRuntime(config);
   const ledger = firebase.available ? createUsageLedger(firebase.firestore) : null;
+  const provider = createModelProvider({ config });
   return {
     config,
-    ai: createAiService({ config, firebase, ledger }),
+    ai: createAiService({ config, firebase, ledger, provider }),
     speech: createSpeechService({ config, firebase, ledger }),
-    courseProgress: createCourseProgressService({ firebase })
+    courseProgress: createCourseProgressService({ firebase }),
+    learningAnalytics: createLearningAnalyticsService({ config, firebase }),
+    adaptiveSupport: createAdaptiveSupportService({ config, firebase, ledger, provider }),
+    assessments: createAssessmentService({ config, firebase, ledger, provider })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, speech, courseProgress } = runtime;
+  const { config, ai, speech, courseProgress, learningAnalytics, adaptiveSupport, assessments } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -179,6 +219,9 @@ const handleApi = async (request, response, pathname, runtime) => {
       ai: ai.status(),
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
+      adaptiveLearning: learningAnalytics.status(),
+      adaptiveSupport: adaptiveSupport.status(),
+      assessments: assessments.status(),
       model: config.openAiModel
     });
   }
@@ -205,6 +248,41 @@ const handleApi = async (request, response, pathname, runtime) => {
       const body = await readJson(request);
       return sendJson(response, 200, await courseProgress.save({ authorization: request.headers.authorization, courseId: String(body?.courseId || ''), body }));
     }
+    if (request.method === 'POST' && pathname === '/api/v1/adaptive/consent') {
+      return sendJson(response, 200, await learningAnalytics.setConsent({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/learning-summary') {
+      return sendJson(response, 200, await learningAnalytics.saveSummary({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/adaptive/proposal') {
+      return sendJson(response, 200, await adaptiveSupport.proposal({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    const proposalMatch = pathname.match(/^\/api\/v1\/adaptive\/proposal\/([A-Za-z0-9_-]{1,100})\/decision$/);
+    if (request.method === 'POST' && proposalMatch) {
+      return sendJson(response, 200, await adaptiveSupport.decide({ authorization: request.headers.authorization, proposalId: proposalMatch[1], body: await readJson(request) }));
+    }
+    if (request.method === 'DELETE' && pathname === '/api/v1/privacy/adaptive-data') {
+      return sendJson(response, 200, await learningAnalytics.clear({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/privacy/adaptive-data-export') {
+      return sendJson(response, 200, await learningAnalytics.exportData({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/assessment/banks/draft') {
+      return sendJson(response, 200, await assessments.createDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/assessment/banks/publish') {
+      return sendJson(response, 200, await assessments.publishDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/assessment/start') {
+      return sendJson(response, 200, await assessments.start({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    const assessmentRunMatch = pathname.match(/^\/api\/v1\/assessment\/([A-Za-z0-9_-]{1,100})$/);
+    if (assessmentRunMatch && request.method === 'GET') {
+      return sendJson(response, 200, await assessments.getRun({ authorization: request.headers.authorization, runId: assessmentRunMatch[1] }));
+    }
+    if (assessmentRunMatch && request.method === 'POST') {
+      return sendJson(response, 200, await assessments.answer({ authorization: request.headers.authorization, runId: assessmentRunMatch[1], body: await readJson(request) }));
+    }
     return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'This API route does not exist.' } });
   } catch (error) {
     const publicFailure = publicError(error);
@@ -220,8 +298,9 @@ export const startServer = async () => {
     const pathname = url.pathname;
     try {
       if (pathname.startsWith('/api/')) return await handleApi(request, response, pathname, runtime);
-      const redirect = redirects.get(pathname);
-      if (redirect) return send(response, 302, '', { ...securityHeaders(pathname), Location: redirect });
+      const redirectPath = pathname.replace(/\/index\.html$/, '/');
+      const redirect = redirects.get(pathname) || redirects.get(redirectPath);
+      if (redirect) return send(response, 301, '', { ...securityHeaders(pathname), Location: redirect });
       if (!['GET', 'HEAD'].includes(request.method || 'GET')) return send(response, 405, 'Method not allowed', { ...securityHeaders(pathname), Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8' });
       return await serveStatic(request, response, pathname);
     } catch {

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { APPROVED_OPENAI_MODEL } from './config.mjs';
 import { coursePageContext, normaliseConversation, normaliseLearnerMessage } from './course-context.mjs';
 import { apiError } from './errors.mjs';
 import { openAiUsageCaps, usageEstimate } from './usage-ledger.mjs';
+import { createModelProvider } from './model-provider.mjs';
 
 const MAX_REPLY_CHARACTERS = 2200;
 
@@ -59,36 +59,17 @@ const conversationInput = (history, message) => {
   ].join('\n\n');
 };
 
-const outputText = (payload) => {
-  if (typeof payload?.output_text === 'string' && payload.output_text.trim()) return payload.output_text.trim();
-  return (Array.isArray(payload?.output) ? payload.output : [])
-    .flatMap((item) => Array.isArray(item?.content) ? item.content : [])
-    .map((item) => item?.text || item?.value || '')
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-};
-
-const upstreamError = async (response) => {
-  const body = await response.json().catch(() => ({}));
-  const code = String(body?.error?.code || '');
-  const unavailable = response.status === 404 || response.status === 410 || code.includes('model');
-  return unavailable
-    ? apiError(503, 'MODEL_UNAVAILABLE', 'The approved AI model is not available for this API key yet.')
-    : apiError(502, 'AI_UPSTREAM_ERROR', 'The AI helper could not answer right now. Please try again later.');
-};
-
-export const createAiService = ({ config, firebase, ledger }) => {
-  const available = () => Boolean(config.openAiApiKey && config.openAiResponsesUrl && firebase.available && ledger);
+export const createAiService = ({ config, firebase, ledger, provider = createModelProvider({ config }) }) => {
+  const available = () => Boolean(provider.available() && firebase.available && ledger);
   const status = () => ({
     available: available(),
     requiresSignIn: true,
-    model: config.openAiModel
+    model: provider.status().chatModel,
+    provider: provider.status().primary || provider.status().fallback
   });
 
   const chat = async ({ authorization, body }) => {
-    if (!config.openAiApiKey || !config.openAiResponsesUrl) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
-    if (config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
+    if (!provider.available()) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
     if (!firebase.available || !ledger) throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
     const learner = await firebase.verifyBearer(authorization);
     const message = normaliseLearnerMessage(body?.message);
@@ -122,38 +103,18 @@ export const createAiService = ({ config, firebase, ledger }) => {
     }
     let settled = false;
     try {
-      let response;
-      try {
-        response = await fetch(config.openAiResponsesUrl, {
-          method: 'POST',
-          headers: {
-            ...(config.openAiProvider === 'azure-openai'
-              ? { 'api-key': config.openAiApiKey }
-              : { Authorization: `Bearer ${config.openAiApiKey}` }),
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: config.openAiModel,
-            store: false,
-            instructions,
-            input,
-            max_output_tokens: config.openAiMaxOutputTokens
-          }),
-          signal: AbortSignal.timeout(35000)
-        });
-      } catch {
-        throw apiError(502, 'AI_UPSTREAM_ERROR', 'The AI helper could not answer right now. Please try again later.');
-      }
-      if (!response.ok) throw await upstreamError(response);
-      const payload = await response.json().catch(() => ({}));
-      const reply = outputText(payload).slice(0, MAX_REPLY_CHARACTERS);
+      const generated = await provider.generate({ purpose: 'chat', instructions, input, maxOutputTokens: config.openAiMaxOutputTokens });
+      const reply = String(generated.text || '').slice(0, MAX_REPLY_CHARACTERS);
       if (!reply) throw apiError(502, 'EMPTY_AI_REPLY', 'The AI helper did not return a usable reply. Please try again.');
-      const inputTokens = Number(payload?.usage?.input_tokens) || estimatedInputTokens;
-      const outputTokens = Number(payload?.usage?.output_tokens) || 0;
+      const inputTokens = Number(generated?.usage?.inputTokens) || estimatedInputTokens;
+      const cachedInputTokens = Number(generated?.usage?.cachedInputTokens) || 0;
+      const outputTokens = Number(generated?.usage?.outputTokens) || 0;
       await ledger.settle({
         ...reservation,
         actual: {
-          usd: usageEstimate(inputTokens, outputTokens, config),
+          // Gemini keys are deliberately primary and can be free-tier keys;
+          // OpenAI is the paid fallback whose cost is retained in the ledger.
+          usd: generated.provider === 'openai' ? usageEstimate(inputTokens, outputTokens, config, cachedInputTokens) : 0,
           inputTokens,
           outputTokens,
           credits: 0

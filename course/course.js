@@ -2,7 +2,10 @@ import { COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { askCourseAi, getCourseAiStatus, loadCourseProgress, saveCourseProgress, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260806-cloud1';
+import { answerUnderstandingCheck, askCourseAi, decideAdaptiveProposal, getCourseAiStatus, loadCourseProgress, loadUnderstandingCheck, requestAdaptiveProposal, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260808-ai4';
+import { LearningTelemetry } from './learning-telemetry.js?v=20260807-adaptive1';
+import { adaptiveProposalMarkup, taskInitiationMarkup } from './adaptive-support.js?v=20260807-adaptive1';
+import { visualExplanationMarkup } from './visual-explanations.js?v=20260807-visual1';
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
@@ -17,6 +20,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const liveRegion = document.getElementById('course-live-region');
   let storageKeys = { preferences: '', course: '', learnerId: '' };
   let authenticatedUser = null;
+  const learningTelemetry = new LearningTelemetry({
+    onFlush: async (summary) => {
+      if (!authenticatedUser || authenticatedUser.isGuest || learningChoices()['adaptive-learning'] !== 'on') return;
+      await saveLearningSummary({ user: authenticatedUser, summary });
+    }
+  });
   const narration = { service: null, status: 'idle', activeIndex: -1, activeRange: null, chunks: [], voices: [], scrollFrame: null };
   const taskNarration = {
     preludeActive: false,
@@ -27,6 +36,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
   const PERIODIC_SAVE_INTERVAL_MS = 7000;
   const TYPING_AUTO_ACCEPT_ACCURACY = 85;
+  let telemetryLastTypingAt = 0;
   let periodicSaveTimer = null;
   let typingAutoSubmitTimer = null;
   const cloudProgress = {
@@ -121,7 +131,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     draft: '',
     status: 'idle',
     error: '',
-    connection: { checked: false, checking: false, ai: false, speech: false, aiAudio: false },
+    connection: { checked: false, checking: false, ai: false, speech: false, aiAudio: false, assessments: false },
     requestController: null,
     dictation: {
       recorder: null,
@@ -140,6 +150,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     },
     audio: { controller: null, element: null, url: '', messageIndex: -1, loadingIndex: -1, error: '' }
   };
+  // Adaptive support is optional and remains session-only in the browser. The
+  // server stores the consented aggregate summary/proposal; no raw behaviour
+  // history or proposal contents are written into the regular course save.
+  const adaptiveSupport = { proposal: null, requesting: false, taskInitiation: false, pendingTaskInitiation: false };
+  const visualExplanation = { open: false, moduleIndex: -1 };
+  // This state contains no response text. The server holds an opaque run ID
+  // and persists only bounded outcomes, so refreshing never recovers a raw
+  // typed/spoken assessment answer.
+  const understandingCheck = { run: null, loading: false, error: '', feedback: '', response: '', selectedOption: '' };
   // A modal render replaces the triggering control, so remember its stable
   // action selector rather than a stale DOM reference. This lets keyboard and
   // assistive-technology users return to the control that opened the dialog.
@@ -232,7 +251,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'mascot-language-explicit': false,
     'mascot-voice': 'text',
     'mascot-voice-language': 'english',
-    'urdu-mode': 'off'
+    'urdu-mode': 'off',
+    // This remains off until a signed-in learner explicitly enables it. The
+    // server independently checks consent and the feature flag before storing
+    // any summary.
+    'adaptive-learning': 'off'
   });
 
   const websiteSchemes = ['calm', 'playful'];
@@ -448,7 +471,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       completedSteps: [],
       attempt: blankAttempt(),
       moduleSnapshots: {},
-      finalExam: blankFinalExamAttempt()
+      finalExam: blankFinalExamAttempt(),
+      assessmentRunId: '',
+      assessmentScope: 'module'
     },
     modal: '',
     helpOption: '',
@@ -481,12 +506,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!['standard', 'relaxed'].includes(fresh.preferences.spacing)) fresh.preferences.spacing = 'standard';
     const savedProgress = saved.progress || {};
     fresh.progress.lessonIndex = Math.min(Math.max(Number(savedProgress.lessonIndex) || 0, 0), COURSE.steps.length - 1);
-    fresh.progress.phase = ['preview', 'read', 'type', 'check', 'apply', 'complete', 'exam-intro', 'exam', 'exam-results'].includes(savedProgress.phase) ? savedProgress.phase : 'preview';
+    fresh.progress.phase = ['preview', 'read', 'type', 'check', 'apply', 'complete', 'assessment', 'exam-intro', 'exam', 'exam-results'].includes(savedProgress.phase) ? savedProgress.phase : 'preview';
     fresh.progress.completedSteps = Array.isArray(savedProgress.completedSteps)
       ? savedProgress.completedSteps.filter((index) => Number.isInteger(index) && index >= 0 && index < COURSE.steps.length)
       : [];
     const savedAttempt = savedProgress.attempt || {};
     fresh.progress.attempt = { ...blankAttempt(), ...savedAttempt };
+    fresh.progress.assessmentRunId = /^[A-Za-z0-9_-]{1,100}$/.test(String(savedProgress.assessmentRunId || '')) ? String(savedProgress.assessmentRunId) : '';
+    fresh.progress.assessmentScope = savedProgress.assessmentScope === 'final' ? 'final' : 'module';
     const savedModuleSnapshots = savedProgress.moduleSnapshots && typeof savedProgress.moduleSnapshots === 'object'
       ? savedProgress.moduleSnapshots
       : {};
@@ -1041,6 +1068,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It always starts quietly.', choices['background-noise'] === 'on'),
       choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="35" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
       settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
+      settingsSwitch('adaptive-learning', 'Adaptive learning support', authenticatedUser?.isGuest ? 'Available after you log in. It offers optional, private learning support.' : 'Save private learning summaries to offer optional support after a module.', choices['adaptive-learning'] === 'on', Boolean(authenticatedUser?.isGuest)),
       settingsSwitch('mascot', 'Mascot', mascotUnavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', choices.mascot === 'on', mascotUnavailable),
       choices.mascot === 'on' ? settingsChoiceGroup('mascot-language', 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || supportLanguage()) : '',
       choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice', 'Mascot Speech', 'Choose how your mascot will communicate with you.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '',
@@ -1054,6 +1082,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const mascotCanAppear = () => Boolean(
     mascotPresentation.enabled
     && state.view !== 'dashboard'
+    && !visualExplanation.open
     && mascotViewportQuery?.matches
   );
 
@@ -1219,20 +1248,21 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     try {
       const status = await getCourseAiStatus();
       if (contextKey !== aiChat.contextKey) return;
-      aiChat.connection = { checked: true, checking: false, ai: Boolean(status?.ai?.available), speech: Boolean(status?.speechToText?.available), aiAudio: Boolean(status?.speechToText?.textToSpeech?.available) };
+      aiChat.connection = { checked: true, checking: false, ai: Boolean(status?.ai?.available), speech: Boolean(status?.speechToText?.available), aiAudio: Boolean(status?.speechToText?.textToSpeech?.available), assessments: Boolean(status?.assessments?.available) };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
       if (aiChatIsVisible()) {
         render();
         focusAiInput();
-      }
+      } else if (state.view === 'course' && ['complete', 'assessment'].includes(state.progress.phase)) render();
     } catch (_) {
       if (contextKey !== aiChat.contextKey) return;
-      aiChat.connection = { checked: true, checking: false, ai: false, speech: false, aiAudio: false };
+      aiChat.connection = { checked: true, checking: false, ai: false, speech: false, aiAudio: false, assessments: false };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
       if (aiChatIsVisible()) {
         render();
         focusAiInput();
       }
+      else if (state.view === 'course' && ['complete', 'assessment'].includes(state.progress.phase)) render();
     }
   };
 
@@ -1286,6 +1316,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!signedInLearner() || !message || !aiChat.connection.ai || aiChat.status !== 'idle') return;
     const history = aiChat.messages.filter((entry) => !entry.initial).slice(-6).map((entry) => ({ role: entry.role, content: entry.content }));
     aiChat.messages.push({ role: 'user', content: message });
+    learningTelemetry.action('ai-request');
     aiChat.draft = '';
     aiChat.error = '';
     aiChat.status = 'sending';
@@ -1780,7 +1811,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const courseProgress = () => Math.round((state.progress.completedSteps.length / COURSE.steps.length) * 100);
   const isFinalExamPhase = () => ['exam-intro', 'exam', 'exam-results'].includes(state.progress.phase);
   const currentFinalExamQuestion = () => finalExam().questions[state.progress.finalExam.questionIndex];
-  const phaseNumber = () => ({ preview: 1, read: 2, type: 3, check: 4, apply: 5, complete: 5 }[state.progress.phase] || 1);
+  const phaseNumber = () => ({ preview: 1, read: 2, type: 3, check: 4, apply: 5, assessment: 5, complete: 5 }[state.progress.phase] || 1);
 
   // The typing work mirrors the lesson the learner has just read. Each
   // content section remains whole—rather than reducing the lesson to a single
@@ -1888,8 +1919,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       ? '<button class="course-task-explain" type="button" data-action="call-ai">' + explainLabel + '</button>'
       : '<span class="course-ai-login-gate" tabindex="0" data-tooltip="' + escapeHtml(courseUi('Log in required', 'لاگ اِن ضروری ہے')) + '"><button class="course-task-explain" type="button" data-action="call-ai" disabled aria-disabled="true">' + explainLabel + '</button></span>';
     const narrationControl = taskNarrationControlMarkup();
+    const canShowVisual = state.view === 'course' && !['type', 'complete', 'exam', 'exam-results'].includes(state.progress.phase);
+    const visual = canShowVisual
+      ? '<button class="course-task-explain course-task-visual" type="button" data-action="show-visual-explanation">' + escapeHtml(courseUi('Show a visual', 'بصری وضاحت دکھائیں')) + '</button>'
+      : '';
     const showPace = learningChoices().layout === 'open' || Boolean(narrationControl);
-    return '<span class="course-task-header-controls">' + narrationControl + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + explain + '</span>';
+    return '<span class="course-task-header-controls">' + narrationControl + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + visual + explain + '</span>';
   };
 
   const applyPreferences = () => {
@@ -3292,11 +3327,49 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Adapted practice', 'عملی مشق') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Use the idea in a small situation', 'خیال کو ایک مختصر صورتحال میں استعمال کریں') + '</h2><p>' + bilingualCopy('A learner is working on a similar task. Which response best uses the idea from this module?', 'ایک سیکھنے والا ملتے جلتے کام پر ہے۔ کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + bilingualCopy('Which response best uses the idea from this module?', 'کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</legend>' + renderedTaskOptions(choices, 'course-apply', 'data-apply-answer', urduChoices) + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
   };
 
-  const completeTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Progress update', 'پیش رفت کی تازہ کاری') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('One small step complete.', 'ایک مختصر مرحلہ مکمل ہو گیا۔') + '</h2><p>' + bilingualCopy(isLastStep() ? 'You have reached the end of this prototype course. Your completed steps and settings are saved locally.' : 'Your progress is saved. You can come back whenever you are ready, or continue to the next short step.', isLastStep() ? 'آپ اس نمونہ کورس کے اختتام تک پہنچ گئے ہیں۔ آپ کے مکمل مراحل اور ترتیبات مقامی طور پر محفوظ ہیں۔' : 'آپ کی پیش رفت محفوظ ہے۔ جب تیار ہوں واپس آ سکتے ہیں، یا اگلے مختصر مرحلے پر جا سکتے ہیں۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="next-step">' + courseUi(isLastStep() ? 'Return to learning overview' : 'Continue to step ' + (state.progress.lessonIndex + 2), isLastStep() ? 'سیکھنے کے خلاصے پر واپس جائیں' : 'مرحلہ ' + (state.progress.lessonIndex + 2) + ' جاری رکھیں') + ' <span aria-hidden="true">→</span></button></div></article>';
+  const understandingChecksAvailable = () => signedInLearner() && aiChat.connection.assessments;
+
+  const assessmentQuestionMarkup = (question) => {
+    if (question.responseMode === 'mcq') {
+      const selected = understandingCheck.selectedOption;
+      return '<fieldset class="course-check-options"><legend>' + escapeHtml(question.prompt) + '</legend>'
+        + question.options.map((option, index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="understanding-check-answer" value="' + index + '" data-assessment-option' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(option) + '</span></label>').join('') + '</fieldset>';
+    }
+    return '<label class="course-input-label" for="course-assessment-response">' + escapeHtml(courseUi('Your response', 'آپ کا جواب')) + '</label><textarea id="course-assessment-response" data-assessment-response rows="5" maxlength="1400" autocomplete="off" spellcheck="true" placeholder="' + escapeHtml(courseUi('Answer in your own words.', 'اپنے الفاظ میں جواب دیں۔')) + '">' + escapeHtml(understandingCheck.response) + '</textarea><p class="course-input-help">' + escapeHtml(courseUi('There is no target text, timer, or score. Your response stays editable until you submit it.', 'کوئی ہدف متن، ٹائمر یا اسکور نہیں ہے۔ جمع کرنے تک آپ اپنا جواب بدل سکتے ہیں۔')) + '</p>';
+  };
+
+  const understandingCheckTask = () => {
+    const run = understandingCheck.run;
+    if (!run) {
+      const canResume = Boolean(state.progress.assessmentRunId);
+      return '<article class="course-task-card course-final-exam"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(courseUi('Understanding check', 'سمجھ جانچ')) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(courseUi(canResume ? 'Your next question is saved.' : 'Preparing one question at a time.', canResume ? 'آپ کا اگلا سوال محفوظ ہے۔' : 'ایک وقت میں ایک سوال تیار ہو رہا ہے۔')) + '</h2><p>' + escapeHtml(understandingCheck.error || courseUi('This check uses reviewed course questions. It has no timer, score, or target text.', 'اس جانچ میں کورس کے منظور شدہ سوالات استعمال ہوتے ہیں۔ اس میں کوئی ٹائمر، اسکور یا ہدف متن نہیں ہے۔')) + '</p></div></div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="return-from-understanding-check">' + escapeHtml(courseUi('Return to module', 'ماڈیول پر واپس جائیں')) + '</button><button class="course-primary-button" type="button" data-action="' + (canResume ? 'resume-understanding-check' : 'start-understanding-check') + '"' + (understandingCheck.loading ? ' disabled' : '') + '>' + escapeHtml(understandingCheck.loading ? courseUi('Preparing…', 'تیار ہو رہا ہے…') : canResume ? courseUi('Resume check', 'جانچ دوبارہ کھولیں') : courseUi('Start understanding check', 'سمجھ جانچ شروع کریں')) + ' <span aria-hidden="true">→</span></button></div></article>';
+    }
+    if (run.status === 'complete') {
+      return '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(courseUi('Understanding check complete', 'سمجھ جانچ مکمل')) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(run.nextHelpfulStep || courseUi('You completed this check.', 'آپ نے یہ جانچ مکمل کر لی ہے۔')) + '</h2><p>' + escapeHtml(understandingCheck.feedback || courseUi('Your next learning step is ready whenever you are.', 'آپ کا اگلا سیکھنے کا مرحلہ جب چاہیں تیار ہے۔')) + '</p></div></div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="finish-understanding-check">' + escapeHtml(isLastStep() ? courseUi('Continue to course review', 'کورس کے جائزے کی طرف جائیں') : courseUi('Continue to next module', 'اگلے ماڈیول کی طرف جائیں')) + ' <span aria-hidden="true">→</span></button></div></article>';
+    }
+    const question = run.currentQuestion;
+    const ready = question?.responseMode === 'mcq' ? understandingCheck.selectedOption !== '' : understandingCheck.response.trim().length >= 2;
+    return '<article class="course-task-card course-typing-task course-assessment-task"><div class="course-typing-body"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(courseUi('Understanding check', 'سمجھ جانچ')) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(courseUi('Question ' + run.questionPosition + ' of ' + run.questionCount, 'سوال ' + run.questionPosition + ' از ' + run.questionCount)) + '</h2><p>' + escapeHtml(courseUi('Answer one question in the way that works for you.', 'ایک وقت میں ایک سوال کا اپنی سہولت سے جواب دیں۔')) + '</p></div></div><div class="typing-practice">' + assessmentQuestionMarkup(question) + (understandingCheck.feedback ? '<p class="check-feedback" role="status">' + escapeHtml(understandingCheck.feedback) + '</p>' : '') + (understandingCheck.error ? '<p class="typing-feedback" role="alert">' + escapeHtml(understandingCheck.error) + '</p>' : '') + '</div></div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="return-from-understanding-check">' + escapeHtml(courseUi('Save and return', 'محفوظ کریں اور واپس جائیں')) + '</button><button class="course-primary-button" type="button" data-action="submit-understanding-check"' + (!ready || understandingCheck.loading ? ' disabled' : '') + '>' + escapeHtml(understandingCheck.loading ? courseUi('Checking…', 'جانچ ہو رہی ہے…') : courseUi('Continue', 'جاری رکھیں')) + ' <span aria-hidden="true">→</span></button></div></article>';
+  };
+
+  const completeTask = () => {
+    const assessmentAction = understandingChecksAvailable()
+      ? '<button class="course-secondary-button" type="button" data-action="start-understanding-check">' + escapeHtml(courseUi('Understanding check', 'سمجھ جانچ')) + '</button>'
+      : '';
+    return '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Progress update', 'پیش رفت کی تازہ کاری') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('One small step complete.', 'ایک مختصر مرحلہ مکمل ہو گیا۔') + '</h2><p>' + bilingualCopy(isLastStep() ? 'You have reached the end of this prototype course. Your completed steps and settings are saved locally.' : 'Your progress is saved. You can come back whenever you are ready, or continue to the next short step.', isLastStep() ? 'آپ اس نمونہ کورس کے اختتام تک پہنچ گئے ہیں۔ آپ کے مکمل مراحل اور ترتیبات مقامی طور پر محفوظ ہیں۔' : 'آپ کی پیش رفت محفوظ ہے۔ جب تیار ہوں واپس آ سکتے ہیں، یا اگلے مختصر مرحلے پر جا سکتے ہیں۔') + '</p></div>' + taskHeaderControls() + '</div>' + adaptiveProposalForCompletion() + '<div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button>' + assessmentAction + '<button class="course-primary-button" type="button" data-action="next-step">' + courseUi(isLastStep() ? 'Return to learning overview' : 'Continue to step ' + (state.progress.lessonIndex + 2), isLastStep() ? 'سیکھنے کے خلاصے پر واپس جائیں' : 'مرحلہ ' + (state.progress.lessonIndex + 2) + ' جاری رکھیں') + ' <span aria-hidden="true">→</span></button></div></article>';
+  };
 
   const finalModuleCompleteTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('The 11 learning modules are complete.', 'سیکھنے کے 11 ماڈیولز مکمل ہو گئے ہیں।') + '</h2><p>' + bilingualCopy('Your completed modules and settings are saved locally. When you are ready, complete the final exam one question at a time. It has ' + finalExamQuestionCount() + ' questions and no timer.', 'آپ کے مکمل ماڈیولز اور ترتیبات مقامی طور پر محفوظ ہیں۔ جب تیار ہوں، آخری امتحان ایک وقت میں ایک سوال مکمل کریں۔ اس میں ' + finalExamQuestionCount() + ' سوال ہیں اور کوئی ٹائمر نہیں ہے۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="start-final-exam">' + courseUi('Start final exam', 'آخری امتحان شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
 
-  const completionTask = () => isLastStep() ? finalModuleCompleteTask() : completeTask();
+  const reviewedFinalModuleCompleteTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('The 11 learning modules are complete.', 'سیکھنے کے 11 ماڈیولز مکمل ہو گئے ہیں۔') + '</h2><p>' + bilingualCopy('When you are ready, take the reviewed final understanding check one question at a time. There are no timers, scores, or rankings.', 'جب تیار ہوں، منظور شدہ آخری سمجھ جانچ ایک وقت میں ایک سوال مکمل کریں۔ کوئی ٹائمر، اسکور یا درجہ بندی نہیں ہے۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="start-final-understanding-check">' + courseUi('Start final understanding check', 'آخری سمجھ جانچ شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
+
+  const completionTask = () => isLastStep()
+    ? (understandingChecksAvailable() ? reviewedFinalModuleCompleteTask() : finalModuleCompleteTask())
+    : completeTask();
+
+  const adaptiveProposalForCompletion = () => state.progress.phase === 'complete'
+    ? adaptiveProposalMarkup({ proposal: adaptiveSupport.proposal, escapeHtml, courseUi })
+    : '';
 
   const examOptionState = (index, selected, correctIndex, submitted) => {
     if (!submitted) return index === selected ? ' is-selected' : '';
@@ -3629,6 +3702,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const stopVoiceInput = (message = '', nextStatus = 'stopped') => {
     const recognition = voiceInput.recognition;
     const recorder = voiceInput.recorder;
+    const wasListening = Boolean(recognition || recorder || voiceInput.listening);
     voiceInput.stopRequested = true;
     voiceInput.sessionId += 1;
     if (voiceInput.restartTimer) {
@@ -3664,6 +3738,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (recorder && recorder.state !== 'inactive') {
       try { recorder.stop(); } catch (_) { /* Stopping a recorder is best-effort. */ }
     }
+    if (wasListening) learningTelemetry.action('speech-complete');
     renderVoiceInputState(nextStatus, message);
   };
 
@@ -3940,6 +4015,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       save(canonical.corrected
         ? 'A close spoken match was placed as the visible course sentence.'
         : 'Voice input added to your response. You can edit it before checking.');
+      learningTelemetry.action('speech-complete');
       renderVoiceInputState('stopped', canonical.corrected
         ? 'A close spoken match was aligned with the visible course sentence.'
         : 'Your recording is now editable in the response field.');
@@ -4013,10 +4089,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       // interim words, allowing the visible authored text to turn green while
       // the learner speaks. Speechmatics receives a completed recording and
       // therefore cannot offer that immediate feedback.
+      learningTelemetry.action('speech-start');
       startBrowserVoiceInput();
       return;
     }
     if (await speechmaticsTypingIsReady()) {
+      learningTelemetry.action('speech-start');
       await startSpeechmaticsTypingInput();
       return;
     }
@@ -4350,6 +4428,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     narration.service = new NarrationService({
       onStateChange: (status) => {
         narration.status = status;
+        if (status === 'playing') learningTelemetry.action('tts-start');
+        if (status === 'finished') learningTelemetry.action('tts-complete');
         if (status !== 'playing') cancelNarrationAutoScroll();
         syncNarrationUi();
         syncTaskNarrationControl();
@@ -4858,6 +4938,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     addCourseConclusion();
     updateCourseCopy();
     addGuestModuleNavigation();
+    addAdaptiveTaskInitiation();
     buildTypingTester();
     applyRenderedSupportBehavior();
     prepareNarrationForRenderedTask();
@@ -4866,9 +4947,24 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     enhancePageEntranceMotion();
   };
 
-  const renderTask = () => isReviewingModule()
-    ? reviewModuleTask()
-    : ({ preview: previewTask, read: readTask, type: typingTask, check: checkTaskWithFeedback, apply: applyTaskWithFeedback, complete: completionTask, 'exam-intro': finalExamIntroTask, exam: finalExamQuestionTask, 'exam-results': finalExamResultsTask }[state.progress.phase] || previewTask)();
+  const addAdaptiveTaskInitiation = () => {
+    if (!adaptiveSupport.taskInitiation || state.view !== 'course' || ['complete', 'exam-intro', 'exam', 'exam-results'].includes(state.progress.phase)) return;
+    const card = app.querySelector('.course-task-card');
+    const heading = card?.querySelector('.course-task-top');
+    if (!card || !heading || card.querySelector('[data-task-initiation]')) return;
+    heading.insertAdjacentHTML('afterend', taskInitiationMarkup({ active: true, escapeHtml, courseUi }));
+    learningTelemetry.action('task-initiation-offered');
+  };
+
+  const renderTask = () => {
+    const task = isReviewingModule()
+      ? reviewModuleTask()
+      : ({ preview: previewTask, read: readTask, type: typingTask, check: checkTaskWithFeedback, apply: applyTaskWithFeedback, assessment: understandingCheckTask, complete: completionTask, 'exam-intro': finalExamIntroTask, exam: finalExamQuestionTask, 'exam-results': finalExamResultsTask }[state.progress.phase] || previewTask)();
+    const visual = visualExplanation.open && visualExplanation.moduleIndex === displayedModuleIndex()
+      ? visualExplanationMarkup({ step: currentStep(), translatedStep: urduStep(), isUrdu: courseUsesUrdu(), escapeHtml, courseUi })
+      : '';
+    return task + visual;
+  };
 
   const courseProgressBar = () => '<section class="course-progress-panel" aria-label="' + escapeHtml(courseUi('Learning progress', 'سیکھنے کی پیش رفت')) + '"><div><p>' + escapeHtml(courseUi('Course progress', 'کورس کی پیش رفت')) + '</p><strong>' + escapeHtml(courseUi('Step ' + (state.progress.lessonIndex + 1) + ' of ' + COURSE.steps.length, 'مرحلہ ' + (state.progress.lessonIndex + 1) + ' از ' + COURSE.steps.length)) + '</strong><span>' + escapeHtml(courseUi('One small step at a time', 'ایک وقت میں ایک مختصر مرحلہ')) + '</span></div><div class="course-progress-bars"><div><span>' + escapeHtml(courseUi('Current step · Task ' + phaseNumber() + ' of 5', 'موجودہ مرحلہ · کام ' + phaseNumber() + ' از 5')) + '</span><progress value="' + phaseNumber() + '" max="5">' + escapeHtml(courseUi(phaseNumber() + ' of 5', phaseNumber() + ' از 5')) + '</progress></div><div><span>' + escapeHtml(courseUi('Course · ' + state.progress.completedSteps.length + ' lessons completed', 'کورس · ' + state.progress.completedSteps.length + ' اسباق مکمل')) + '</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + escapeHtml(courseUi(state.progress.completedSteps.length + ' of ' + COURSE.steps.length, state.progress.completedSteps.length + ' از ' + COURSE.steps.length)) + '</progress></div></div></section>';
 
@@ -5155,6 +5251,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     syncAiChatContext();
     if (state.view !== 'course' || state.progress.phase !== 'type' || isReviewingModule()) stopVoiceInput();
     applyPreferences();
+    learningTelemetry.begin({
+      moduleIndex: displayedModuleIndex(),
+      phase: state.progress.phase,
+      language: courseUsesUrdu() ? 'ur' : 'en',
+      enabled: Boolean(authenticatedUser && !authenticatedUser.isGuest && learningChoices()['adaptive-learning'] === 'on')
+    });
     let content = '';
     if (state.view === 'dashboard') content = renderDashboard();
     else if (state.view === 'browse') content = renderBrowse();
@@ -5366,6 +5468,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const startNextStep = () => {
     storeActiveGuestModuleSnapshot();
+    visualExplanation.open = false;
     if (isLastStep()) {
       state.view = 'course';
       state.progress.phase = 'exam-intro';
@@ -5383,6 +5486,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     state.manualExampleVisible = false;
     state.showSimple = false;
     state.readingSectionIndex = 0;
+    adaptiveSupport.taskInitiation = adaptiveSupport.pendingTaskInitiation;
+    adaptiveSupport.pendingTaskInitiation = false;
     recordSupportMoment('task-entry', { result: 'module-entry' });
     save();
     render();
@@ -5525,6 +5630,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     recordSupportMoment('module-complete', { result: 'module' });
     save();
     render();
+    void requestAdaptiveSupportForCompletedModule(state.progress.lessonIndex);
   };
 
   const checkTyping = () => {
@@ -5645,6 +5751,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const saveCourseLearningChoice = (key, value) => {
     const choices = learningChoices();
+    const previousValue = choices[key];
+    if (key === 'adaptive-learning' && (!authenticatedUser || authenticatedUser.isGuest)) {
+      announce('Log in to choose adaptive learning support.');
+      return;
+    }
     choices[key] = value;
     // The companion follows Urdu mode until the learner explicitly gives it a
     // different language in the same menu.
@@ -5655,6 +5766,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (key === 'colours' && colorModes.includes(value)) window.Type2LearnColorMode?.set(value, false);
     if (key === 'website-scheme' && websiteSchemes.includes(value)) window.Type2LearnWebsiteScheme?.set(value);
     if (key === 'text-to-speech') setCourseSetting('readAloud', value === 'on');
+    if (key === 'adaptive-learning') {
+      void setAdaptiveLearningConsent({ user: authenticatedUser, enabled: value === 'on' }).catch(() => {
+        const restored = learningChoices();
+        restored[key] = previousValue || 'off';
+        saveLearningChoices(restored);
+        announce('Adaptive learning support could not be updated right now. Your course will keep using your current settings.');
+        render();
+      });
+    }
 
     const shouldPreviewSupportMode = state.view === 'course'
       && ['encouragement', 'animations'].includes(key);
@@ -5680,7 +5800,163 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
   };
 
+  const requestAdaptiveSupportForCompletedModule = async (moduleIndex) => {
+    if (adaptiveSupport.requesting || !signedInLearner() || learningChoices()['adaptive-learning'] !== 'on') return;
+    adaptiveSupport.requesting = true;
+    try {
+      // The aggregated, consented module summary is saved before the support
+      // request. The service never sees raw typed text, speech, or chat.
+      await learningTelemetry.flush('module-complete');
+      const result = await requestAdaptiveProposal({ user: authenticatedUser, moduleIndex });
+      if (state.view === 'course' && state.progress.phase === 'complete' && state.progress.lessonIndex === moduleIndex) {
+        adaptiveSupport.proposal = result?.proposal || null;
+        render();
+      }
+    } catch (_) {
+      // Optional support quietly falls back to the authored completion card.
+    } finally {
+      adaptiveSupport.requesting = false;
+    }
+  };
+
+  // Assessment answers live only in this in-memory state until submission.
+  // The persisted course record contains an opaque run id, never what a
+  // learner typed or said in response to a question.
+  const resetUnderstandingCheckResponse = () => {
+    understandingCheck.response = '';
+    understandingCheck.selectedOption = '';
+    understandingCheck.error = '';
+    understandingCheck.feedback = '';
+  };
+
+  const renderUnderstandingCheck = (focusSelector = '') => {
+    render();
+    if (focusSelector) window.requestAnimationFrame(() => app.querySelector(focusSelector)?.focus?.({ preventScroll: true }));
+  };
+
+  const openUnderstandingCheck = async ({ resume = false, scope = 'module' } = {}) => {
+    if (!signedInLearner()) {
+      announce(courseUi('Please sign in to use the understanding check.', 'سمجھ جانچ استعمال کرنے کے لیے براہِ کرم سائن اِن کریں۔'));
+      return;
+    }
+    understandingCheck.loading = true;
+    understandingCheck.error = '';
+    state.progress.assessmentScope = scope === 'final' ? 'final' : 'module';
+    state.progress.phase = 'assessment';
+    renderUnderstandingCheck();
+    try {
+      const savedRunId = state.progress.assessmentRunId;
+      const result = resume && savedRunId
+        ? await loadUnderstandingCheck({ user: authenticatedUser, runId: savedRunId })
+        : await startUnderstandingCheck({ user: authenticatedUser, moduleIndex: state.progress.lessonIndex, scope: state.progress.assessmentScope, language: courseUsesUrdu() ? 'ur' : 'en' });
+      const run = result?.run;
+      if (!run?.runId) throw new Error(courseUi('This understanding check could not be opened.', 'یہ سمجھ جانچ نہیں کھولی جا سکی۔'));
+      understandingCheck.run = run;
+      resetUnderstandingCheckResponse();
+      state.progress.assessmentRunId = run.runId;
+      state.progress.phase = 'assessment';
+      save();
+      renderUnderstandingCheck(run.currentQuestion?.responseMode === 'mcq' ? '[data-assessment-option]' : '[data-assessment-response]');
+    } catch (error) {
+      understandingCheck.run = null;
+      understandingCheck.error = error?.message || courseUi('This understanding check is not ready yet. Your course work is still saved.', 'یہ سمجھ جانچ ابھی تیار نہیں ہے۔ آپ کا کورس ورک محفوظ ہے۔');
+      state.progress.phase = 'assessment';
+      save();
+      renderUnderstandingCheck();
+    } finally {
+      understandingCheck.loading = false;
+      renderUnderstandingCheck();
+    }
+  };
+
+  const submitUnderstandingCheck = async () => {
+    const run = understandingCheck.run;
+    const question = run?.currentQuestion;
+    if (!run?.runId || !question || understandingCheck.loading) return;
+    const answer = question.responseMode === 'mcq'
+      ? { optionIndex: Number(understandingCheck.selectedOption) }
+      : { text: understandingCheck.response.trim() };
+    if ((question.responseMode === 'mcq' && !Number.isInteger(answer.optionIndex)) || (question.responseMode !== 'mcq' && answer.text.length < 2)) {
+      understandingCheck.error = courseUi('Choose or write a response before continuing.', 'جاری رکھنے سے پہلے جواب منتخب کریں یا لکھیں۔');
+      renderUnderstandingCheck(question.responseMode === 'mcq' ? '[data-assessment-option]' : '[data-assessment-response]');
+      return;
+    }
+    understandingCheck.loading = true;
+    understandingCheck.error = '';
+    renderUnderstandingCheck();
+    try {
+      const result = await answerUnderstandingCheck({ user: authenticatedUser, runId: run.runId, answer });
+      understandingCheck.run = result?.run || null;
+      understandingCheck.feedback = result?.evaluation?.feedback || '';
+      // Do not retain a submitted learner response in the page or local save.
+      understandingCheck.response = '';
+      understandingCheck.selectedOption = '';
+      if (!understandingCheck.run?.runId) throw new Error(courseUi('Your response could not be saved. Please try again.', 'آپ کا جواب محفوظ نہیں ہو سکا۔ براہِ کرم دوبارہ کوشش کریں۔'));
+      state.progress.assessmentRunId = understandingCheck.run.runId;
+      save();
+      renderUnderstandingCheck(understandingCheck.run.status === 'complete'
+        ? '[data-action="finish-understanding-check"]'
+        : understandingCheck.run.currentQuestion?.responseMode === 'mcq' ? '[data-assessment-option]' : '[data-assessment-response]');
+    } catch (error) {
+      understandingCheck.error = error?.message || courseUi('Your response is still here. Try again when you are ready.', 'آپ کا جواب ابھی یہاں موجود ہے۔ جب تیار ہوں دوبارہ کوشش کریں۔');
+      renderUnderstandingCheck(question.responseMode === 'mcq' ? '[data-assessment-option]' : '[data-assessment-response]');
+    } finally {
+      understandingCheck.loading = false;
+      renderUnderstandingCheck();
+    }
+  };
+
+  const leaveUnderstandingCheck = () => {
+    understandingCheck.loading = false;
+    understandingCheck.error = '';
+    understandingCheck.feedback = '';
+    understandingCheck.response = '';
+    understandingCheck.selectedOption = '';
+    understandingCheck.run = null;
+    state.progress.phase = 'complete';
+    save(courseUi('Your next question is saved. You can return whenever you are ready.', 'آپ کا اگلا سوال محفوظ ہے۔ جب تیار ہوں واپس آ سکتے ہیں۔'));
+    renderUnderstandingCheck('[data-action="start-understanding-check"]');
+  };
+
+  const finishUnderstandingCheck = () => {
+    state.progress.assessmentRunId = '';
+    understandingCheck.run = null;
+    resetUnderstandingCheckResponse();
+    if (state.progress.assessmentScope === 'final') {
+      state.progress.assessmentScope = 'module';
+      goTo('dashboard', courseUi('Your final understanding check is complete.', 'آپ کی آخری سمجھ جانچ مکمل ہو گئی ہے۔'));
+      return;
+    }
+    startNextStep();
+  };
+
+  const decideCurrentAdaptiveProposal = async (accepted) => {
+    const proposal = adaptiveSupport.proposal;
+    if (!proposal || !signedInLearner()) return;
+    try {
+      const result = await decideAdaptiveProposal({ user: authenticatedUser, proposalId: proposal.id, accepted });
+      adaptiveSupport.proposal = null;
+      if (accepted && proposal.kind === 'preference' && proposal.preference?.key && proposal.preference?.value) {
+        saveCourseLearningChoice(proposal.preference.key, proposal.preference.value);
+        announce('This optional support will be ready in the next module.');
+        return;
+      }
+      if (accepted && proposal.kind === 'task-initiation') {
+        adaptiveSupport.pendingTaskInitiation = true;
+        announce('A small first-step card will be ready in the next module.');
+      } else if (!accepted) {
+        announce('Your current settings will stay in place.');
+      } else if (result?.proposal?.status === 'accepted') {
+        announce('This optional support will be ready in the next module.');
+      }
+      render();
+    } catch (_) {
+      announce('This support choice could not be saved right now. Your current settings will stay in place.');
+    }
+  };
+
   const handleAction = (action, element) => {
+    learningTelemetry.action(action === 'return-to-read' ? 'reread' : 'action');
     switch (action) {
       case 'dashboard': goTo('dashboard'); break;
       case 'browse': goTo('browse'); break;
@@ -5695,6 +5971,25 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         break;
       case 'guest-skip-module': skipGuestModule(); break;
       case 'guest-previous-module': moveGuestModule(-1); break;
+      case 'show-visual-explanation':
+        visualExplanation.open = true;
+        visualExplanation.moduleIndex = displayedModuleIndex();
+        learningTelemetry.action('visual-open');
+        render();
+        window.requestAnimationFrame(() => app.querySelector('[data-visual-explanation]')?.focus?.({ preventScroll: true }));
+        break;
+      case 'close-visual-explanation':
+        visualExplanation.open = false;
+        render();
+        window.requestAnimationFrame(() => app.querySelector('[data-action="show-visual-explanation"]')?.focus?.({ preventScroll: true }));
+        break;
+      case 'accept-adaptive-proposal': void decideCurrentAdaptiveProposal(true); break;
+      case 'decline-adaptive-proposal': void decideCurrentAdaptiveProposal(false); break;
+      case 'dismiss-task-initiation':
+        adaptiveSupport.taskInitiation = false;
+        learningTelemetry.action('task-initiation-used');
+        render();
+        break;
       case 'toggle-settings-menu':
         state.settingsMenu = !state.settingsMenu;
         render();
@@ -5791,6 +6086,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         else stopVoiceInput('Microphone input stopped. Your response is still here.');
         break;
       case 'check-typing': checkTyping(); break;
+      case 'start-understanding-check': void openUnderstandingCheck(); break;
+      case 'resume-understanding-check': void openUnderstandingCheck({ resume: true }); break;
+      case 'submit-understanding-check': void submitUnderstandingCheck(); break;
+      case 'return-from-understanding-check': leaveUnderstandingCheck(); break;
+      case 'finish-understanding-check': finishUnderstandingCheck(); break;
+      case 'start-final-understanding-check': void openUnderstandingCheck({ scope: 'final' }); break;
       case 'submit-check': finishCheck(); break;
       case 'continue-check': continueCheck(); break;
       case 'submit-apply': finishApply(); break;
@@ -5987,6 +6288,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       window.requestAnimationFrame(() => app.querySelector('[data-exam-answer][value="' + answer + '"]')?.focus?.());
       return;
     }
+    if (event.target.matches('[data-assessment-option]')) {
+      if (state.progress.phase !== 'assessment' || understandingCheck.loading) return;
+      understandingCheck.selectedOption = event.target.value;
+      understandingCheck.error = '';
+      renderUnderstandingCheck('[data-assessment-option][value="' + understandingCheck.selectedOption + '"]');
+      return;
+    }
     if (event.target.matches('[data-check-answer], [data-apply-answer]')) {
       if (state.progress.attempt.submitted) return;
       state.progress.attempt.selectedAnswer = event.target.value;
@@ -6017,11 +6325,30 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       syncAiComposerState();
       return;
     }
+    if (event.target.matches('[data-assessment-response]')) {
+      // Keep drafts only in RAM. We never call save() for assessment text.
+      understandingCheck.response = event.target.value.slice(0, 1400);
+      understandingCheck.error = '';
+      return;
+    }
     if (!event.target.matches('[data-typing-input]')) return;
     const input = event.target;
     const previousLength = state.progress.attempt.response.length;
     const nextValue = input.value;
     const insertedLength = Math.max(0, nextValue.length - previousLength);
+    const removedLength = Math.max(0, previousLength - nextValue.length);
+    const now = window.performance.now();
+    const expected = Array.from(activeTypingReference() || '');
+    const inserted = Array.from(nextValue).slice(previousLength);
+    const correctCharacters = inserted.filter((character, index) => character === expected[previousLength + index]).length;
+    learningTelemetry.action('typing', {
+      characters: insertedLength,
+      correctCharacters,
+      incorrectCharacters: Math.max(0, insertedLength - correctCharacters),
+      backspaces: removedLength,
+      pauseMs: telemetryLastTypingAt ? now - telemetryLastTypingAt : 0
+    });
+    telemetryLastTypingAt = now;
     const usesAlternativeInput = usingAlternativeInput();
     const isComposition = Boolean(event.isComposing) || /composition/i.test(event.inputType || '');
     const isUnexpectedInsertion = event.inputType === 'insertFromPaste' || event.inputType === 'insertFromDrop';
@@ -6225,6 +6552,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     syncMascotPreferences();
     if (upgradeLegacyNarrationVoice()) save();
     render();
+    if (signedInLearner()) void refreshAiConnection();
     // Preferences are saved immediately before the learner enters the course.
     // The preview audio belongs to that previous document, so rebuild and
     // resume the selected loop here instead of leaving a silent handoff.
@@ -6236,6 +6564,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   window.addEventListener('pagehide', () => {
+    void learningTelemetry.flush('pagehide');
     clearTypingAutoSubmit();
     if (cloudProgress.timer !== null) {
       window.clearTimeout(cloudProgress.timer);

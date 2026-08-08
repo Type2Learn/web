@@ -74,6 +74,63 @@ export const saveCourseProgress = async ({ user, snapshot, signal }) => authenti
   signal
 });
 
+export const setAdaptiveLearningConsent = async ({ user, enabled, signal }) => authenticatedRequest(user, '/api/v1/adaptive/consent', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ enabled: Boolean(enabled) }),
+  signal
+});
+
+export const saveLearningSummary = async ({ user, summary, signal }) => authenticatedRequest(user, '/api/v1/learning-summary', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(summary),
+  signal
+});
+
+export const requestAdaptiveProposal = async ({ user, moduleIndex, signal }) => authenticatedRequest(user, '/api/v1/adaptive/proposal', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ moduleIndex }),
+  signal
+});
+
+export const decideAdaptiveProposal = async ({ user, proposalId, accepted, signal }) => authenticatedRequest(user, '/api/v1/adaptive/proposal/' + encodeURIComponent(proposalId) + '/decision', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ accepted: Boolean(accepted) }),
+  signal
+});
+
+export const deleteAdaptiveLearningData = async ({ user, signal }) => authenticatedRequest(user, '/api/v1/privacy/adaptive-data', {
+  method: 'DELETE',
+  signal
+});
+
+export const exportAdaptiveLearningData = async ({ user, signal }) => authenticatedRequest(user, '/api/v1/privacy/adaptive-data-export', {
+  method: 'POST',
+  signal
+});
+
+// Assessment runs are intentionally separate from guided lesson typing. The
+// server returns only the current question and short supportive feedback; it
+// never returns an answer key, score, or hidden evaluation rubric.
+export const startUnderstandingCheck = async ({ user, moduleIndex, language, scope = 'module', signal }) => authenticatedRequest(user, '/api/v1/assessment/start', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ moduleIndex, scope: scope === 'final' ? 'final' : 'module', language: language === 'ur' ? 'ur' : 'en' }),
+  signal
+});
+
+export const loadUnderstandingCheck = async ({ user, runId, signal }) => authenticatedRequest(user, '/api/v1/assessment/' + encodeURIComponent(runId), { signal });
+
+export const answerUnderstandingCheck = async ({ user, runId, answer, signal }) => authenticatedRequest(user, '/api/v1/assessment/' + encodeURIComponent(runId), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ answer }),
+  signal
+});
+
 export const synthesiseCourseAiReply = async ({ user, text, language, signal }) => {
   const token = await requireToken(user);
   let response;
