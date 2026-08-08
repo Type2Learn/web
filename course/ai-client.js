@@ -53,6 +53,19 @@ export const askCourseAi = async ({ user, message, history, courseId, page, lang
   });
 };
 
+// Adaptive recall is intentionally a distinct, structured endpoint instead
+// of an unrestricted chat call. The browser sends only the learner's current
+// attempt and current page identity; provider keys and model selection remain
+// server-only.
+export const requestAdaptiveRecall = async ({ user, courseId, page, language, response, previousResponse, barrier, signal }) => {
+  return authenticatedRequest(user, '/api/v1/adaptive-recall', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ courseId, page, language, response, previousResponse, barrier }),
+    signal
+  });
+};
+
 export const transcribeCourseAudio = async ({ user, audio, durationMs, language, purpose, signal }) => {
   const form = new FormData();
   form.append('audio', audio, 'type2learn-voice.webm');

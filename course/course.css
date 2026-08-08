@@ -2179,6 +2179,35 @@ body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .
 .help-detail .course-secondary-button,
 .help-detail .course-primary-button { margin-top: 14px; }
 
+/* Adaptive recall is intentionally part of the current task, not a floating
+   assistant. The learner can keep their own words and the next action in one
+   predictable place. */
+.course-adaptive-recall {
+  max-width: 780px;
+  margin: 18px 0;
+  border: 1px solid var(--course-teal);
+  border-inline-start: 5px solid var(--course-teal);
+  border-radius: 13px;
+  padding: 16px 18px;
+  color: var(--course-ink);
+  background: var(--course-paper);
+  box-shadow: 0 10px 24px rgba(18, 52, 83, .07);
+}
+.course-adaptive-recall .course-eyebrow { margin: 0 0 6px; }
+.course-adaptive-recall h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+.course-adaptive-recall > p { margin: 8px 0 0; color: var(--course-ink-soft); font-size: 14px; line-height: 1.5; }
+.course-adaptive-recall.is-loading { border-color: var(--course-blue); border-inline-start-color: var(--course-blue); }
+.course-adaptive-recall.is-fallback { border-color: var(--course-line-strong); border-inline-start-color: var(--course-blue); }
+.course-adaptive-next { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--course-line); }
+.course-adaptive-next span { color: var(--course-green); font-size: 11px; font-weight: 850; letter-spacing: .11em; text-transform: uppercase; }
+.course-adaptive-next p { margin: 5px 0 0; font-weight: 750; line-height: 1.45; }
+.course-adaptive-review { margin: 11px 0 0; color: var(--course-muted); font-size: 12px; line-height: 1.45; }
+.course-adaptive-recall.is-compact { margin-bottom: 0; }
+.course-adaptive-help-modal { max-width: 720px; }
+.course-barrier-choice-grid button { min-height: 58px; }
+body[data-course-colours="flat"] .course-adaptive-recall { box-shadow: none; }
+body[data-course-colours="vivid"] .course-adaptive-recall { border-inline-start-width: 6px; box-shadow: 0 14px 30px rgba(0, 139, 178, .13); }
+
 body.course-focus-mode { background: var(--course-paper); }
 body.course-focus-mode .course-topbar { border-bottom-color: var(--course-line); }
 body.course-focus-mode .course-prototype-label,

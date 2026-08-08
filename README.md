@@ -16,7 +16,7 @@ Then open `http://localhost:8000`.
 
 ## Deploy on Render
 
-The root-level `render.yaml` defines a Render static site with `staticPublishPath: .`, automatic deploys from commits, and baseline response headers. Create a new Render Blueprint from this repository; no build command or environment variables are required.
+The root-level `render.yaml` defines a Render Node web service with `npm ci`, `npm start`, and `/api/v1/health` as the health check. Create a Render Blueprint from this repository. For the protected learning features, add the Firebase Admin credentials plus `GEMINI_API_KEY_1` (and optional numbered rotation keys) in Render’s encrypted environment. `OPENAI_API_KEY` and `OPENAI_RESPONSES_URL` are optional server-side fallback credentials. Do not place any of these values in client-side JavaScript or public files.
 
 Every primary public route has its own directory and `index.html`, so no single-page-app rewrite is needed. Privacy and Terms are full, standalone, indexable documents at `/privacy/` and `/terms/`, with downloadable copies of the supplied source PDFs. Render redirects the former Research page into How it works, Support into Community, and the legacy Accessibility and Security routes into the relevant Trust-center sections.
 
@@ -25,6 +25,14 @@ Every primary marketing page has a dedicated Urdu counterpart under `/ur/`, incl
 The centered account experience is available at `/login/`. All marketing CTA buttons lead into that route; there is no separate header sign-in link. Its seven-scene learner slideshow progressively loads compressed images instead of fetching every photograph at startup. Firebase Authentication powers email/password sign-in, registration, remembered local or session persistence, Google popup/redirect sign-in, password-reset email delivery, authenticated account state, and sign-out. Successful sign-in routes into the protected `/learn/` after-login home. The project must keep Email/Password and Google enabled in Firebase Authentication, with `type2learn.tech` in its authorized-domain list.
 
 The `/learn/` route is a temporary authenticated learning home for the next import phase, with `/afterlogin/` kept as a literal alias during development. It includes a desktop auto-hide sidebar inspired by the `newwebsite` workspace behavior, mobile-friendly static navigation, and the Type2Learn companion mascot from the working preview. Unauthenticated visitors are sent back to `/login/?next=%2Flearn%2F`.
+
+## Adaptive Recall Engine
+
+The protected course includes a real, server-side Adaptive Recall Engine rather than browser-embedded API keys or an unrestricted chatbot. On a learner's own-word recall response, it returns validated structured feedback: evidence found, one missing concept, one support mode, a concise strength-first message, and one next prompt. The learner can revise their response and see the improvement identified between attempts.
+
+`I’m stuck` is a separate, barrier-specific route for the current step only: unclear instruction, a step that feels too large, difficult words, trouble starting, too much on screen, or worry about being wrong. It does not regenerate the lesson or diagnose the learner. Gemini Flash Lite is the primary provider with key rotation; OpenAI is the server-side fallback. Neither provider key nor the model endpoint is sent to the browser. Invalid model output, unavailable models, unauthenticated sessions, and quota limits all fall back to an authored, deterministic current-step support.
+
+The engine code-enforces these limits: no complete answer before an attempt, no diagnosis, no rankings or speed scores, no answer-key context, a maximum of two feedback sentences, and JSON validation before any model result reaches the learner.
 
 ## LinkedIn campaign
 

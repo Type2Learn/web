@@ -73,3 +73,26 @@ export const normaliseConversation = (history) => (Array.isArray(history) ? hist
   .filter((entry) => entry.role && entry.content);
 
 export const normaliseLearnerMessage = (value) => boundedText(value, 900);
+
+// This context deliberately exposes the learning objective and a compact
+// authored outline, never an exact typing target or answer option. It gives
+// the adaptive engine enough curriculum grounding to notice evidence in a
+// learner's own words without turning it into an answer generator.
+export const adaptiveRecallContext = (body) => {
+  const context = coursePageContext({
+    ...body,
+    page: { ...(body?.page || {}), phase: body?.page?.phase === 'type' ? 'read' : body?.page?.phase }
+  });
+  const response = boundedText(body?.response, 1600);
+  const previousResponse = boundedText(body?.previousResponse, 1600);
+  const barrier = boundedText(body?.barrier, 80);
+  if (!response && !barrier) throw apiError(400, 'EMPTY_LEARNING_EVIDENCE', 'Write a response or choose what is getting in the way first.');
+  return {
+    ...context,
+    response,
+    previousResponse,
+    barrier,
+    objective: boundedText(context.facts[0] || context.title, 420),
+    outline: context.facts.slice(0, 5)
+  };
+};

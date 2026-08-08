@@ -74,6 +74,11 @@ const splitOrigins = (value) => String(value || '')
   .map((origin) => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
+const splitKeys = (value) => String(value || '')
+  .split(/[\s,]+/)
+  .map((key) => key.trim())
+  .filter(Boolean);
+
 const openAiEndpoint = (value) => {
   const fallback = 'https://api.openai.com/v1/responses';
   if (!value) return { url: fallback, provider: 'openai' };
@@ -106,6 +111,12 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     }
     return '';
   };
+  // Unlike ordinary single-value settings, every supplied Gemini key is
+  // meaningful: preserve all aliases so gemchat, gemtext, and numbered keys
+  // participate in round-robin rotation instead of silently taking the first.
+  const values = (...keys) => keys.flatMap((key) => [environment[key], local[key]])
+    .filter((configured) => configured !== undefined && String(configured).trim())
+    .map((configured) => String(configured).trim());
   const defaultOrigins = [
     'https://type2learn.tech',
     'https://www.type2learn.tech',
@@ -115,6 +126,11 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
   const configuredOrigins = splitOrigins(value('AI_ALLOWED_ORIGINS'));
 
   const configuredOpenAiEndpoint = openAiEndpoint(value('OPENAI_RESPONSES_URL', 'OPENAI_API_BASE_URL', 'OPENAI_BASE_URL', 'url'));
+  const geminiApiKeys = Array.from(new Set([
+    ...values('GEMINI_API_KEYS', 'GEMINI_API_KEY').flatMap(splitKeys),
+    ...values('gemchat', 'gemtext', 'gemtest').flatMap(splitKeys),
+    ...Array.from({ length: 12 }, (_, index) => values(`GEMINI_API_KEY_${index + 1}`, `GEMINI_KEY_${index + 1}`)).flatMap(splitKeys)
+  ]));
 
   return {
     production,
@@ -145,6 +161,13 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     openAiOutputUsdPerMillion: numberFrom(value('OPENAI_OUTPUT_USD_PER_MILLION_TOKENS'), 0.4, { min: 0, max: 0.4 }),
     openAiMaxOutputTokens: numberFrom(value('OPENAI_MAX_OUTPUT_TOKENS'), 320, { min: 32, max: 320 }),
     openAiRequestsPerMinute: numberFrom(value('OPENAI_REQUESTS_PER_MINUTE'), 12, { min: 1, max: 12 }),
+    // Gemini is the primary low-cost provider. Keys are read only by this
+    // server process and are rotated by the model provider after temporary
+    // quota or transport failures. OpenAI remains a server-side fallback.
+    geminiApiKeys,
+    geminiFastModel: value('GEMINI_FAST_MODEL') || 'gemini-3.5-flash-lite',
+    geminiHeavyModel: value('GEMINI_HEAVY_MODEL') || 'gemini-3.6-flash',
+    geminiMaxOutputTokens: numberFrom(value('GEMINI_MAX_OUTPUT_TOKENS'), 420, { min: 64, max: 700 }),
     speechmaticsMonthlyCreditCap: numberFrom(value('SPEECHMATICS_MONTHLY_CREDIT_CAP'), 180, { min: 0, max: 180 }),
     speechmaticsUserCreditCap: numberFrom(value('SPEECHMATICS_MONTHLY_USER_CREDIT_CAP'), 12, { min: 0, max: 12 }),
     speechmaticsCreditsPerMinute: numberFrom(value('SPEECHMATICS_CREDITS_PER_AUDIO_MINUTE'), 1, { min: 0.01, max: 10 }),

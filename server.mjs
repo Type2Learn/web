@@ -3,12 +3,14 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAiService } from './server/ai-service.mjs';
+import { createAdaptiveRecallService } from './server/adaptive-recall-service.mjs';
 import { loadRuntimeConfig } from './server/config.mjs';
 import { publicError, apiError } from './server/errors.mjs';
 import { createFirebaseRuntime } from './server/firebase-runtime.mjs';
 import { createSpeechService } from './server/speech-service.mjs';
 import { createUsageLedger } from './server/usage-ledger.mjs';
 import { createCourseProgressService } from './server/course-progress-service.mjs';
+import { createModelProvider } from './server/model-provider.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -193,22 +195,27 @@ const buildRuntime = async () => {
   const config = await loadRuntimeConfig();
   const firebase = createFirebaseRuntime(config);
   const ledger = firebase.available ? createUsageLedger(firebase.firestore) : null;
+  const modelProvider = createModelProvider(config);
   return {
     config,
+    modelProvider,
     ai: createAiService({ config, firebase, ledger }),
+    adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider }),
     speech: createSpeechService({ config, firebase, ledger }),
     courseProgress: createCourseProgressService({ firebase })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, speech, courseProgress } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
   if (request.method === 'GET' && pathname === '/api/v1/health') {
     return sendJson(response, 200, {
       ai: ai.status(),
+      adaptiveRecall: adaptiveRecall.status(),
+      modelRouting: modelProvider.status(),
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
       model: config.openAiModel
@@ -217,6 +224,9 @@ const handleApi = async (request, response, pathname, runtime) => {
   try {
     if (request.method === 'POST' && pathname === '/api/v1/ai/chat') {
       return sendJson(response, 200, await ai.chat({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/adaptive-recall') {
+      return sendJson(response, 200, await adaptiveRecall.analyse({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/speech/transcribe') {
       return sendJson(response, 200, await speech.transcribe({ authorization: request.headers.authorization, form: await readForm(request) }));
