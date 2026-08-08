@@ -11,6 +11,9 @@ import { createSpeechService } from './server/speech-service.mjs';
 import { createUsageLedger } from './server/usage-ledger.mjs';
 import { createCourseProgressService } from './server/course-progress-service.mjs';
 import { createModelProvider } from './server/model-provider.mjs';
+import { createLearningAnalyticsService } from './server/learning-analytics-service.mjs';
+import { createAdaptiveSupportService } from './server/adaptive-support-service.mjs';
+import { createAssessmentService } from './server/assessment-service.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -222,12 +225,18 @@ const buildRuntime = async () => {
     ai: createAiService({ config, firebase, ledger, provider: modelProvider }),
     adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider }),
     speech: createSpeechService({ config, firebase, ledger }),
-    courseProgress: createCourseProgressService({ firebase })
+    courseProgress: createCourseProgressService({ firebase }),
+    // ADAPTIVE LEARNING: all three services independently enforce feature
+    // flags, bearer authentication, consent/reviewer checks, and Firestore
+    // availability. They are present even while disabled for a staged rollout.
+    learningAnalytics: createLearningAnalyticsService({ config, firebase }),
+    adaptiveSupport: createAdaptiveSupportService({ config, firebase, ledger, provider: modelProvider }),
+    assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -235,6 +244,9 @@ const handleApi = async (request, response, pathname, runtime) => {
     return sendJson(response, 200, {
       ai: ai.status(),
       adaptiveRecall: { ...adaptiveRecall.status(), localGuestPreview: config.allowLocalGuestAi },
+      adaptiveLearning: learningAnalytics.status(),
+      adaptiveSupport: adaptiveSupport.status(),
+      assessments: assessments.status(),
       modelRouting: modelProvider.status(),
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
@@ -255,6 +267,47 @@ const handleApi = async (request, response, pathname, runtime) => {
         body: await readJson(request),
         localGuest: localGuestFromRequest(request, config)
       }));
+    }
+    // ADAPTIVE LEARNING: these routes only accept the compact, validated
+    // summaries/decisions described in AI_ADAPTIVE_LEARNING_README.md. They
+    // never receive raw keystrokes, recordings, chat history, or answer keys.
+    if (request.method === 'POST' && pathname === '/api/v1/adaptive/consent') {
+      return sendJson(response, 200, await learningAnalytics.setConsent({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/adaptive/consent') {
+      return sendJson(response, 200, await learningAnalytics.getConsent({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/learning-summary') {
+      return sendJson(response, 200, await learningAnalytics.saveSummary({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/adaptive/proposal') {
+      return sendJson(response, 200, await adaptiveSupport.proposal({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    const proposalDecision = pathname.match(/^\/api\/v1\/adaptive\/proposal\/([A-Za-z0-9_-]{1,100})\/decision$/);
+    if (request.method === 'POST' && proposalDecision) {
+      return sendJson(response, 200, await adaptiveSupport.decide({ authorization: request.headers.authorization, proposalId: proposalDecision[1], body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/privacy/adaptive-data-export') {
+      return sendJson(response, 200, await learningAnalytics.exportData({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'DELETE' && pathname === '/api/v1/privacy/adaptive-data') {
+      return sendJson(response, 200, await learningAnalytics.clear({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/assessment/drafts') {
+      return sendJson(response, 200, await assessments.createDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/assessment/publish') {
+      return sendJson(response, 200, await assessments.publishDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/assessment/start') {
+      return sendJson(response, 200, await assessments.start({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    const assessmentRun = pathname.match(/^\/api\/v1\/assessment\/([A-Za-z0-9_-]{1,100})$/);
+    if (assessmentRun && request.method === 'GET') {
+      return sendJson(response, 200, await assessments.getRun({ authorization: request.headers.authorization, runId: assessmentRun[1] }));
+    }
+    if (assessmentRun && request.method === 'POST') {
+      return sendJson(response, 200, await assessments.answer({ authorization: request.headers.authorization, runId: assessmentRun[1], body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/speech/transcribe') {
       return sendJson(response, 200, await speech.transcribe({ authorization: request.headers.authorization, form: await readForm(request) }));

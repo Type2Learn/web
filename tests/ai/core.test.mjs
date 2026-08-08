@@ -8,6 +8,8 @@ import { APPROVED_OPENAI_MODEL, RESERVED_TEST_GENERATION_MODEL, loadRuntimeConfi
 import { createAiService } from '../../server/ai-service.mjs';
 import { createAdaptiveRecallService } from '../../server/adaptive-recall-service.mjs';
 import { adaptiveRecallContext, coursePageContext, normaliseConversation, normaliseLearnerMessage } from '../../server/course-context.mjs';
+import { createFallbackAssessmentBank } from '../../server/fallback-assessment-bank.mjs';
+import { assessmentCurriculum, publicAssessmentItem, validateAssessmentBank } from '../../server/assessment-schemas.mjs';
 import { usageEstimate } from '../../server/usage-ledger.mjs';
 
 test('environment parser keeps comments out and reads quoted local values', () => {
@@ -188,6 +190,50 @@ test('Azure Responses calls use api-key, the exact approved model, and parse Azu
   }
 });
 
+test('signed-in Course AI uses the shared Gemini-first provider before an unavailable OpenAI fallback', async () => {
+  const settled = [];
+  const service = createAiService({
+    config: {
+      openAiApiKey: '',
+      openAiResponsesUrl: '',
+      openAiModel: APPROVED_OPENAI_MODEL,
+      openAiMaxOutputTokens: 120,
+      openAiInputUsdPerMillion: .05,
+      openAiOutputUsdPerMillion: .4,
+      openAiAppCapUsd: 14,
+      openAiAppInputTokenCap: 11200000,
+      openAiAppOutputTokenCap: 5600000,
+      openAiUserCapUsd: 2,
+      openAiUserInputTokenCap: 1000000,
+      openAiUserOutputTokenCap: 500000,
+      openAiRequestsPerMinute: 12,
+      allowLocalGuestAi: false
+    },
+    firebase: { available: true, verifyBearer: async () => ({ uid: 'gemini-first-learner' }) },
+    ledger: {
+      reserve: async () => ({ month: '2026-08', reservationId: 'gemini-first-test' }),
+      settle: async (details) => settled.push(details),
+      release: async () => assert.fail('a successful Gemini reply must settle its reservation')
+    },
+    provider: {
+      status: () => ({ available: true, primary: 'gemini', chatModel: 'gemini-3.5-flash-lite' }),
+      generate: async () => ({
+        text: 'Try naming one helpful next step.',
+        provider: 'gemini',
+        usage: { inputTokens: 22, outputTokens: 9 }
+      })
+    }
+  });
+  const result = await service.chat({
+    authorization: 'Bearer test-token',
+    body: { message: 'I am stuck.', history: [], courseId: COURSE_CONTENT.id, page: { moduleIndex: 0, phase: 'read' }, language: 'en' }
+  });
+  assert.equal(result.reply, 'Try naming one helpful next step.');
+  assert.equal(service.status().provider, 'gemini');
+  assert.equal(settled.length, 1);
+  assert.equal(settled[0].actual.usd, 0);
+});
+
 test('course context limits model facts to the current page and excludes assessment options', () => {
   const context = coursePageContext({
     courseId: COURSE_CONTENT.id,
@@ -269,6 +315,28 @@ test('adaptive recall context has no assessment answers or exact typing target',
   const supplied = context.outline.join(' ');
   assert.equal(supplied.includes(COURSE_CONTENT.steps[0].typing.target), false);
   assert.equal(supplied.includes(String(COURSE_CONTENT.steps[0].check.options[0][0])), false);
+});
+
+test('authored module assessment reserve is deterministic, bounded, and keeps answer keys server-only', () => {
+  const curriculum = assessmentCurriculum(0, 'en');
+  const first = createFallbackAssessmentBank(curriculum);
+  const second = createFallbackAssessmentBank(curriculum);
+  assert.deepEqual(first, second);
+  const bank = validateAssessmentBank(first, curriculum);
+  assert.equal(bank.items.filter((item) => item.responseMode === 'open').length, 4);
+  assert.equal(bank.items.filter((item) => item.responseMode === 'mcq').length, 5);
+  const publicItem = publicAssessmentItem(bank.items.find((item) => item.responseMode === 'mcq'));
+  assert.equal(Object.hasOwn(publicItem, 'correctOptionIndex'), false);
+  assert.equal(Object.hasOwn(publicItem, 'answerGuide'), false);
+  assert.equal(Object.hasOwn(publicItem, 'rubric'), false);
+});
+
+test('authored final assessment reserve provides the requested calm question limits', () => {
+  const curriculum = assessmentCurriculum('final', 'en');
+  const bank = validateAssessmentBank(createFallbackAssessmentBank(curriculum), curriculum);
+  assert.equal(bank.items.filter((item) => item.responseMode === 'open').length, 9);
+  assert.equal(bank.items.filter((item) => item.responseMode === 'mcq').length, 12);
+  assert.equal(bank.items.length, 21);
 });
 
 test('usage estimate uses the documented Nano price configuration and keeps Mini reserved', () => {

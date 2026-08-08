@@ -60,12 +60,34 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
   const summary = (uid, moduleIndex) => profile(uid)
     .collection('courses').doc(COURSE_ID)
     .collection('modules').doc(String(moduleIndex));
+  // Assessment runs intentionally live separately from analytics summaries.
+  // They still belong in the same export/delete control because they contain
+  // bounded assessment outcomes derived from an opted-in learner response.
+  const assessmentRuns = (uid) => firebase.firestore
+    .collection('type2learnAssessmentRuns').doc(userHash(uid)).collection('runs');
+  const assessmentRoot = (uid) => firebase.firestore
+    .collection('type2learnAssessmentRuns').doc(userHash(uid));
 
   const status = () => ({
     available: available(),
     consentVersion: CONSENT_VERSION,
     requiresSignIn: true
   });
+
+  // ADAPTIVE LEARNING: this read-only check lets the course render the
+  // learner's choice without creating a profile or collecting anything.
+  const getConsent = async ({ authorization }) => {
+    if (!firebase.available || !firebase.firestore) {
+      throw apiError(503, 'ADAPTIVE_LEARNING_UNAVAILABLE', 'Adaptive learning support is not connected right now.');
+    }
+    const learner = await firebase.verifyBearer(authorization);
+    const data = (await profile(learner.uid).get()).data() || {};
+    return {
+      available: available(),
+      enabled: data.consentVersion === CONSENT_VERSION && data.adaptiveEnabled === true,
+      consentVersion: CONSENT_VERSION
+    };
+  };
 
   const setConsent = async ({ authorization, body }) => {
     if (!available()) throw apiError(503, 'ADAPTIVE_LEARNING_UNAVAILABLE', 'Adaptive learning support is not available right now.');
@@ -111,12 +133,25 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     const learner = await firebase.verifyBearer(authorization);
     const root = profile(learner.uid);
     const course = root.collection('courses').doc(COURSE_ID);
-    const modules = await course.collection('modules').limit(20).get();
-    const proposals = await course.collection('adaptiveProposals').limit(50).get();
+    // Firestore batches are capped. Keep deleting bounded records in batches
+    // so this privacy action remains complete even after many optional runs.
+    const deleteCollection = async (collection) => {
+      while (true) {
+        const snapshot = await collection.limit(200).get();
+        if (snapshot.empty) return;
+        const deletion = firebase.firestore.batch();
+        snapshot.docs.forEach((document) => deletion.delete(document.ref));
+        await deletion.commit();
+      }
+    };
+    await Promise.all([
+      deleteCollection(course.collection('modules')),
+      deleteCollection(course.collection('adaptiveProposals')),
+      deleteCollection(assessmentRuns(learner.uid))
+    ]);
     const batch = firebase.firestore.batch();
-    modules.docs.forEach((document) => batch.delete(document.ref));
-    proposals.docs.forEach((document) => batch.delete(document.ref));
     batch.delete(course);
+    batch.delete(assessmentRoot(learner.uid));
     batch.set(root, {
       schemaVersion: 1,
       consentVersion: CONSENT_VERSION,
@@ -133,10 +168,11 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     const learner = await firebase.verifyBearer(authorization);
     const root = profile(learner.uid);
     const course = root.collection('courses').doc(COURSE_ID);
-    const [profileSnapshot, moduleSnapshots, proposalSnapshots] = await Promise.all([
+    const [profileSnapshot, moduleSnapshots, proposalSnapshots, assessmentSnapshots] = await Promise.all([
       root.get(),
-      course.collection('modules').limit(20).get(),
-      course.collection('adaptiveProposals').limit(50).get()
+      course.collection('modules').get(),
+      course.collection('adaptiveProposals').get(),
+      assessmentRuns(learner.uid).get()
     ]);
     const profileData = profileSnapshot.data() || {};
     // This export is intentionally the same minimised data that can be
@@ -164,9 +200,26 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
           candidateId: String(data.candidateId || ''), kind: String(data.kind || ''),
           status: String(data.status || ''), preference: data.preference || null
         };
+      }),
+      assessments: assessmentSnapshots.docs.map((document) => {
+        const data = document.data() || {};
+        return {
+          id: String(data.id || document.id),
+          moduleIndex: data.moduleIndex === 'final' ? 'final' : Number(data.moduleIndex) || 0,
+          scope: data.moduleIndex === 'final' ? 'final' : 'module',
+          status: String(data.status || ''),
+          completionKind: String(data.completionKind || ''),
+          questionCount: Array.isArray(data.itemOrder) ? data.itemOrder.length : 0,
+          outcomes: Array.isArray(data.outcomes) ? data.outcomes.map((outcome) => ({
+            itemId: String(outcome?.itemId || ''),
+            outcome: String(outcome?.outcome || ''),
+            demonstratedObjectiveIds: Array.isArray(outcome?.demonstratedObjectiveIds) ? outcome.demonstratedObjectiveIds.map((id) => String(id)).slice(0, 3) : [],
+            needsReviewObjectiveIds: Array.isArray(outcome?.needsReviewObjectiveIds) ? outcome.needsReviewObjectiveIds.map((id) => String(id)).slice(0, 3) : []
+          })) : []
+        };
       })
     };
   };
 
-  return { status, setConsent, saveSummary, exportData, clear };
+  return { status, getConsent, setConsent, saveSummary, exportData, clear };
 };

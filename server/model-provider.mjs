@@ -55,6 +55,8 @@ export const createModelProvider = (config) => {
     primary: geminiReady() ? 'gemini' : openAiReady() ? 'openai' : 'offline',
     fallback: openAiReady() ? 'openai' : null,
     fastModel: config.geminiFastModel || null,
+    heavyModel: config.geminiHeavyModel || config.openAiTestModel || null,
+    chatModel: config.geminiFastModel || config.openAiModel || null,
     fallbackModel: config.openAiModel || null
   });
 
@@ -128,7 +130,7 @@ export const createModelProvider = (config) => {
     throw lastError || new Error('No Gemini key is ready.');
   };
 
-  const callOpenAi = async ({ instructions, input, maxOutputTokens, jsonSchema }) => {
+  const callOpenAi = async ({ instructions, input, maxOutputTokens, jsonSchema, heavy = false }) => {
     if (!openAiReady()) throw new Error('No fallback model is configured.');
     const response = await fetch(config.openAiResponsesUrl, {
       method: 'POST',
@@ -137,7 +139,7 @@ export const createModelProvider = (config) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: config.openAiModel,
+        model: heavy ? (config.openAiTestModel || config.openAiModel) : config.openAiModel,
         store: false,
         instructions,
         input,
@@ -153,7 +155,7 @@ export const createModelProvider = (config) => {
     return {
       text,
       provider: 'openai',
-      model: config.openAiModel,
+      model: heavy ? (config.openAiTestModel || config.openAiModel) : config.openAiModel,
       usage: {
         inputTokens: number(payload?.usage?.input_tokens, Math.ceil((instructions.length + input.length) / 3)),
         outputTokens: number(payload?.usage?.output_tokens, Math.ceil(text.length / 3))
@@ -162,16 +164,27 @@ export const createModelProvider = (config) => {
   };
 
   const generate = async (request) => {
+    // ADAPTIVE LEARNING: the imported assessment service names high-complexity
+    // work by purpose. Normalise it here so all routes still share one
+    // Gemini-first rotation and one OpenAI fallback implementation.
+    const normalisedRequest = {
+      ...request,
+      heavy: Boolean(request?.heavy || request?.purpose === 'heavy')
+    };
     let geminiError;
     if (geminiReady()) {
-      try { return await callGemini(request); } catch (error) { geminiError = error; }
+      try { return await callGemini(normalisedRequest); } catch (error) { geminiError = error; }
     }
-    try { return await callOpenAi(request); } catch (openAiError) {
+    try { return await callOpenAi(normalisedRequest); } catch (openAiError) {
       const failure = new Error(geminiError?.message || openAiError?.message || 'No learning model is available.');
       failure.cause = openAiError;
       throw failure;
     }
   };
 
-  return { status, generate };
+  const available = () => status().available;
+  const availableFor = (purpose) => purpose === 'heavy'
+    ? Boolean(geminiReady() || openAiReady())
+    : available();
+  return { status, available, availableFor, generate };
 };

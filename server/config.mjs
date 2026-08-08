@@ -149,6 +149,12 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // Firebase account. It is hard-disabled in production even when an
     // environment variable is accidentally supplied there.
     allowLocalGuestAi: !production && booleanFrom(value('AI_ALLOW_GUESTS')),
+    // ADAPTIVE LEARNING: every data-collecting or generative feature remains
+    // off by default. These flags must block server routes as well as UI, so a
+    // hidden button cannot create learner data or provider spend.
+    adaptiveLearningEnabled: booleanFrom(value('ADAPTIVE_LEARNING_ENABLED')),
+    aiAssessmentsEnabled: booleanFrom(value('AI_ASSESSMENTS_ENABLED')),
+    aiVisualsEnabled: booleanFrom(value('AI_VISUALS_ENABLED')),
     firebaseProjectId: value('FIREBASE_PROJECT_ID') || 'type2learn-defcc',
     firebaseServiceAccountJson: value('FIREBASE_SERVICE_ACCOUNT_JSON'),
     openAiApiKey: value('OPENAI_API_KEY', 'openai', 'key'),
@@ -158,6 +164,7 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // deployment variable is always the explicit SPEECHMATICS_API_KEY name.
     speechmaticsApiKey: value('SPEECHMATICS_API_KEY', 'speech'),
     openAiModel: APPROVED_OPENAI_MODEL,
+    openAiTestModel: RESERVED_TEST_GENERATION_MODEL,
     // A zero cap makes every first request look as though the monthly budget
     // was spent. Treat accidental zero-valued deployment variables as absent
     // and retain the deliberately bounded defaults instead.
@@ -173,6 +180,23 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     openAiOutputUsdPerMillion: numberFrom(value('OPENAI_OUTPUT_USD_PER_MILLION_TOKENS'), 0.4, { min: 0, max: 0.4 }),
     openAiMaxOutputTokens: numberFrom(value('OPENAI_MAX_OUTPUT_TOKENS'), 320, { min: 32, max: 320 }),
     openAiRequestsPerMinute: numberFrom(value('OPENAI_REQUESTS_PER_MINUTE'), 12, { min: 1, max: 12 }),
+    // The adaptive proposal service uses a smaller portion of the existing
+    // protected ledger. These are ceilings, never new defaults that enable a
+    // feature by themselves.
+    adaptiveAppCapUsd: numberFrom(value('ADAPTIVE_MONTHLY_APP_USD_CAP'), 2, { min: 0.01, max: 2 }),
+    adaptiveUserCapUsd: numberFrom(value('ADAPTIVE_MONTHLY_USER_USD_CAP'), 0.5, { min: 0.01, max: 0.5 }),
+    adaptiveRequestsPerMinute: numberFrom(value('ADAPTIVE_REQUESTS_PER_MINUTE'), 4, { min: 1, max: 4 }),
+    // Assessment generation is intentionally rare and reviewer-only. The
+    // learner-facing authored reserve needs no provider call.
+    assessmentAppCapUsd: numberFrom(value('OPENAI_ASSESSMENT_MONTHLY_APP_USD_CAP'), 3, { min: 0.01, max: 3 }),
+    assessmentUserCapUsd: numberFrom(value('OPENAI_ASSESSMENT_MONTHLY_USER_USD_CAP'), 0.5, { min: 0.01, max: 0.5 }),
+    assessmentRequestsPerMinute: numberFrom(value('OPENAI_ASSESSMENT_REQUESTS_PER_MINUTE'), 2, { min: 1, max: 2 }),
+    assessmentGenerationIntervalMs: numberFrom(value('ASSESSMENT_GENERATION_INTERVAL_MS'), 3600000, { min: 60000, max: 86400000 }),
+    assessmentMaxOutputTokens: numberFrom(value('OPENAI_ASSESSMENT_MAX_OUTPUT_TOKENS'), 2400, { min: 400, max: 4800 }),
+    assessmentReviewerUids: new Set(value('ASSESSMENT_REVIEWER_UIDS').split(',').map((item) => item.trim()).filter(Boolean)),
+    openAiTestInputUsdPerMillion: numberFrom(value('OPENAI_TEST_INPUT_USD_PER_MILLION_TOKENS'), 0.25, { min: 0, max: 5 }),
+    openAiTestCachedInputUsdPerMillion: numberFrom(value('OPENAI_TEST_CACHED_INPUT_USD_PER_MILLION_TOKENS'), 0.025, { min: 0, max: 5 }),
+    openAiTestOutputUsdPerMillion: numberFrom(value('OPENAI_TEST_OUTPUT_USD_PER_MILLION_TOKENS'), 2, { min: 0, max: 10 }),
     // Gemini is the primary low-cost provider. Keys are read only by this
     // server process and are rotated by the model provider after temporary
     // quota or transport failures. OpenAI remains a server-side fallback.

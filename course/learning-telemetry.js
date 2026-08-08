@@ -33,8 +33,10 @@ export class LearningTelemetry {
   }
 
   begin(context) {
-    const key = [context?.moduleIndex, context?.phase, context?.language].join(':');
-    const oldKey = this.context && [this.context.moduleIndex, this.context.phase, this.context.language].join(':');
+    // A module is the aggregation boundary. Moving between reading, typing,
+    // and checking must not create a stream of task-level uploads.
+    const key = [context?.moduleIndex, context?.language].join(':');
+    const oldKey = this.context && [this.context.moduleIndex, this.context.language].join(':');
     if (oldKey && oldKey !== key) void this.flush('task-change');
     if (oldKey !== key) {
       this.context = { moduleIndex: Number(context?.moduleIndex) || 0, phase: String(context?.phase || 'read'), language: context?.language === 'ur' ? 'ur' : 'en' };
@@ -43,6 +45,8 @@ export class LearningTelemetry {
       this.contextStartedAt = now();
       this.lastMeaningfulActionAt = this.contextStartedAt;
       this.lastTickAt = this.contextStartedAt;
+    } else if (this.context) {
+      this.context.phase = String(context?.phase || this.context.phase || 'read');
     }
     this.enabled = Boolean(context?.enabled);
   }

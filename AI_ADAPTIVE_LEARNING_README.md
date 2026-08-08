@@ -1,8 +1,33 @@
 # Type2Learn adaptive learning and AI plan
 
-Status: **planning only**. This document does not enable new behavioural
-telemetry, adaptive decisions, generated tests, images, or learner-profile
-data.
+Status: **implemented in guarded stages** (updated 2026-08-09). This document
+remains the product and safety specification, while the table below records
+what is now connected in the application and what intentionally remains
+disabled until its privacy/review requirements are met.
+
+## Current implementation coverage
+
+| Area | Current status | Where it is implemented |
+| --- | --- | --- |
+| Gemini-first model routing | **Live when Gemini keys are configured.** Numbered Gemini keys rotate before the OpenAI fallback. | `server/model-provider.mjs`, `server/ai-service.mjs` |
+| Course AI / “Talk to Course AI” | **Live for signed-in learners; local guest preview only behind `AI_ALLOW_GUESTS`.** It is bounded to the current course step. | `course/course.js`, `server/ai-service.mjs` |
+| Adaptive Recall / barrier support | **Live when the adaptive recall endpoint is configured.** The “I’m stuck” choices include a direct Course AI route. | `server/adaptive-recall-service.mjs`, `course/course.js` |
+| Consent-gated learning summaries | **Implemented, off by default.** Only compact aggregate metrics are uploaded after a learner opts in. | `course/learning-telemetry.js`, `server/learning-analytics-service.mjs` |
+| One-change support proposals | **Implemented, off by default.** Deterministic policy selects the allowed change; Gemini may only shorten the wording. | `server/adaptive-policy.mjs`, `server/adaptive-support-service.mjs` |
+| Task initiation / visual explanation | **Implemented as authored supports.** A small first step and an accessible, authored visual rail never depend on a model. | `course/adaptive-support.js`, `course/visual-explanations.js` |
+| Readability support | **Implemented manual controls.** Text size, spacing, reading width, smaller sections, optional TTS and synced highlighting remain learner-controlled. A dedicated dyslexia-font/colour-overlay control is not yet shipped. | `course/learner-settings.js`, `course/course.js`, `course/course.css` |
+| Module/final understanding checks | **Implemented behind `AI_ASSESSMENTS_ENABLED` and adaptive consent.** One public question is shown at a time; no answer key, numeric score or raw answer is stored in the learner progress. | `server/assessment-*.mjs`, `course/course.js` |
+| No-provider assessment fallback | **Implemented.** The reviewed/generated bank can be unavailable and the authored reserve still supplies 4 open + 5 MCQ module checks or 9 open + 12 MCQ final checks. | `server/fallback-assessment-bank.mjs` |
+| Targeted review and another check | **Implemented as an optional recovery path.** Learners can review a related module or try another calm check; there is no forced, unlimited retesting. | `server/assessment-service.mjs`, `course/course.js` |
+| Export/delete | **Implemented for adaptive summaries, proposals and opaque assessment outcomes.** | `server/learning-analytics-service.mjs` |
+| AI-generated images | **Intentionally not implemented.** The product currently uses authored visuals only; generated visuals require separate approval, moderation, private storage and retention work. | `course/visual-explanations.js` |
+| Automated retention job | **Not yet implemented.** Deletion on request works; an inactivity-retention scheduler still needs privacy/legal approval. | Future work |
+
+Feature flags remain off in `security/api.env.example` so deploying the site
+does not silently begin adaptive collection or assessment. To enable them in a
+reviewed environment, set `ADAPTIVE_LEARNING_ENABLED=true` and, separately,
+`AI_ASSESSMENTS_ENABLED=true`; learners must still opt in from the course
+settings menu.
 
 This is the implementation specification for Type2Learn's next AI layer. It
 fits the present course architecture and preserves the course's calm,

@@ -105,6 +105,11 @@ export const setAdaptiveLearningConsent = async ({ user, enabled, signal }) => a
   signal
 });
 
+export const getAdaptiveLearningConsent = async ({ user, signal }) => authenticatedRequest(user, '/api/v1/adaptive/consent', {
+  method: 'GET',
+  signal
+});
+
 export const saveLearningSummary = async ({ user, summary, signal }) => authenticatedRequest(user, '/api/v1/learning-summary', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },

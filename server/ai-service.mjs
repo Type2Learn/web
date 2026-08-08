@@ -79,7 +79,12 @@ const upstreamError = async (response) => {
 };
 
 export const createAiService = ({ config, firebase, ledger, provider = null }) => {
-  const available = () => Boolean(config.openAiApiKey && config.openAiResponsesUrl && firebase.available && ledger);
+  // Course AI uses the shared Gemini-first provider whenever it is present.
+  // The direct Responses implementation remains only as a compatibility path
+  // for an isolated deployment/test that has no shared provider at all.
+  const providerAvailable = () => Boolean(provider?.status?.().available);
+  const directOpenAiAvailable = () => Boolean(config.openAiApiKey && config.openAiResponsesUrl);
+  const available = () => Boolean((providerAvailable() || directOpenAiAvailable()) && firebase.available && ledger);
   // Local guest chat is intentionally narrower than the signed-in product
   // route. It exists only for developer/Playwright preview when the explicit
   // non-production flag is set; production always remains signed-in only.
@@ -87,19 +92,20 @@ export const createAiService = ({ config, firebase, ledger, provider = null }) =
     config.allowLocalGuestAi
     && firebase.available
     && ledger
-    && provider?.status?.().available
+    && providerAvailable()
   );
   const status = () => ({
     available: available(),
     requiresSignIn: true,
     localGuestPreview: localGuestPreviewAvailable(),
-    model: config.openAiModel
+    provider: providerAvailable() ? provider.status().primary : 'openai',
+    model: providerAvailable() ? provider.status().chatModel : config.openAiModel
   });
 
   const chat = async ({ authorization, body, localGuest = null }) => {
     const guestPreview = Boolean(localGuest?.isGuest && localGuestPreviewAvailable());
-    if (!guestPreview && (!config.openAiApiKey || !config.openAiResponsesUrl)) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
-    if (!guestPreview && config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
+    if (!providerAvailable() && !directOpenAiAvailable()) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
+    if (!providerAvailable() && config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
     if (!firebase.available || !ledger) throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
     const learner = guestPreview ? localGuest : await firebase.verifyBearer(authorization);
     const message = normaliseLearnerMessage(body?.message);
@@ -136,9 +142,11 @@ export const createAiService = ({ config, firebase, ledger, provider = null }) =
       let reply = '';
       let inputTokens = estimatedInputTokens;
       let outputTokens = 0;
-      if (guestPreview) {
-        // Gemini-first rotation is handled exclusively by model-provider. The
-        // returned key slot and provider details remain server-only.
+      let generatedProvider = 'openai';
+      if (providerAvailable()) {
+        // Gemini-first rotation is handled exclusively by model-provider for
+        // signed learners and local guest preview alike. Key-slot diagnostics
+        // remain server-only and are never returned to the browser.
         const generated = await provider.generate({
           instructions,
           input,
@@ -147,6 +155,7 @@ export const createAiService = ({ config, firebase, ledger, provider = null }) =
         reply = String(generated.text || '').trim().slice(0, MAX_REPLY_CHARACTERS);
         inputTokens = Number(generated?.usage?.inputTokens) || estimatedInputTokens;
         outputTokens = Number(generated?.usage?.outputTokens) || 0;
+        generatedProvider = generated?.provider === 'gemini' ? 'gemini' : 'openai';
       } else {
         let response;
         try {
@@ -180,7 +189,10 @@ export const createAiService = ({ config, firebase, ledger, provider = null }) =
       await ledger.settle({
         ...reservation,
         actual: {
-          usd: usageEstimate(inputTokens, outputTokens, config),
+          // Gemini is the preferred no-cost path. The reservation still
+          // protects request volume; only a real OpenAI fallback consumes the
+          // bounded paid-model allowance.
+          usd: generatedProvider === 'openai' ? usageEstimate(inputTokens, outputTokens, config) : 0,
           inputTokens,
           outputTokens,
           credits: 0

@@ -21,6 +21,21 @@ const MAX_RUN_ITEMS = 21;
 
 const stableModuleId = (moduleIndex) => moduleIndex === 'final' ? 'final' : `module-${Number(moduleIndex) + 1}`;
 const nowDate = () => new Date();
+const reviewModuleIndexFor = (objectiveIds = []) => {
+  const match = String(Array.isArray(objectiveIds) ? objectiveIds[0] || '' : '').match(/^m(\d{2})-/);
+  const index = Number(match?.[1]) - 1;
+  return Number.isInteger(index) && index >= 0 && index <= 10 ? index : null;
+};
+
+// A run gets a random id once, then receives a stable order derived from it.
+// This avoids a hidden Math.random() reshuffle after reloads or retries.
+const stableItemOrder = (items, seed) => [...items]
+  .map((item) => ({
+    item,
+    rank: createHash('sha256').update(`${seed}:${item.id}`).digest('hex')
+  }))
+  .sort((left, right) => left.rank.localeCompare(right.rank) || left.item.id.localeCompare(right.item.id))
+  .map(({ item }) => item.id);
 
 const generationInstructions = (curriculum) => [
   'Create a candidate assessment bank for a nonprofit education course.',
@@ -70,6 +85,9 @@ const visibleRun = (run, bank) => {
   const currentIndex = Math.max(0, Math.min(Number(run?.currentIndex) || 0, itemIds.length));
   const item = bank?.items?.find((candidate) => candidate.id === itemIds[currentIndex]) || null;
   const completed = run?.status === 'complete';
+  const reviewModuleIndex = completed && run?.completionKind === 'review'
+    ? reviewModuleIndexFor(run?.missingObjectiveIds)
+    : null;
   return {
     runId: String(run?.id || ''),
     courseId: ASSESSMENT_COURSE_ID,
@@ -77,13 +95,15 @@ const visibleRun = (run, bank) => {
     scope: run?.moduleIndex === 'final' ? 'final' : 'module',
     language: run?.language === 'ur' ? 'ur' : 'en',
     status: completed ? 'complete' : 'active',
+    completionKind: completed && run?.completionKind === 'ready' ? 'ready' : completed ? 'review' : '',
+    reviewModuleIndex,
     currentQuestion: completed || !item ? null : publicAssessmentItem(item),
     questionPosition: completed ? itemIds.length : currentIndex + 1,
     questionCount: itemIds.length,
     nextHelpfulStep: completed
       ? (run?.completionKind === 'ready'
         ? (run?.moduleIndex === 'final' ? 'You completed the final course check.' : 'You are ready for the next module.')
-        : 'You did useful work. One idea could use a closer look — you can review it when you are ready.')
+        : 'You did useful work. One course idea could use another look before the next calm check.')
       : 'Answer one question at a time. There is no timer or score shown here.'
   };
 };
@@ -92,6 +112,7 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
   const assessmentBanks = () => firebase.firestore.collection('type2learnAssessmentBanks');
   const bankModuleRef = (curriculum) => assessmentBanks().doc(bankKey(curriculum)).collection('modules').doc(stableModuleId(curriculum.moduleIndex));
   const runCollection = (uid) => firebase.firestore.collection('type2learnAssessmentRuns').doc(hash(uid)).collection('runs');
+  const learningProfile = (uid) => firebase.firestore.collection('type2learnLearningProfiles').doc(hash(uid));
   const hasReviewerConfiguration = () => config.assessmentReviewerUids instanceof Set && config.assessmentReviewerUids.size > 0;
   const available = () => Boolean(config.aiAssessmentsEnabled && firebase.available && firebase.firestore);
   const status = () => ({
@@ -114,12 +135,23 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
       throw apiError(503, 'ASSESSMENT_GENERATION_UNAVAILABLE', 'Assessment generation is not connected right now. The authored assessment bank remains available.');
     }
   };
-  const learner = async (authorization) => {
+  const signedInAccount = async (authorization) => {
     assertAvailable();
     return firebase.verifyBearer(authorization);
   };
+  const learner = async (authorization) => {
+    const account = await signedInAccount(authorization);
+    // ADAPTIVE LEARNING: a written or spoken assessment response may be
+    // evaluated by the configured model. A feature flag never substitutes for
+    // the learner's explicit data-use choice.
+    const profile = (await learningProfile(account.uid).get()).data() || {};
+    if (profile.consentVersion !== 1 || profile.adaptiveEnabled !== true) {
+      throw apiError(403, 'ADAPTIVE_CONSENT_REQUIRED', 'Choose adaptive learning support before starting an understanding check.');
+    }
+    return account;
+  };
   const reviewer = async (authorization) => {
-    const account = await learner(authorization);
+    const account = await signedInAccount(authorization);
     if (!hasReviewerConfiguration() || !config.assessmentReviewerUids.has(account.uid)) {
       throw apiError(403, 'ASSESSMENT_REVIEW_REQUIRED', 'This assessment-bank action requires an approved curriculum reviewer.');
     }
@@ -237,9 +269,9 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     const curriculum = assessmentCurriculum(body?.scope === 'final' ? 'final' : body?.moduleIndex, body?.language);
     const bank = await activeBank(curriculum);
     const id = randomUUID();
-    // The generated bank is reviewed before publication. This per-run order is
-    // deterministic only within the run and stores item IDs, never answers.
-    const itemOrder = [...bank.items].sort(() => Math.random() - 0.5).map((item) => item.id);
+    // The generated bank is reviewed before publication. This per-run order
+    // is stable and stores item IDs only—never answers or answer keys.
+    const itemOrder = stableItemOrder(bank.items, id);
     const run = {
       schemaVersion: 1, id, status: 'active', courseId: curriculum.courseId,
       curriculumVersion: curriculum.curriculumVersion, moduleIndex: curriculum.moduleIndex,
@@ -297,11 +329,19 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     }];
     const nextIndex = Number(run.currentIndex) + 1;
     const complete = nextIndex >= run.itemOrder.length;
-    const completionKind = complete && outcomes.every((outcome) => outcome.outcome === 'demonstrated') ? 'ready' : 'review';
-    const updated = { ...run, currentIndex: nextIndex, outcomes, status: complete ? 'complete' : 'active', completionKind: complete ? completionKind : null, updatedAt: nowDate() };
+    // A learner is ready when every approved objective has at least one piece
+    // of demonstrated evidence. Requiring every individual question to be
+    // perfect would turn this into a score by another name and make the calm
+    // fallback impossible to complete when model evaluation is unavailable.
+    const demonstrated = new Set(outcomes.flatMap((outcome) => outcome.outcome === 'demonstrated' ? outcome.demonstratedObjectiveIds : []));
+    const missingObjectiveIds = curriculum.objectives
+      .map((objective) => objective.id)
+      .filter((objectiveId) => !demonstrated.has(objectiveId));
+    const completionKind = complete && missingObjectiveIds.length === 0 ? 'ready' : 'review';
+    const updated = { ...run, currentIndex: nextIndex, outcomes, status: complete ? 'complete' : 'active', completionKind: complete ? completionKind : null, missingObjectiveIds: complete ? missingObjectiveIds : [], updatedAt: nowDate() };
     // No raw typed/spoken answer, prompt response, option choice, score, or
     // model chain-of-thought is persisted. Only a bounded outcome remains.
-    await ref.set({ currentIndex: updated.currentIndex, outcomes, status: updated.status, completionKind: updated.completionKind, updatedAt: updated.updatedAt }, { merge: true });
+    await ref.set({ currentIndex: updated.currentIndex, outcomes, status: updated.status, completionKind: updated.completionKind, missingObjectiveIds: updated.missingObjectiveIds, updatedAt: updated.updatedAt }, { merge: true });
     const feedback = /^result under review\./i.test(String(evaluation.feedback || ''))
       ? evaluation.feedback
       : 'Result under review. ' + String(evaluation.feedback || 'You can continue to the next question when you are ready.');

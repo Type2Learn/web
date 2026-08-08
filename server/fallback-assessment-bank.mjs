@@ -4,6 +4,16 @@
 
 const idFor = (prefix, position) => `${prefix}-${String(position).padStart(2, '0')}`;
 
+// The reserve must be repeatable even when the model is unavailable. Each run
+// gets a stable, per-run order in assessment-service; this selector simply
+// chooses a safe authored subset without relying on Math.random().
+const rotateTake = (items, amount, seed = 0) => {
+  const ordered = [...items].sort((left, right) => left.id.localeCompare(right.id));
+  if (ordered.length <= amount) return ordered;
+  const start = Math.abs(Number(seed) || 0) % ordered.length;
+  return Array.from({ length: amount }, (_, index) => ordered[(start + index) % ordered.length]);
+};
+
 const supportFromSource = (source) => {
   const match = String(source || '').match(/(?:support|supports):\s*([^\n.;]+)/i);
   return match?.[1]?.trim() || 'ask what support would make the next step clearer';
@@ -96,13 +106,14 @@ const finalItems = (curriculum) => {
 export const createFallbackAssessmentBank = (curriculum) => {
   const allItems = curriculum.scope === 'final' ? finalItems(curriculum) : moduleItems(curriculum);
   // Each module has a 32-item authored reserve (16 open + 16 MCQ). A single
-  // calm run uses a small, shuffled subset, so a return visit does not always
-  // repeat the same questions while still staying inside the approved limit.
+  // calm run uses a small deterministic subset, then assessment-service gives
+  // it a stable per-run order. This keeps the no-model experience reproducible
+  // and within the approved 4 open / 5 MCQ module cap.
   const items = curriculum.scope === 'final'
     ? allItems
     : [
-      ...allItems.filter((item) => item.responseMode === 'open').sort(() => Math.random() - 0.5).slice(0, 4),
-      ...allItems.filter((item) => item.responseMode === 'mcq').sort(() => Math.random() - 0.5).slice(0, 5)
+      ...rotateTake(allItems.filter((item) => item.responseMode === 'open'), 4, Number(curriculum.moduleIndex) * 3),
+      ...rotateTake(allItems.filter((item) => item.responseMode === 'mcq'), 5, Number(curriculum.moduleIndex) * 5)
     ];
   return {
     schemaVersion: 1,
