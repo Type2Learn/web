@@ -277,48 +277,52 @@ html[data-website-scheme="playful"] .learning-mascot-stage {
   filter: drop-shadow(0 12px 9px rgba(29, 105, 150, .14));
 }
 
-/* Flat is a deliberately quieter, blue-filtered evening version of Playful.
-   It removes the colourful card washes and shadows while keeping the same
-   readable structure, including supportive feedback. */
+/* Flat is a deliberately quieter, blue-filtered version of Playful. It keeps
+   a little of the illustrated world, but the blue filter is light enough for
+   the course heading and orientation text to remain comfortably readable. */
 html[data-website-scheme="playful"][data-color-mode="flat"] body[data-app-route="afterlogin"],
 html[data-website-scheme="playful"][data-color-mode="flat"] body[data-app-route="course"] {
-  background-color: #385D7C !important;
+  background-color: #DCECF7 !important;
   background-image:
-    linear-gradient(rgba(14, 42, 76, .56), rgba(24, 57, 92, .66)),
+    linear-gradient(rgba(229, 242, 251, .88), rgba(210, 230, 245, .92)),
     url("/assets/schemes/playful-stickers.svg"),
     url("/assets/schemes/playful-sky.svg") !important;
-  background-blend-mode: color, luminosity, normal;
+  background-position: center, left bottom, center top;
+  background-size: cover, min(34vw, 420px) auto, cover;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-attachment: fixed, fixed, fixed;
+  background-blend-mode: normal, luminosity, normal;
 }
 
 html[data-website-scheme="playful"][data-color-mode="flat"] body[data-app-route="course"] {
-  --course-ink: #163552;
-  --course-ink-soft: #385772;
-  --course-muted: #587187;
-  --course-paper: #EEF5FB;
+  --course-ink: #123B5B;
+  --course-ink-soft: #315C7A;
+  --course-muted: #55718A;
+  --course-paper: #F8FCFF;
   --course-cloud: transparent;
-  --course-line: #9EB8CC;
-  --course-line-strong: #4E7595;
-  --course-green: #397C71;
-  --course-teal: #477C91;
-  --course-cyan: #5E94AD;
-  --course-blue: #285D8D;
-  --course-green-pale: #E6F1EE;
-  --course-blue-pale: #E5EFF8;
-  --course-teal-pale: #E7F0F4;
+  --course-line: #B8D0E0;
+  --course-line-strong: #5A86A5;
+  --course-green: #347A69;
+  --course-teal: #4A8196;
+  --course-cyan: #639AB2;
+  --course-blue: #286999;
+  --course-green-pale: #E5F2ED;
+  --course-blue-pale: #E6F1F8;
+  --course-teal-pale: #E7F2F5;
 }
 
 html[data-website-scheme="playful"][data-color-mode="flat"] body[data-app-route="afterlogin"] {
-  --learn-ink: #163552;
-  --learn-soft: #385772;
-  --learn-muted: #587187;
-  --learn-paper: #EEF5FB;
+  --learn-ink: #123B5B;
+  --learn-soft: #315C7A;
+  --learn-muted: #55718A;
+  --learn-paper: #F8FCFF;
   --learn-cloud: transparent;
-  --learn-line: #9EB8CC;
-  --learn-line-strong: #4E7595;
-  --learn-green: #397C71;
-  --learn-teal: #477C91;
-  --learn-cyan: #5E94AD;
-  --learn-blue: #285D8D;
+  --learn-line: #B8D0E0;
+  --learn-line-strong: #5A86A5;
+  --learn-green: #347A69;
+  --learn-teal: #4A8196;
+  --learn-cyan: #639AB2;
+  --learn-blue: #286999;
 }
 
 html[data-website-scheme="playful"][data-color-mode="flat"] .learning-settings,
@@ -330,9 +334,9 @@ html[data-website-scheme="playful"][data-color-mode="flat"] .course-task-card,
 html[data-website-scheme="playful"][data-color-mode="flat"] .course-module-strip,
 html[data-website-scheme="playful"][data-color-mode="flat"] .course-settings-menu,
 html[data-website-scheme="playful"][data-color-mode="flat"] .course-ai-chat {
-  border-color: #4E7595;
-  background-color: #EEF5FB !important;
-  background-image: linear-gradient(135deg, #F4F8FC, #E5EFF8) !important;
+  border-color: #5A86A5;
+  background-color: #F8FCFF !important;
+  background-image: linear-gradient(135deg, #FFFFFF, #EAF4FA) !important;
   box-shadow: none !important;
 }
 
@@ -345,8 +349,8 @@ html[data-website-scheme="playful"][data-color-mode="flat"] .course-ai-message,
 html[data-website-scheme="playful"][data-color-mode="flat"] .course-ai-composer textarea,
 html[data-website-scheme="playful"][data-color-mode="flat"] .course-support-popup,
 html[data-website-scheme="playful"][data-color-mode="flat"] .learning-encouragement-popup {
-  border-color: #7898B0 !important;
-  background: #E7F0F8 !important;
+  border-color: #8EADBF !important;
+  background: #EDF6FB !important;
   box-shadow: none !important;
 }
 
@@ -355,7 +359,7 @@ html[data-website-scheme="playful"][data-color-mode="flat"] .course-support-prog
 html[data-website-scheme="playful"][data-color-mode="flat"] .learning-encouragement-popup > span,
 html[data-website-scheme="playful"][data-color-mode="flat"] .learning-encouragement-popup > i {
   color: #EAF4FB;
-  background: #39718B !important;
+  background: #39738A !important;
 }
 
 html[data-website-scheme="playful"][data-color-mode="flat"] .preference-options button,
@@ -366,8 +370,8 @@ html[data-website-scheme="playful"][data-color-mode="flat"] .course-task-explain
 html[data-website-scheme="playful"][data-color-mode="flat"] .course-task-time,
 html[data-website-scheme="playful"][data-color-mode="flat"] .learning-continue,
 html[data-website-scheme="playful"][data-color-mode="flat"] .course-primary-button {
-  border-color: #39718B;
-  background: #E8F1F8;
+  border-color: #39738A;
+  background: #EFF7FB;
   box-shadow: none;
 }
 

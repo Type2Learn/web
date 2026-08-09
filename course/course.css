@@ -1677,6 +1677,45 @@ body[data-course-layout="focused"] .course-workspace { width: min(100%, 1080px);
 body[data-course-layout="balanced"] .course-workspace { width: min(100%, 1080px); }
 body[data-course-layout="open"] .course-workspace { width: 100%; }
 
+/* Open is a learner-selected reading space. Its primary learning copy is 20%
+   larger in every visual scheme and whether or not a mascot rail is present.
+   Keep the compact top controls at their familiar size so this never turns
+   into browser zoom or causes the horizontal module route to overflow. */
+body[data-course-layout="open"] {
+  --course-font-size: 19.2px;
+  --course-reading-font-size: 19.2px;
+  --course-reading-list-font-size: 18px;
+  --course-task-copy-font-size: 18px;
+  --course-option-font-size: 19.2px;
+  --course-task-heading-size: clamp(1.8rem, 3.6vw, 2.76rem);
+  --course-question-font-size: clamp(1.344rem, 2.88vw, 1.704rem);
+}
+
+body[data-course-layout="open"][data-course-text-size="large"] {
+  --course-font-size: 21.6px;
+  --course-reading-font-size: 22.8px;
+  --course-reading-list-font-size: 21.6px;
+  --course-task-copy-font-size: 20.4px;
+  --course-option-font-size: 21.6px;
+  --course-task-heading-size: clamp(2.04rem, 3.96vw, 3.06rem);
+  --course-question-font-size: clamp(1.5rem, 3.24vw, 1.896rem);
+}
+
+body[data-course-layout="open"][data-course-text-size="extra-large"] {
+  --course-font-size: 24px;
+  --course-reading-font-size: 25.2px;
+  --course-reading-list-font-size: 24px;
+  --course-task-copy-font-size: 22.8px;
+  --course-option-font-size: 24px;
+  --course-task-heading-size: clamp(2.28rem, 4.32vw, 3.36rem);
+  --course-question-font-size: clamp(1.656rem, 3.6vw, 2.1rem);
+}
+
+body[data-course-layout="open"] .course-heading h1 { font-size: clamp(2.4rem, 4.8vw, 4.2rem); }
+body[data-course-layout="open"] .course-step-meta { font-size: 16.8px; }
+body[data-course-layout="open"] .course-now-panel span { font-size: 13.2px; }
+body[data-course-layout="open"] .course-now-panel strong { font-size: 15.6px; }
+
 body[data-course-layout="focused"] .course-workspace--focused .course-task-card { margin-top: 0; }
 
 @media (min-width: 1181px) {
@@ -1765,12 +1804,12 @@ body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .
 }
 
 body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-task-top h2 {
-  font-size: clamp(2rem, 3.15vw, 3.1rem);
+  font-size: clamp(2.4rem, 3.78vw, 3.72rem);
 }
 
 body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-task-top p:not(.course-task-label) {
   max-width: 980px;
-  font-size: clamp(1rem, 1.25vw, 1.18rem);
+  font-size: clamp(1.2rem, 1.5vw, 1.416rem);
 }
 
 body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-reading-copy,
@@ -1786,16 +1825,16 @@ body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .
 }
 
 body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-reading-section h3 {
-  font-size: clamp(1rem, 1.28vw, 1.16rem);
+  font-size: clamp(1.2rem, 1.536vw, 1.392rem);
 }
 
 body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .course-reading-section p {
-  font-size: clamp(1rem, 1.24vw, 1.15rem);
+  font-size: clamp(1.2rem, 1.488vw, 1.38rem);
   line-height: 1.72;
 }
 
-body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .typing-target { font-size: clamp(1rem, 1.24vw, 1.14rem); }
-body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .typing-practice textarea { min-height: 154px; font-size: clamp(1rem, 1.28vw, 1.16rem); }
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .typing-target { font-size: clamp(1.2rem, 1.488vw, 1.368rem); }
+body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .typing-practice textarea { min-height: 154px; font-size: clamp(1.2rem, 1.536vw, 1.392rem); }
 
 /* The Open typing task uses the working surface itself. Without this override
    it inherited Balanced's 780px typing column inside a much wider card. */
