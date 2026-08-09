@@ -6290,8 +6290,6 @@ html[data-color-mode="vivid"] .site-cta-panel { border-color: #006BFF; backgroun
 .professional-record-section { overflow: hidden; }
 .professional-interview-stage { margin-top: 54px; }
 .professional-interview-card { border-top-color: var(--green); }
-.professor-interview-card { grid-template-columns: 1fr; }
-.professor-interview-card .interview-card-copy { max-width: 1160px; }
 .interview-carousel,
 .review-carousel { position: relative; margin-top: 54px; }
 .interview-viewport,
@@ -6341,6 +6339,16 @@ html[data-color-mode="vivid"] .site-cta-panel { border-color: #006BFF; backgroun
 .interview-notes li::before { color: var(--teal); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-weight: 900; content: "→"; }
 .interview-video-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 25px; color: var(--blue); font-size: 13px; font-weight: 900; text-decoration: none; }
 .interview-video-link:hover { color: var(--ink); }
+
+/* Professor records have no portrait column. Let their concise notes use the
+   whole card so the record reads as a compact reference grid instead of a
+   narrow strip beside unused space. */
+.interview-card.professor-interview-card { grid-template-columns: minmax(0, 1fr); }
+.interview-card.professor-interview-card .interview-card-copy { max-width: none; padding: clamp(28px, 3.2vw, 46px); }
+.interview-card.professor-interview-card .interview-card-meta > span { font-size: clamp(2.45rem, 3.25vw, 3.75rem); }
+.interview-card.professor-interview-card h3 { max-width: 780px; margin-top: 14px; font-size: clamp(2.35rem, 3.25vw, 3.7rem); }
+.interview-card.professor-interview-card .interview-notes { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 22px; margin-top: 22px; }
+.interview-card.professor-interview-card .interview-notes li { min-height: 0; padding-block: 13px; }
 
 .interview-carousel-controls,
 .review-carousel-controls { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 20px; }
