@@ -52,6 +52,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     telemetry: null,
     proposal: null,
     taskInitiation: false,
+    taskInitiationTimer: null,
     visualOpen: false,
     lastTypingAt: 0
   };
@@ -528,7 +529,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!['standard', 'relaxed'].includes(fresh.preferences.spacing)) fresh.preferences.spacing = 'standard';
     const savedProgress = saved.progress || {};
     fresh.progress.lessonIndex = Math.min(Math.max(Number(savedProgress.lessonIndex) || 0, 0), COURSE.steps.length - 1);
-    fresh.progress.phase = ['preview', 'read', 'type', 'check', 'apply', 'complete', 'assessment', 'exam-intro', 'exam', 'exam-results'].includes(savedProgress.phase) ? savedProgress.phase : 'preview';
+    // Legacy local multiple-choice exam snapshots are deliberately retired in
+    // favour of the server-side, one-question understanding check. Do not
+    // restore a hidden score path after an upgrade; return the learner to the
+    // completed-module screen where the final check is available.
+    const legacyExamPhase = ['exam-intro', 'exam', 'exam-results'].includes(savedProgress.phase);
+    fresh.progress.phase = legacyExamPhase
+      ? 'complete'
+      : ['preview', 'read', 'type', 'check', 'apply', 'complete', 'assessment'].includes(savedProgress.phase) ? savedProgress.phase : 'preview';
+    if (legacyExamPhase) fresh.progress.lessonIndex = COURSE.steps.length - 1;
     fresh.progress.completedSteps = Array.isArray(savedProgress.completedSteps)
       ? savedProgress.completedSteps.filter((index) => Number.isInteger(index) && index >= 0 && index < COURSE.steps.length)
       : [];
@@ -569,8 +578,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       submitted: Boolean(savedExam.submitted),
       completed: Boolean(savedExam.completed)
     };
-    if (fresh.progress.finalExam.completed && fresh.progress.phase === 'exam') fresh.progress.phase = 'exam-results';
-    if (fresh.progress.phase === 'exam-results') fresh.progress.finalExam.completed = true;
+    // `finalExam` stays in old local snapshots only so progress migration can
+    // be non-destructive; no current course route renders or resumes it.
     if (fresh.progress.finalExam.submitted && fresh.progress.finalExam.answers[fresh.progress.finalExam.questionIndex] === null) fresh.progress.finalExam.submitted = false;
     // Older builds used `showExample` for both a learner's disclosure choice
     // and examples automatically opened by the global setting. Those sources
@@ -1091,10 +1100,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       settingsChoiceGroup('encouragement', 'Encouragement', 'Choose how visible supportive moments feel.', [['subtle', 'Subtle'], ['balanced', 'Balanced'], ['expressive', 'Expressive']], choices.encouragement),
       settingsChoiceGroup('animations', 'Animations', 'Choose how much supportive movement you would like to see.', [['still', 'Still'], ['gentle', 'Gentle'], ['lively', 'Lively']], choices.animations),
       signedInLearner() && adaptiveLearning.available
-        ? settingsSwitch('adaptive-learning', 'Adaptive learning support', 'Save compact course-use summaries to offer optional support suggestions and understanding checks. It never saves raw typing, recordings, or chats.', adaptiveLearning.consented, adaptiveLearning.updatingConsent)
+        ? settingsSwitch('adaptive-learning', 'Adaptive learning support', 'Use compact course summaries to offer one optional setting change and objective-based understanding checks. It never saves raw typing, recordings, or chats.', adaptiveLearning.consented, adaptiveLearning.updatingConsent)
+          + '<details class="course-adaptive-settings-explainer"><summary>' + escapeHtml(courseUi('How this support works', 'یہ مدد کیسے کام کرتی ہے')) + '</summary><p>' + escapeHtml(courseUi('After a module, Type2Learn may offer one reversible presentation change. Understanding checks use approved course objectives and can return you to one related idea. You choose every change, and no score is shown.', 'ہر ماڈیول کے بعد Type2Learn ایک قابلِ واپسی پیشکش کر سکتا ہے۔ سمجھ جانچ منظور شدہ کورس کے مقاصد استعمال کرتی ہے اور آپ کو ایک متعلقہ خیال کی طرف واپس لے جا سکتی ہے۔ ہر تبدیلی آپ منتخب کرتے ہیں اور کوئی اسکور نہیں دکھایا جاتا۔')) + '</p></details>'
         : signedInLearner() && adaptiveLearning.consentKnown
           ? '<p class="course-settings-menu-gate">Adaptive learning support is not available right now.</p>'
           : '',
+      settingsChoiceGroup('reading-text-size', 'Reading text size', 'Change text size immediately for this course.', [['standard', 'Standard'], ['large', 'Larger'], ['extra-large', 'Extra large']], state.preferences.textSize),
+      settingsChoiceGroup('reading-width', 'Reading width', 'Choose shorter or wider reading lines.', [['narrow', 'Short lines'], ['comfortable', 'Comfortable'], ['wide', 'Wide lines']], state.preferences.readingWidth),
+      settingsChoiceGroup('reading-contrast', 'Reading contrast', 'Use a higher-contrast reading surface when that feels clearer.', [['off', 'Standard'], ['on', 'Higher contrast']], state.preferences.highContrast ? 'on' : 'off'),
       settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It starts muted; you choose the volume.', choices['background-noise'] === 'on'),
       choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="' + (BACKGROUND_NOISE_MAX_VOLUME * 100) + '" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
       settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
@@ -1748,6 +1761,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   );
 
   const stopAdaptiveLearningTelemetry = () => {
+    window.clearTimeout(adaptiveLearning.taskInitiationTimer);
+    adaptiveLearning.taskInitiationTimer = null;
     adaptiveLearning.telemetry?.dispose?.();
     adaptiveLearning.telemetry = null;
     adaptiveLearning.proposal = null;
@@ -1782,6 +1797,29 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       language: courseUsesUrdu() ? 'ur' : 'en',
       enabled: true
     });
+    scheduleTaskInitiationOffer(telemetry);
+  };
+
+  // ADAPTIVE LEARNING: this early support is deliberately modest. After a
+  // quiet pause at the *preview* stage, it offers one dismissible first-step
+  // card. It does not say why the pause happened, alter a preference, create
+  // pressure, or interrupt reading/typing after the learner has begun.
+  const scheduleTaskInitiationOffer = (telemetry) => {
+    window.clearTimeout(adaptiveLearning.taskInitiationTimer);
+    adaptiveLearning.taskInitiationTimer = null;
+    if (!adaptiveLearningIsActive() || adaptiveLearning.taskInitiation
+      || state.view !== 'course' || state.progress.phase !== 'preview'
+      || isReviewingModule() || isFinalExamPhase()) return;
+    const moduleIndex = displayedModuleIndex();
+    adaptiveLearning.taskInitiationTimer = window.setTimeout(() => {
+      if (!adaptiveLearningIsActive() || state.view !== 'course'
+        || state.progress.phase !== 'preview' || displayedModuleIndex() !== moduleIndex
+        || adaptiveLearning.taskInitiation || telemetry.hasRecordedFirstAction()) return;
+      adaptiveLearning.taskInitiation = true;
+      telemetry.action('task-initiation-offered');
+      recordSupportMoment('task-entry', { result: 'optional-first-step' });
+      render();
+    }, 90_000);
   };
 
   const hydrateAdaptiveLearning = async () => {
@@ -2163,7 +2201,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const currentStep = () => COURSE.steps[displayedModuleIndex()];
   const isLastStep = () => state.progress.lessonIndex === COURSE.steps.length - 1;
   const courseProgress = () => Math.round((state.progress.completedSteps.length / COURSE.steps.length) * 100);
-  const isFinalExamPhase = () => ['assessment', 'exam-intro', 'exam', 'exam-results'].includes(state.progress.phase);
+  const isFinalExamPhase = () => state.progress.phase === 'assessment';
   const currentFinalExamQuestion = () => finalExam().questions[state.progress.finalExam.questionIndex];
   const phaseNumber = () => ({ preview: 1, read: 2, type: 3, check: 4, apply: 5, assessment: 5, complete: 5 }[state.progress.phase] || 1);
 
@@ -2206,6 +2244,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     type: 'Type the current lesson section',
     check: 'Check understanding',
     apply: 'Use the idea in a small situation',
+    assessment: 'Answer one understanding-check question',
     complete: 'One small step complete',
     'exam-intro': 'Get ready for the final exam',
     exam: 'Answer one final exam question',
@@ -2216,6 +2255,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     type: 'سبق کا موجودہ حصہ ٹائپ کریں',
     check: 'سمجھ جانچیں',
     apply: 'خیال کو مختصر صورتحال میں استعمال کریں',
+    assessment: 'سمجھ جانچ کے ایک سوال کا جواب دیں',
     complete: 'ایک مختصر مرحلہ مکمل ہوا',
     'exam-intro': 'آخری امتحان کے لیے تیار ہوں',
     exam: 'آخری امتحان کے ایک سوال کا جواب دیں',
@@ -2399,15 +2439,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       return '<span>' + escapeHtml(reviewLabel) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(duration || courseUi('Ready when you are', 'جب تیار ہوں')) + '</span>';
     }
     if (isFinalExamPhase()) {
-      const exam = state.progress.finalExam;
-      const detail = !state.preferences.visibleProgress
-        ? courseUi(state.progress.phase === 'exam-results' ? 'Results and review' : 'One question at a time', state.progress.phase === 'exam-results' ? 'نتائج اور جائزہ' : 'ایک وقت میں ایک سوال')
-        : state.progress.phase === 'exam'
-        ? courseUi('Question ' + (exam.questionIndex + 1) + ' of ' + finalExamQuestionCount(), 'سوال ' + (exam.questionIndex + 1) + ' از ' + finalExamQuestionCount())
-        : state.progress.phase === 'exam-results'
-          ? courseUi('Results and review', 'نتائج اور جائزہ')
-          : courseUi(finalExamQuestionCount() + ' questions', finalExamQuestionCount() + ' سوالات');
-      return '<span>' + escapeHtml(courseUi('Final exam', 'آخری امتحان')) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(detail) + '</span>';
+      const run = understandingCheck.run;
+      const position = Math.max(1, Number(run?.questionPosition) || 1);
+      const total = Math.max(position, Number(run?.questionCount) || 1);
+      const detail = run?.status === 'complete'
+        ? courseUi('Complete', 'مکمل')
+        : courseUi('Question ' + position + ' of ' + total, 'سوال ' + position + ' از ' + total);
+      return '<span>' + escapeHtml(courseUi('Final understanding check', 'آخری سمجھ جانچ')) + '</span><i aria-hidden="true"></i><span>' + escapeHtml(detail) + '</span>';
     }
     const stepNumber = state.progress.lessonIndex + 1;
     const stepLabel = state.preferences.visibleProgress
@@ -2501,14 +2539,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const courseModuleStripWithFinalExam = () => {
     const modules = COURSE.steps.map((step, index) => moduleProgressItem(step, index, true)).join('');
     const examActive = isFinalExamPhase() && !isReviewingModule();
-    const examComplete = Boolean(state.progress.finalExam.completed);
+    const examComplete = Boolean(understandingCheck.run?.status === 'complete');
     const examStatus = examActive
       ? taskLabel()
       : examComplete
         ? courseUi('Completed', 'مکمل')
         : courseUi('Available after module ' + COURSE.steps.length, 'ماڈیول ' + COURSE.steps.length + ' کے بعد دستیاب');
-    const examItem = '<li class="course-module-exam ' + (examComplete ? 'is-complete ' : '') + (examActive ? 'is-active' : '') + '"><span>' + (examComplete ? '✓' : COURSE.steps.length + 1) + '</span><div><strong>' + escapeHtml(courseUi(finalExam().title || 'Final exam', COURSE_URDU.finalExam?.title || 'آخری امتحان')) + '</strong><small>' + escapeHtml(examStatus) + '</small></div></li>';
-    return '<nav class="course-module-strip" aria-label="' + escapeHtml(courseUi(state.preferences.visibleProgress ? 'Course progress' : 'Course module navigation', state.preferences.visibleProgress ? 'کورس کی پیش رفت' : 'کورس ماڈیول کی رہنمائی')) + '"><div class="course-module-strip-heading"><p class="course-eyebrow">' + escapeHtml(courseUi(state.preferences.visibleProgress ? 'Course progress' : 'Course modules', state.preferences.visibleProgress ? 'کورس کی پیش رفت' : 'کورس ماڈیولز')) + '</p><span>' + escapeHtml(courseUi(COURSE.steps.length + ' small modules · one final exam', COURSE.steps.length + ' مختصر ماڈیولز · ایک آخری امتحان')) + '</span></div><ol class="course-module-list">' + modules + examItem + '</ol></nav>';
+    const examItem = '<li class="course-module-exam ' + (examComplete ? 'is-complete ' : '') + (examActive ? 'is-active' : '') + '"><span>' + (examComplete ? '✓' : COURSE.steps.length + 1) + '</span><div><strong>' + escapeHtml(courseUi('Final understanding check', 'آخری سمجھ جانچ')) + '</strong><small>' + escapeHtml(examStatus) + '</small></div></li>';
+    return '<nav class="course-module-strip" aria-label="' + escapeHtml(courseUi(state.preferences.visibleProgress ? 'Course progress' : 'Course module navigation', state.preferences.visibleProgress ? 'کورس کی پیش رفت' : 'کورس ماڈیول کی رہنمائی')) + '"><div class="course-module-strip-heading"><p class="course-eyebrow">' + escapeHtml(courseUi(state.preferences.visibleProgress ? 'Course progress' : 'Course modules', state.preferences.visibleProgress ? 'کورس کی پیش رفت' : 'کورس ماڈیولز')) + '</p><span>' + escapeHtml(courseUi(COURSE.steps.length + ' small modules · one final understanding check', COURSE.steps.length + ' مختصر ماڈیولز · ایک آخری سمجھ جانچ')) + '</span></div><ol class="course-module-list">' + modules + examItem + '</ol></nav>';
   };
 
   const courseNextStepCopy = () => {
@@ -2519,7 +2557,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     type: 'Complete the lesson typing',
     check: 'Use the idea in a small situation',
     apply: 'Mark this step complete',
-    complete: isLastStep() ? 'Start the final exam' : 'Preview the next short step',
+    assessment: 'Answer one question at a time',
+    complete: isLastStep() ? 'Start the final understanding check' : 'Preview the next short step',
     'exam-intro': 'Start the first exam question',
     exam: state.progress.finalExam.submitted
       ? state.progress.finalExam.questionIndex === finalExamQuestionCount() - 1 ? 'See your final results' : 'Move to the next question'
@@ -2531,7 +2570,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     type: 'سبق کی ٹائپنگ مکمل کریں',
     check: 'خیال کو مختصر صورتحال میں استعمال کریں',
     apply: 'اس مرحلے کو مکمل نشان زد کریں',
-    complete: isLastStep() ? 'آخری امتحان شروع کریں' : 'اگلے مختصر مرحلے کا پیش نظارہ دیکھیں',
+    assessment: 'ایک وقت میں ایک سوال کا جواب دیں',
+    complete: isLastStep() ? 'آخری سمجھ جانچ شروع کریں' : 'اگلے مختصر مرحلے کا پیش نظارہ دیکھیں',
     'exam-intro': 'امتحان کا پہلا سوال شروع کریں',
     exam: state.progress.finalExam.submitted
       ? state.progress.finalExam.questionIndex === finalExamQuestionCount() - 1 ? 'آخری نتائج دیکھیں' : 'اگلے سوال کی طرف جائیں'
@@ -2545,6 +2585,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const savedStep = COURSE.steps[state.progress.lessonIndex];
       return (courseUsesUrdu() ? COURSE_URDU.steps[state.progress.lessonIndex].title : savedStep.title) + ' · ' + taskLabel();
     }
+    if (isFinalExamPhase()) {
+      const run = understandingCheck.run;
+      const position = Math.max(1, Number(run?.questionPosition) || 1);
+      const total = Math.max(position, Number(run?.questionCount) || 1);
+      const detail = run?.status === 'complete'
+        ? courseUi('Complete', 'مکمل')
+        : courseUi('Question ' + position + ' of ' + total, 'سوال ' + position + ' از ' + total);
+      return courseUi('Final understanding check · ', 'آخری سمجھ جانچ · ') + detail;
+    }
     if (state.progress.phase === 'exam') return courseUi('Final exam · Question ' + (state.progress.finalExam.questionIndex + 1) + ' of ' + finalExamQuestionCount(), 'آخری امتحان · سوال ' + (state.progress.finalExam.questionIndex + 1) + ' از ' + finalExamQuestionCount());
     if (state.progress.phase === 'exam-intro') return courseUi('Final exam · Ready to begin', 'آخری امتحان · شروع کرنے کے لیے تیار');
     if (state.progress.phase === 'exam-results') return courseUi('Final exam · Results and review', 'آخری امتحان · نتائج اور جائزہ');
@@ -2553,17 +2602,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const courseProgressWithFinalExam = () => {
     if (!isFinalExamPhase()) return courseProgressBar();
-    const exam = state.progress.finalExam;
-    const total = finalExamQuestionCount();
-    const answered = exam.answers.filter((answer) => Number.isInteger(answer)).length;
-    const progress = state.progress.phase === 'exam-results' ? total : state.progress.phase === 'exam' ? Math.min(exam.questionIndex + (exam.submitted ? 1 : 0), total) : 0;
-    const status = state.progress.phase === 'exam-results'
-      ? courseUi('Results are ready', 'نتائج تیار ہیں')
-      : state.progress.phase === 'exam'
-        ? courseUi('Question ' + (exam.questionIndex + 1) + ' of ' + total, 'سوال ' + (exam.questionIndex + 1) + ' از ' + total)
-        : courseUi('Ready when you are', 'جب تیار ہوں');
+    const run = understandingCheck.run;
+    const total = Math.max(1, Number(run?.questionCount) || 1);
+    const progress = run?.status === 'complete' ? total : Math.max(0, Math.min(total, (Number(run?.questionPosition) || 1) - 1));
+    const status = run?.status === 'complete'
+      ? courseUi('Complete', 'مکمل')
+      : courseUi('Question ' + Math.max(1, Number(run?.questionPosition) || 1) + ' of ' + total, 'سوال ' + Math.max(1, Number(run?.questionPosition) || 1) + ' از ' + total);
     const progressFallback = (value, maximum) => courseUi(value + ' of ' + maximum, value + ' از ' + maximum);
-    return '<section class="course-progress-panel" aria-label="' + escapeHtml(courseUi('Learning progress', 'سیکھنے کی پیش رفت')) + '"><div><p>' + escapeHtml(courseUi('Course progress', 'کورس کی پیش رفت')) + '</p><strong>' + escapeHtml(courseUi('Final exam', 'آخری امتحان')) + '</strong><span>' + escapeHtml(courseUi('One calm question at a time', 'ایک وقت میں ایک پُرسکون سوال')) + '</span></div><div class="course-progress-bars"><div><span>' + escapeHtml(courseUi('Final exam · ', 'آخری امتحان · ') + status) + '</span><progress value="' + progress + '" max="' + total + '">' + progressFallback(progress, total) + '</progress></div><div><span>' + escapeHtml(courseUi('Course modules · ' + state.progress.completedSteps.length + ' lessons completed', 'کورس ماڈیولز · ' + state.progress.completedSteps.length + ' اسباق مکمل')) + '</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + progressFallback(state.progress.completedSteps.length, COURSE.steps.length) + '</progress></div><div><span>' + escapeHtml(courseUi('Answers saved · ' + answered + ' of ' + total, 'جوابات محفوظ · ' + answered + ' از ' + total)) + '</span><progress value="' + answered + '" max="' + total + '">' + progressFallback(answered, total) + '</progress></div></div></section>';
+    return '<section class="course-progress-panel" aria-label="' + escapeHtml(courseUi('Learning progress', 'سیکھنے کی پیش رفت')) + '"><div><p>' + escapeHtml(courseUi('Course progress', 'کورس کی پیش رفت')) + '</p><strong>' + escapeHtml(courseUi('Final understanding check', 'آخری سمجھ جانچ')) + '</strong><span>' + escapeHtml(courseUi('One calm question at a time', 'ایک وقت میں ایک پُرسکون سوال')) + '</span></div><div class="course-progress-bars"><div><span>' + escapeHtml(courseUi('Understanding check · ', 'سمجھ جانچ · ') + status) + '</span><progress value="' + progress + '" max="' + total + '">' + progressFallback(progress, total) + '</progress></div><div><span>' + escapeHtml(courseUi('Course modules · ' + state.progress.completedSteps.length + ' lessons completed', 'کورس ماڈیولز · ' + state.progress.completedSteps.length + ' اسباق مکمل')) + '</span><progress value="' + state.progress.completedSteps.length + '" max="' + COURSE.steps.length + '">' + progressFallback(state.progress.completedSteps.length, COURSE.steps.length) + '</progress></div></div></section>';
   };
 
   const selectedCourseLayout = () => {
@@ -2573,7 +2619,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const courseHeaderMarkup = (layout) => {
     const isBalanced = layout === 'balanced';
-    const eyebrow = isReviewingModule() ? (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label) : isFinalExamPhase() ? (courseUsesUrdu() ? 'کورس کا آخری امتحان' : 'Course final exam') : (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label);
+    const eyebrow = isReviewingModule() ? (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label) : isFinalExamPhase() ? (courseUsesUrdu() ? 'کورس کی آخری سمجھ جانچ' : 'Course final understanding check') : (courseUsesUrdu() ? COURSE_URDU.label : COURSE.label);
     const savedLabel = signedInLearner() && cloudProgress.status === 'account'
       ? courseUi('Saved to your account', 'آپ کے اکاؤنٹ میں محفوظ ہے')
       : courseUi('Saved on this device', 'اس آلے پر محفوظ ہے');
@@ -3829,8 +3875,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const finalUnderstandingCompleteTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('The 11 learning modules are complete.', 'سیکھنے کے 11 ماڈیولز مکمل ہو گئے ہیں۔') + '</h2><p>' + bilingualCopy('When you are ready, take the final understanding check one question at a time. There are no timers or scores.', 'جب تیار ہوں، آخری سمجھ جانچ ایک وقت میں ایک سوال مکمل کریں۔ کوئی ٹائمر یا اسکور نہیں ہے۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="start-final-understanding-check">' + courseUi('Start final understanding check', 'آخری سمجھ جانچ شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
 
+  // The safeguards that make an understanding check private and objective are
+  // server-side. If they are unavailable, the course ends here rather than
+  // falling back to the retired client-only final exam.
+  const finalModuleSavedTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Your course work is saved.', 'آپ کا کورس ورک محفوظ ہے۔') + '</h2><p>' + bilingualCopy('The optional understanding check is not available in this session. You can return to your learning overview without losing your completed modules.', 'اختیاری سمجھ جانچ اس سیشن میں دستیاب نہیں ہے۔ آپ مکمل ماڈیولز کھوئے بغیر سیکھنے کے خلاصے پر واپس جا سکتے ہیں۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="dashboard">' + courseUi('Return to learning overview', 'سیکھنے کے خلاصے پر واپس جائیں') + ' <span aria-hidden="true">→</span></button></div></article>';
+
   const completionTask = () => isLastStep()
-    ? (understandingChecksAvailable() ? finalUnderstandingCompleteTask() : finalModuleCompleteTask())
+    ? (understandingChecksAvailable() ? finalUnderstandingCompleteTask() : finalModuleSavedTask())
     : completeTask();
 
   const examOptionState = (index, selected, correctIndex, submitted) => {
@@ -5920,14 +5971,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const startNextStep = () => {
     storeActiveGuestModuleSnapshot();
     if (isLastStep()) {
-      state.view = 'course';
-      state.progress.phase = 'exam-intro';
-      state.progress.finalExam = state.progress.finalExam.completed ? blankFinalExamAttempt() : state.progress.finalExam;
-      state.modal = '';
-      recordSupportMoment('task-entry', { result: 'exam-intro' });
-      save();
-      render();
-      showCurrentTaskFromStart();
+      // The final route is the guarded, backend-only understanding check: up
+      // to nine own-words prompts and twelve MCQs from a reviewed bank. The
+      // old client-only exam must not provide a parallel score-like pathway.
+      if (understandingChecksAvailable()) {
+        void openUnderstandingCheck({ scope: 'final' });
+      } else {
+        goTo('dashboard', courseUi('Your course modules are complete. Your learning overview is ready.', 'آپ کے کورس ماڈیول مکمل ہیں۔ آپ کا سیکھنے کا خلاصہ تیار ہے۔'));
+      }
       return;
     }
     state.progress.lessonIndex += 1;
@@ -5996,7 +6047,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const skippedTitle = currentStep().title;
       storeActiveGuestModuleSnapshot();
       startNextStep();
-      announce(skippedTitle + ' was skipped for now. The final exam is ready when you are.');
+      announce(skippedTitle + ' was skipped for now. Your learning overview is ready when you are.');
       return;
     }
     moveGuestModule(1);
@@ -6027,7 +6078,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     skip.className = 'course-secondary-button course-skip-module-button';
     skip.type = 'button';
     skip.dataset.action = 'guest-skip-module';
-    const destination = isLastStep() ? courseUi('the final exam', 'آخری امتحان') : moduleTitle(currentIndex + 1);
+    const destination = isLastStep() ? courseUi('your learning overview', 'آپ کا سیکھنے کا خلاصہ') : moduleTitle(currentIndex + 1);
     skip.setAttribute('aria-label', courseUi('Skip this module: ' + moduleTitle(currentIndex) + '. ' + destination + ' will open next.', 'اس ماڈیول کو چھوڑ دیں: ' + moduleTitle(currentIndex) + '۔ اگلا ' + destination + ' کھلے گا۔'));
     skip.innerHTML = courseUi('Skip this module <span aria-hidden="true">→</span>', '<span aria-hidden="true">←</span> یہ ماڈیول چھوڑ دیں');
     navigation.append(skip);
@@ -6236,6 +6287,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (key === 'colours' && colorModes.includes(value)) window.Type2LearnColorMode?.set(value, false);
     if (key === 'website-scheme' && websiteSchemes.includes(value)) window.Type2LearnWebsiteScheme?.set(value);
     if (key === 'text-to-speech') setCourseSetting('readAloud', value === 'on');
+    // READING ACCESS: these controls are immediate presentation changes. They
+    // are not inferred by AI and remain available whether adaptive support is
+    // on or off. The optional adaptive layer may only propose the allow-listed
+    // course controls; the learner always applies them here.
+    if (key === 'reading-text-size' && ['standard', 'large', 'extra-large'].includes(value)) setCourseSetting('textSize', value);
+    if (key === 'reading-width' && ['narrow', 'comfortable', 'wide'].includes(value)) setCourseSetting('readingWidth', value);
+    if (key === 'reading-contrast') setCourseSetting('highContrast', value === 'on');
 
     const shouldPreviewSupportMode = state.view === 'course'
       && ['encouragement', 'animations'].includes(key);
@@ -6393,6 +6451,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         showCurrentTaskFromStart('#course-typing-input');
         break;
       case 'preview-complete':
+        // The first-step prompt belongs only to this preview. Once the learner
+        // starts, it must not follow them through reading or silently appear
+        // in the next module.
+        adaptiveLearning.taskInitiation = false;
+        window.clearTimeout(adaptiveLearning.taskInitiationTimer);
+        adaptiveLearning.taskInitiationTimer = null;
         state.progress.phase = 'read';
         state.progress.attempt = blankAttempt();
         state.readingSectionIndex = 0;
@@ -6420,7 +6484,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'review-understanding-module': reviewUnderstandingModule(); break;
       case 'restart-understanding-check': restartUnderstandingCheck(); break;
       case 'finish-understanding-check': finishUnderstandingCheck(); break;
-      case 'start-final-exam': startFinalExam(); break;
+      case 'start-final-exam':
+        // Defensive migration for a cached/older page. Current markup never
+        // renders this action; it must still lead to the safe final check.
+        if (understandingChecksAvailable()) void openUnderstandingCheck({ scope: 'final' });
+        else goTo('dashboard', courseUi('Your course modules are complete.', 'آپ کے کورس ماڈیول مکمل ہیں۔'));
+        break;
       case 'submit-exam-answer': submitFinalExamAnswer(); break;
       case 'next-exam-question': nextFinalExamQuestion(); break;
       case 'return-course': goTo('dashboard', 'Your final exam results are saved locally.'); break;

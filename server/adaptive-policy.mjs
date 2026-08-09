@@ -1,7 +1,7 @@
 // This policy is intentionally deterministic. A model can make the wording
 // warmer, but it never decides whether support is warranted or changes a
 // preference itself.
-export const ADAPTIVE_POLICY_VERSION = 1;
+export const ADAPTIVE_POLICY_VERSION = 2;
 
 const copy = (english, urdu) => ({ english, urdu });
 
@@ -17,6 +17,12 @@ const candidates = {
     title: copy('More space around each task', 'ہر کام کے ارد گرد زیادہ جگہ'),
     description: copy('Use a more open layout in the next module. You can change it back anytime.', 'اگلے ماڈیول میں زیادہ کھلی ترتیب استعمال کریں۔ آپ اسے کبھی بھی واپس بدل سکتے ہیں۔'),
     reason: copy('There were several long pauses while reading.', 'پڑھتے وقت کئی طویل وقفے آئے۔')
+  },
+  readingWidth: {
+    id: 'reading-width-narrow', kind: 'preference', preference: { key: 'reading-width', value: 'narrow' },
+    title: copy('Shorter reading lines', 'مختصر پڑھنے کی سطریں'),
+    description: copy('Try shorter reading lines in the next module. You can change them back anytime.', 'اگلے ماڈیول میں مختصر سطریں آزمائیں۔ آپ انہیں کبھی بھی واپس بدل سکتے ہیں۔'),
+    reason: copy('This reading section stayed open for a while.', 'یہ پڑھنے والا حصہ کچھ دیر تک کھلا رہا۔')
   },
   audio: {
     id: 'text-to-speech-on', kind: 'preference', preference: { key: 'text-to-speech', value: 'on' },
@@ -51,7 +57,8 @@ export const adaptiveCandidateForSummary = (summary) => {
 
   if (firstActionMs >= 90000) return candidates.start;
   if (aiActiveMs >= 6 * 60 * 1000 || aiRequests >= 5) return candidates.returnFromAi;
-  if (typingPauseMs >= 45000 || (activeMs >= 12 * 60 * 1000 && summary?.phase === 'read')) return candidates.spacing;
+  if (typingPauseMs >= 45000) return candidates.spacing;
+  if (activeMs >= 12 * 60 * 1000 && summary?.phase === 'read') return candidates.readingWidth;
   if (activeMs >= 8 * 60 * 1000 && summary?.phase === 'read' && ttsStarts === 0) return candidates.audio;
   if (returns >= 2) return candidates.encouragement;
   return null;

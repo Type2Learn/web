@@ -4,6 +4,7 @@ import { assessmentUsageCaps, assessmentUsageEstimate } from './usage-ledger.mjs
 import { createModelProvider } from './model-provider.mjs';
 import { createFallbackAssessmentBank } from './fallback-assessment-bank.mjs';
 import { constrainAssessmentEvaluation, deterministicAssessmentEvaluation } from './assessment-evaluator.mjs';
+import { assessmentLearningSignals, assessmentProgressDecision, prioritiseAssessmentItems } from './assessment-monitor.mjs';
 import {
   ASSESSMENT_COURSE_ID,
   assessmentBankJsonSchema,
@@ -22,22 +23,6 @@ const MAX_RUN_ITEMS = 21;
 
 const stableModuleId = (moduleIndex) => moduleIndex === 'final' ? 'final' : `module-${Number(moduleIndex) + 1}`;
 const nowDate = () => new Date();
-const reviewModuleIndexFor = (objectiveIds = []) => {
-  const match = String(Array.isArray(objectiveIds) ? objectiveIds[0] || '' : '').match(/^m(\d{2})-/);
-  const index = Number(match?.[1]) - 1;
-  return Number.isInteger(index) && index >= 0 && index <= 10 ? index : null;
-};
-
-// A run gets a random id once, then receives a stable order derived from it.
-// This avoids a hidden Math.random() reshuffle after reloads or retries.
-const stableItemOrder = (items, seed) => [...items]
-  .map((item) => ({
-    item,
-    rank: createHash('sha256').update(`${seed}:${item.id}`).digest('hex')
-  }))
-  .sort((left, right) => left.rank.localeCompare(right.rank) || left.item.id.localeCompare(right.item.id))
-  .map(({ item }) => item.id);
-
 const generationInstructions = (curriculum) => [
   'Create a candidate assessment bank for a nonprofit education course.',
   'Use only the supplied approved objective and source text. Do not diagnose, label, infer learner traits, mention scoring, timers, speed, rankings, or private data.',
@@ -79,8 +64,11 @@ const visibleRun = (run, bank) => {
   const currentIndex = Math.max(0, Math.min(Number(run?.currentIndex) || 0, itemIds.length));
   const item = bank?.items?.find((candidate) => candidate.id === itemIds[currentIndex]) || null;
   const completed = run?.status === 'complete';
+  const storedReviewModuleIndex = run?.reviewModuleIndex;
   const reviewModuleIndex = completed && run?.completionKind === 'review'
-    ? reviewModuleIndexFor(run?.missingObjectiveIds)
+    && storedReviewModuleIndex !== null && storedReviewModuleIndex !== undefined
+    && Number.isInteger(Number(storedReviewModuleIndex))
+    ? Number(storedReviewModuleIndex)
     : null;
   return {
     runId: String(run?.id || ''),
@@ -91,6 +79,7 @@ const visibleRun = (run, bank) => {
     status: completed ? 'complete' : 'active',
     completionKind: completed && run?.completionKind === 'ready' ? 'ready' : completed ? 'review' : '',
     reviewModuleIndex,
+    reviewFocusObjectiveId: completed && run?.completionKind === 'review' ? String(run?.reviewFocusObjectiveId || '') : '',
     currentQuestion: completed || !item ? null : publicAssessmentItem(item),
     questionPosition: completed ? itemIds.length : currentIndex + 1,
     questionCount: itemIds.length,
@@ -114,7 +103,8 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     requiresSignIn: true,
     reviewerWorkflowConfigured: hasReviewerConfiguration(),
     draftModel: provider.status().heavyModel,
-      evaluationModel: provider.status().chatModel,
+      evaluationModel: provider.status().miniModel || provider.status().chatModel,
+      monitoring: 'objective-evidence-without-scores',
       authoredReserveAvailable: true
   });
   const assertAvailable = () => {
@@ -263,13 +253,18 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     const curriculum = assessmentCurriculum(body?.scope === 'final' ? 'final' : body?.moduleIndex, body?.language);
     const bank = await activeBank(curriculum);
     const id = randomUUID();
-    // The generated bank is reviewed before publication. This per-run order
-    // is stable and stores item IDs only—never answers or answer keys.
-    const itemOrder = stableItemOrder(bank.items, id);
+    const summarySnapshot = curriculum.scope === 'final'
+      ? null
+      : await learningProfile(account.uid).collection('courses').doc(curriculum.courseId).collection('modules').doc(String(curriculum.moduleIndex)).get();
+    const assessmentSignals = assessmentLearningSignals(summarySnapshot?.data?.() || {});
+    // The reviewed bank never changes. A run uses only compact, consented
+    // summary signals to choose whether an own-words explanation or an MCQ is
+    // shown first. No behaviour signal can decide a learner's result.
+    const itemOrder = prioritiseAssessmentItems({ items: bank.items, runId: id, signals: assessmentSignals });
     const run = {
       schemaVersion: 1, id, status: 'active', courseId: curriculum.courseId,
       curriculumVersion: curriculum.curriculumVersion, moduleIndex: curriculum.moduleIndex,
-      language: curriculum.language, bankId: bank.bankVersion, itemOrder,
+      language: curriculum.language, bankId: bank.bankVersion, itemOrder, assessmentSignals,
       currentIndex: 0, outcomes: [], createdAt: nowDate(), updatedAt: nowDate()
     };
     await runCollection(account.uid).doc(id).create(run);
@@ -319,6 +314,10 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     const outcomes = [...(Array.isArray(run.outcomes) ? run.outcomes : []), {
       itemId: item.id,
       outcome: evaluation.outcome,
+      // Keep the approved objective identifiers that the question covered so
+      // an uncertain response can still lead back to the relevant lesson.
+      // These IDs are curriculum metadata, not learner content or a score.
+      askedObjectiveIds: item.objectiveIds,
       demonstratedObjectiveIds: evaluation.demonstratedObjectiveIds,
       needsReviewObjectiveIds: evaluation.needsReviewObjectiveIds,
       // This bounded trace makes the assessment auditable without retaining a
@@ -337,15 +336,32 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     // of demonstrated evidence. Requiring every individual question to be
     // perfect would turn this into a score by another name and make the calm
     // fallback impossible to complete when model evaluation is unavailable.
-    const demonstrated = new Set(outcomes.flatMap((outcome) => outcome.outcome === 'demonstrated' ? outcome.demonstratedObjectiveIds : []));
-    const missingObjectiveIds = curriculum.objectives
-      .map((objective) => objective.id)
-      .filter((objectiveId) => !demonstrated.has(objectiveId));
-    const completionKind = complete && missingObjectiveIds.length === 0 ? 'ready' : 'review';
-    const updated = { ...run, currentIndex: nextIndex, outcomes, status: complete ? 'complete' : 'active', completionKind: complete ? completionKind : null, missingObjectiveIds: complete ? missingObjectiveIds : [], updatedAt: nowDate() };
+    const decision = complete ? assessmentProgressDecision({ curriculum, outcomes }) : null;
+    const updated = {
+      ...run,
+      currentIndex: nextIndex,
+      outcomes,
+      status: complete ? 'complete' : 'active',
+      completionKind: complete ? decision.completionKind : null,
+      missingObjectiveIds: complete ? decision.missingObjectiveIds : [],
+      reviewFocusObjectiveId: complete ? decision.reviewFocusObjectiveId : '',
+      reviewModuleIndex: complete ? decision.reviewModuleIndex : null,
+      // A bounded objective-evidence trail supports a human audit and a
+      // precise return route. It is not a numerical grade and contains none
+      // of the raw response, selected option, answer key, or model reasoning.
+      monitoring: complete ? { schemaVersion: 1, nextAction: decision.nextAction, evidence: decision.evidence } : null,
+      updatedAt: nowDate()
+    };
     // No raw typed/spoken answer, prompt response, option choice, score, or
     // model chain-of-thought is persisted. Only a bounded outcome remains.
-    await ref.set({ currentIndex: updated.currentIndex, outcomes, status: updated.status, completionKind: updated.completionKind, missingObjectiveIds: updated.missingObjectiveIds, updatedAt: updated.updatedAt }, { merge: true });
+    await ref.set({
+      currentIndex: updated.currentIndex, outcomes, status: updated.status,
+      completionKind: updated.completionKind, missingObjectiveIds: updated.missingObjectiveIds,
+      reviewFocusObjectiveId: updated.reviewFocusObjectiveId,
+      reviewModuleIndex: updated.reviewModuleIndex,
+      monitoring: updated.monitoring,
+      updatedAt: updated.updatedAt
+    }, { merge: true });
     const feedback = /^result under review\./i.test(String(evaluation.feedback || ''))
       ? evaluation.feedback
       : 'Result under review. ' + String(evaluation.feedback || 'You can continue to the next question when you are ready.');

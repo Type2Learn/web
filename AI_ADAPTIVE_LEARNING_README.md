@@ -58,10 +58,10 @@ site architecture, start with the [main README](README.md).
 | Course AI / “Talk to Course AI” | **Live for signed-in learners; local guest preview only behind `AI_ALLOW_GUESTS`.** It is bounded to the current course step. | `course/course.js`, `server/ai-service.mjs` |
 | Adaptive Recall / barrier support | **Live when the adaptive recall endpoint is configured.** The “I’m stuck” choices include a direct Course AI route. | `server/adaptive-recall-service.mjs`, `course/course.js` |
 | Consent-gated learning summaries | **Implemented, off by default.** Only compact aggregate metrics are uploaded after a learner opts in. | `course/learning-telemetry.js`, `server/learning-analytics-service.mjs` |
-| One-change support proposals | **Implemented, off by default.** Deterministic policy selects the allowed change; Gemini may only shorten the wording. | `server/adaptive-policy.mjs`, `server/adaptive-support-service.mjs` |
+| One-change support proposals | **Implemented, off by default.** Deterministic policy selects the allowed change; Mini may only shorten the wording. The learner must choose whether to use it. | `server/adaptive-policy.mjs`, `server/adaptive-support-service.mjs` |
 | Task initiation / visual explanation | **Implemented as authored supports.** A small first step and an accessible, authored visual rail never depend on a model. | `course/adaptive-support.js`, `course/visual-explanations.js` |
 | Readability support | **Implemented manual controls.** Text size, spacing, reading width, smaller sections, optional TTS and synced highlighting remain learner-controlled. A dedicated dyslexia-font/colour-overlay control is not yet shipped. | `course/learner-settings.js`, `course/course.js`, `course/course.css` |
-| Module/final understanding checks | **Implemented behind `AI_ASSESSMENTS_ENABLED` and adaptive consent.** One public question is shown at a time; no answer key, numeric score or raw answer is stored in the learner progress. | `server/assessment-*.mjs`, `course/course.js` |
+| Module/final understanding checks | **Implemented behind `AI_ASSESSMENTS_ENABLED` and adaptive consent.** One public question is shown at a time; the deterministic monitor records objective evidence categories, then returns one specific review route when needed. No answer key, numeric score, raw answer, option choice, or model rationale is stored in learner progress. | `server/assessment-service.mjs`, `server/assessment-evaluator.mjs`, `server/assessment-monitor.mjs`, `course/course.js` |
 | No-provider assessment fallback | **Implemented.** The reviewed/generated bank can be unavailable and the authored reserve still supplies 4 open + 5 MCQ module checks or 9 open + 12 MCQ final checks. | `server/fallback-assessment-bank.mjs` |
 | Targeted review and another check | **Implemented as an optional recovery path.** Learners can review a related module or try another calm check; there is no forced, unlimited retesting. | `server/assessment-service.mjs`, `course/course.js` |
 | Export/delete | **Implemented for adaptive summaries, proposals and opaque assessment outcomes.** | `server/learning-analytics-service.mjs` |
@@ -112,7 +112,7 @@ storage, or a network connection is unavailable.
 | No raw surveillance | Do not persist keystroke logs, microphone recordings, complete chat histories, or raw answers as behavioural analytics. |
 | One support at a time | Do not stack popups or automatically switch on several stimulating features. Respect existing animation, colour, layout, and encouragement choices. |
 | Learner control | Each suggestion names the exact setting it would change, includes Yes/No, can be disabled in Settings, and remains manually editable. |
-| Assessment integrity | Course AI cannot reveal answers, select an option, write a response for the learner, or expose answer keys or scoring criteria. |
+| Assessment integrity | Course AI cannot reveal answers, select an option, write a response for the learner, or expose answer keys or scoring criteria. A deterministic evaluator constrains any model judgment, and the monitor uses objective evidence—not behavioural data—to choose readiness or review. |
 | No endless gate | Learners must never be trapped in unlimited retesting. Rechecks are targeted, limited, and provide a supported way forward. |
 | Accessibility | All support, visual and test flows must work with keyboard, screen reader, zoom, reduced motion, English and Urdu. Existing Urdu-mode typing targets stay English. |
 | Fail closed | If authentication, consent, Firestore, budget, schema validation, moderation, provider, or asset storage fails, use authored support only. Do not make a personalised claim. |
@@ -162,7 +162,7 @@ used. It is not a hidden judgement of a person.
 | Speech | feature used, browser/Speechmatics path, audio duration bucket, transcription result, final accepted character count | Learn whether speech support helped | raw audio, voiceprint, raw transcript in analytics |
 | Support/settings | selected presentation/accessibility settings, proposal shown/accepted/declined/dismissed | Respect choices and prevent repeated unwanted suggestions | a secret inferred condition/profile |
 | Course AI | opened/closed, request count, active-duration bucket, response success/failure, audio reply used, page ID | Offer a calm return-to-task cue | persistent chat transcript/message text in analytics |
-| Assessment | bank/item/objective IDs, response mode, completion, outcome category, evidence coverage, retry state | Targeted review without visible scores | permanent raw answer text, rankings, time score |
+| Assessment | bank/item/objective IDs, response mode, completion, bounded outcome category, objective-evidence coverage, retry state | Targeted review without visible scores | permanent raw answer text, option choice, rankings, time score, model rationale |
 
 ### 4.1 Active time
 
@@ -429,7 +429,7 @@ purpose-bound OpenAI specialist tier for structured work:
 | --- | --- | --- |
 | Existing Course AI chat | Gemini 3.5 Flash-Lite | Current page only, concise, signed-in; rotate eligible Gemini chat keys before the GPT-5.4 Nano fallback |
 | Prompt checks / compact JSON verification | GPT-5.4 Nano | Strict schema, bounded input and output; rotating Gemini pool is the outage fallback |
-| Adaptive recall, support wording, response classification, module-bank generation | GPT-5.4 Mini | Purpose-bound structured output, deterministic validator, and Gemini fallback; never used as unrestricted chat |
+| Adaptive recall, support wording, response classification, module-bank generation | GPT-5.4 Mini | Purpose-bound structured output, deterministic validator, and rotating Gemini fallback; never used as unrestricted chat |
 | Final assessment-bank generation | GPT-5.1 | Reviewer-triggered only, once per course version/language window; Gemini 3.6 Flash is the outage fallback |
 | Image generation | Disabled pending approval | Separate provider/model/moderation/object-store/shared-cost design |
 
@@ -447,16 +447,17 @@ ordinary learner chat keeps Gemini as its first choice.
 
 ### 8.1 Shared budget
 
-Product direction sets USD 25/month total. The USD 2/month per-user allowance
-belongs specifically to live Course AI chat; adaptive support and assessments
-have their own smaller per-user limits.
+Runtime ceilings are parsed from the deployment environment and remain
+independent feature gates. The default limits are deliberately small; they are
+reservation limits rather than a promise that a feature is enabled or that a
+model call will occur.
 
 | Reserve | Monthly application cap | Use |
 | --- | ---: | --- |
-| Live text Course AI chat | USD 10 | Gemini-first; OpenAI Nano fallback only; USD 2/user cap |
-| Adaptive support | USD 7 | Gemini-first; OpenAI Nano fallback only; summaries, proposals, encouragements; USD 2/user cap |
-| Assessment banks | USD 8 | Gemini 3.6 Flash first; OpenAI Mini fallback only; cache by curriculum version/language; USD 4/user cap |
-| Total | **USD 25** | fixed application cap |
+| Live text Course AI chat | Configured shared OpenAI cap | Gemini-first; OpenAI Nano fallback only; per-user ceiling applies |
+| Adaptive support | USD 2 default app cap | Mini-first structured wording with rotating Gemini fallback; per-user ceiling applies |
+| Assessment bank/evaluation | USD 3 default app cap | Mini for module work; GPT-5.1 only for reviewer-triggered final-bank generation; cache by curriculum version/language |
+| Total | Explicitly deployment-configured | Every request reserves a bounded maximum before provider access and settles actual usage |
 
 Image generation cannot begin without explicitly reallocating this table or
 raising the product budget. Every call reserves maximum cost before provider
@@ -535,7 +536,10 @@ Assessment mode uses:
 - the same STT fixer, then an editable response before submit;
 - no timer, WPM score, ranking or visible percentage;
 - Course AI only for relevant concept clarification, never answer completion;
-- strict current-question/current-objective model context.
+- strict current-question/current-objective model context;
+- a deterministic evaluator before and after optional Mini evaluation;
+- objective-only completion evidence: an interaction summary can influence
+  question order, but it can never determine readiness or a review outcome.
 
 Call this an **Understanding check** and **Next helpful step** in the learner
 UI. Back-end outcomes remain versioned/auditable but no numerical score appears
@@ -566,15 +570,13 @@ End states:
 A retry points to one small section and uses a new equivalent question. It
 preserves work and makes clear that it is about an idea, not failure.
 
-Proposed safe limit:
+Current delivery keeps a recovery path voluntary: the monitor identifies one
+approved objective and module, then the learner can revisit that idea or start
+a fresh calm check. The course does not trap a learner in forced retesting.
 
-1. initial module assessment;
-2. one targeted review/re-check;
-3. one alternative-format re-check (typed or MCQ, learner choice);
-4. allow continue with a review marker and a supportive revisit path.
-
-The exact passing threshold and whether any course blocks progress require
-product/educational approval. The model cannot invent them.
+A future explicitly approved rollout may add a bounded alternative-format
+recheck. The model cannot invent a threshold, force a retry, or decide a
+learner’s readiness from dwell time, typing pace, or support use.
 
 ### 9.4 Final assessment
 
@@ -600,8 +602,9 @@ approved curriculum + explicit objective IDs
      safety and leakage validators
   -> human curriculum review/approval
   -> immutable published bank for curriculum version
-  -> Nano/deterministic selector chooses learner item
-  -> scoped response evaluator
+  -> deterministic selector orders the reviewed/authored item IDs
+  -> deterministic evidence evaluator + optional scoped Mini evaluation
+  -> objective-evidence monitor
   -> targeted review/supportive next step
 ~~~
 
@@ -618,11 +621,13 @@ separate evaluation evidence and explicit owner approval.
 | "server/learning-analytics-service.mjs" | authenticate, validate, aggregate/store minimal summaries |
 | "server/model-provider.mjs" | Gemini-first model route, round-robin key health/cooldowns and narrow OpenAI fallback |
 | "server/adaptive-support-service.mjs" | deterministic policy, low-cost proposal/encouragement, schema validation, cooldown/consent |
-| "server/assessment-service.mjs" | bank lifecycle, item selection, response evaluation, retry/final state |
+| "server/assessment-evaluator.mjs" | deterministic text-grounding signal and a guard that prevents weak model promotion |
+| "server/assessment-monitor.mjs" | compact interaction labels for question ordering; objective-evidence progression and a precise review route |
+| "server/assessment-service.mjs" | bank lifecycle, item selection, response evaluation, objective monitoring, retry/final state |
 | "server/assessment-schemas.mjs" | strict schemas, enums, objective validation |
-| "server/visual-explanation-service.mjs" | visual intent, moderation, cache/storage metadata; disabled until visual release |
+| "server/visual-explanation-service.mjs" | Planned visual intent, moderation, cache/storage metadata; disabled until visual release |
 | "server/adaptive-policy.mjs" | versioned limits, trigger rules, cooldowns, retention, feature flags |
-| "server/privacy-service.mjs" | consent versioning, export/delete workflow, retention jobs |
+| "server/privacy-service.mjs" | Planned retention job boundary; current consent/export/delete is in `learning-analytics-service.mjs` |
 
 After tests exist, "server.mjs" can add authenticated, origin-checked,
 payload-bounded endpoints:
@@ -686,13 +691,13 @@ AI_VISUALS_ENABLED=false
 # Model roles are pinned in server/config.mjs; this is documentation only.
 # GPT-5.4 Nano = verification; GPT-5.4 Mini = bounded adaptive work;
 # GPT-5.1 = final assessment-bank generation.
-OPENAI_MONTHLY_APP_USD_CAP=10
+OPENAI_MONTHLY_APP_USD_CAP=14
 OPENAI_MONTHLY_USER_USD_CAP=2
-ADAPTIVE_MONTHLY_APP_USD_CAP=7
-ADAPTIVE_MONTHLY_USER_USD_CAP=2
-OPENAI_ASSESSMENT_MONTHLY_APP_USD_CAP=8
-OPENAI_ASSESSMENT_MONTHLY_USER_USD_CAP=4
-ASSESSMENT_REQUESTS_PER_MINUTE=2
+ADAPTIVE_MONTHLY_APP_USD_CAP=2
+ADAPTIVE_MONTHLY_USER_USD_CAP=0.5
+OPENAI_ASSESSMENT_MONTHLY_APP_USD_CAP=3
+OPENAI_ASSESSMENT_MONTHLY_USER_USD_CAP=0.5
+OPENAI_ASSESSMENT_REQUESTS_PER_MINUTE=2
 GEMINI_CHAT_API_KEYS=<comma-separated server-only chat keys>
 GEMINI_TEST_API_KEYS=<comma-separated server-only heavy keys>
 ASSESSMENT_REVIEWER_UIDS=<comma-separated Firebase reviewer UIDs>

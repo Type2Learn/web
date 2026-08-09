@@ -33,7 +33,14 @@ export const createAdaptiveSupportService = ({ config, firebase, ledger, provide
   const course = (uid) => profile(uid).collection('courses').doc(COURSE_ID);
   const proposalRef = (uid, moduleIndex, candidateId) => course(uid).collection('adaptiveProposals').doc(`${moduleIndex}-${candidateId}`);
 
-  const status = () => ({ available: available(), requiresSignIn: true, model: provider.status().chatModel, provider: provider.status().primary || provider.status().fallback });
+  const status = () => ({
+    available: available(),
+    requiresSignIn: true,
+    // Mini produces bounded wording for the already-deterministic policy. The
+    // provider never selects the setting change or applies it by itself.
+    model: provider.status().miniModel || provider.status().chatModel,
+    provider: provider.status().primary || provider.status().fallback
+  });
   const assertAvailable = () => {
     if (!config.adaptiveLearningEnabled) throw apiError(503, 'ADAPTIVE_LEARNING_UNAVAILABLE', 'Adaptive learning support is not enabled right now.');
     if (!provider.available() || !firebase.available || !firebase.firestore || !ledger) throw apiError(503, 'ADAPTIVE_LEARNING_UNAVAILABLE', 'Adaptive learning support is not connected right now.');

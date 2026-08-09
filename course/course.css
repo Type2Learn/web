@@ -5958,6 +5958,18 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
 .course-task-initiation > div { display: flex; flex-wrap: wrap; gap: .65rem; align-items: center; }
 .course-adaptive-proposal details { margin-top: .75rem; }
 .course-adaptive-proposal summary { color: var(--course-link, #0b68d5); cursor: pointer; font-weight: 700; }
+.course-adaptive-settings-explainer {
+  margin: -3px 0 2px;
+  padding: 9px 10px;
+  border: 1px solid var(--course-line);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--course-cloud) 78%, var(--course-paper));
+  color: var(--course-ink-soft);
+  font-size: 11px;
+  line-height: 1.48;
+}
+.course-adaptive-settings-explainer summary { cursor: pointer; color: var(--course-link); font-weight: 800; }
+.course-adaptive-settings-explainer p { margin: 7px 0 0; }
 .course-task-initiation { border-left-color: #2c8cdb; background: color-mix(in srgb, var(--course-panel, #fff) 88%, #e7f6ff); }
 
 html[data-website-scheme="playful"] .course-adaptive-proposal,

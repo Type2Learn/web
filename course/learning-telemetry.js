@@ -123,6 +123,14 @@ export class LearningTelemetry {
     }
   }
 
+  // This is intentionally a narrow UI-only query. It is used to decide
+  // whether a single, dismissible first-step card could be helpful on the
+  // current page. It is never sent as a new event or treated as a learner
+  // characteristic.
+  hasRecordedFirstAction() {
+    return Boolean(this.metrics.firstActionMs);
+  }
+
   snapshot(reason = 'manual') {
     this.tick();
     if (!this.enabled || !this.context) return null;

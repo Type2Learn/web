@@ -81,8 +81,8 @@ unrestricted chatbot as a substitute for curriculum or learner judgement.
 | --- | --- | --- |
 | **Adaptive Recall** | Looks for curriculum concepts in a learner’s own explanation and offers one concise next support: a hint, simpler framing, example, or application prompt. | Write the answer before an attempt, diagnose a learner, reveal a rubric, or rank ability. |
 | **I’m stuck** | Lets a learner name the barrier—unclear instructions, a task that feels too large, difficult words, uncertainty about starting, too much on screen, or worry about being wrong—then adjusts only the current step. | Regenerate the whole lesson or make a claim about the learner. |
-| **Learning summaries** | When a signed-in learner explicitly opts in, stores a minimal aggregate summary to offer one reversible, specific preference proposal after a module. | Upload keystroke logs, raw audio, permanent chat history, or a hidden behavioural profile. |
-| **Understanding checks** | Delivers one question at a time, with authored fallback banks when a provider is unavailable. Learners see next steps, never numerical scores or answer keys. | Expose correct answers, visible percentages, speed scores, or endless retesting. |
+| **Adaptive presentation** | When a signed-in learner explicitly opts in, it can offer one small first-step prompt after a quiet preview, then one reversible reading/layout/encouragement proposal after a module. | Upload keystroke logs, raw audio, permanent chat history, or silently change a learner’s settings. |
+| **Understanding checks** | Delivers one question at a time from a reviewed or authored reserve. A deterministic objective-evidence monitor guides a precise review route; Mini may recognise a safe paraphrase, but never decides alone. | Expose correct answers, visible percentages, speed scores, raw answers, or a learner profile. |
 | **Visual explanations** | Provides authored, accessible concept maps in the visual/mascot rail. | Generate stereotyped learner images or make visuals the only way to learn. |
 
 AI is **Gemini-first for ordinary course chat**, with bounded key rotation and
@@ -90,8 +90,8 @@ server-only specialist OpenAI roles: **GPT-5.4 Nano** for prompt/JSON checks,
 **GPT-5.4 Mini** for bounded adaptive intent and assessment work, and
 **GPT-5.1** only for reviewer-triggered final assessment-bank generation.
 Provider credentials, answer keys, hidden rubrics, and model prompts stay on
-the server. Every model response is schema-validated and has an authored
-deterministic fallback.
+the server. Every model response is schema-validated, constrained by a
+deterministic evidence check, and has an authored deterministic fallback.
 
 Some adaptive capabilities require an enabled server flag, a signed-in user,
 and explicit learner consent. AI-generated visual assets and an automated data
@@ -110,6 +110,7 @@ feature flags, safeguards, and rollout requirements in
 | Course AI and Adaptive Recall | Yes | Signed-in learner plus configured provider and Firebase; local guest preview is intentionally development-only |
 | Consent-gated adaptive summaries/proposals | Implemented | `ADAPTIVE_LEARNING_ENABLED=true`, signed-in learner, Firebase, and learner opt-in |
 | Reviewed assessment banks and fallback checks | Implemented | `AI_ASSESSMENTS_ENABLED=true`, adaptive consent, Firebase, and reviewer workflow for generated banks |
+| Objective-evidence monitor and targeted review | Implemented | Assessment runs store only question/objective IDs and bounded outcome categories; never an answer, option choice, score, or model rationale |
 | AI-generated visual assets | Intentionally disabled | Requires separate moderation, storage, retention, and curriculum-review work |
 
 ## Repository map
@@ -145,6 +146,8 @@ feature flags, safeguards, and rollout requirements in
 │   ├── adaptive-recall-service.mjs    # Structured recall feedback / barrier support
 │   ├── adaptive-support-service.mjs   # Consent-gated proposals and copy
 │   ├── assessment-service.mjs         # One-question assessment runs and evaluation
+│   ├── assessment-evaluator.mjs       # Deterministic grounding guard around model evaluation
+│   ├── assessment-monitor.mjs         # Objective evidence, question order, and targeted review route
 │   ├── fallback-assessment-bank.mjs   # Authored no-provider assessment reserve
 │   ├── learning-analytics-service.mjs # Minimal summary, export, and deletion routes
 │   └── firebase-runtime.mjs           # Firebase Admin boundary
@@ -170,7 +173,7 @@ feature flags, safeguards, and rollout requirements in
 | Course colour, layout, noise, motion, encouragement, or accessibility preferences | `course/learner-settings.js`, `course/course.css` |
 | Login and Firebase client behaviour | `login/`, `firebase-auth.js`, `guest-session.js` |
 | AI routing, safety policy, API limits, and key rotation | `server/config.mjs`, `server/model-provider.mjs`, `server/ai-service.mjs` |
-| Adaptive-support and assessment rules | `server/adaptive-policy.mjs`, `server/adaptive-support-service.mjs`, `server/assessment-*.mjs` |
+| Adaptive-support, deterministic assessment evidence, and targeted review | `server/adaptive-policy.mjs`, `server/adaptive-support-service.mjs`, `server/assessment-evaluator.mjs`, `server/assessment-monitor.mjs`, `server/assessment-service.mjs` |
 | Deployment secrets | Render environment variables or ignored `security/api.env` — **never browser code** |
 
 ## Run locally
