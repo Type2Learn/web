@@ -87,12 +87,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     white: '/assets/audio/background-noise/white-noise-loop.mp3',
     brown: '/assets/audio/background-noise/brown-noise-loop.mp3'
   };
-  const BACKGROUND_NOISE_MAX_VOLUME = 0.35;
+  // Background noise always begins muted. Learners can deliberately raise it
+  // to a useful level, while the cap remains below the browser's full volume.
+  const BACKGROUND_NOISE_MAX_VOLUME = 0.6;
   const backgroundNoise = {
     audio: null,
     enabled: false,
     type: 'pink',
-    volume: 0.12,
+    volume: 0,
     isPlaying: false,
     fadeFrame: null,
     settleTimer: null
@@ -231,7 +233,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const clampBackgroundNoiseVolume = (value) => {
     const numericValue = Number(value);
-    if (!Number.isFinite(numericValue)) return 0.12;
+    if (!Number.isFinite(numericValue)) return 0;
     return Math.min(BACKGROUND_NOISE_MAX_VOLUME, Math.max(0, numericValue / 100));
   };
 
@@ -266,7 +268,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     animations: 'gentle',
     'background-noise': 'off',
     'background-noise-type': 'pink',
-    'background-noise-volume': '15',
+    'background-noise-volume': '0',
     'text-to-speech': 'off',
     mascot: 'off',
     'mascot-language': 'english',
@@ -1078,7 +1080,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const preferencesSaved = coursePreferencesAreSaved();
     const choices = learningChoices();
     const noiseType = ['pink', 'white', 'brown'].includes(choices['background-noise-type']) ? choices['background-noise-type'] : 'pink';
-    const noiseVolume = Math.min(35, Math.max(0, Number(choices['background-noise-volume']) || 15));
+    const requestedNoiseVolume = Number(choices['background-noise-volume']);
+    const noiseVolume = Math.min(BACKGROUND_NOISE_MAX_VOLUME * 100, Math.max(0, Number.isFinite(requestedNoiseVolume) ? requestedNoiseVolume : 0));
     const mascotUnavailable = !mascotViewportQuery?.matches;
     const controls = preferencesSaved ? [
       '<div class="course-settings-menu-controls">',
@@ -1092,8 +1095,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         : signedInLearner() && adaptiveLearning.consentKnown
           ? '<p class="course-settings-menu-gate">Adaptive learning support is not available right now.</p>'
           : '',
-      settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It always starts quietly.', choices['background-noise'] === 'on'),
-      choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="35" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
+      settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It starts muted; you choose the volume.', choices['background-noise'] === 'on'),
+      choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="' + (BACKGROUND_NOISE_MAX_VOLUME * 100) + '" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
       settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
       settingsSwitch('mascot', 'Mascot', mascotUnavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', choices.mascot === 'on', mascotUnavailable),
       choices.mascot === 'on' ? settingsChoiceGroup('mascot-language', 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || supportLanguage()) : '',
@@ -6213,6 +6216,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const saveCourseLearningChoice = (key, value) => {
     const choices = learningChoices();
     choices[key] = value;
+    // Each explicit enable is a fresh consent to the sound option, not consent
+    // to resume an earlier loudness. Start it at zero and let the learner
+    // raise the slider only if they want to hear it.
+    if (key === 'background-noise' && value === 'on') choices['background-noise-volume'] = '0';
     // The companion follows Urdu mode until the learner explicitly gives it a
     // different language in the same menu.
     if (key === 'urdu-mode' && !choices['mascot-language-explicit']) choices['mascot-language'] = value === 'on' ? 'urdu' : 'english';
@@ -6625,7 +6632,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   app.addEventListener('input', (event) => {
     if (event.target.matches('[data-settings-noise-volume]')) {
-      const value = String(Math.min(35, Math.max(0, Number(event.target.value) || 0)));
+      const value = String(Math.min(BACKGROUND_NOISE_MAX_VOLUME * 100, Math.max(0, Number(event.target.value) || 0)));
       const choices = learningChoices();
       choices['background-noise-volume'] = value;
       saveLearningChoices(choices);

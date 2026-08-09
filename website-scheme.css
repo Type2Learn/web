@@ -93,6 +93,20 @@ html[data-website-scheme="playful"] .course-task-card {
     linear-gradient(135deg, #FFFDF5 0%, #F4FCFF 55%, #FFF7D6 100%) !important;
 }
 
+/* Balanced Playful keeps the cheerful outer scene but gives the learner a
+   completely quiet white work surface. Vivid intentionally retains the
+   illustrated corners above, so the two colour choices are immediately
+   distinguishable without changing the course structure. */
+html[data-website-scheme="playful"][data-color-mode="balanced"] .learning-settings,
+html[data-website-scheme="playful"][data-color-mode="balanced"] .learning-single-setting,
+html[data-website-scheme="playful"][data-color-mode="balanced"] .learning-focused-settings,
+html[data-website-scheme="playful"][data-color-mode="balanced"] .course-dashboard-primary,
+html[data-website-scheme="playful"][data-color-mode="balanced"] .course-panel-page,
+html[data-website-scheme="playful"][data-color-mode="balanced"] .course-task-card {
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+}
+
 /* These shells have no baseline card padding. Give heading, choices, and the
    action row a protected interior so a playful border never cuts into text. */
 html[data-website-scheme="playful"] .learning-settings,
