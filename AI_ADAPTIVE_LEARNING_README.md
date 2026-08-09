@@ -1,9 +1,54 @@
-# Type2Learn adaptive learning and AI plan
+# Type2Learn adaptive learning and AI
 
-Status: **implemented in guarded stages** (updated 2026-08-09). This document
-remains the product and safety specification, while the table below records
-what is now connected in the application and what intentionally remains
-disabled until its privacy/review requirements are met.
+> **The smallest useful support, grounded in what a learner can express.**
+
+This is the technical and product specification for Type2Learn’s adaptive
+learning layer. It is intentionally not a generic chatbot layer or a learner
+profiling system. Its job is to help a learner continue with one appropriate,
+reversible next action while keeping curriculum, privacy, and learner choice in
+control.
+
+**Status:** implemented in guarded stages (updated 2026-08-09). The course,
+server routes, authored fallbacks, and safety boundaries described in the
+implementation table are in this repository. Features that collect signed-in
+learning summaries, invoke adaptive proposals, or deliver AI-backed
+assessments remain independently feature-flagged and consent-gated. Generative
+visual assets and automated retention are deliberately not shipped.
+
+For the product overview, setup, deployment, complete file tree, and public
+site architecture, start with the [main README](README.md).
+
+## What this layer promises
+
+1. **Evidence, not guesses.** It responds to a learner’s expressed
+   understanding and learner-chosen controls; it does not diagnose or label.
+2. **One small support.** It can offer a hint, simpler explanation, example,
+   application prompt, visual explanation, or preference proposal—not an
+   overwhelming replacement lesson.
+3. **Choice remains with the learner.** The system proposes at most one
+   reversible change; it never silently rewrites persistent preferences.
+4. **Safe without a model.** Every AI-dependent route has an authored,
+   deterministic fallback. Provider failure never blocks course progress.
+5. **No score theatre.** Understanding checks use server-side outcomes and
+   supportive next steps, not visible numerical scores, speed measures, or
+   answer keys.
+
+## Reading this document
+
+| Section | Use it for |
+| --- | --- |
+| [Current implementation coverage](#current-implementation-coverage) | Which features are connected today and which are deliberately off |
+| [Non-negotiable learner safeguards](#2-non-negotiable-learner-safeguards) | Privacy, no-diagnosis, learner-choice, assessment, and accessibility rules |
+| [Behavioural data scope](#4-behavioural-data-scope) | The minimal aggregate signals the product may use after consent |
+| [Adaptive support engine](#6-adaptive-support-engine) | How policy, provider output, validation, and the learner proposal fit together |
+| [AI assessment design](#9-ai-assessment-design) | The authored fallback bank, item limits, review path, and no-score rule |
+| [Model routing and budget](#8-model-routing-and-budget) | Gemini-first rotation, constrained OpenAI fallback, and caps |
+| [Delivery phases](#14-delivery-phases) | Remaining governance and rollout work |
+
+> **Important:** the “proposed” and “future” parts of this specification are
+> intentional product gates, not claims of a live capability. Do not enable a
+> feature just because a UI path or server module exists; its consent, review,
+> budget, and storage conditions must also be met.
 
 ## Current implementation coverage
 

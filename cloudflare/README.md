@@ -1,26 +1,59 @@
-# Pakistan and Urdu language routing
+# Optional Cloudflare locale routing
 
-The website itself is a Render static site, so it never receives a visitor's country code. `locale-redirect-worker.js` is a small Cloudflare Worker that adds the requested behavior at the edge without any third-party IP-lookup request:
+> Route a first visit to the matching English or Urdu experience without
+> building an IP database or retaining an IP address.
 
-- visitors whose browser prefers Urdu are sent to the matching Urdu page;
-- visitors whose Cloudflare edge country is `PK` are sent to the matching Urdu page;
-- supported routes include the home page, How it works, Pathways, Learners, Families, Schools, Team, Co-design, Community, and Trust;
-- everyone else remains on the matching English page;
-- an explicit language choice wins and is saved for one year in the `t2l_locale` first-party cookie;
-- crawlers are never redirected, while every English and Urdu route remains separately indexable through canonical, `hreflang`, and sitemap entries;
-- the Worker reads only Cloudflare's transient country code. It does not save, log, or send IP addresses anywhere.
+Type2Learn is fully usable on Render without Cloudflare. This folder contains
+an optional edge worker for a domain proxied through Cloudflare. It keeps both
+language versions separately shareable and indexable while making the first
+route more welcoming for visitors who prefer Urdu or arrive through a Pakistan
+edge location.
 
-## One-time Cloudflare setup
+## Behaviour
 
-1. Add `type2learn.tech` to Cloudflare and keep the DNS record that points to Render **proxied** (orange cloud).
-2. In **Workers & Pages**, create a Worker and replace its starter code with `locale-redirect-worker.js`.
-3. Add the Worker route `type2learn.tech/*`. The Worker changes only the supported English/Urdu route pairs; every other route passes through untouched to Render.
-4. Deploy the Worker.
+`locale-redirect-worker.js` implements the following rules:
 
-## Verify after deployment
+| Situation | Result |
+| --- | --- |
+| Visitor explicitly chooses `?lang=ur` or `?lang=en` | Choice wins and is stored for one year in the first-party `t2l_locale` cookie |
+| Browser prefers Urdu | Redirect to the matching `/ur/` route when no explicit choice exists |
+| Cloudflare country is `PK` | Redirect to the matching `/ur/` route when no explicit choice exists |
+| Visitor is a crawler | Never redirect; leave English and Urdu pages independently discoverable |
+| Other visitor | Keep the matching English route |
+| Unsupported route | Pass through untouched to Render |
 
-- Open `https://type2learn.tech/?lang=ur` in a private window. It should set the Urdu choice and land on `/ur/`.
-- Open `https://type2learn.tech/?lang=en`. It should set the English choice and land on `/`.
-- Open `https://type2learn.tech/team/?lang=ur`. It should preserve the route and land on `/ur/team/`; switching back should return to `/team/`.
-- Clear the `t2l_locale` cookie, then test a Pakistan network or Cloudflare's country simulation. A Pakistan request should receive a `302` to `/ur/`.
-- Visit any `/ur/.../` route directly. It must remain available regardless of IP, so people can share Urdu pages and search engines can index them.
+The worker reads Cloudflare’s transient country code only. It does not store,
+log, or forward an IP address.
+
+Supported language pairs include the home page plus How it works, Learning
+together, Participation & trust, Team, and their consolidated/legacy route
+aliases. Direct Urdu links remain valid regardless of a visitor’s location.
+
+## Deploy it once
+
+1. Add `type2learn.tech` to Cloudflare and keep the DNS record pointing to
+   Render **proxied** (orange cloud).
+2. Open **Workers & Pages**, create a Worker, and replace the starter code with
+   [`locale-redirect-worker.js`](locale-redirect-worker.js).
+3. Add the route `type2learn.tech/*`.
+4. Deploy the worker after the Render site is already reachable.
+
+## Verify the experience
+
+```text
+https://type2learn.tech/?lang=ur
+https://type2learn.tech/?lang=en
+https://type2learn.tech/team/?lang=ur
+```
+
+- The first URL should save the Urdu preference and reach `/ur/`.
+- The second should save English and reach `/`.
+- The team URL should preserve the route and reach `/ur/team/`.
+- Clear `t2l_locale`, then test using Cloudflare’s country simulation or a
+  Pakistan network: the first matching request should receive a `302` to its
+  Urdu counterpart.
+- Open a direct `/ur/.../` link and confirm it remains available even from a
+  non-Pakistan IP.
+
+See the [main README](../README.md) for the full product, deployment, search,
+and bilingual-route architecture.
