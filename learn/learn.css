@@ -461,6 +461,43 @@ a:focus-visible {
   padding-inline: clamp(22px, 4.8vw, 82px);
 }
 
+/* The open layout is deliberately a larger, more spacious reading surface in
+   the course itself.  Reproduce that readable scale while it is being chosen
+   here, otherwise the preferences screen and the saved course disagree. */
+body[data-setup-layout="open"] .learn-main--open .learning-settings-header h1 {
+  font-size: clamp(2.4rem, 4.8vw, 4.2rem);
+}
+
+body[data-setup-layout="open"] .learn-main--open .learning-settings-header span {
+  max-width: 760px;
+  font-size: 18px;
+}
+
+body[data-setup-layout="open"] .learn-main--open .learning-settings-later {
+  max-width: 760px;
+  font-size: 14px;
+}
+
+body[data-setup-layout="open"] .learn-main--open .learning-open-row > .learning-control h2 {
+  font-size: 21.6px;
+}
+
+body[data-setup-layout="open"] .learn-main--open .learning-open-row > .learning-control p {
+  font-size: 15px;
+  line-height: 1.62;
+}
+
+body[data-setup-layout="open"] .learn-main--open .preference-options button {
+  min-height: 48px;
+  font-size: 14px;
+}
+
+body[data-setup-layout="open"] .learn-main--open .noise-volume-control,
+body[data-setup-layout="open"] .learn-main--open .learning-noise-details small,
+body[data-setup-layout="open"] .learn-main--open .noise-preview-status {
+  font-size: 13px;
+}
+
 .learning-settings--open {
   width: 100%;
   max-width: none;

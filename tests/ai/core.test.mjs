@@ -4,9 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { COURSE_CONTENT } from '../../course/course-content.js';
-import { APPROVED_OPENAI_MODEL, RESERVED_TEST_GENERATION_MODEL, loadRuntimeConfig, parseEnvText } from '../../server/config.mjs';
+import { APPROVED_OPENAI_MINI_MODEL, APPROVED_OPENAI_MODEL, RESERVED_TEST_GENERATION_MODEL, loadRuntimeConfig, parseEnvText } from '../../server/config.mjs';
 import { createAiService } from '../../server/ai-service.mjs';
 import { createAdaptiveRecallService } from '../../server/adaptive-recall-service.mjs';
+import { createModelProvider } from '../../server/model-provider.mjs';
 import { adaptiveRecallContext, coursePageContext, normaliseConversation, normaliseLearnerMessage } from '../../server/course-context.mjs';
 import { createFallbackAssessmentBank } from '../../server/fallback-assessment-bank.mjs';
 import { assessmentCurriculum, publicAssessmentItem, validateAssessmentBank } from '../../server/assessment-schemas.mjs';
@@ -42,7 +43,8 @@ test('production runtime never loads the local secret file and caps cannot be ra
     assert.equal(production.openAiApiKey, '');
     assert.equal(production.openAiUserCapUsd, 2);
     assert.equal(production.openAiAppCapUsd, 14);
-    assert.equal(production.openAiModel, 'gpt-5-nano');
+    assert.equal(production.openAiModel, 'gpt-5.4-nano');
+    assert.equal(production.openAiMiniModel, 'gpt-5.4-mini');
 
     const development = await loadRuntimeConfig({ root, environment: { NODE_ENV: 'development' } });
     assert.equal(development.openAiApiKey, 'local-only-value');
@@ -165,7 +167,7 @@ test('Azure Responses calls use api-key, the exact approved model, and parse Azu
     assert.equal(request.model, APPROVED_OPENAI_MODEL);
     assert.equal(request.store, false);
     assert.equal(request.max_output_tokens, 64);
-    assert.match(request.instructions, /Muhammad Taha Bin Zaeem, Founder and Product Direction/);
+    assert.match(request.instructions, /Muhammad Taha Bin Zaeem, Founder and Development Lead/);
     assert.equal(settled.length, 1);
     assert.equal(settled[0].actual.inputTokens, 31);
     assert.equal(settled[0].actual.outputTokens, 7);
@@ -185,6 +187,32 @@ test('Azure Responses calls use api-key, the exact approved model, and parse Azu
     const urduPageFacts = urduRequest.instructions.split('Approved page facts:\n')[1];
     assert.match(urduPageFacts, /اے ڈی ایچ ڈی/);
     assert.doesNotMatch(urduPageFacts, /\bADHD\b/);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test('structured adaptive work uses mini and final-bank work uses the reserved 5.1 model', { concurrency: false }, async () => {
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (!String(url).startsWith('https://api.openai.com/')) throw new Error('The OpenAI primary should be attempted before Gemini for this purpose.');
+    return new Response(JSON.stringify({
+      output: [{ type: 'message', content: [{ type: 'output_text', text: '{"ok":true}' }] }],
+      usage: { input_tokens: 10, output_tokens: 5 }
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const provider = createModelProvider({
+      geminiApiKeys: ['unused-gemini-test-key'], geminiFastModel: 'gemini-3.5-flash-lite', geminiHeavyModel: 'gemini-3.6-flash', geminiMaxOutputTokens: 420,
+      openAiApiKey: 'unit-test-key', openAiResponsesUrl: 'https://api.openai.com/v1/responses', openAiProvider: 'openai',
+      openAiModel: APPROVED_OPENAI_MODEL, openAiMiniModel: APPROVED_OPENAI_MINI_MODEL, openAiTestModel: RESERVED_TEST_GENERATION_MODEL
+    });
+    await provider.generate({ purpose: 'adaptive-recall', instructions: 'Return JSON.', input: '{}', maxOutputTokens: 50, jsonSchema: { type: 'object' } });
+    await provider.generate({ purpose: 'final-assessment-generation', instructions: 'Return JSON.', input: '{}', maxOutputTokens: 50, jsonSchema: { type: 'object' } });
+    assert.equal(JSON.parse(calls[0].options.body).model, APPROVED_OPENAI_MINI_MODEL);
+    assert.equal(JSON.parse(calls[1].options.body).model, RESERVED_TEST_GENERATION_MODEL);
   } finally {
     globalThis.fetch = previousFetch;
   }
@@ -339,10 +367,12 @@ test('authored final assessment reserve provides the requested calm question lim
   assert.equal(bank.items.length, 21);
 });
 
-test('usage estimate uses the documented Nano price configuration and keeps Mini reserved', () => {
+test('model roles keep nano, mini, and final assessment generation distinct', () => {
   const estimate = usageEstimate(1000000, 500000, { openAiInputUsdPerMillion: 0.05, openAiOutputUsdPerMillion: 0.4 });
   assert.equal(estimate, 0.25);
-  assert.equal(APPROVED_OPENAI_MODEL, 'gpt-5-nano');
-  assert.equal(RESERVED_TEST_GENERATION_MODEL, 'gpt-5.1-codex-mini');
+  assert.equal(APPROVED_OPENAI_MODEL, 'gpt-5.4-nano');
+  assert.equal(APPROVED_OPENAI_MINI_MODEL, 'gpt-5.4-mini');
+  assert.equal(RESERVED_TEST_GENERATION_MODEL, 'gpt-5.1');
   assert.notEqual(APPROVED_OPENAI_MODEL, RESERVED_TEST_GENERATION_MODEL);
+  assert.notEqual(APPROVED_OPENAI_MINI_MODEL, RESERVED_TEST_GENERATION_MODEL);
 });

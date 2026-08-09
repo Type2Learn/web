@@ -3,6 +3,7 @@ import { apiError } from './errors.mjs';
 import { assessmentUsageCaps, assessmentUsageEstimate } from './usage-ledger.mjs';
 import { createModelProvider } from './model-provider.mjs';
 import { createFallbackAssessmentBank } from './fallback-assessment-bank.mjs';
+import { constrainAssessmentEvaluation, deterministicAssessmentEvaluation } from './assessment-evaluator.mjs';
 import {
   ASSESSMENT_COURSE_ID,
   assessmentBankJsonSchema,
@@ -71,14 +72,7 @@ const evaluationInput = (answer) => JSON.stringify({ learnerResponse: answer });
 
 const bankKey = (curriculum) => `${curriculum.courseId}--${curriculum.curriculumVersion}--${curriculum.language}`;
 const generatedBankKey = (curriculum) => `${curriculum.courseId}:${curriculum.curriculumVersion}:${curriculum.language}:${curriculum.moduleIndex}`;
-const fallbackEvaluation = (item) => ({
-  outcome: 'uncertain',
-  demonstratedObjectiveIds: [],
-  needsReviewObjectiveIds: [],
-  feedback: item?.responseMode === 'open'
-    ? 'Result under review. Your response is recorded, and you can continue to the next question.'
-    : 'Result under review. Your choice is recorded, and you can continue to the next question.'
-});
+const fallbackEvaluation = (item, curriculum, answer = '') => deterministicAssessmentEvaluation({ item, curriculum, answer });
 
 const visibleRun = (run, bank) => {
   const itemIds = Array.isArray(run?.itemOrder) ? run.itemOrder.slice(0, MAX_RUN_ITEMS) : [];
@@ -206,7 +200,7 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     try {
       reservation = await reserve({ userHash: hash(`assessment-bank:${generatedBankKey(curriculum)}`), inputTokens: estimatedInputTokens, outputTokens: config.assessmentMaxOutputTokens });
       const generated = await provider.generate({
-        purpose: 'heavy',
+        purpose: curriculum.scope === 'final' ? 'final-assessment-generation' : 'assessment-generation',
         instructions,
         input,
         maxOutputTokens: config.assessmentMaxOutputTokens,
@@ -283,19 +277,21 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
   };
 
   const evaluateOpen = async ({ account, curriculum, item, answer }) => {
-    if (!ledger || !provider.availableFor?.('chat')) return fallbackEvaluation(item);
+    const deterministic = fallbackEvaluation(item, curriculum, answer);
+    if (!ledger || !provider.availableFor?.('chat')) return deterministic;
     const instructions = evaluationInstructions(curriculum, item);
     const input = evaluationInput(answer);
     const estimatedInputTokens = estimateTokens(instructions + input);
     let reservation;
     try {
       reservation = await reserve({ userHash: hash(account.uid), inputTokens: estimatedInputTokens, outputTokens: 180 });
-      const generated = await provider.generate({ purpose: 'chat', instructions, input, maxOutputTokens: 180, jsonSchema: responseEvaluationJsonSchema(curriculum) });
+      const generated = await provider.generate({ purpose: 'assessment-evaluation', instructions, input, maxOutputTokens: 180, jsonSchema: responseEvaluationJsonSchema(curriculum) });
       await settle({ reservation, generated, estimatedInputTokens });
       reservation = null;
-      return validateResponseEvaluation(JSON.parse(generated.text), { item, curriculum });
+      const validated = validateResponseEvaluation(JSON.parse(generated.text), { item, curriculum });
+      return constrainAssessmentEvaluation({ candidate: validated, deterministic, item });
     } catch {
-      return fallbackEvaluation(item);
+      return deterministic;
     } finally {
       if (reservation) await ledger.release({ ...reservation, tolerateMissing: true }).catch(() => {});
     }
@@ -317,14 +313,22 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     const cleanAnswer = validateAssessmentAnswer({ item, answer: body?.answer });
     const evaluation = item.responseMode === 'mcq'
       ? (cleanAnswer.optionIndex === item.correctOptionIndex
-        ? { outcome: 'demonstrated', demonstratedObjectiveIds: item.objectiveIds, needsReviewObjectiveIds: [], feedback: 'Result under review. Your choice is recorded, and you can continue when you are ready.' }
-        : { outcome: 'needs-review', demonstratedObjectiveIds: [], needsReviewObjectiveIds: item.objectiveIds, feedback: 'Result under review. Your choice is recorded, and you can continue when you are ready.' })
+        ? { outcome: 'demonstrated', demonstratedObjectiveIds: item.objectiveIds, needsReviewObjectiveIds: [], feedback: 'Result under review. Your choice is recorded, and you can continue when you are ready.', signal: { responseDepth: 'selected', courseGrounding: 'demonstrated', sourceTermsMatched: 0, rubricTermsMatched: 0 } }
+        : { outcome: 'needs-review', demonstratedObjectiveIds: [], needsReviewObjectiveIds: item.objectiveIds, feedback: 'Result under review. Your choice is recorded, and you can continue when you are ready.', signal: { responseDepth: 'selected', courseGrounding: 'needs-review', sourceTermsMatched: 0, rubricTermsMatched: 0 } })
       : await evaluateOpen({ account, curriculum, item, answer: cleanAnswer.text });
     const outcomes = [...(Array.isArray(run.outcomes) ? run.outcomes : []), {
       itemId: item.id,
       outcome: evaluation.outcome,
       demonstratedObjectiveIds: evaluation.demonstratedObjectiveIds,
       needsReviewObjectiveIds: evaluation.needsReviewObjectiveIds,
+      // This bounded trace makes the assessment auditable without retaining a
+      // learner response, answer key, exact option, score, or model rationale.
+      evidenceSignal: {
+        responseDepth: String(evaluation.signal?.responseDepth || 'unknown'),
+        courseGrounding: String(evaluation.signal?.courseGrounding || 'unknown'),
+        sourceTermsMatched: Math.max(0, Math.min(8, Number(evaluation.signal?.sourceTermsMatched) || 0)),
+        rubricTermsMatched: Math.max(0, Math.min(6, Number(evaluation.signal?.rubricTermsMatched) || 0))
+      },
       answeredAt: nowDate()
     }];
     const nextIndex = Number(run.currentIndex) + 1;

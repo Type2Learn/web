@@ -29,6 +29,12 @@ const candidates = {
     title: copy('A little more visible encouragement', 'تھوڑی زیادہ نمایاں حوصلہ افزائی'),
     description: copy('Use calm, more visible progress moments in the next module.', 'اگلے ماڈیول میں پرسکون اور زیادہ نمایاں پیش رفت کے لمحات استعمال کریں۔'),
     reason: copy('You returned to this task more than once.', 'آپ اس کام پر ایک سے زیادہ بار واپس آئے۔')
+  },
+  returnFromAi: {
+    id: 'return-from-ai-one-step', kind: 'task-initiation',
+    title: copy('Return to one clear next step', 'ایک واضح اگلے قدم پر واپس آئیں'),
+    description: copy('Keep the next task small and visible after using page support.', 'صفحے کی مدد استعمال کرنے کے بعد اگلا کام چھوٹا اور واضح رکھیں۔'),
+    reason: copy('You spent time with the page helper during this module.', 'آپ نے اس ماڈیول میں صفحے کے مددگار کے ساتھ وقت گزارا۔')
   }
 };
 
@@ -40,8 +46,11 @@ export const adaptiveCandidateForSummary = (summary) => {
   const typingPauseMs = metric(summary, 'typingLongestPauseMs');
   const ttsStarts = metric(summary, 'ttsStarts');
   const returns = metric(summary, 'returns') + metric(summary, 'rereads');
+  const aiActiveMs = metric(summary, 'aiActiveMs');
+  const aiRequests = metric(summary, 'aiRequests');
 
   if (firstActionMs >= 90000) return candidates.start;
+  if (aiActiveMs >= 6 * 60 * 1000 || aiRequests >= 5) return candidates.returnFromAi;
   if (typingPauseMs >= 45000 || (activeMs >= 12 * 60 * 1000 && summary?.phase === 'read')) return candidates.spacing;
   if (activeMs >= 8 * 60 * 1000 && summary?.phase === 'read' && ttsStarts === 0) return candidates.audio;
   if (returns >= 2) return candidates.encouragement;

@@ -23,11 +23,11 @@ const assistantInstructions = (context) => {
     : 'Reply in clear English.';
   const teamFacts = context.language === 'ur'
     ? [
-      'ٹائپ ٹو لرن کے بانی اور مصنوعات کی سمت کے ذمہ دار محمد طٰہٰ بن زعیم ہیں۔',
+      'ٹائپ ٹو لرن کے بانی اور ترقیاتی سربراہ محمد طٰہٰ بن زعیم ہیں۔',
       'شریک بانی: محمد حامز بن کاشف (انجینئرنگ)، محمد فہد یونس (مصنوعی ذہانت)، ادریس بابر (تحقیق)، اور علیزے حسن (مصنوعات)۔'
     ]
     : [
-      'Type2Learn was founded by Muhammad Taha Bin Zaeem, Founder and Product Direction.',
+      'Type2Learn was founded by Muhammad Taha Bin Zaeem, Founder and Development Lead.',
       'The co-founders are Muhammad Hamiz Bin Kashif (Engineering Lead), Muhammad Fahad Younus (AI Lead), Idrees Babar (Research Lead), and Alizay Hassan (Product Lead).'
     ];
   const assessmentRule = ['type', 'check', 'apply', 'exam', 'exam-intro'].includes(context.phase)

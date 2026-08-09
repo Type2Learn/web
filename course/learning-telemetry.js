@@ -13,8 +13,18 @@ export class LearningTelemetry {
     this.lastMeaningfulActionAt = 0;
     this.lastTickAt = 0;
     this.contextStartedAt = 0;
+    // AI time is collected as one aggregate number only.  No prompt, reply,
+    // transcript, or keystroke stream is ever stored in this telemetry.
+    this.aiSessionOpen = false;
+    this.aiSessionStartedAt = 0;
     this.flushInFlight = null;
-    this.visibilityHandler = () => this.tick();
+    this.visibilityHandler = () => {
+      if (document.visibilityState !== 'visible') this.finishAiInterval();
+      this.tick();
+      if (document.visibilityState === 'visible' && this.aiSessionOpen && !this.aiSessionStartedAt) {
+        this.aiSessionStartedAt = now();
+      }
+    };
     document.addEventListener('visibilitychange', this.visibilityHandler);
   }
 
@@ -37,7 +47,10 @@ export class LearningTelemetry {
     // and checking must not create a stream of task-level uploads.
     const key = [context?.moduleIndex, context?.language].join(':');
     const oldKey = this.context && [this.context.moduleIndex, this.context.language].join(':');
-    if (oldKey && oldKey !== key) void this.flush('task-change');
+    if (oldKey && oldKey !== key) {
+      this.finishAiInterval();
+      void this.flush('task-change');
+    }
     if (oldKey !== key) {
       this.context = { moduleIndex: Number(context?.moduleIndex) || 0, phase: String(context?.phase || 'read'), language: context?.language === 'ur' ? 'ur' : 'en' };
       this.metrics = this.emptyMetrics();
@@ -45,6 +58,8 @@ export class LearningTelemetry {
       this.contextStartedAt = now();
       this.lastMeaningfulActionAt = this.contextStartedAt;
       this.lastTickAt = this.contextStartedAt;
+      this.aiSessionOpen = false;
+      this.aiSessionStartedAt = 0;
     } else if (this.context) {
       this.context.phase = String(context?.phase || this.context.phase || 'read');
     }
@@ -64,6 +79,15 @@ export class LearningTelemetry {
     else this.metrics.idleMs += elapsed;
   }
 
+  finishAiInterval() {
+    if (!this.aiSessionStartedAt) return;
+    const current = now();
+    if (this.enabled && document.visibilityState === 'visible') {
+      this.metrics.aiActiveMs += bounded(current - this.aiSessionStartedAt, 30 * 60 * 1000);
+    }
+    this.aiSessionStartedAt = 0;
+  }
+
   action(kind, detail = {}) {
     this.tick();
     if (!this.context || !this.enabled) return;
@@ -77,6 +101,14 @@ export class LearningTelemetry {
     if (kind === 'speech-start') this.metrics.speechStarts += 1;
     if (kind === 'speech-complete') this.metrics.speechCompleted += 1;
     if (kind === 'ai-request') this.metrics.aiRequests += 1;
+    if (kind === 'ai-open') {
+      this.aiSessionOpen = true;
+      if (document.visibilityState === 'visible' && !this.aiSessionStartedAt) this.aiSessionStartedAt = current;
+    }
+    if (kind === 'ai-close') {
+      this.finishAiInterval();
+      this.aiSessionOpen = false;
+    }
     if (kind === 'tts-start') this.support.textToSpeech = true;
     if (kind === 'visual-offered') this.support.visualOffered = true;
     if (kind === 'visual-open') this.support.visualOpened = true;
@@ -112,6 +144,8 @@ export class LearningTelemetry {
   }
 
   dispose() {
+    this.finishAiInterval();
+    this.aiSessionOpen = false;
     document.removeEventListener('visibilitychange', this.visibilityHandler);
     void this.flush('dispose');
   }

@@ -120,7 +120,7 @@ export const createAdaptiveRecallService = ({ config, firebase, ledger, provider
     }
     let settled = false;
     try {
-      const generated = await provider.generate({ instructions, input, maxOutputTokens: MAX_OUTPUT_TOKENS, jsonSchema: schema });
+      const generated = await provider.generate({ purpose: 'adaptive-recall', instructions, input, maxOutputTokens: MAX_OUTPUT_TOKENS, jsonSchema: schema });
       const result = validate(JSON.parse(generated.text));
       if (!result) throw apiError(502, 'INVALID_ADAPTIVE_OUTPUT', 'The adaptive response was not safe to show.');
       await ledger.settle({

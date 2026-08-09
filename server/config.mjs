@@ -2,15 +2,15 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Course AI is deliberately pinned to the low-cost model selected for normal
-// learner conversations. Do not introduce an automatic fallback: a model
-// availability problem must be visible rather than silently spending the
-// future assessment-generation budget.
-export const APPROVED_OPENAI_MODEL = 'gpt-5-nano';
-
-// Reserved for the future assessment/test-generation feature only. It is not
-// an approved Course AI chat model and must not be used as a chat fallback.
-export const RESERVED_TEST_GENERATION_MODEL = 'gpt-5.1-codex-mini';
+// Model roles are deliberately pinned in server code. Browser code never gets
+// a model name, provider URL, or key. Gemini remains the low-cost default for
+// ordinary learner chat; these OpenAI roles are used for the bounded work
+// where their extra reasoning or schema discipline is useful.
+export const APPROVED_OPENAI_MODEL = 'gpt-5.4-nano';
+export const APPROVED_OPENAI_MINI_MODEL = 'gpt-5.4-mini';
+// Final-bank generation happens at most once per course version and is the
+// only flow allowed to request the stronger reserved model.
+export const RESERVED_TEST_GENERATION_MODEL = 'gpt-5.1';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repositoryRoot = path.resolve(here, '..');
@@ -163,7 +163,11 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // `speech` is supported only for the existing local api.env file. The
     // deployment variable is always the explicit SPEECHMATICS_API_KEY name.
     speechmaticsApiKey: value('SPEECHMATICS_API_KEY', 'speech'),
+    // OpenAI role map: nano verifies prompts, classifications, feasibility,
+    // and JSON; mini handles bounded intent/repair/planning work; 5.1 is
+    // reserved for reviewer-triggered final assessment-bank generation.
     openAiModel: APPROVED_OPENAI_MODEL,
+    openAiMiniModel: APPROVED_OPENAI_MINI_MODEL,
     openAiTestModel: RESERVED_TEST_GENERATION_MODEL,
     // A zero cap makes every first request look as though the monthly budget
     // was spent. Treat accidental zero-valued deployment variables as absent

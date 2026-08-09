@@ -22,7 +22,9 @@ const wordingInput = ({ candidate, summary }) => JSON.stringify({
   phase: summary.phase,
   active_minutes: Math.round((Number(summary.metrics?.activeMs) || 0) / 60000),
   long_pause_seconds: Math.round((Number(summary.metrics?.typingLongestPauseMs) || 0) / 1000),
-  returns: Number(summary.metrics?.returns || 0) + Number(summary.metrics?.rereads || 0)
+  returns: Number(summary.metrics?.returns || 0) + Number(summary.metrics?.rereads || 0),
+  ai_minutes: Math.round((Number(summary.metrics?.aiActiveMs) || 0) / 60000),
+  ai_requests: Number(summary.metrics?.aiRequests || 0)
 });
 
 export const createAdaptiveSupportService = ({ config, firebase, ledger, provider = createModelProvider({ config }) }) => {
@@ -59,7 +61,7 @@ export const createAdaptiveSupportService = ({ config, firebase, ledger, provide
         caps: adaptiveUsageCaps(config), requestsPerMinute: config.adaptiveRequestsPerMinute
       });
       const generated = await provider.generate({
-        purpose: 'chat',
+        purpose: 'adaptive-support',
         instructions,
         input,
         maxOutputTokens: 70,

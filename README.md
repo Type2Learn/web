@@ -85,10 +85,13 @@ unrestricted chatbot as a substitute for curriculum or learner judgement.
 | **Understanding checks** | Delivers one question at a time, with authored fallback banks when a provider is unavailable. Learners see next steps, never numerical scores or answer keys. | Expose correct answers, visible percentages, speed scores, or endless retesting. |
 | **Visual explanations** | Provides authored, accessible concept maps in the visual/mascot rail. | Generate stereotyped learner images or make visuals the only way to learn. |
 
-AI is **Gemini-first with bounded key rotation** and a server-side OpenAI
-fallback. Provider credentials, answer keys, hidden rubrics, and model prompts
-stay on the server. Every model response is schema-validated and has an
-authored deterministic fallback.
+AI is **Gemini-first for ordinary course chat**, with bounded key rotation and
+server-only specialist OpenAI roles: **GPT-5.4 Nano** for prompt/JSON checks,
+**GPT-5.4 Mini** for bounded adaptive intent and assessment work, and
+**GPT-5.1** only for reviewer-triggered final assessment-bank generation.
+Provider credentials, answer keys, hidden rubrics, and model prompts stay on
+the server. Every model response is schema-validated and has an authored
+deterministic fallback.
 
 Some adaptive capabilities require an enabled server flag, a signed-in user,
 and explicit learner consent. AI-generated visual assets and an automated data

@@ -10,7 +10,10 @@ const backgroundNoiseSources = {
   white: '/assets/audio/background-noise/white-noise-loop.mp3',
   brown: '/assets/audio/background-noise/brown-noise-loop.mp3'
 };
-const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0.15, playing: false, fadeFrame: null, playRequest: 0 };
+// Keep this aligned with the in-course settings menu.  The setup page is a
+// live preview of the same course preference, not a separate audio system.
+const BACKGROUND_NOISE_MAX_PERCENT = 60;
+const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0, playing: false, fadeFrame: null, playRequest: 0 };
 const mascotAnimationUrls = ['/assets/2D%20Mascot/blinking.webp?v=20260804-loop1'];
 const mascotModuleUrl = '/course/mascot-2d.js?v=20260804-blink1';
 // 3D rollback reference: preserve the original model URL alongside the
@@ -48,9 +51,9 @@ const defaultChoices = {
   'mascot-voice': 'text',
   'mascot-voice-language': 'english',
   'background-noise-type': 'pink',
-  // A deliberately quiet starting point. The interface caps this at 35% so
-  // background sound cannot jump to an unexpectedly loud browser volume.
-  'background-noise-volume': '15'
+  // Turning background noise on never starts sound at an assumed loudness.
+  // It begins at 0% and the learner chooses a level up to the shared 60% cap.
+  'background-noise-volume': '0'
 };
 
 const preferenceKey = (user, courseId) => preferenceStoragePrefix
@@ -199,7 +202,7 @@ const controlMarkup = (originalControl, selected, language = 'english') => {
 
 const noiseVolume = (value) => {
   const number = Number(value);
-  return Number.isFinite(number) ? Math.min(35, Math.max(0, Math.round(number))) : 15;
+  return Number.isFinite(number) ? Math.min(BACKGROUND_NOISE_MAX_PERCENT, Math.max(0, Math.round(number))) : 0;
 };
 
 const noiseType = (value) => ['pink', 'white', 'brown'].includes(value) ? value : 'pink';
@@ -221,7 +224,7 @@ const stopBackgroundNoisePreview = () => {
 const prepareBackgroundNoisePreview = (type, volume) => {
   const safeType = noiseType(type);
   const source = backgroundNoiseSources[safeType];
-  const targetVolume = Math.min(.35, Math.max(0, noiseVolume(volume) / 100));
+  const targetVolume = Math.min(BACKGROUND_NOISE_MAX_PERCENT / 100, Math.max(0, noiseVolume(volume) / 100));
   if (backgroundNoisePreview.audio?.src?.endsWith(source)) {
     backgroundNoisePreview.type = safeType;
     backgroundNoisePreview.volume = targetVolume;
@@ -290,7 +293,7 @@ const backgroundNoiseMarkup = (choices) => {
     '</div>',
     '<label class="noise-volume-control" for="background-noise-volume">',
     '<span>' + copy.volume + ' <strong data-background-noise-volume-output>' + volume + '%</strong></span>',
-    '<input id="background-noise-volume" type="range" min="0" max="35" step="1" value="' + volume + '" style="--noise-volume-fill:' + ((volume / 35) * 100).toFixed(2) + '%" data-background-noise-volume aria-describedby="background-noise-volume-help">',
+    '<input id="background-noise-volume" type="range" min="0" max="' + BACKGROUND_NOISE_MAX_PERCENT + '" step="1" value="' + volume + '" style="--noise-volume-fill:' + ((volume / BACKGROUND_NOISE_MAX_PERCENT) * 100).toFixed(2) + '%" data-background-noise-volume aria-describedby="background-noise-volume-help">',
     '</label>',
     '<small id="background-noise-volume-help">' + copy.quietStart + '</small>',
     '<span class="noise-preview-status" data-background-noise-preview-status aria-live="polite">' + (backgroundNoisePreview.playing ? copy.playing + ' ' + noiseTypeLabel(selectedType) + ' · ' + volume + '%' : copy.selectNoise + ' ' + volume + '%') + '</span>',
@@ -515,6 +518,12 @@ const applySetupPresentation = (choices) => {
   document.body.dataset.setupEncouragement = ['subtle', 'balanced', 'expressive'].includes(choices.encouragement)
     ? choices.encouragement
     : 'subtle';
+  // The open course layout increases primary reading text.  Apply the same
+  // preview here so this first-run screen never promises a layout it does not
+  // visually demonstrate.
+  document.body.dataset.setupLayout = ['focused', 'balanced', 'open'].includes(choices.layout)
+    ? choices.layout
+    : 'balanced';
 };
 
 const launchSetupControlMotion = (control, event, choices, routeChange = false) => {
@@ -600,7 +609,7 @@ const updateNoiseVolumeUi = (value) => {
   const output = document.querySelector('[data-background-noise-volume-output]');
   if (output) output.textContent = noiseVolume(value) + '%';
   const input = document.querySelector('[data-background-noise-volume]');
-  if (input) input.style.setProperty('--noise-volume-fill', ((noiseVolume(value) / 35) * 100).toFixed(2) + '%');
+  if (input) input.style.setProperty('--noise-volume-fill', ((noiseVolume(value) / BACKGROUND_NOISE_MAX_PERCENT) * 100).toFixed(2) + '%');
 };
 
 const boot = async () => {
@@ -702,7 +711,12 @@ const boot = async () => {
         }
       }
       if (preference === 'background-noise') {
-        if (value === 'on') startBackgroundNoisePreview(choices);
+        // Enabling is always a fresh, muted start—even if an old course record
+        // contained a louder value.  This mirrors the settings-menu contract.
+        if (value === 'on') {
+          choices['background-noise-volume'] = '0';
+          startBackgroundNoisePreview(choices);
+        }
         else stopBackgroundNoisePreview();
         render(choices);
         return;
@@ -785,7 +799,7 @@ const boot = async () => {
     if (!event.target.matches('[data-background-noise-volume]')) return;
     choices['background-noise-volume'] = String(noiseVolume(event.target.value));
     updateNoiseVolumeUi(choices['background-noise-volume']);
-    backgroundNoisePreview.volume = Math.min(.35, noiseVolume(choices['background-noise-volume']) / 100);
+    backgroundNoisePreview.volume = Math.min(BACKGROUND_NOISE_MAX_PERCENT / 100, noiseVolume(choices['background-noise-volume']) / 100);
     if (backgroundNoisePreview.audio) backgroundNoisePreview.audio.volume = backgroundNoisePreview.volume;
   });
 

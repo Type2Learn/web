@@ -137,10 +137,11 @@ The current repository already has the pieces this work should extend:
   Firestore under a SHA-256 hash of the Firebase UID. Guest progress is local.
 - "server/usage-ledger.mjs" already handles account/per-user reservations,
   rate limits, expiry and settlement in Firestore.
-- "server/config.mjs" pins the Gemini-first route to "gemini-3.5-flash-lite"
-  for frequent text support and "gemini-3.6-flash" for rare heavy work. It
-  keeps "gpt-5-nano" and "gpt-5.1-codex-mini" as the corresponding OpenAI
-  fallbacks only.
+- "server/config.mjs" pins Gemini 3.5 Flash-Lite to ordinary course chat and
+  Gemini 3.6 Flash to resilient heavy fallback. It assigns server-only OpenAI
+  roles: "gpt-5.4-nano" for compact prompt/JSON checks, "gpt-5.4-mini" for
+  bounded adaptive and assessment reasoning, and "gpt-5.1" only for rare,
+  reviewer-triggered final assessment-bank generation.
 - "course/narration.js", the course audio manifest, voice library and
   Speechmatics path are the existing read-aloud/speech foundations.
 
@@ -421,13 +422,15 @@ the current task and returns to saved choices.
 
 ## 8. Model routing and budget
 
-The provider policy is Gemini-first with a controlled OpenAI fallback:
+The provider policy is Gemini-first for ordinary learner chat, with a
+purpose-bound OpenAI specialist tier for structured work:
 
 | Job | Model | Boundary |
 | --- | --- | --- |
-| Existing Course AI chat | Gemini 3.5 Flash-Lite | Current page only, concise, signed-in; rotate eligible Gemini chat keys before the OpenAI Nano fallback |
-| Summary wording, proposal ranking, re-entry copy, encouragement, response classification | Gemini 3.5 Flash-Lite | Strict structured schema and low output cap; gpt-5-nano only after every eligible Gemini key fails/is cooling down |
-| New module/final assessment bank generation and rare heavy reasoning | Gemini 3.6 Flash | At most once per hour per curriculum/bank work item; rotate Gemini heavy keys before the OpenAI Mini fallback |
+| Existing Course AI chat | Gemini 3.5 Flash-Lite | Current page only, concise, signed-in; rotate eligible Gemini chat keys before the GPT-5.4 Nano fallback |
+| Prompt checks / compact JSON verification | GPT-5.4 Nano | Strict schema, bounded input and output; rotating Gemini pool is the outage fallback |
+| Adaptive recall, support wording, response classification, module-bank generation | GPT-5.4 Mini | Purpose-bound structured output, deterministic validator, and Gemini fallback; never used as unrestricted chat |
+| Final assessment-bank generation | GPT-5.1 | Reviewer-triggered only, once per course version/language window; Gemini 3.6 Flash is the outage fallback |
 | Image generation | Disabled pending approval | Separate provider/model/moderation/object-store/shared-cost design |
 
 Use the provider-specific API, structured JSON when required, bounded inputs,
@@ -438,8 +441,9 @@ instruction/command, provider key, or upstream error body.
 Gemini key rotation is server-only. Deployment may use comma-separated
 `GEMINI_CHAT_API_KEYS` / `GEMINI_TEST_API_KEYS` or numbered key variables.
 Each request begins at the next healthy key. Auth, model, quota and temporary
-upstream failures cool that key down before the next rotation; only after the
-Gemini pool cannot answer may the matching OpenAI fallback be used.
+upstream failures cool that key down before the next rotation. Specialist
+OpenAI work falls back to the matching Gemini pool on provider or quota failure;
+ordinary learner chat keeps Gemini as its first choice.
 
 ### 8.1 Shared budget
 
@@ -679,7 +683,9 @@ New Render/local variables use disabled/restrictive defaults:
 ADAPTIVE_LEARNING_ENABLED=false
 AI_ASSESSMENTS_ENABLED=false
 AI_VISUALS_ENABLED=false
-OPENAI_TEST_GENERATION_MODEL=gpt-5.1-codex-mini
+# Model roles are pinned in server/config.mjs; this is documentation only.
+# GPT-5.4 Nano = verification; GPT-5.4 Mini = bounded adaptive work;
+# GPT-5.1 = final assessment-bank generation.
 OPENAI_MONTHLY_APP_USD_CAP=10
 OPENAI_MONTHLY_USER_USD_CAP=2
 ADAPTIVE_MONTHLY_APP_USD_CAP=7

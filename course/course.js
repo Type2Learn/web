@@ -1179,6 +1179,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const resetAiChat = ({ close = true } = {}) => {
+    // ADAPTIVE LEARNING: close the aggregate AI-use interval before clearing
+    // the session.  The telemetry never receives the learner's messages.
+    adaptiveLearning.telemetry?.action?.('ai-close');
     abortAiRequest();
     stopAiReplyAudio();
     discardAiDictation();
@@ -1320,6 +1323,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       aiChat.messages = [{ role: 'assistant', content: aiInitialMessage(), initial: true }];
       aiChat.draft = '';
       aiChat.error = '';
+      // ADAPTIVE LEARNING: this is only an aggregate visible-panel duration,
+      // used to offer an optional one-step return suggestion after a module.
+      adaptiveLearning.telemetry?.action?.('ai-open');
     }
     if (canUseMascotAiPanel()) {
       state.modal = '';
@@ -1365,6 +1371,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const contextKey = aiChat.contextKey;
     const controller = new AbortController();
     aiChat.requestController = controller;
+    adaptiveLearning.telemetry?.action?.('ai-request');
     render();
     try {
       const reply = await askCourseAi({ user: authenticatedUser, message, history, ...aiPageRequestContext(), signal: controller.signal });
