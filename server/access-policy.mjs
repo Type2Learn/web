@@ -12,6 +12,21 @@ export const normaliseRoles = (value) => Array.from(new Set((Array.isArray(value
   .map((role) => String(role || '').trim())
   .filter((role) => roleSet.has(role))));
 
+// Roles granted through an educator or learner invitation are only effective
+// while their Firestore organisation membership remains active. Platform
+// administration is deliberately organisation-independent, so it is retained
+// from the account record. This lets a membership revocation take effect on
+// the next protected request even if the client's custom-claim token has not
+// refreshed yet.
+export const effectiveRoles = ({ storedRoles, organisations } = {}) => {
+  const platformRoles = normaliseRoles(storedRoles).filter((role) => role === 'platform-admin');
+  const membershipRoles = (Array.isArray(organisations) ? organisations : [])
+    .filter((entry) => entry && entry.active !== false)
+    .map((entry) => String(entry.membershipRole || '').trim())
+    .filter((role) => roleSet.has(role));
+  return normaliseRoles([...platformRoles, ...membershipRoles]);
+};
+
 export const hasRole = (roles, role) => normaliseRoles(roles).includes(role);
 
 export const canCreateCode = ({ roles, kind }) => {

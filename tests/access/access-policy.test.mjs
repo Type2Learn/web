@@ -7,6 +7,7 @@ import {
   canCreateCode,
   canSeeOrganisation,
   codeRoleForKind,
+  effectiveRoles,
   isTheoryCourseType,
   normaliseRoles,
   publicAccount
@@ -25,6 +26,20 @@ test('role normalisation removes invalid and duplicate values', () => {
   assert.deepEqual(normaliseRoles(['teacher', 'teacher', '', 'admin', 'learner']), ['teacher', 'learner']);
   assert.deepEqual(normaliseRoles(null), []);
   assert.deepEqual(normaliseRoles([' platform-admin ', 'institute-owner']), ['platform-admin', 'institute-owner']);
+});
+
+test('effective educator roles disappear as soon as their organisation membership is inactive', () => {
+  assert.deepEqual(effectiveRoles({
+    storedRoles: ['platform-admin', 'teacher', 'learner'],
+    organisations: [
+      { organisationId: 'org-a', membershipRole: 'teacher', active: false },
+      { organisationId: 'org-b', membershipRole: 'learner', active: true }
+    ]
+  }), ['platform-admin', 'learner']);
+  assert.deepEqual(effectiveRoles({
+    storedRoles: ['teacher'],
+    organisations: [{ organisationId: 'org-a', membershipRole: 'teacher', active: false }]
+  }), []);
 });
 
 test('only administrators create educator codes and scoped educators create learner codes', () => {

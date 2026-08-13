@@ -280,6 +280,9 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'POST' && pathname === '/api/v1/access/codes') {
       return sendJson(response, 200, await access.createCode({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
+    if (request.method === 'GET' && pathname === '/api/v1/access/codes') {
+      return sendJson(response, 200, await access.listCodes({ authorization: request.headers.authorization }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/access/redeem') {
       return sendJson(response, 200, await access.redeemCode({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
@@ -290,6 +293,9 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'GET' && pathname === '/api/v1/access/roster') {
       const organisationId = new URL(request.url || '/', 'http://localhost').searchParams.get('organisationId') || '';
       return sendJson(response, 200, await access.roster({ authorization: request.headers.authorization, organisationId }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/access/memberships/revoke') {
+      return sendJson(response, 200, await access.revokeMembership({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/source') {
       return sendJson(response, 200, await courseAuthoring.submitSource({ authorization: request.headers.authorization, form: await readForm(request, 25 * 1024 * 1024) }));

@@ -6,6 +6,7 @@ import {
   canCreateCode,
   canSeeOrganisation,
   codeRoleForKind,
+  effectiveRoles,
   normaliseRoles,
   publicAccount
 } from './access-policy.mjs';
@@ -50,10 +51,11 @@ const requireAvailable = (firebase, config) => {
 
 const memberFromSnapshot = (snapshot, uid) => {
   const stored = snapshot?.exists ? snapshot.data() || {} : {};
+  const organisations = Array.isArray(stored.organisations) ? stored.organisations.filter((entry) => entry && entry.active !== false) : [];
   return {
     uid: String(uid),
-    roles: normaliseRoles(stored.roles),
-    organisations: Array.isArray(stored.organisations) ? stored.organisations.filter((entry) => entry && entry.active !== false) : [],
+    roles: effectiveRoles({ storedRoles: stored.roles, organisations }),
+    organisations,
     createdAt: stored.createdAt || '',
     updatedAt: stored.updatedAt || ''
   };
@@ -183,7 +185,29 @@ export const createAccessService = ({ firebase, config }) => {
       };
       await collection(firebase.firestore, CODES).doc(id).set(record);
       await collection(firebase.firestore, AUDIT).add(auditData({ actorUid: actor.uid, action: 'access-code-created', organisationId, codeKind: kind }));
-      return { code, codeId: id.slice(0, 12), kind, organisationId, expiresAt: record.expiresAt, oneUse: true };
+      // codeId is an opaque HMAC digest, not the redeemable code. It is
+      // returned in full so a revoked-code request can address the exact
+      // Firestore record; user interfaces may display only a short prefix.
+      return { code, codeId: id, kind, organisationId, expiresAt: record.expiresAt, oneUse: true };
+    },
+
+    async listCodes({ authorization }) {
+      const actor = await accountFor(authorization);
+      const snapshot = await collection(firebase.firestore, CODES).orderBy('createdAt', 'desc').limit(200).get();
+      const codes = snapshot.docs.map((document) => document.data() || {}).filter((record) => (
+        actor.roles.includes('platform-admin') || (record.kind === 'learner' && record.createdBy === actor.uid)
+      ));
+      return {
+        codes: codes.map((record) => ({
+          codeId: String(record.id || ''),
+          kind: String(record.kind || ''),
+          organisationId: String(record.organisationId || ''),
+          expiresAt: String(record.expiresAt || ''),
+          revokedAt: String(record.revokedAt || ''),
+          redeemedAt: String(record.redeemedAt || ''),
+          oneUse: true
+        }))
+      };
     },
 
     async redeemCode({ authorization, body }) {
@@ -249,6 +273,41 @@ export const createAccessService = ({ firebase, config }) => {
       await reference.set({ revokedAt: nowIso(), revokedBy: actor.uid }, { merge: true });
       await collection(firebase.firestore, AUDIT).add(auditData({ actorUid: actor.uid, action: 'access-code-revoked', organisationId: code.organisationId, codeKind: code.kind }));
       return { revoked: true };
+    },
+
+    async revokeMembership({ authorization, body }) {
+      const actor = await accountFor(authorization);
+      const organisationId = safeIdentifier(body?.organisationId);
+      const memberId = safeIdentifier(body?.memberId, 128);
+      if (!organisationId || !memberId) throw apiError(400, 'MEMBERSHIP_REQUIRED', 'Choose an organisation member to remove.');
+      const managesOrganisation = actor.roles.includes('platform-admin')
+        || ((actor.roles.includes('institute-owner') || actor.roles.includes('teacher'))
+          && actor.organisations.some((entry) => entry.organisationId === organisationId && entry.active !== false));
+      if (!managesOrganisation) throw apiError(403, 'MEMBERSHIP_REVOKE_DENIED', 'You cannot remove members from this organisation.');
+      if (memberId === actor.uid && !actor.roles.includes('platform-admin')) throw apiError(400, 'SELF_MEMBERSHIP_REVOKE_DENIED', 'Ask an institute owner or administrator to remove your own workspace access.');
+
+      const firestore = firebase.firestore;
+      const membershipReference = organisationMemberDoc(firestore, organisationId, memberId);
+      const memberAccountReference = accountDoc(firestore, memberId);
+      let nextRoles = [];
+      await firestore.runTransaction(async (transaction) => {
+        const [membershipSnapshot, accountSnapshot] = await Promise.all([transaction.get(membershipReference), transaction.get(memberAccountReference)]);
+        if (!membershipSnapshot.exists || membershipSnapshot.data()?.active === false) throw apiError(404, 'MEMBERSHIP_NOT_ACTIVE', 'This organisation membership is not active.');
+        const membership = membershipSnapshot.data() || {};
+        if (!actor.roles.includes('platform-admin') && membership.membershipRole === 'institute-owner') {
+          throw apiError(403, 'MEMBERSHIP_REVOKE_DENIED', 'Only a platform administrator can remove an institute owner.');
+        }
+        const stored = accountSnapshot.exists ? accountSnapshot.data() || {} : {};
+        const organisations = (Array.isArray(stored.organisations) ? stored.organisations : []).map((entry) => (
+          entry?.organisationId === organisationId ? { ...entry, active: false, revokedAt: nowIso(), revokedBy: actor.uid } : entry
+        ));
+        nextRoles = effectiveRoles({ storedRoles: stored.roles, organisations });
+        transaction.set(membershipReference, { active: false, revokedAt: nowIso(), revokedBy: actor.uid, updatedAt: nowIso() }, { merge: true });
+        transaction.set(memberAccountReference, { organisations, roles: nextRoles, updatedAt: nowIso() }, { merge: true });
+        transaction.set(collection(firestore, AUDIT).doc(`membership-revoke-${organisationId}-${memberId}-${Date.now()}`), auditData({ actorUid: actor.uid, subjectUid: memberId, action: 'organisation-membership-revoked', organisationId, detail: membership.membershipRole || '' }));
+      });
+      await refreshClaims(firebase, memberId, nextRoles);
+      return { revoked: true, memberId, organisationId, refreshToken: true };
     },
 
     async roster({ authorization, organisationId }) {

@@ -119,6 +119,19 @@ const bindCourseSelectors = () => {
   }));
 };
 const bindRoleCodes = () => {
+  const refreshCodes = async () => {
+    const list = $('[data-code-list]');
+    if (!list) return;
+    try {
+      const result = await api('/api/v1/access/codes');
+      const codes = result.codes || [];
+      list.innerHTML = codes.length ? codes.map((entry) => {
+        const state = entry.revokedAt ? 'Revoked' : entry.redeemedAt ? 'Redeemed' : 'Ready to use';
+        const canRevoke = !entry.revokedAt && !entry.redeemedAt;
+        return `<li><div><strong>${escapeHtml(humanise(entry.kind))}</strong><small>Code reference ${escapeHtml(entry.codeId.slice(0, 12))} · ${escapeHtml(state)} · Expires ${escapeHtml(entry.expiresAt || 'not set')}</small></div>${canRevoke ? `<button class="workspace-button workspace-button--quiet" data-revoke-code="${escapeHtml(entry.codeId)}" type="button">Revoke code</button>` : ''}</li>`;
+      }).join('') : '<li class="workspace-empty">No active or past codes are visible to this workspace yet.</li>';
+    } catch (error) { status(error.message, 'error'); }
+  };
   $('[data-role-code-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -127,6 +140,7 @@ const bindRoleCodes = () => {
       $('[data-generated-code]').textContent = result.code;
       $('[data-generated-code-wrap]').hidden = false;
       status('One-use access code created. Copy it now; the raw code is never stored.', 'success');
+      await refreshCodes();
     } catch (error) { status(error.message, 'error'); }
   });
   $('[data-learner-code-form]')?.addEventListener('submit', async (event) => {
@@ -136,8 +150,20 @@ const bindRoleCodes = () => {
       $('[data-generated-code]').textContent = result.code;
       $('[data-generated-code-wrap]').hidden = false;
       status('One-use learner invite created. It expires automatically and can be revoked.', 'success');
+      await refreshCodes();
     } catch (error) { status(error.message, 'error'); }
   });
+  $('[data-code-list]')?.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-revoke-code]');
+    if (!button) return;
+    if (!confirm('Revoke this unused access code? It cannot be redeemed afterwards.')) return;
+    try {
+      await api(`/api/v1/access/codes/${encodeURIComponent(button.dataset.revokeCode)}/revoke`, { method: 'POST' });
+      status('Access code revoked. It can no longer be redeemed.', 'success');
+      await refreshCodes();
+    } catch (error) { status(error.message, 'error'); }
+  });
+  if (!DEMO) refreshCodes();
 };
 const bindSubmission = () => {
   $$('[data-course-type]').forEach((button) => button.addEventListener('click', () => {
@@ -149,7 +175,7 @@ const bindSubmission = () => {
   $('[data-source-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    if (!form.get('source')?.size) { status('Choose source material to submit privately.', 'error'); return; }
+    if (!form.get('sourceFile')?.size) { status('Choose source material to submit privately.', 'error'); return; }
     try {
       const result = await api('/api/v1/course-authoring/source', { method: 'POST', body: form });
       status(`Source submitted as ${result.submission?.submissionId}. ${result.submission?.source?.extraction === 'requires-admin-transcription' ? 'It is private and requires administrator transcription.' : 'Its safe text is ready for review.'}`, 'success');
@@ -235,8 +261,20 @@ const bindPublishing = () => {
   });
 };
 const bindRoster = () => {
-  $('[data-load-roster]')?.addEventListener('click', async () => {
-    try { const data = await api(`/api/v1/access/roster?organisationId=${encodeURIComponent(primaryOrganisation())}`); const list = $('[data-roster-list]'); list.innerHTML = data.members.length ? data.members.map((member) => `<li><div><strong>${escapeHtml(member.membershipRole)}</strong><small>Member ID: ${escapeHtml(member.memberId)} · Joined ${escapeHtml(member.joinedAt)}</small></div></li>`).join('') : '<li class="workspace-empty">No active members yet. Create a learner invite to build this private roster.</li>'; } catch (error) { status(error.message, 'error'); }
+  const loadRoster = async () => {
+    try { const data = await api(`/api/v1/access/roster?organisationId=${encodeURIComponent(primaryOrganisation())}`); const list = $('[data-roster-list]'); list.innerHTML = data.members.length ? data.members.map((member) => `<li><div><strong>${escapeHtml(member.membershipRole)}</strong><small>Member ID: ${escapeHtml(member.memberId)} · Joined ${escapeHtml(member.joinedAt)}</small></div>${member.memberId === user?.uid ? '' : `<button class="workspace-button workspace-button--quiet" data-revoke-member="${escapeHtml(member.memberId)}" type="button">Remove access</button>`}</li>`).join('') : '<li class="workspace-empty">No active members yet. Create a learner invite to build this private roster.</li>'; } catch (error) { status(error.message, 'error'); }
+  };
+  $('[data-load-roster]')?.addEventListener('click', loadRoster);
+  $('[data-roster-list]')?.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-revoke-member]');
+    if (!button) return;
+    const memberId = button.dataset.revokeMember;
+    if (!memberId || !confirm('Remove this member from the organisation? Their protected access will stop immediately.')) return;
+    try {
+      await api('/api/v1/access/memberships/revoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ organisationId: primaryOrganisation(), memberId }) });
+      status('Organisation membership revoked. The member can no longer use protected workspace or course actions.', 'success');
+      await loadRoster();
+    } catch (error) { status(error.message, 'error'); }
   });
 };
 const bindDistribution = () => {
