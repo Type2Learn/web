@@ -225,13 +225,14 @@ const buildRuntime = async () => {
   const ledger = firebase.available ? createUsageLedger(firebase.firestore) : null;
   const modelProvider = createModelProvider(config);
   const access = createAccessService({ config, firebase });
+  const courseCatalog = createCourseCatalogService({ config, firebase, access });
   return {
     config,
     modelProvider,
     ai: createAiService({ config, firebase, ledger, provider: modelProvider }),
     adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider }),
     speech: createSpeechService({ config, firebase, ledger }),
-    courseProgress: createCourseProgressService({ firebase }),
+    courseProgress: createCourseProgressService({ firebase, assertCourseAccess: courseCatalog.assertProgressAccess }),
     // ADAPTIVE LEARNING: all three services independently enforce feature
     // flags, bearer authentication, consent/reviewer checks, and Firestore
     // availability. They are present even while disabled for a staged rollout.
@@ -242,7 +243,7 @@ const buildRuntime = async () => {
     access,
     courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider }),
     courseBackups: createCourseBackupService({ config, firebase, access }),
-    courseCatalog: createCourseCatalogService({ config, firebase, access })
+    courseCatalog
   };
 };
 

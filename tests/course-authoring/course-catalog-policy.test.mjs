@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { learnerCourseProjection, visibleToAccount } from '../../server/course-catalog-service.mjs';
+import { learnerCourseProjection, splitCourseKey, visibleToAccount } from '../../server/course-catalog-service.mjs';
 
 const base = (overrides = {}) => ({
   courseId: 'course-alpha', version: '1.0.0', status: 'published', requestedAudience: 'organisation', ownerOrganisationId: 'org-one',
@@ -23,4 +23,11 @@ test('learner catalogue projection never carries source material, review notes, 
   assert.equal(projected.modules, 2);
   assert.equal(JSON.stringify(projected).includes('learner-a'), false);
   assert.equal(JSON.stringify(projected).includes('answerKeys'), false);
+});
+
+test('progress course keys are versioned for authored courses and preserve the existing legacy course route', () => {
+  assert.deepEqual(splitCourseKey('course-alpha@1.0.0'), { courseId: 'course-alpha', version: '1.0.0' });
+  assert.deepEqual(splitCourseKey('course-1-neurodivergent-conditions-v2'), { courseId: 'course-1-neurodivergent-conditions-v2', version: '' });
+  assert.equal(splitCourseKey('course-alpha@wrong'), null);
+  assert.equal(splitCourseKey('../course-alpha@1.0.0'), null);
 });

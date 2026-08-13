@@ -45,7 +45,7 @@ const cleanPayload = (payload) => {
   return candidate;
 };
 
-export const createCourseProgressService = ({ firebase }) => {
+export const createCourseProgressService = ({ firebase, assertCourseAccess = null }) => {
   const available = () => Boolean(firebase.available && firebase.firestore);
   const status = () => ({ available: available(), requiresSignIn: true, storage: 'firestore' });
   const documentFor = (uid, courseId) => firebase.firestore
@@ -58,6 +58,7 @@ export const createCourseProgressService = ({ firebase }) => {
     if (!available()) throw apiError(503, 'COURSE_SYNC_NOT_CONFIGURED', 'Account saving is not connected yet. Your progress remains on this device.');
     const safeCourseId = courseIdentifier(courseId);
     const learner = await firebase.verifyBearer(authorization);
+    if (typeof assertCourseAccess === 'function') await assertCourseAccess({ authorization, courseKey: safeCourseId });
     let snapshot;
     try {
       snapshot = await documentFor(learner.uid, safeCourseId).get();
@@ -80,6 +81,7 @@ export const createCourseProgressService = ({ firebase }) => {
     if (!available()) throw apiError(503, 'COURSE_SYNC_NOT_CONFIGURED', 'Account saving is not connected yet. Your progress remains on this device.');
     const safeCourseId = courseIdentifier(courseId);
     const learner = await firebase.verifyBearer(authorization);
+    if (typeof assertCourseAccess === 'function') await assertCourseAccess({ authorization, courseKey: safeCourseId });
     const payload = cleanPayload(body);
     const updatedAtMs = Date.now();
     try {

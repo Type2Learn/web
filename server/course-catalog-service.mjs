@@ -21,6 +21,11 @@ const audit = (firestore, entry) => root(firestore).collection('audit').add({ ..
 const courseRecord = (firestore, courseId, version) => courses(firestore).doc(courseKey(courseId, version));
 const orgMembership = (account, organisationId) => account?.organisations?.some((membership) => membership?.organisationId === organisationId && membership.active !== false);
 const internalAudience = (record = {}) => record.requestedAudience === 'platform' ? 'platform' : 'organisation';
+export const splitCourseKey = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  const match = raw.match(/^([a-z0-9][a-z0-9-]{2,79})(?:@(\d+\.\d+(?:\.\d+)?))?$/);
+  return match ? { courseId: match[1], version: match[2] || '' } : null;
+};
 
 export const learnerCourseProjection = (record = {}) => ({
   courseId: String(record.courseId || ''),
@@ -89,6 +94,20 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       // The learner-safe manifest contains no answer key, review note, source
       // upload, audio object path, access code, or learner data.
       return { legacy: false, course: learnerCourseProjection(record), manifest: record.learnerManifest };
+    },
+
+    async assertProgressAccess({ authorization, courseKey: requestedCourseKey }) {
+      const account = await accountFor(authorization);
+      const parsed = splitCourseKey(requestedCourseKey);
+      if (!parsed) throw apiError(400, 'UNKNOWN_COURSE', 'Choose an available course before saving progress.');
+      if (parsed.courseId === LEGACY_COURSE.courseId && (!parsed.version || parsed.version === LEGACY_COURSE.version)) {
+        if (!account.roles?.length) throw apiError(403, 'COURSE_ACCESS_DENIED', 'This course is not available to this account.');
+        return { courseId: LEGACY_COURSE.courseId, version: LEGACY_COURSE.version };
+      }
+      if (!parsed.version) throw apiError(400, 'COURSE_VERSION_REQUIRED', 'Choose a versioned reviewed course before saving progress.');
+      const { record } = await load(parsed.courseId, parsed.version);
+      assertVisible(record, account);
+      return { courseId: parsed.courseId, version: parsed.version };
     },
 
     async checkAnswer({ authorization, body }) {
