@@ -86,7 +86,7 @@ export const createCourseBackupService = ({ firebase, config, access }) => {
       const admin = await requireAdmin(authorization);
       const { reference, record } = await loadCourse(body?.courseId, body?.version);
       if (!record.validation?.valid || !record.learnerManifest || !record.privateManifest) throw apiError(409, 'COURSE_NOT_READY_FOR_BACKUP', 'A validated bilingual course manifest is required before backup.');
-      if (!['admin-review', 'audio-ready', 'backups-pending'].includes(record.status)) throw apiError(409, 'ADMIN_REVIEW_REQUIRED', 'Move the course into administrator review before verifying publication backups.');
+      if (record.status !== 'backups-pending') throw apiError(409, 'BACKUP_STAGE_REQUIRED', 'Finish human review, then move the course to Backups pending before verifying publication backups.');
       const packageData = packageFor(record);
       const basePath = `courses/${record.courseId}/${record.version}`;
       const markdown = Buffer.from(record.markdown || '', 'utf8');

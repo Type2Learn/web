@@ -118,6 +118,20 @@ feature flags, safeguards, and rollout requirements in
 | Reviewed assessment banks and fallback checks | Implemented | `AI_ASSESSMENTS_ENABLED=true`, adaptive consent, Firebase, and reviewer workflow for generated banks |
 | Objective-evidence monitor and targeted review | Implemented | Assessment runs store only question/objective IDs and bounded outcome categories; never an answer, option choice, score, or model rationale |
 | AI-generated visual assets | Intentionally disabled | Requires separate moderation, storage, retention, and curriculum-review work |
+| Reviewed theory-course publishing | Implemented behind private server configuration | Requires Firebase, a private GitHub repository, Supabase Storage, human administrator review, verified narration/TTS choice, and all four backup receipts before publication |
+
+## Private educator and course-publishing workspace
+
+The protected authoring workspace is intentionally separate from learner pages:
+
+- `/admin/` bootstraps the first platform administrator with a one-time server-side secret, then manages role codes, source review, bilingual Markdown, AI drafts, narration, backup receipts, release approval, audit history, and a non-destructive learner preview.
+- `/teacher/` and `/institute/` accept **theory** course source material, show review status, create scoped learner invites, maintain private rosters, and distribute only approved courses to their organisation or assignment list. Coding, project, and other course types are visibly locked and rejected by the API until their learning engines exist.
+- `/redeem/` redeems a signed-in user's one-use, revocable, expiring educator or learner code. Fresh Firestore membership checks supplement Firebase custom claims on every protected action.
+- Authoring uses versioned `type2learn-theory-course/v1` Markdown with English and Urdu for every published course. The deterministic compiler produces a private review manifest (including answer keys) and a learner-safe manifest (without keys, uploads, or review notes).
+- AI is Gemini-first and OpenAI-fallback only for missing draft material. Its JSON is schema-validated and marked **AI draft — admin review required**; it cannot become learner-visible until a human accepts the reviewed Markdown and completes the workflow.
+- Publishing cannot bypass the workflow: `Submitted → Source reviewed → Markdown draft → Validation ready → AI draft ready → Admin review → Audio ready → Backups pending → Backups verified → Approved → Published`. The final gate needs Firebase primary storage, private GitHub review artifacts, Supabase package storage, and an administrator-acknowledged downloadable ZIP.
+
+The reusable player is `/course/?courseId=<course-id>&version=<version>`. It uses the same learner support settings as the existing course: small sections, spacing, text size, reading width, contrast, quiet display, motion preferences, optional device text-to-speech, and intentionally requested speech-to-text where the browser supports it. The existing Neurodivergent Conditions course is deterministically migrated through the same bilingual Markdown compiler while its established learner route remains intact.
 
 ## Repository map
 
