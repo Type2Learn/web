@@ -15,6 +15,7 @@ test('catalogue only exposes published learner-safe records to their eligible au
   assert.equal(visibleToAccount(base({ requestedAudience: 'platform' }), { uid: 'another', roles: ['learner'], organisations: [] }), true);
   assert.equal(visibleToAccount(base({ distribution: { mode: 'assigned', learnerIds: ['learner-a'] } }), learner), true);
   assert.equal(visibleToAccount(base({ distribution: { mode: 'assigned', learnerIds: ['other'] } }), learner), false);
+  assert.equal(visibleToAccount(base({ ownerOrganisationId: 'other', distribution: { mode: 'assigned', learnerIds: ['other'] } }), { uid: 'admin', roles: ['platform-admin'], organisations: [] }), true);
 });
 
 test('learner catalogue projection never carries source material, review notes, answer keys, or roster IDs', () => {

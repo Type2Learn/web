@@ -2,7 +2,7 @@ import { COURSE_CONTENT as DEFAULT_COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU as DEFAULT_COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadReviewedCourseManifest, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260813-rich-manifest1';
+import { answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260813-rich-manifest2';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
 import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
 import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
@@ -26,6 +26,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   // Compatibility route: query-selected reviewed courses retain this mature
   // UI, but their content comes only from a learner-safe published manifest.
   let reviewedCourseContext = null;
+  // Reviewed course narration is fetched only for the visible module. It uses
+  // a short-lived URL and falls back to device TTS if no human clip exists.
+  const reviewedNarration = { readyKey: '', missingKey: '', loadingKey: '', url: '', expiresAt: 0, request: null };
   const narration = { service: null, status: 'idle', activeIndex: -1, activeRange: null, chunks: [], voices: [], scrollFrame: null };
   const taskNarration = {
     preludeActive: false,
@@ -265,6 +268,57 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const progressCourseKey = () => usesReviewedManifest() ? `${COURSE.id}@${COURSE.version}` : COURSE.id;
   const activeCourseVersion = () => usesReviewedManifest() ? COURSE.version : '';
 
+  const reviewedNarrationKey = () => {
+    if (!usesReviewedManifest() || !authenticatedUser || authenticatedUser.isGuest) return '';
+    const moduleId = String(currentStep?.()?.manifestModuleId || '').trim();
+    if (!moduleId) return '';
+    return `${COURSE.id}@${COURSE.version}:${courseUsesUrdu?.() ? 'ur' : 'en'}:${moduleId}`;
+  };
+
+  const resetReviewedNarration = () => {
+    reviewedNarration.readyKey = '';
+    reviewedNarration.missingKey = '';
+    reviewedNarration.loadingKey = '';
+    reviewedNarration.url = '';
+    reviewedNarration.expiresAt = 0;
+    reviewedNarration.request = null;
+  };
+
+  const ensureReviewedNarrationForCurrentTask = async () => {
+    const key = reviewedNarrationKey();
+    if (!key) return false;
+    if (reviewedNarration.readyKey === key && reviewedNarration.url && reviewedNarration.expiresAt > Date.now() + 5000) return true;
+    if (reviewedNarration.missingKey === key) return false;
+    if (reviewedNarration.loadingKey === key && reviewedNarration.request) return reviewedNarration.request;
+    const moduleId = String(currentStep()?.manifestModuleId || '').trim();
+    const language = courseUsesUrdu() ? 'ur' : 'en';
+    reviewedNarration.loadingKey = key;
+    reviewedNarration.request = loadReviewedCourseNarration({
+      user: authenticatedUser,
+      courseId: COURSE.id,
+      version: COURSE.version,
+      moduleId,
+      language,
+      signal: requestTimeoutSignal(10000)
+    }).then((result) => {
+      reviewedNarration.readyKey = key;
+      reviewedNarration.missingKey = '';
+      reviewedNarration.url = String(result?.url || '');
+      reviewedNarration.expiresAt = Date.parse(result?.expiresAt || '') || (Date.now() + (4 * 60 * 1000));
+      return Boolean(reviewedNarration.url);
+    }).catch((error) => {
+      // No clip is a valid admin choice; the device reader remains usable.
+      if (error?.code === 'NARRATION_NOT_FOUND') reviewedNarration.missingKey = key;
+      return false;
+    }).finally(() => {
+      if (reviewedNarration.loadingKey === key) {
+        reviewedNarration.loadingKey = '';
+        reviewedNarration.request = null;
+      }
+    });
+    return reviewedNarration.request;
+  };
+
   const renderReviewedManifestFailure = (message) => {
     app.innerHTML = '<main class="course-setup" id="course-main"><div class="course-setup-card course-auth-check"><p class="course-eyebrow">Reviewed course</p><h1>This course is not ready here.</h1><p class="course-lead">' + escapeHtml(message) + '</p><p class="course-input-help">Sign in with an approved learner account to open a reviewed course. The regular course preview remains available from the course home.</p><a class="course-primary-button" href="/course/">Return to course home</a></div></main>';
   };
@@ -285,6 +339,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     COURSE = adapted.course;
     COURSE_URDU = adapted.urdu;
     reviewedCourseContext = adapted.context;
+    resetReviewedNarration();
     initialiseCourseReadSections();
   };
 
@@ -3122,6 +3177,23 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }, []);
   };
 
+  const reviewedNarrationPlaylist = (chunks) => {
+    const key = reviewedNarrationKey();
+    if (!key || reviewedNarration.readyKey !== key || !reviewedNarration.url || !Array.isArray(chunks) || !chunks.length) return [];
+    const text = chunks.map((chunk) => String(chunk?.text || '').trim()).filter(Boolean).join(' ');
+    const chunkMap = mapAudioTextToNarrationChunks(text, chunks);
+    // Never approximate a human recording against content that no longer
+    // matches the reviewed module's visible text.
+    if (chunkMap.length !== chunks.length) return [];
+    return [{
+      id: `reviewed-human-${key}`,
+      src: reviewedNarration.url,
+      text,
+      chunkIndexes: chunks.map((_, index) => index),
+      chunkMap
+    }];
+  };
+
   const localAvaPlaylist = (chunks) => {
     if (!usesLocalAvaNarration()) return [];
     const audioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex()];
@@ -3187,7 +3259,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const configureLocalAvaPlaylist = (service, chunks) => {
     if (typeof service?.setAudioPlaylist !== 'function') return [];
-    const playlist = localAvaPlaylist(chunks);
+    const humanPlaylist = reviewedNarrationPlaylist(chunks);
+    const playlist = humanPlaylist.length ? humanPlaylist : localAvaPlaylist(chunks);
     service.setAudioPlaylist(playlist);
     return playlist;
   };
@@ -3284,7 +3357,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const taskNarrationReadingPlaylist = (chunks) => {
-    if (!usesLocalAvaNarration() || !chunks.length) return [];
+    if (!chunks.length) return [];
+    const humanPlaylist = reviewedNarrationPlaylist(chunks);
+    if (humanPlaylist.length) return humanPlaylist;
+    if (!usesLocalAvaNarration()) return [];
     const audioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex()];
     const assets = COURSE_AUDIO_MANIFEST.modules?.[audioKey];
     const step = currentStep();
@@ -3694,7 +3770,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     syncTaskNarrationControl();
   };
 
-  const startTaskNarration = () => {
+  const startTaskNarration = async () => {
     if (!taskNarrationIsAvailable()) return;
     if (state.progress.phase === 'type') {
       toggleTypingGuidance();
@@ -3727,6 +3803,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       service.start();
       return;
     }
+    if (state.progress.phase === 'read' || isReviewingModule()) await ensureReviewedNarrationForCurrentTask();
     const plan = taskNarrationPlan();
     if (!plan.chunks.length) {
       announce(courseUi('There is no audio summary for this step yet.', 'اس مرحلے کے لیے ابھی آڈیو خلاصہ موجود نہیں ہے۔'));
@@ -5326,7 +5403,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const prepareNarrationForRenderedTask = () => {
     const service = ensureNarrationService();
-    service.setRecordedAudioOnly?.(true);
+    // A human upload can fail or expire. Preserve browser text-to-speech as
+    // the documented fallback; bundled Ava narration remains recorded-only.
+    service.setRecordedAudioOnly?.(usesLocalAvaNarration());
     service.configure({
       rate: state.preferences.narrationSpeed,
       voiceURI: effectiveNarrationVoice(),
@@ -5403,7 +5482,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return [{ id: 'task', label: taskLabel(), text: [step.title, ...sourceReadSections(step)].filter(Boolean).join('. ') }];
   };
 
-  const startNarration = (index) => {
+  const startNarration = async (index) => {
     const enablingTextToSpeech = !state.preferences.readAloud;
     if (enablingTextToSpeech) {
       setCourseSetting('readAloud', true);
@@ -5417,6 +5496,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       service.setAudioPlaylist?.([]);
       service.setChunks(narration.chunks);
     } else {
+      await ensureReviewedNarrationForCurrentTask();
       narration.chunks = renderedNarrationChunks();
       if (!narration.chunks.length) narration.chunks = readingNarrationChunks();
       service.setChunks(narration.chunks);
@@ -5466,10 +5546,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return { element: textElement, index: Number(textElement.dataset.narrationIndex), characterOffset };
   };
 
-  const startNarrationFromChunkPoint = (requestedIndex, requestedOffset = 0) => {
+  const startNarrationFromChunkPoint = async (requestedIndex, requestedOffset = 0) => {
     if (!state.preferences.readAloud || state.view !== 'course' || (state.progress.phase !== 'read' && !isReviewingModule())) return;
     if (!Number.isInteger(requestedIndex)) return;
     const service = ensureNarrationService();
+    await ensureReviewedNarrationForCurrentTask();
     const chunks = renderedNarrationChunks();
     if (!chunks.length || !chunks[requestedIndex]) return;
     let startIndex = requestedIndex;
@@ -5505,7 +5586,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const startNarrationFromTextPoint = (event) => {
     const point = pointInsideNarrationText(event);
     if (!point) return;
-    startNarrationFromChunkPoint(point.index, point.characterOffset);
+    void startNarrationFromChunkPoint(point.index, point.characterOffset);
   };
 
   const supportMomentBelongsToCurrentTask = () => Boolean(

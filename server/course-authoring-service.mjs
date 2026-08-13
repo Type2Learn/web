@@ -35,6 +35,12 @@ const publicCourse = (record = {}) => ({
   updatedAt: record.updatedAt || '',
   createdAt: record.createdAt || '',
   narration: record.narration || { humanAudioCount: 0, fallback: 'device-text-to-speech' },
+  // This is staff-only workflow metadata. It gives an administrator the exact
+  // reviewed module IDs needed to attach a narration file, without exposing a
+  // Storage path, source upload, answer key or private manifest.
+  narrationSections: Array.isArray(record.learnerManifest?.modules)
+    ? record.learnerManifest.modules.map((module) => ({ id: String(module?.id || ''), title: String(module?.en?.title || module?.id || '') })).filter((module) => module.id)
+    : [],
   backups: {
     firebase: Boolean(record.backups?.firebase?.verified),
     github: Boolean(record.backups?.github?.verified),
@@ -328,6 +334,9 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const locale = form?.get('locale') === 'ur' ? 'ur' : 'en';
       const sectionId = slug(form?.get('sectionId'));
       if (!sectionId) throw apiError(400, 'NARRATION_SECTION_REQUIRED', 'Choose the module or section this narration belongs to.');
+      const knownModule = Array.isArray(record.learnerManifest?.modules)
+        && record.learnerManifest.modules.some((module) => slug(module?.id) === sectionId);
+      if (!knownModule) throw apiError(400, 'NARRATION_SECTION_UNKNOWN', 'Use the exact reviewed module ID shown in the validated course before uploading narration.');
       const objectPath = `private-course-audio/${record.courseId}/${record.version}/${locale}/${sectionId}/${file.sha256}.${file.extension}`;
       await firebase.storage.file(objectPath).save(file.buffer, { resumable: false, contentType: file.contentType, metadata: { metadata: { courseId: record.courseId, version: record.version, locale, sectionId, sha256: file.sha256 } } });
       const assets = [...(record.narrationAssets || []), { locale, sectionId, objectPath, sha256: file.sha256, bytes: file.buffer.length, uploadedAt: nowIso(), uploadedBy: admin.uid }];

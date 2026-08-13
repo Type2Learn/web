@@ -70,6 +70,7 @@ const renderSubmissions = () => {
 const renderCourses = () => {
   const options = `<option value="">Choose a validated course</option>${courses.map((entry) => `<option value="${escapeHtml(entry.courseId)}@${escapeHtml(entry.version)}">${escapeHtml(entry.title?.en || entry.courseId)} · ${escapeHtml(entry.version)}</option>`).join('')}`;
   $$('[data-course-select]').forEach((select) => { const previous = select.value; select.innerHTML = options; select.value = courses.some((entry) => `${entry.courseId}@${entry.version}` === previous) ? previous : ''; });
+  renderNarrationSectionHint();
 };
 const loadSubmissions = async () => {
   if (DEMO) {
@@ -95,6 +96,22 @@ const selectedCourse = () => {
   if (!courseId || !version) throw new Error('Choose a course first.');
   return { courseId, version };
 };
+const selectedCourseRecord = () => {
+  const selected = selectedCourse();
+  return courses.find((entry) => entry.courseId === selected.courseId && entry.version === selected.version) || null;
+};
+const renderNarrationSectionHint = () => {
+  const target = $('[data-narration-section-hint]');
+  if (!target) return;
+  try {
+    const sections = selectedCourseRecord()?.narrationSections || [];
+    target.textContent = sections.length
+      ? `Reviewed module IDs: ${sections.map((section) => section.id).join(', ')}`
+      : 'Choose a validated course to see its reviewed module IDs.';
+  } catch (_) {
+    target.textContent = 'Choose a validated course to see its reviewed module IDs.';
+  }
+};
 const refreshRole = async () => {
   if (DEMO) { account = demoAccount(); renderIdentity(); return; }
   const data = await api('/api/v1/access/me');
@@ -116,6 +133,7 @@ const bindNavigation = () => {
 const bindCourseSelectors = () => {
   $$('[data-course-select]').forEach((select) => select.addEventListener('change', () => {
     $$('[data-course-select]').forEach((other) => { if (other !== select) other.value = select.value; });
+    renderNarrationSectionHint();
   }));
 };
 const bindRoleCodes = () => {
@@ -219,12 +237,24 @@ const bindAuthoring = () => {
       status('AI draft saved as review-only. It is not learner-visible until an administrator accepts each item.', 'success');
     } catch (error) { status(error.message, 'error'); }
   });
-  $('[data-mcq-draft]')?.addEventListener('click', async () => {
+  $('[data-mcq-draft-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
     try {
       const { courseId, version } = selectedCourse();
-      const result = await api('/api/v1/course-authoring/deterministic-mcq', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ courseId, version, prompt: 'Which answer best matches the reviewed key idea?' }) });
+      const form = new FormData(event.currentTarget);
+      const result = await api('/api/v1/course-authoring/deterministic-mcq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId,
+          version,
+          prompt: form.get('prompt'),
+          answer: form.get('answer'),
+          distractors: ['distractor1', 'distractor2', 'distractor3'].map((name) => form.get(name))
+        })
+      });
       $('[data-ai-draft-output]').textContent = JSON.stringify(result, null, 2);
-      status('Fallback MCQ draft created for human review. It has four choices and cannot publish by itself.', 'success');
+      status('Fallback MCQ draft created from the reviewed facts. Copy only approved wording into Markdown and validate it again.', 'success');
     } catch (error) { status(error.message, 'error'); }
   });
   $('[data-begin-admin-review]')?.addEventListener('click', async () => {
@@ -306,7 +336,21 @@ const bindRedeem = () => {
 };
 const bindShared = () => {
   $('[data-sign-out]')?.addEventListener('click', async () => { await signOutType2LearnUser(); location.assign('/'); });
-  $('[data-view-learner]')?.addEventListener('click', () => { $('[data-learner-preview]')?.classList.toggle('workspace-hidden'); });
+  $('[data-view-learner]')?.addEventListener('click', () => {
+    try {
+      const course = selectedCourseRecord();
+      if (!course || course.status !== 'published') throw new Error('Select a published course first. Draft and review stages retain the safe visual preview until publication.');
+      const destination = new URL('/course/', window.location.origin);
+      destination.searchParams.set('courseId', course.courseId);
+      destination.searchParams.set('version', course.version);
+      destination.searchParams.set('start', 'course');
+      window.open(destination.href, '_blank', 'noopener,noreferrer');
+      status('Opening the published learner course in a new tab. It uses the same rich course UI and learner-safe manifest.', 'success');
+    } catch (error) {
+      $('[data-learner-preview]')?.classList.toggle('workspace-hidden');
+      status(error.message || 'Open a published course to use the real learner view.', 'warning');
+    }
+  });
 };
 
 const initialise = async () => {

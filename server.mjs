@@ -354,6 +354,21 @@ const handleApi = async (request, response, pathname, runtime) => {
       const url = new URL(request.url || '/', 'http://localhost');
       return sendJson(response, 200, await courseCatalog.manifest({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') }));
     }
+    if (request.method === 'GET' && pathname === '/api/v1/course-narration') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseCatalog.narration({
+        authorization: request.headers.authorization,
+        courseId: url.searchParams.get('courseId'),
+        version: url.searchParams.get('version'),
+        moduleId: url.searchParams.get('moduleId'),
+        language: url.searchParams.get('language')
+      }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-narration-stream') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      const stream = await courseCatalog.narrationStream({ token: url.searchParams.get('token') });
+      return send(response, 302, '', { ...securityHeaders('/api', { api: true }), Location: stream.url });
+    }
     if (request.method === 'POST' && pathname === '/api/v1/courses/check-answer') {
       return sendJson(response, 200, await courseCatalog.checkAnswer({ authorization: request.headers.authorization, body: await readJson(request) }));
     }

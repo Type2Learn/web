@@ -1,5 +1,6 @@
 import { apiError } from './errors.mjs';
 import { migratedLegacyTheoryCourse } from './legacy-neurodivergent-migration.mjs';
+import { randomUUID } from 'node:crypto';
 
 const ROOT = 'type2learnCourseAuthoring';
 const legacyCompiled = migratedLegacyTheoryCourse();
@@ -54,6 +55,11 @@ export const learnerCourseProjection = (record = {}) => ({
 
 export const visibleToAccount = (record, account) => {
   if (!record?.learnerManifest || record.status !== 'published') return false;
+  // A platform administrator must be able to open the same learner-safe
+  // course player while reviewing a release. This is an explicit review
+  // authority, not a broader learner-data grant: the catalogue projection
+  // and manifest still exclude source uploads, answer keys and rosters.
+  if (account?.roles?.includes('platform-admin')) return true;
   if (internalAudience(record) === 'platform') return true;
   if (!orgMembership(account, record.ownerOrganisationId)) return false;
   const distribution = record.distribution || { mode: 'organisation' };
@@ -70,6 +76,14 @@ const ensureAvailable = ({ firebase, config }) => {
 };
 
 export const createCourseCatalogService = ({ firebase, config, access }) => {
+  // Opaque, short-lived media leases keep private Storage object names out of
+  // learner-visible API JSON. The stream route resolves a lease once and then
+  // redirects the media element; leases are process-local and expire quickly.
+  const narrationLeases = new Map();
+  const purgeNarrationLeases = () => {
+    const now = Date.now();
+    narrationLeases.forEach((lease, key) => { if (!lease || lease.expiresAtMs <= now) narrationLeases.delete(key); });
+  };
   const accountFor = async (authorization) => {
     ensureAvailable({ firebase, config });
     return access.accountFor(authorization);
@@ -107,6 +121,47 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       // The learner-safe manifest contains no answer key, review note, source
       // upload, audio object path, access code, or learner data.
       return { legacy: false, course: learnerCourseProjection(record), manifest: record.learnerManifest };
+    },
+
+    // Human narration stays in private Firebase Storage. A learner who can
+    // already open the reviewed manifest may request one short-lived URL for
+    // the current module; object paths and storage credentials never enter
+    // the course manifest or learner-facing API JSON.
+    async narration({ authorization, courseId, version, moduleId, language }) {
+      const account = await accountFor(authorization);
+      const { record } = await load(courseId, version);
+      assertVisible(record, account);
+      if (!firebase.storage) throw apiError(503, 'NARRATION_STORAGE_NOT_CONFIGURED', 'Human narration is not connected yet. Device text-to-speech remains available.');
+      const sectionId = clean(moduleId, 80);
+      const locale = language === 'ur' ? 'ur' : 'en';
+      if (!sectionId) throw apiError(400, 'NARRATION_SECTION_REQUIRED', 'Choose a course module before requesting narration.');
+      const knownModule = Array.isArray(record.learnerManifest?.modules)
+        && record.learnerManifest.modules.some((module) => clean(module?.id, 80) === sectionId);
+      if (!knownModule) throw apiError(400, 'NARRATION_SECTION_UNKNOWN', 'This narration request does not match a reviewed course module.');
+      const asset = (Array.isArray(record.narrationAssets) ? record.narrationAssets : [])
+        .find((candidate) => candidate?.locale === locale && clean(candidate?.sectionId, 80) === sectionId && typeof candidate?.objectPath === 'string');
+      if (!asset) throw apiError(404, 'NARRATION_NOT_FOUND', 'Human narration has not been added for this module. Device text-to-speech remains available.');
+      const expiresAt = new Date(Date.now() + (5 * 60 * 1000));
+      purgeNarrationLeases();
+      const token = randomUUID().replace(/-/g, '');
+      narrationLeases.set(token, { objectPath: asset.objectPath, expiresAtMs: expiresAt.getTime() });
+      await audit(firebase.firestore, { actorUid: account.uid, action: 'learner-course-narration-opened', courseId: record.courseId, version: record.version, detail: `${locale}:${sectionId}` });
+      return { source: 'human-narration', url: `/api/v1/course-narration-stream?token=${token}`, expiresAt: expiresAt.toISOString(), locale, sectionId };
+    },
+
+    async narrationStream({ token }) {
+      purgeNarrationLeases();
+      const lease = narrationLeases.get(String(token || ''));
+      if (!lease) throw apiError(404, 'NARRATION_LEASE_EXPIRED', 'This narration link has expired. Choose Listen again to request a new one.');
+      // A lease is single-purpose but reusable for its brief lifetime so native
+      // media range/retry requests can still work without a second API call.
+      try {
+        const [url] = await firebase.storage.file(lease.objectPath).getSignedUrl({ action: 'read', expires: new Date(lease.expiresAtMs) });
+        return { url, expiresAt: new Date(lease.expiresAtMs).toISOString() };
+      } catch {
+        narrationLeases.delete(String(token || ''));
+        throw apiError(503, 'NARRATION_TEMPORARILY_UNAVAILABLE', 'Human narration could not be opened right now. Device text-to-speech remains available.');
+      }
     },
 
     async assertProgressAccess({ authorization, courseKey: requestedCourseKey }) {

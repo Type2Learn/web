@@ -53,7 +53,10 @@ test('catalogue-selected reviewed links retain the rich compatibility player rat
   assert.match(richPlayer, /checkReviewedManifestModuleAnswer/);
   assert.match(richPlayer, /checkReviewedManifestFinalAnswer/);
   assert.match(courseClient, /\/api\/v1\/course-manifest/);
+  assert.match(courseClient, /\/api\/v1\/course-narration/);
   assert.match(courseClient, /\/api\/v1\/courses\/check-answer/);
+  assert.match(richPlayer, /ensureReviewedNarrationForCurrentTask/);
+  assert.match(richPlayer, /reviewedNarrationPlaylist/);
 });
 
 test('course preferences preserve the selected reviewed version on their round-trip', async () => {

@@ -108,6 +108,18 @@ export const loadReviewedCourseManifest = async ({ user, courseId, version, sign
   return authenticatedRequest(user, '/api/v1/course-manifest?' + query.toString(), { signal });
 };
 
+// Published human narration is retrieved only for the visible module. The
+// endpoint returns a short-lived signed URL, never a private Storage path.
+export const loadReviewedCourseNarration = async ({ user, courseId, version, moduleId, language, signal }) => {
+  const query = new URLSearchParams({
+    courseId: String(courseId || ''),
+    version: String(version || ''),
+    moduleId: String(moduleId || ''),
+    language: language === 'ur' ? 'ur' : 'en'
+  });
+  return authenticatedRequest(user, '/api/v1/course-narration?' + query.toString(), { signal });
+};
+
 export const checkReviewedCourseAnswer = async ({ user, courseId, version, scope, moduleId, questionIndex, language, selectedIndex, signal }) => authenticatedRequest(user, '/api/v1/courses/check-answer', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
