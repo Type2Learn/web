@@ -36,7 +36,12 @@ const publicCourse = (record = {}) => ({
   updatedAt: record.updatedAt || '',
   createdAt: record.createdAt || '',
   narration: record.narration || { humanAudioCount: 0, fallback: 'device-text-to-speech' },
-  backups: record.backups || { firebase: false, github: false, supabase: false, zip: false }
+  backups: {
+    firebase: Boolean(record.backups?.firebase?.verified),
+    github: Boolean(record.backups?.github?.verified),
+    supabase: Boolean(record.backups?.supabase?.verified),
+    zip: Boolean(record.backups?.zip?.verified && record.backups?.zip?.downloadedAt)
+  }
 });
 const publicSubmission = (record = {}) => ({
   submissionId: record.submissionId || '',

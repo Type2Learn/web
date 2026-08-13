@@ -18,6 +18,7 @@ import { createBehaviouralPartnerService } from './server/behavioural-partner-se
 import { createAccessService } from './server/access-service.mjs';
 import { createCourseAuthoringService } from './server/course-authoring-service.mjs';
 import { createCourseBackupService } from './server/course-backup-service.mjs';
+import { createCourseCatalogService } from './server/course-catalog-service.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -240,12 +241,13 @@ const buildRuntime = async () => {
     behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider }),
     access,
     courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider }),
-    courseBackups: createCourseBackupService({ config, firebase, access })
+    courseBackups: createCourseBackupService({ config, firebase, access }),
+    courseCatalog: createCourseCatalogService({ config, firebase, access })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access, courseAuthoring, courseBackups } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access, courseAuthoring, courseBackups, courseCatalog } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -263,6 +265,7 @@ const handleApi = async (request, response, pathname, runtime) => {
       educatorWorkspace: access.status(),
       courseAuthoring: courseAuthoring.status(),
       courseBackups: courseBackups.status(),
+      courseCatalogue: courseCatalog.status(),
       model: config.openAiModel
     });
   }
@@ -334,6 +337,22 @@ const handleApi = async (request, response, pathname, runtime) => {
     }
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/publish') {
       return sendJson(response, 200, await courseBackups.publish({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/courses') {
+      return sendJson(response, 200, await courseCatalog.catalogue({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-manifest') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseCatalog.manifest({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/courses/check-answer') {
+      return sendJson(response, 200, await courseCatalog.checkAnswer({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/courses/distribution') {
+      return sendJson(response, 200, await courseCatalog.setDistribution({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/courses/request-platform-release') {
+      return sendJson(response, 200, await courseCatalog.requestPlatformRelease({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/ai/chat') {
       return sendJson(response, 200, await ai.chat({

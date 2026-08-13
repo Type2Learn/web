@@ -132,6 +132,7 @@ export const createCourseBackupService = ({ firebase, config, access }) => {
       const backups = backupShape(record.backups);
       if (!backupsComplete(backups)) throw apiError(409, 'BACKUPS_NOT_COMPLETE', 'Firebase, private GitHub, Supabase, and a downloaded ZIP export must all verify before publication.');
       if (!record.validation?.valid || !record.learnerManifest || !record.privateManifest) throw apiError(409, 'COURSE_NOT_APPROVED', 'A validated bilingual course is required before publication.');
+      if (record.status !== 'approved') throw apiError(409, 'ADMIN_APPROVAL_REQUIRED', 'An administrator must explicitly approve this reviewed course after backups verify before it can publish.');
       await reference.set({ status: 'published', requestedAudience: audience, publishedAt: nowIso(), publishedBy: admin.uid, updatedAt: nowIso(), updatedBy: admin.uid }, { merge: true });
       await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-published', courseId: record.courseId, version: record.version, audience });
       return { courseId: record.courseId, version: record.version, status: 'published', audience };

@@ -1,13 +1,19 @@
 import { createHash } from 'node:crypto';
 import { apiError } from './errors.mjs';
 
-const COURSE_ID = 'course-1-neurodivergent-conditions-v2';
 const MAX_SNAPSHOT_BYTES = 48 * 1024;
 const MAX_STRING_LENGTH = 6000;
 const MAX_ARRAY_LENGTH = 240;
 const MAX_OBJECT_KEYS = 80;
 
 const identifierHash = (value) => createHash('sha256').update(String(value)).digest('hex');
+const courseIdentifier = (value) => {
+  const normalised = String(value || '').trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{2,79}(?:@[0-9]+\.[0-9]+(?:\.[0-9]+)?)?$/.test(normalised)) {
+    throw apiError(400, 'UNKNOWN_COURSE', 'Choose an available course before saving progress.');
+  }
+  return normalised;
+};
 
 // Course progress comes from the learner's own browser. Keep the stored form
 // deliberately boring and bounded: it is only a resume snapshot, never an
@@ -42,19 +48,19 @@ const cleanPayload = (payload) => {
 export const createCourseProgressService = ({ firebase }) => {
   const available = () => Boolean(firebase.available && firebase.firestore);
   const status = () => ({ available: available(), requiresSignIn: true, storage: 'firestore' });
-  const documentFor = (uid) => firebase.firestore
+  const documentFor = (uid, courseId) => firebase.firestore
     .collection('type2learnLearnerProgress')
     .doc(identifierHash(uid))
     .collection('courses')
-    .doc(COURSE_ID);
+    .doc(identifierHash(courseIdentifier(courseId)));
 
   const load = async ({ authorization, courseId }) => {
     if (!available()) throw apiError(503, 'COURSE_SYNC_NOT_CONFIGURED', 'Account saving is not connected yet. Your progress remains on this device.');
-    if (courseId !== COURSE_ID) throw apiError(400, 'UNKNOWN_COURSE', 'This course is not available for account saving.');
+    const safeCourseId = courseIdentifier(courseId);
     const learner = await firebase.verifyBearer(authorization);
     let snapshot;
     try {
-      snapshot = await documentFor(learner.uid).get();
+      snapshot = await documentFor(learner.uid, safeCourseId).get();
     } catch {
       throw apiError(503, 'COURSE_SYNC_UNAVAILABLE', 'Account saving is temporarily unavailable. Your progress remains on this device.');
     }
@@ -72,13 +78,14 @@ export const createCourseProgressService = ({ firebase }) => {
 
   const save = async ({ authorization, courseId, body }) => {
     if (!available()) throw apiError(503, 'COURSE_SYNC_NOT_CONFIGURED', 'Account saving is not connected yet. Your progress remains on this device.');
-    if (courseId !== COURSE_ID) throw apiError(400, 'UNKNOWN_COURSE', 'This course is not available for account saving.');
+    const safeCourseId = courseIdentifier(courseId);
     const learner = await firebase.verifyBearer(authorization);
     const payload = cleanPayload(body);
     const updatedAtMs = Date.now();
     try {
-      await documentFor(learner.uid).set({
+      await documentFor(learner.uid, safeCourseId).set({
         schemaVersion: 1,
+        courseId: safeCourseId,
         ...payload,
         updatedAtMs,
         updatedAt: new Date(updatedAtMs)

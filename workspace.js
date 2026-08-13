@@ -224,10 +224,28 @@ const bindPublishing = () => {
     event.preventDefault();
     try { const result = await api('/api/v1/course-authoring/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selectedCourse(), audience: new FormData(event.currentTarget).get('audience') }) }); status(`${result.courseId} is published to ${result.audience === 'platform' ? 'the platform catalogue' : 'its organisation'} after all required backup checks.`, 'success'); await loadSubmissions(); } catch (error) { status(error.message, 'error'); }
   });
+  $('[data-approve-course]')?.addEventListener('click', async () => {
+    try { await api('/api/v1/course-authoring/transition', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selectedCourse(), status: 'approved', reviewNote: 'Administrator approval after learner-preview, accessibility, MCQ, narration, and backup review.' }) }); status('Administrator approval recorded. The course can now pass through the final publication gate.', 'success'); await loadCourses(); } catch (error) { status(error.message, 'error'); }
+  });
 };
 const bindRoster = () => {
   $('[data-load-roster]')?.addEventListener('click', async () => {
     try { const data = await api(`/api/v1/access/roster?organisationId=${encodeURIComponent(primaryOrganisation())}`); const list = $('[data-roster-list]'); list.innerHTML = data.members.length ? data.members.map((member) => `<li><div><strong>${escapeHtml(member.membershipRole)}</strong><small>Member ID: ${escapeHtml(member.memberId)} · Joined ${escapeHtml(member.joinedAt)}</small></div></li>`).join('') : '<li class="workspace-empty">No active members yet. Create a learner invite to build this private roster.</li>'; } catch (error) { status(error.message, 'error'); }
+  });
+};
+const bindDistribution = () => {
+  $('[data-set-organisation-distribution]')?.addEventListener('click', async () => {
+    try { const result = await api('/api/v1/courses/distribution', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selectedCourse(), mode: 'organisation' }) }); status(`Course visibility is now set to the enrolled organisation roster (${result.distribution.mode}).`, 'success'); } catch (error) { status(error.message, 'error'); }
+  });
+  $('[data-set-assigned-distribution]')?.addEventListener('click', async () => {
+    try {
+      const learnerIds = String($('[data-assigned-learner-ids]')?.value || '').split(/[\s,]+/).map((value) => value.trim()).filter(Boolean);
+      const result = await api('/api/v1/courses/distribution', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selectedCourse(), mode: 'assigned', learnerIds }) });
+      status(`Course assigned to ${result.distribution.learnerCount} enrolled learner${result.distribution.learnerCount === 1 ? '' : 's'}.`, 'success');
+    } catch (error) { status(error.message, 'error'); }
+  });
+  $('[data-request-platform-release]')?.addEventListener('click', async () => {
+    try { const result = await api('/api/v1/courses/request-platform-release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selectedCourse()) }); status(`Platform-wide release request recorded as ${result.status}. It still needs administrator approval.`, 'success'); } catch (error) { status(error.message, 'error'); }
   });
 };
 const bindBootstrap = () => {
@@ -248,7 +266,7 @@ const bindShared = () => {
 };
 
 const initialise = async () => {
-  bindNavigation(); bindCourseSelectors(); bindShared(); bindRoleCodes(); bindSubmission(); bindAuthoring(); bindPublishing(); bindRoster(); bindBootstrap(); bindRedeem();
+  bindNavigation(); bindCourseSelectors(); bindShared(); bindRoleCodes(); bindSubmission(); bindAuthoring(); bindPublishing(); bindRoster(); bindDistribution(); bindBootstrap(); bindRedeem();
   if (DEMO) { account = demoAccount(); renderIdentity(); renderWorkspace(); await loadSubmissions(); status('Preview mode shows the interface only. It cannot access a learner record or call protected APIs.', 'warning'); return; }
   user = await waitForType2LearnUser();
   if (!user) { location.assign(`/login/?next=${encodeURIComponent(location.pathname + location.hash)}`); return; }
