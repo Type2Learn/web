@@ -19,6 +19,7 @@ export const createFirebaseRuntime = (config) => {
     const firestore = getFirestore(app);
     return {
       available: true,
+      auth,
       firestore,
       async verifyBearer(authorization) {
         const token = String(authorization || '').startsWith('Bearer ')
@@ -28,7 +29,12 @@ export const createFirebaseRuntime = (config) => {
         try {
           const decoded = await auth.verifyIdToken(token);
           if (!decoded?.uid) throw new Error('No user ID.');
-          return { uid: String(decoded.uid) };
+          return {
+            uid: String(decoded.uid),
+            claims: decoded?.type2learnRoles && Array.isArray(decoded.type2learnRoles)
+              ? { type2learnRoles: decoded.type2learnRoles }
+              : {}
+          };
         } catch {
           throw apiError(401, 'INVALID_SESSION', 'Your sign-in session is not valid. Please sign in again.');
         }

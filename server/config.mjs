@@ -164,6 +164,12 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     aiVisualsEnabled: booleanFrom(value('AI_VISUALS_ENABLED')),
     firebaseProjectId: value('FIREBASE_PROJECT_ID') || 'type2learn-defcc',
     firebaseServiceAccountJson: value('FIREBASE_SERVICE_ACCOUNT_JSON'),
+    // Private educator workspace. The first administrator proves possession of
+    // the one-time setup code; only its SHA-256 digest is stored in deployment
+    // configuration. Role/invite codes are HMAC hashed with a separate pepper.
+    adminBootstrapCodeHash: value('ADMIN_BOOTSTRAP_CODE_SHA256'),
+    roleCodePepper: value('ROLE_CODE_PEPPER'),
+    educatorWorkspaceEnabled: booleanFrom(value('EDUCATOR_WORKSPACE_ENABLED')),
     openAiApiKey: value('OPENAI_API_KEY', 'openai', 'key'),
     openAiResponsesUrl: configuredOpenAiEndpoint.url,
     openAiProvider: configuredOpenAiEndpoint.provider,

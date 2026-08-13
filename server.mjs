@@ -15,6 +15,7 @@ import { createLearningAnalyticsService } from './server/learning-analytics-serv
 import { createAdaptiveSupportService } from './server/adaptive-support-service.mjs';
 import { createAssessmentService } from './server/assessment-service.mjs';
 import { createBehaviouralPartnerService } from './server/behavioural-partner-service.mjs';
+import { createAccessService } from './server/access-service.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -233,12 +234,13 @@ const buildRuntime = async () => {
     learningAnalytics: createLearningAnalyticsService({ config, firebase }),
     adaptiveSupport: createAdaptiveSupportService({ config, firebase, ledger, provider: modelProvider }),
     assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider }),
-    behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider })
+    behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider }),
+    access: createAccessService({ config, firebase })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -253,10 +255,31 @@ const handleApi = async (request, response, pathname, runtime) => {
       modelRouting: modelProvider.status(),
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
+      educatorWorkspace: access.status(),
       model: config.openAiModel
     });
   }
   try {
+    if (request.method === 'GET' && pathname === '/api/v1/access/me') {
+      return sendJson(response, 200, await access.me({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/access/bootstrap') {
+      return sendJson(response, 200, await access.bootstrap({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/access/codes') {
+      return sendJson(response, 200, await access.createCode({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/access/redeem') {
+      return sendJson(response, 200, await access.redeemCode({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    const codeRevoke = pathname.match(/^\/api\/v1\/access\/codes\/([A-Za-z0-9_-]{8,96})\/revoke$/);
+    if (request.method === 'POST' && codeRevoke) {
+      return sendJson(response, 200, await access.revokeCode({ authorization: request.headers.authorization, codeId: codeRevoke[1] }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/access/roster') {
+      const organisationId = new URL(request.url || '/', 'http://localhost').searchParams.get('organisationId') || '';
+      return sendJson(response, 200, await access.roster({ authorization: request.headers.authorization, organisationId }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/ai/chat') {
       return sendJson(response, 200, await ai.chat({
         authorization: request.headers.authorization,
