@@ -5970,6 +5970,86 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
 }
 .course-adaptive-settings-explainer summary { cursor: pointer; color: var(--course-link); font-weight: 800; }
 .course-adaptive-settings-explainer p { margin: 7px 0 0; }
+.course-learning-partner-settings {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--course-line);
+  padding-top: 14px;
+}
+.course-learning-partner-settings > .course-eyebrow { margin: 0; }
+.course-learning-partner-settings > p:not(.course-settings-menu-gate) { margin: -3px 0 2px; color: var(--course-muted); font-size: 11px; line-height: 1.45; }
+.course-partner-data-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.course-partner-data-actions .course-text-button { padding: 0; color: var(--course-link); font-size: 11px; font-weight: 800; }
+.course-partner-data-status { margin: 0; color: var(--course-ink-soft); font-size: 11px; line-height: 1.45; }
+
+/* BEHAVIOURAL LEARNING PARTNER. The bubble stays on the companion rail so it
+   can never cover typed work. Only its controls receive pointer input; the
+   rail remains non-interactive over the shared module route. */
+@media (min-width: 1181px) {
+  .course-mascot-rail.has-learning-partner { isolation: isolate; }
+  .course-companion-bubble {
+    position: absolute;
+    z-index: 5;
+    top: 16%;
+    right: 72%;
+    width: min(320px, 78%);
+    border: 1px solid var(--course-line-strong);
+    border-radius: 16px;
+    padding: 14px 15px;
+    color: var(--course-ink);
+    background: var(--course-paper);
+    box-shadow: 0 14px 32px rgba(18, 52, 83, .13);
+    pointer-events: auto;
+  }
+  .course-companion-bubble::after {
+    position: absolute;
+    top: 50%; right: -8px;
+    width: 14px; height: 14px;
+    border-top: 1px solid var(--course-line-strong);
+    border-right: 1px solid var(--course-line-strong);
+    background: var(--course-paper);
+    content: "";
+    transform: translateY(-50%) rotate(45deg);
+  }
+  .course-companion-bubble .course-eyebrow { margin: 0 0 5px; font-size: 10px; }
+  .course-companion-bubble > p:not(.course-eyebrow) { margin: 0; font-size: 13px; font-weight: 700; line-height: 1.45; }
+  .course-companion-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 11px; }
+  .course-companion-actions .course-secondary-button { min-height: 32px; padding: 6px 9px; font-size: 11px; }
+  .course-companion-actions .course-text-button { padding: 3px 0; color: var(--course-link); font-size: 10px; font-weight: 800; }
+  .course-companion-dock {
+    position: absolute;
+    z-index: 5;
+    right: 3%; bottom: 2%; left: 3%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 9px;
+    border: 1px solid var(--course-line-strong);
+    border-radius: 13px;
+    padding: 9px;
+    background: color-mix(in srgb, var(--course-paper) 94%, transparent);
+    box-shadow: 0 10px 24px rgba(18, 52, 83, .10);
+    pointer-events: auto;
+  }
+  .course-companion-dock label { min-width: 0; }
+  .course-companion-dock textarea { width: 100%; min-height: 48px; resize: vertical; border: 1px solid var(--course-line-strong); border-radius: 8px; padding: 7px 8px; color: var(--course-ink); background: var(--course-paper); font: inherit; font-size: 12px; line-height: 1.35; }
+  .course-companion-dock > div { display: grid; align-content: start; gap: 6px; }
+  .course-companion-dock .course-secondary-button,
+  .course-companion-dock .course-primary-button { min-height: 30px; padding: 6px 8px; font-size: 10px; white-space: nowrap; }
+  .course-companion-dock .course-text-button { grid-column: 1 / -1; justify-self: start; padding: 0; color: var(--course-link); font-size: 10px; font-weight: 800; }
+  .course-companion-quiet-trigger { position: absolute; z-index: 5; top: 14%; right: 7%; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--course-line-strong); border-radius: 999px; padding: 8px 10px; color: var(--course-ink); background: var(--course-paper); font: inherit; font-size: 11px; font-weight: 800; box-shadow: 0 8px 20px rgba(18, 52, 83, .09); pointer-events: auto; cursor: pointer; }
+  html[dir="rtl"] .course-companion-bubble,
+  body[data-course-direction="rtl"] .course-companion-bubble { right: auto; left: 72%; text-align: right; }
+  html[dir="rtl"] .course-companion-bubble::after,
+  body[data-course-direction="rtl"] .course-companion-bubble::after { right: auto; left: -8px; border-top: 0; border-right: 0; border-bottom: 1px solid var(--course-line-strong); border-left: 1px solid var(--course-line-strong); }
+  html[dir="rtl"] .course-companion-quiet-trigger,
+  body[data-course-direction="rtl"] .course-companion-quiet-trigger { right: auto; left: 7%; }
+}
+
+@media (min-width: 1181px) and (max-width: 1500px) {
+  .course-mascot-rail--lesson .course-companion-bubble { right: auto; left: -48%; width: min(300px, 72%); }
+  html[dir="rtl"] .course-mascot-rail--lesson .course-companion-bubble,
+  body[data-course-direction="rtl"] .course-mascot-rail--lesson .course-companion-bubble { right: -48%; left: auto; }
+}
 .course-task-initiation { border-left-color: #2c8cdb; background: color-mix(in srgb, var(--course-panel, #fff) 88%, #e7f6ff); }
 
 html[data-website-scheme="playful"] .course-adaptive-proposal,

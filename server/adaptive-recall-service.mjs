@@ -62,6 +62,7 @@ const instructionsFor = (context) => [
   'Never give a complete answer, reproduce or rewrite source text, reveal answers, or supply more than one support. The next prompt must invite the learner to think or apply the objective in their own words.',
   !context.response ? 'There is no learner attempt yet. Give only a starting strategy for the selected barrier; do not explain, paraphrase, or reveal the lesson objective.' : '',
   'If a barrier is supplied, adapt only the current step. Do not change the lesson, module, or plan.',
+  context.supportStates?.length ? 'Neutral task context: ' + context.supportStates.join(', ') + '. Use this only to choose the presentation of the one permitted support; it is not a learner trait, diagnosis, score, or readiness signal.' : '',
   context.language === 'ur' ? 'Reply in clear Urdu script only.' : 'Reply in clear English only.',
   `Current module: ${context.title}.`,
   `Approved objective: ${context.objective}.`,
@@ -89,7 +90,7 @@ const validate = (value) => {
   return { evidence_found: evidence, missing_concept: missing, support_mode: mode, feedback, next_prompt: nextPrompt, improvement };
 };
 
-export const createAdaptiveRecallService = ({ config, firebase, ledger, provider }) => {
+export const createAdaptiveRecallService = ({ config, firebase, ledger, provider, contextResolver = null }) => {
   const available = () => Boolean(firebase.available && ledger && provider?.status?.().available);
   const status = () => ({ available: available(), requiresSignIn: true, structuredOutput: true, fallback: 'authored-current-step support' });
 
@@ -99,7 +100,14 @@ export const createAdaptiveRecallService = ({ config, firebase, ledger, provider
     // when the non-production AI_ALLOW_GUESTS preview flag is enabled. All
     // deployed requests continue to require a Firebase bearer token.
     const learner = localGuest || await firebase.verifyBearer(authorization);
-    const context = adaptiveRecallContext(body);
+    const recallBody = {
+      ...body,
+      page: { ...(body?.page || {}), phase: body?.page?.phase === 'type' ? 'read' : body?.page?.phase }
+    };
+    const resolvedPageContext = contextResolver?.resolve
+      ? await contextResolver.resolve({ authorization, body: recallBody })
+      : null;
+    const context = adaptiveRecallContext(body, resolvedPageContext);
     if (context.barrier && !BARRIERS.has(context.barrier)) throw apiError(400, 'INVALID_BARRIER', 'Choose one of the available support options.');
     if (hasPrivateData(context.response) || hasPrivateData(context.previousResponse)) throw apiError(400, 'PRIVATE_INFORMATION', 'Please remove private information before requesting learning support.');
     const instructions = instructionsFor(context);

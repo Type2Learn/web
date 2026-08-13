@@ -153,10 +153,31 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // off by default. These flags must block server routes as well as UI, so a
     // hidden button cannot create learner data or provider spend.
     adaptiveLearningEnabled: booleanFrom(value('ADAPTIVE_LEARNING_ENABLED')),
+    // BEHAVIOURAL LEARNING PARTNER: this deliberately sits behind its own
+    // rollout flags. Behaviour support can provide local authored help without
+    // this flag, but no server-side directive or consented behaviour summary
+    // is available until it is explicitly enabled.
+    behaviourContextEnabled: booleanFrom(value('BEHAVIOUR_CONTEXT_ENABLED')),
+    mascotPartnerAiEnabled: booleanFrom(value('MASCOT_PARTNER_AI_ENABLED')),
+    adaptiveRetentionDays: numberFrom(value('ADAPTIVE_RETENTION_DAYS'), 90, { min: 1, max: 365 }),
     aiAssessmentsEnabled: booleanFrom(value('AI_ASSESSMENTS_ENABLED')),
     aiVisualsEnabled: booleanFrom(value('AI_VISUALS_ENABLED')),
     firebaseProjectId: value('FIREBASE_PROJECT_ID') || 'type2learn-defcc',
     firebaseServiceAccountJson: value('FIREBASE_SERVICE_ACCOUNT_JSON'),
+    firebaseStorageBucket: value('FIREBASE_STORAGE_BUCKET') || '',
+    // Private educator workspace. The first administrator proves possession of
+    // the one-time setup code; only its SHA-256 digest is stored in deployment
+    // configuration. Role/invite codes are HMAC hashed with a separate pepper.
+    adminBootstrapCodeHash: value('ADMIN_BOOTSTRAP_CODE_SHA256'),
+    roleCodePepper: value('ROLE_CODE_PEPPER'),
+    educatorWorkspaceEnabled: booleanFrom(value('EDUCATOR_WORKSPACE_ENABLED')),
+    coursePublishingEnabled: booleanFrom(value('COURSE_PUBLISHING_ENABLED')),
+    courseBackupGithubRepository: value('COURSE_BACKUP_GITHUB_REPOSITORY'),
+    courseBackupGithubToken: value('COURSE_BACKUP_GITHUB_TOKEN'),
+    courseBackupGithubBranch: value('COURSE_BACKUP_GITHUB_BRANCH') || 'main',
+    supabaseBackupUrl: value('SUPABASE_BACKUP_URL'),
+    supabaseBackupServiceKey: value('SUPABASE_BACKUP_SERVICE_ROLE_KEY'),
+    supabaseBackupBucket: value('SUPABASE_BACKUP_BUCKET'),
     openAiApiKey: value('OPENAI_API_KEY', 'openai', 'key'),
     openAiResponsesUrl: configuredOpenAiEndpoint.url,
     openAiProvider: configuredOpenAiEndpoint.provider,

@@ -4,7 +4,14 @@ const app = document.getElementById('learn-app');
 const preferenceStoragePrefix = 'type2learn-course-preferences-v1:';
 const legacyPreferenceStoragePrefix = 'type2learn-learning-preferences-v1:';
 const supportedCourseIds = new Set(['course-1-neurodivergent-conditions-v2']);
-const selectedCourseId = new URLSearchParams(window.location.search).get('course') || '';
+const setupQuery = new URLSearchParams(window.location.search);
+const selectedCourseId = setupQuery.get('course') || '';
+// A reviewed release is a distinct learning space. Keep its version through
+// the preference round-trip so its choices cannot reopen the bare legacy
+// course or overwrite a different published revision.
+const selectedCourseVersion = String(setupQuery.get('version') || '').trim();
+const selectedCourseKey = selectedCourseVersion ? `${selectedCourseId}@${selectedCourseVersion}` : selectedCourseId;
+const isSelectedReviewedCourse = Boolean(selectedCourseId && selectedCourseVersion);
 const backgroundNoiseSources = {
   pink: '/assets/audio/background-noise/pink-noise-loop.mp3',
   white: '/assets/audio/background-noise/white-noise-loop.mp3',
@@ -16,9 +23,6 @@ const BACKGROUND_NOISE_MAX_PERCENT = 60;
 const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0, playing: false, fadeFrame: null, playRequest: 0 };
 const mascotAnimationUrls = ['/assets/2D%20Mascot/blinking.webp?v=20260804-loop1'];
 const mascotModuleUrl = '/course/mascot-2d.js?v=20260804-blink1';
-// 3D rollback reference: preserve the original model URL alongside the
-// untouched course/mascot-3d.js implementation.
-// const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';
 let mascotAssetsWarmed = false;
 let mascotPreloadLinks = [];
 let mascotPreview = null;
@@ -76,9 +80,9 @@ const readPreferences = (user, courseId) => {
   }
 };
 
-const savePreferences = (user, courseId, choices) => {
+const savePreferences = (user, courseId, choices, courseVersion = '') => {
   try {
-    window.localStorage.setItem(preferenceKey(user, courseId), JSON.stringify({ version: 1, courseId, complete: true, choices }));
+    window.localStorage.setItem(preferenceKey(user, courseId), JSON.stringify({ version: 1, courseId, courseVersion, complete: true, choices }));
   } catch (_) {
     /* The learner can still continue if this browser blocks local storage. */
   }
@@ -613,7 +617,11 @@ const updateNoiseVolumeUi = (value) => {
 };
 
 const boot = async () => {
-  if (!supportedCourseIds.has(selectedCourseId)) {
+  // Historical course setup remains intentionally limited to its known route.
+  // Any explicitly versioned reviewed course is verified later by the protected
+  // manifest endpoint, so the shared preferences UI can serve every published
+  // theory course without maintaining a fragile browser-side course allowlist.
+  if (!supportedCourseIds.has(selectedCourseId) && !isSelectedReviewedCourse) {
     window.location.replace('/course/');
     return;
   }
@@ -629,11 +637,14 @@ const boot = async () => {
   }
 
   if (!user) {
-    window.location.replace('/login/?next=' + encodeURIComponent('/afterlogin/?course=' + encodeURIComponent(selectedCourseId)));
+    const next = new URL('/afterlogin/', window.location.origin);
+    next.searchParams.set('course', selectedCourseId);
+    if (selectedCourseVersion) next.searchParams.set('version', selectedCourseVersion);
+    window.location.replace('/login/?next=' + encodeURIComponent(next.pathname + next.search));
     return;
   }
 
-  const saved = readPreferences(user, selectedCourseId);
+  const saved = readPreferences(user, selectedCourseKey);
   const savedChoices = saved?.choices || {};
   // Preserve an earlier language choice as a one-time migration to the now
   // functional Urdu mode switch. New saves no longer use learning-language.
@@ -752,10 +763,17 @@ const boot = async () => {
     }
 
     if (event.target.closest('[data-save-preferences]')) {
-      savePreferences(user, selectedCourseId, choices);
+      savePreferences(user, selectedCourseKey, choices, selectedCourseVersion);
       window.Type2LearnWebsiteScheme?.set(choices['website-scheme']);
       if (choices.mascot !== 'on') releaseMascotAssets();
-      window.location.assign('/course/?course=' + encodeURIComponent(selectedCourseId) + '&start=course');
+      const destination = new URL('/course/', window.location.origin);
+      destination.searchParams.set('course', selectedCourseId);
+      destination.searchParams.set('start', 'course');
+      if (selectedCourseVersion) {
+        destination.searchParams.set('courseId', selectedCourseId);
+        destination.searchParams.set('version', selectedCourseVersion);
+      }
+      window.location.assign(destination.pathname + destination.search);
     }
 
     const back = event.target.closest('[data-go-back]');
@@ -785,8 +803,15 @@ const boot = async () => {
       if (stage === 'focused') {
         const steps = focusedSteps(choices);
         if (focusedStepIndex >= steps.length - 1) {
-          savePreferences(user, selectedCourseId, choices);
-          window.location.assign('/course/?course=' + encodeURIComponent(selectedCourseId) + '&start=course');
+          savePreferences(user, selectedCourseKey, choices, selectedCourseVersion);
+          const destination = new URL('/course/', window.location.origin);
+          destination.searchParams.set('course', selectedCourseId);
+          destination.searchParams.set('start', 'course');
+          if (selectedCourseVersion) {
+            destination.searchParams.set('courseId', selectedCourseId);
+            destination.searchParams.set('version', selectedCourseVersion);
+          }
+          window.location.assign(destination.pathname + destination.search);
           return;
         }
         focusedStepIndex += 1;

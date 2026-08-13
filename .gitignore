@@ -11,3 +11,7 @@ test-results/
 playwright-report/
 screenshots/
 node_modules/
+tmp/
+
+# Exact-commit offline archives are intentionally local-only.
+zip/

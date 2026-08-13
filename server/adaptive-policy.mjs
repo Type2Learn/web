@@ -54,7 +54,17 @@ export const adaptiveCandidateForSummary = (summary) => {
   const returns = metric(summary, 'returns') + metric(summary, 'rereads');
   const aiActiveMs = metric(summary, 'aiActiveMs');
   const aiRequests = metric(summary, 'aiRequests');
+  // The Behaviour Context contributes only its neutral, temporary support
+  // states. It does not create a learner label, change a setting, or affect
+  // assessment readiness. These states make the existing one-change proposal
+  // more faithful to the learner's explicitly selected support surface.
+  const behaviourStates = new Set(Array.isArray(summary?.behaviour?.states)
+    ? summary.behaviour.states.map((state) => String(state)) : []);
 
+  if (behaviourStates.has('starting')) return candidates.start;
+  if (behaviourStates.has('using-support')) return candidates.returnFromAi;
+  if (behaviourStates.has('re-reading')) return candidates.readingWidth;
+  if (behaviourStates.has('working-through-typing')) return candidates.spacing;
   if (firstActionMs >= 90000) return candidates.start;
   if (aiActiveMs >= 6 * 60 * 1000 || aiRequests >= 5) return candidates.returnFromAi;
   if (typingPauseMs >= 45000) return candidates.spacing;

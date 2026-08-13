@@ -14,6 +14,12 @@ import { createModelProvider } from './server/model-provider.mjs';
 import { createLearningAnalyticsService } from './server/learning-analytics-service.mjs';
 import { createAdaptiveSupportService } from './server/adaptive-support-service.mjs';
 import { createAssessmentService } from './server/assessment-service.mjs';
+import { createBehaviouralPartnerService } from './server/behavioural-partner-service.mjs';
+import { createAccessService } from './server/access-service.mjs';
+import { createCourseAuthoringService } from './server/course-authoring-service.mjs';
+import { createCourseBackupService } from './server/course-backup-service.mjs';
+import { createCourseCatalogService } from './server/course-catalog-service.mjs';
+import { createCourseContextResolver } from './server/course-context.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -141,8 +147,8 @@ const readBody = async (request, maximum) => {
   return Buffer.concat(chunks);
 };
 
-const readJson = async (request) => {
-  const body = await readBody(request, 48 * 1024);
+const readJson = async (request, maximum = 48 * 1024) => {
+  const body = await readBody(request, maximum);
   try {
     return JSON.parse(body.toString('utf8'));
   } catch {
@@ -150,8 +156,8 @@ const readJson = async (request) => {
   }
 };
 
-const readForm = async (request) => {
-  const body = await readBody(request, 7 * 1024 * 1024);
+const readForm = async (request, maximum = 7 * 1024 * 1024) => {
+  const body = await readBody(request, maximum);
   const headers = new Headers();
   Object.entries(request.headers).forEach(([key, value]) => {
     if (Array.isArray(value)) headers.set(key, value.join(', '));
@@ -219,24 +225,32 @@ const buildRuntime = async () => {
   const firebase = createFirebaseRuntime(config);
   const ledger = firebase.available ? createUsageLedger(firebase.firestore) : null;
   const modelProvider = createModelProvider(config);
+  const access = createAccessService({ config, firebase });
+  const courseCatalog = createCourseCatalogService({ config, firebase, access });
+  const courseContextResolver = createCourseContextResolver({ courseCatalog });
   return {
     config,
     modelProvider,
-    ai: createAiService({ config, firebase, ledger, provider: modelProvider }),
-    adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider }),
+    ai: createAiService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
+    adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
     speech: createSpeechService({ config, firebase, ledger }),
-    courseProgress: createCourseProgressService({ firebase }),
+    courseProgress: createCourseProgressService({ firebase, assertCourseAccess: courseCatalog.assertProgressAccess }),
     // ADAPTIVE LEARNING: all three services independently enforce feature
     // flags, bearer authentication, consent/reviewer checks, and Firestore
     // availability. They are present even while disabled for a staged rollout.
     learningAnalytics: createLearningAnalyticsService({ config, firebase }),
     adaptiveSupport: createAdaptiveSupportService({ config, firebase, ledger, provider: modelProvider }),
-    assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider })
+    assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider }),
+    behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider }),
+    access,
+    courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider }),
+    courseBackups: createCourseBackupService({ config, firebase, access }),
+    courseCatalog
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access, courseAuthoring, courseBackups, courseCatalog } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -246,14 +260,124 @@ const handleApi = async (request, response, pathname, runtime) => {
       adaptiveRecall: { ...adaptiveRecall.status(), localGuestPreview: config.allowLocalGuestAi },
       adaptiveLearning: learningAnalytics.status(),
       adaptiveSupport: adaptiveSupport.status(),
+      behaviouralPartner: behaviouralPartner.status(),
       assessments: assessments.status(),
       modelRouting: modelProvider.status(),
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
+      educatorWorkspace: access.status(),
+      courseAuthoring: courseAuthoring.status(),
+      courseBackups: courseBackups.status(),
+      courseCatalogue: courseCatalog.status(),
       model: config.openAiModel
     });
   }
   try {
+    if (request.method === 'GET' && pathname === '/api/v1/access/me') {
+      return sendJson(response, 200, await access.me({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/access/bootstrap') {
+      return sendJson(response, 200, await access.bootstrap({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/access/codes') {
+      return sendJson(response, 200, await access.createCode({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/access/codes') {
+      return sendJson(response, 200, await access.listCodes({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/access/redeem') {
+      return sendJson(response, 200, await access.redeemCode({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    const codeRevoke = pathname.match(/^\/api\/v1\/access\/codes\/([A-Za-z0-9_-]{8,96})\/revoke$/);
+    if (request.method === 'POST' && codeRevoke) {
+      return sendJson(response, 200, await access.revokeCode({ authorization: request.headers.authorization, codeId: codeRevoke[1] }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/access/roster') {
+      const organisationId = new URL(request.url || '/', 'http://localhost').searchParams.get('organisationId') || '';
+      return sendJson(response, 200, await access.roster({ authorization: request.headers.authorization, organisationId }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/access/memberships/revoke') {
+      return sendJson(response, 200, await access.revokeMembership({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/source') {
+      return sendJson(response, 200, await courseAuthoring.submitSource({ authorization: request.headers.authorization, form: await readForm(request, 25 * 1024 * 1024) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/submissions') {
+      return sendJson(response, 200, await courseAuthoring.listSubmissions({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/submission-review') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseAuthoring.submissionReview({ authorization: request.headers.authorization, submissionId: url.searchParams.get('submissionId') }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/courses') {
+      return sendJson(response, 200, await courseAuthoring.listCourses({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/markdown') {
+      return sendJson(response, 200, await courseAuthoring.saveMarkdown({ authorization: request.headers.authorization, body: await readJson(request, 256 * 1024) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/ai-draft') {
+      return sendJson(response, 200, await courseAuthoring.generateAiDraft({ authorization: request.headers.authorization, body: await readJson(request, 32 * 1024) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/deterministic-mcq') {
+      return sendJson(response, 200, await courseAuthoring.createDeterministicMcqDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/transition') {
+      return sendJson(response, 200, await courseAuthoring.transition({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/course') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseAuthoring.courseSummary({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/narration') {
+      return sendJson(response, 200, await courseAuthoring.uploadNarration({ authorization: request.headers.authorization, form: await readForm(request, 25 * 1024 * 1024) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/backups') {
+      return sendJson(response, 200, await courseBackups.verifyBackups({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/export') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      const result = await courseBackups.downloadExport({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') });
+      return send(response, 200, result.archive, {
+        ...securityHeaders('/api', { api: true }),
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${result.filename}"`,
+        'Content-Length': result.archive.length
+      });
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/publish') {
+      return sendJson(response, 200, await courseBackups.publish({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/courses') {
+      return sendJson(response, 200, await courseCatalog.catalogue({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-manifest') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseCatalog.manifest({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-narration') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseCatalog.narration({
+        authorization: request.headers.authorization,
+        courseId: url.searchParams.get('courseId'),
+        version: url.searchParams.get('version'),
+        moduleId: url.searchParams.get('moduleId'),
+        language: url.searchParams.get('language')
+      }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-narration-stream') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      const stream = await courseCatalog.narrationStream({ token: url.searchParams.get('token') });
+      return send(response, 302, '', { ...securityHeaders('/api', { api: true }), Location: stream.url });
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/courses/check-answer') {
+      return sendJson(response, 200, await courseCatalog.checkAnswer({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/courses/distribution') {
+      return sendJson(response, 200, await courseCatalog.setDistribution({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/courses/request-platform-release') {
+      return sendJson(response, 200, await courseCatalog.requestPlatformRelease({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/ai/chat') {
       return sendJson(response, 200, await ai.chat({
         authorization: request.headers.authorization,
@@ -279,6 +403,9 @@ const handleApi = async (request, response, pathname, runtime) => {
     }
     if (request.method === 'POST' && pathname === '/api/v1/learning-summary') {
       return sendJson(response, 200, await learningAnalytics.saveSummary({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/behaviour/directive') {
+      return sendJson(response, 200, await behaviouralPartner.directive({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/adaptive/proposal') {
       return sendJson(response, 200, await adaptiveSupport.proposal({ authorization: request.headers.authorization, body: await readJson(request) }));

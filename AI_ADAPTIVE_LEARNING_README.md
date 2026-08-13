@@ -120,6 +120,50 @@ storage, or a network connection is unavailable.
 Product language must remain educational and respectful. It does not give
 medical, diagnostic, crisis, or treatment advice.
 
+## Behavioural Learning Partner — implemented boundary
+
+The course now has a versioned, aggregate-only **Behaviour Context**. It is
+shared by the mascot surface, Adaptive Recall presentation, adaptive
+presentation policy, encouragement/support moments, visual offers, and
+assessment question ordering, but it can never determine a score, pass/fail
+decision, or learner category.
+
+- **Local by default:** browser-session metrics remain on-device and can power
+  authored support without calling an AI provider.
+- **Consent before upload:** a signed-in learner who enables Adaptive learning
+  support may upload one compact module summary. It contains only bounded
+  counts/categories, is keyed by a SHA-256 Firebase UID hash, and receives a
+  90-day `expiresAt` value. Configure Firestore TTL for `expiresAt`; the
+  service also removes expired module summaries opportunistically on writes.
+- **Four learner-selected roles:** Calm Guide, fictional Learning Partner,
+  Self-Challenge Coach, and Visual Co-Explorer. The profile menu controls
+  on/off, role, Quiet/Available/Involved presence, proactive offers, text or
+  voice interaction, explanation, export, and deletion. The product may never
+  switch a saved role or preference automatically.
+- **Deterministic first:** two neutral signals are required before one offer
+  can appear. A dismissal suppresses that offer for the task. The policy is
+  authored and visible in `course/behaviour-context.js` and
+  `server/behavioural-partner-service.mjs`.
+- **AI is wording only:** when both `BEHAVIOUR_CONTEXT_ENABLED=true` and
+  `MASCOT_PARTNER_AI_ENABLED=true` are set, the server sends only compact
+  module/phase/objective IDs, role, presence and boolean signals to
+  Gemini Flash-Lite. GPT-5.4 Nano is the only fallback and can only repair or
+  validate the short JSON response. Invalid, unavailable, unauthorised, or
+  unconsented calls use authored wording.
+- **Assessment boundary:** the partner may clarify the process, offer text or
+  voice input, or suggest a pause. It cannot give an answer, hint at an option,
+  model an answer, or decide readiness.
+- **Adaptive Recall boundary:** after consent it receives at most three neutral
+  state names such as `re-reading`; it never receives a behavioural counter,
+  learner label, or scoring signal. Those states can only affect the
+  presentation of its one permitted support.
+
+Never place raw typed work, individual key events, microphone data,
+transcripts, full Course AI messages, raw assessment answers, scores, IP
+addresses, fingerprints, eye tracking, or psychological labels in this
+context. The profile menu includes the same scope in “What Type2Learn
+notices,” plus download/delete controls.
+
 ## 3. Existing code foundations to preserve
 
 The current repository already has the pieces this work should extend:

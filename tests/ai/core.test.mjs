@@ -8,7 +8,8 @@ import { APPROVED_OPENAI_MINI_MODEL, APPROVED_OPENAI_MODEL, RESERVED_TEST_GENERA
 import { createAiService } from '../../server/ai-service.mjs';
 import { createAdaptiveRecallService } from '../../server/adaptive-recall-service.mjs';
 import { createModelProvider } from '../../server/model-provider.mjs';
-import { adaptiveRecallContext, coursePageContext, normaliseConversation, normaliseLearnerMessage } from '../../server/course-context.mjs';
+import { adaptiveRecallContext, coursePageContext, createCourseContextResolver, normaliseConversation, normaliseLearnerMessage } from '../../server/course-context.mjs';
+import { migratedLegacyTheoryCourse } from '../../server/legacy-neurodivergent-migration.mjs';
 import { createFallbackAssessmentBank } from '../../server/fallback-assessment-bank.mjs';
 import { assessmentCurriculum, publicAssessmentItem, validateAssessmentBank } from '../../server/assessment-schemas.mjs';
 import { usageEstimate } from '../../server/usage-ledger.mjs';
@@ -275,6 +276,73 @@ test('course context limits model facts to the current page and excludes assessm
   assert.ok(approvedFacts.length > 0);
 });
 
+test('reviewed-course context is reloaded from the authorised learner manifest and excludes targets and options', async () => {
+  const { learnerManifest } = migratedLegacyTheoryCourse();
+  const manifest = structuredClone(learnerManifest);
+  manifest.id = 'teacher-reviewed-course';
+  manifest.version = '2.4';
+  let request = null;
+  const resolver = createCourseContextResolver({
+    courseCatalog: {
+      manifest: async (value) => {
+        request = value;
+        return { manifest };
+      }
+    }
+  });
+  const context = await resolver.resolve({
+    authorization: 'Bearer reviewed-learner',
+    body: {
+      courseId: manifest.id,
+      courseVersion: manifest.version,
+      page: { moduleIndex: 0, phase: 'read' },
+      language: 'en'
+    }
+  });
+  assert.deepEqual(request, { authorization: 'Bearer reviewed-learner', courseId: manifest.id, version: manifest.version });
+  assert.equal(context.title, manifest.modules[0].en.title);
+  const supplied = context.facts.join(' ');
+  assert.equal(supplied.includes(manifest.modules[0].en.typing.target), false);
+  assert.equal(supplied.includes(manifest.modules[0].en.check.options[0]), false);
+  assert.ok(supplied.includes(manifest.modules[0].en.content.definition));
+});
+
+test('reviewed-course context rejects a catalogue manifest that does not match the requested version', async () => {
+  const { learnerManifest } = migratedLegacyTheoryCourse();
+  const resolver = createCourseContextResolver({ courseCatalog: { manifest: async () => ({ manifest: learnerManifest }) } });
+  await assert.rejects(
+    resolver.resolve({
+      authorization: 'Bearer reviewed-learner',
+      body: { courseId: 'other-reviewed-course', courseVersion: '9.9', page: { moduleIndex: 0, phase: 'read' }, language: 'en' }
+    }),
+    (error) => error?.code === 'COURSE_MANIFEST_MISMATCH'
+  );
+});
+
+test('an explicit reviewed version for the historic course re-authorises the manifest instead of using static context', async () => {
+  const { learnerManifest } = migratedLegacyTheoryCourse();
+  let calls = 0;
+  const resolver = createCourseContextResolver({
+    courseCatalog: {
+      manifest: async () => {
+        calls += 1;
+        return { manifest: learnerManifest };
+      }
+    }
+  });
+  const context = await resolver.resolve({
+    authorization: 'Bearer reviewed-learner',
+    body: {
+      courseId: COURSE_CONTENT.id,
+      courseVersion: learnerManifest.version,
+      page: { moduleIndex: 0, phase: 'read' },
+      language: 'en'
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(context.title, learnerManifest.modules[0].en.title);
+});
+
 test('learner chat input and history stay bounded', () => {
   const long = 'a'.repeat(1200);
   assert.equal(normaliseLearnerMessage(long).length, 900);
@@ -338,11 +406,13 @@ test('adaptive recall context has no assessment answers or exact typing target',
     courseId: COURSE_CONTENT.id,
     page: { moduleIndex: 0, phase: 'type' },
     language: 'en',
-    response: 'A learner response'
+    response: 'A learner response',
+    behaviourStates: ['re-reading', 'not-a-real-state', 'working-through-typing']
   });
   const supplied = context.outline.join(' ');
   assert.equal(supplied.includes(COURSE_CONTENT.steps[0].typing.target), false);
   assert.equal(supplied.includes(String(COURSE_CONTENT.steps[0].check.options[0][0])), false);
+  assert.deepEqual(context.supportStates, ['re-reading', 'working-through-typing']);
 });
 
 test('authored module assessment reserve is deterministic, bounded, and keeps answer keys server-only', () => {

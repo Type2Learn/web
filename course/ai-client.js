@@ -44,11 +44,11 @@ const authenticatedRequest = async (user, path, options = {}) => {
 
 export const getCourseAiStatus = () => request('/api/v1/health');
 
-export const askCourseAi = async ({ user, message, history, courseId, page, language, signal }) => {
+export const askCourseAi = async ({ user, message, history, courseId, courseVersion, page, language, signal }) => {
   const requestOptions = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, history, courseId, page, language }),
+    body: JSON.stringify({ message, history, courseId, courseVersion, page, language }),
     signal
   };
   // Local guest chat is a development-only preview. The server accepts it
@@ -62,11 +62,13 @@ export const askCourseAi = async ({ user, message, history, courseId, page, lang
 // of an unrestricted chat call. The browser sends only the learner's current
 // attempt and current page identity; provider keys and model selection remain
 // server-only.
-export const requestAdaptiveRecall = async ({ user, courseId, page, language, response, previousResponse, barrier, signal }) => {
+export const requestAdaptiveRecall = async ({ user, courseId, courseVersion, page, language, response, previousResponse, barrier, behaviourStates = [], signal }) => {
   const requestOptions = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ courseId, page, language, response, previousResponse, barrier }),
+    // Behaviour states are a short allow-list (for example, "re-reading"),
+    // never timings, typed words, recordings, chat, answers, or a learner label.
+    body: JSON.stringify({ courseId, courseVersion, page, language, response, previousResponse, barrier, behaviourStates }),
     signal
   };
   // Local guest AI is an explicitly enabled preview path. It has no token and
@@ -98,6 +100,41 @@ export const saveCourseProgress = async ({ user, snapshot, signal }) => authenti
   signal
 });
 
+// Reviewed publishing catalogue. These helpers deliberately use the same
+// signed-in request boundary as account progress: guest preview never gains
+// access to a private course manifest or its server-held answer keys.
+export const loadReviewedCourseManifest = async ({ user, courseId, version, signal }) => {
+  const query = new URLSearchParams({ courseId: String(courseId || ''), version: String(version || '') });
+  return authenticatedRequest(user, '/api/v1/course-manifest?' + query.toString(), { signal });
+};
+
+// Published human narration is retrieved only for the visible module. The
+// endpoint returns a short-lived signed URL, never a private Storage path.
+export const loadReviewedCourseNarration = async ({ user, courseId, version, moduleId, language, signal }) => {
+  const query = new URLSearchParams({
+    courseId: String(courseId || ''),
+    version: String(version || ''),
+    moduleId: String(moduleId || ''),
+    language: language === 'ur' ? 'ur' : 'en'
+  });
+  return authenticatedRequest(user, '/api/v1/course-narration?' + query.toString(), { signal });
+};
+
+export const checkReviewedCourseAnswer = async ({ user, courseId, version, scope, moduleId, questionIndex, language, selectedIndex, signal }) => authenticatedRequest(user, '/api/v1/courses/check-answer', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    courseId,
+    version,
+    scope: scope === 'final' ? 'final' : 'module',
+    moduleId: moduleId || undefined,
+    questionIndex: Number.isInteger(questionIndex) ? questionIndex : undefined,
+    language: language === 'ur' ? 'ur' : 'en',
+    selectedIndex
+  }),
+  signal
+});
+
 export const setAdaptiveLearningConsent = async ({ user, enabled, signal }) => authenticatedRequest(user, '/api/v1/adaptive/consent', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -117,17 +154,17 @@ export const saveLearningSummary = async ({ user, summary, signal }) => authenti
   signal
 });
 
-export const requestAdaptiveProposal = async ({ user, moduleIndex, signal }) => authenticatedRequest(user, '/api/v1/adaptive/proposal', {
+export const requestAdaptiveProposal = async ({ user, courseId, courseVersion, moduleIndex, signal }) => authenticatedRequest(user, '/api/v1/adaptive/proposal', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ moduleIndex }),
+  body: JSON.stringify({ courseId, courseVersion, moduleIndex }),
   signal
 });
 
-export const decideAdaptiveProposal = async ({ user, proposalId, accepted, signal }) => authenticatedRequest(user, '/api/v1/adaptive/proposal/' + encodeURIComponent(proposalId) + '/decision', {
+export const decideAdaptiveProposal = async ({ user, courseId, courseVersion, proposalId, accepted, signal }) => authenticatedRequest(user, '/api/v1/adaptive/proposal/' + encodeURIComponent(proposalId) + '/decision', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ accepted: Boolean(accepted) }),
+  body: JSON.stringify({ courseId, courseVersion, accepted: Boolean(accepted) }),
   signal
 });
 
@@ -138,6 +175,16 @@ export const deleteAdaptiveLearningData = async ({ user, signal }) => authentica
 
 export const exportAdaptiveLearningData = async ({ user, signal }) => authenticatedRequest(user, '/api/v1/privacy/adaptive-data-export', {
   method: 'POST',
+  signal
+});
+
+// BEHAVIOURAL LEARNING PARTNER: browser code supplies only a validated compact
+// aggregate. The endpoint is signed-in + adaptive-consent gated; guest/local
+// sessions always use authored local support instead.
+export const requestBehaviourDirective = async ({ user, context, signal }) => authenticatedRequest(user, '/api/v1/behaviour/directive', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(context),
   signal
 });
 

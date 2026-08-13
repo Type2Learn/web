@@ -4,9 +4,9 @@ import { adaptiveCandidateForSummary, visibleProposal } from './adaptive-policy.
 import { adaptiveUsageCaps, usageEstimate } from './usage-ledger.mjs';
 import { createModelProvider } from './model-provider.mjs';
 
-const COURSE_ID = 'course-1-neurodivergent-conditions-v2';
+const LEGACY_COURSE_ID = 'course-1-neurodivergent-conditions-v2';
 const CONSENT_VERSION = 1;
-const MAX_MODULE_INDEX = 10;
+const MAX_MODULE_INDEX = 99;
 const COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 const hash = (value) => createHash('sha256').update(String(value)).digest('hex');
 const estimateTokens = (text) => Math.ceil(String(text).length / 3);
@@ -14,6 +14,14 @@ const requestedModule = (value) => {
   const moduleIndex = Number(value);
   if (!Number.isInteger(moduleIndex) || moduleIndex < 0 || moduleIndex > MAX_MODULE_INDEX) throw apiError(400, 'INVALID_MODULE', 'This support request is not for an available module.');
   return moduleIndex;
+};
+const courseIdentity = (body = {}) => {
+  const courseId = String(body.courseId || LEGACY_COURSE_ID).trim().toLowerCase();
+  const courseVersion = String(body.courseVersion || '').trim();
+  if (!/^[a-z0-9][a-z0-9-]{2,79}$/.test(courseId) || (courseVersion && !/^\d+\.\d+(?:\.\d+)?$/.test(courseVersion))) {
+    throw apiError(400, 'INVALID_COURSE_CONTEXT', 'This support request is not for an available course.');
+  }
+  return { courseId, courseVersion, storageKey: courseVersion ? `${courseId}@${courseVersion}` : courseId };
 };
 const text = (copy, language) => language === 'ur' ? copy.urdu : copy.english;
 
@@ -30,8 +38,8 @@ const wordingInput = ({ candidate, summary }) => JSON.stringify({
 export const createAdaptiveSupportService = ({ config, firebase, ledger, provider = createModelProvider({ config }) }) => {
   const available = () => Boolean(config.adaptiveLearningEnabled && provider.available() && firebase.available && firebase.firestore && ledger);
   const profile = (uid) => firebase.firestore.collection('type2learnLearningProfiles').doc(hash(uid));
-  const course = (uid) => profile(uid).collection('courses').doc(COURSE_ID);
-  const proposalRef = (uid, moduleIndex, candidateId) => course(uid).collection('adaptiveProposals').doc(`${moduleIndex}-${candidateId}`);
+  const course = (uid, identity) => profile(uid).collection('courses').doc(identity.storageKey);
+  const proposalRef = (uid, identity, moduleIndex, candidateId) => course(uid, identity).collection('adaptiveProposals').doc(`${moduleIndex}-${candidateId}`);
 
   const status = () => ({
     available: available(),
@@ -91,18 +99,19 @@ export const createAdaptiveSupportService = ({ config, firebase, ledger, provide
   const proposal = async ({ authorization, body }) => {
     const learner = await learnerWithConsent(authorization);
     const moduleIndex = requestedModule(body?.moduleIndex);
-    const summary = (await course(learner.uid).collection('modules').doc(String(moduleIndex)).get()).data();
+    const identity = courseIdentity(body);
+    const summary = (await course(learner.uid, identity).collection('modules').doc(String(moduleIndex)).get()).data();
     if (!summary) return { proposal: null };
     const candidate = adaptiveCandidateForSummary(summary);
     if (!candidate) return { proposal: null };
-    const ref = proposalRef(learner.uid, moduleIndex, candidate.id);
+    const ref = proposalRef(learner.uid, identity, moduleIndex, candidate.id);
     const existing = (await ref.get()).data();
     const now = new Date();
     if (existing?.status === 'active' || existing?.status === 'accepted') return { proposal: visibleProposal(existing) };
     if (existing?.status === 'declined' && Number(existing.cooldownUntilMs) > now.getTime()) return { proposal: null };
     const language = summary.language === 'ur' ? 'ur' : 'en';
     const created = {
-      schemaVersion: 1, id: ref.id, moduleIndex, candidateId: candidate.id, kind: candidate.kind,
+      schemaVersion: 1, id: ref.id, courseId: identity.courseId, courseVersion: identity.courseVersion || null, moduleIndex, candidateId: candidate.id, kind: candidate.kind,
       preference: candidate.preference || null, title: text(candidate.title, language),
       description: await personalisedDescription({ learner, candidate, summary, language }),
       reason: text(candidate.reason, language), status: 'active', createdAt: now, updatedAt: now
@@ -114,7 +123,8 @@ export const createAdaptiveSupportService = ({ config, firebase, ledger, provide
     const learner = await learnerWithConsent(authorization);
     const id = String(proposalId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 100);
     if (!id) throw apiError(400, 'INVALID_PROPOSAL', 'That support suggestion is not available.');
-    const ref = course(learner.uid).collection('adaptiveProposals').doc(id);
+    const identity = courseIdentity(body);
+    const ref = course(learner.uid, identity).collection('adaptiveProposals').doc(id);
     const snapshot = await ref.get();
     if (!snapshot.exists) throw apiError(404, 'PROPOSAL_NOT_FOUND', 'That support suggestion is no longer available.');
     const current = snapshot.data() || {};
