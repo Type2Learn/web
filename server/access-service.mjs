@@ -263,6 +263,13 @@ export const createAccessService = ({ firebase, config }) => {
           return { memberId: document.id, membershipRole: member.membershipRole || 'learner', joinedAt: member.joinedAt || '' };
         })
       };
-    }
+    },
+
+    // Server-only helpers used by other private-workspace services. Browser
+    // routes never receive these functions, and each call re-reads Firestore
+    // instead of trusting a possibly stale Firebase custom claim.
+    assertAdmin: requireAdmin,
+    assertOrganisationAccess: requireOrganisationAccess,
+    accountFor
   };
 };

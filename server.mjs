@@ -16,6 +16,7 @@ import { createAdaptiveSupportService } from './server/adaptive-support-service.
 import { createAssessmentService } from './server/assessment-service.mjs';
 import { createBehaviouralPartnerService } from './server/behavioural-partner-service.mjs';
 import { createAccessService } from './server/access-service.mjs';
+import { createCourseAuthoringService } from './server/course-authoring-service.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -143,8 +144,8 @@ const readBody = async (request, maximum) => {
   return Buffer.concat(chunks);
 };
 
-const readJson = async (request) => {
-  const body = await readBody(request, 48 * 1024);
+const readJson = async (request, maximum = 48 * 1024) => {
+  const body = await readBody(request, maximum);
   try {
     return JSON.parse(body.toString('utf8'));
   } catch {
@@ -152,8 +153,8 @@ const readJson = async (request) => {
   }
 };
 
-const readForm = async (request) => {
-  const body = await readBody(request, 7 * 1024 * 1024);
+const readForm = async (request, maximum = 7 * 1024 * 1024) => {
+  const body = await readBody(request, maximum);
   const headers = new Headers();
   Object.entries(request.headers).forEach(([key, value]) => {
     if (Array.isArray(value)) headers.set(key, value.join(', '));
@@ -221,6 +222,7 @@ const buildRuntime = async () => {
   const firebase = createFirebaseRuntime(config);
   const ledger = firebase.available ? createUsageLedger(firebase.firestore) : null;
   const modelProvider = createModelProvider(config);
+  const access = createAccessService({ config, firebase });
   return {
     config,
     modelProvider,
@@ -235,12 +237,13 @@ const buildRuntime = async () => {
     adaptiveSupport: createAdaptiveSupportService({ config, firebase, ledger, provider: modelProvider }),
     assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider }),
     behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider }),
-    access: createAccessService({ config, firebase })
+    access,
+    courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access, courseAuthoring } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -256,6 +259,7 @@ const handleApi = async (request, response, pathname, runtime) => {
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
       educatorWorkspace: access.status(),
+      courseAuthoring: courseAuthoring.status(),
       model: config.openAiModel
     });
   }
@@ -279,6 +283,31 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'GET' && pathname === '/api/v1/access/roster') {
       const organisationId = new URL(request.url || '/', 'http://localhost').searchParams.get('organisationId') || '';
       return sendJson(response, 200, await access.roster({ authorization: request.headers.authorization, organisationId }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/source') {
+      return sendJson(response, 200, await courseAuthoring.submitSource({ authorization: request.headers.authorization, form: await readForm(request, 25 * 1024 * 1024) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/submissions') {
+      return sendJson(response, 200, await courseAuthoring.listSubmissions({ authorization: request.headers.authorization }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/markdown') {
+      return sendJson(response, 200, await courseAuthoring.saveMarkdown({ authorization: request.headers.authorization, body: await readJson(request, 256 * 1024) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/ai-draft') {
+      return sendJson(response, 200, await courseAuthoring.generateAiDraft({ authorization: request.headers.authorization, body: await readJson(request, 32 * 1024) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/deterministic-mcq') {
+      return sendJson(response, 200, await courseAuthoring.createDeterministicMcqDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/transition') {
+      return sendJson(response, 200, await courseAuthoring.transition({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/course') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseAuthoring.courseSummary({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/narration') {
+      return sendJson(response, 200, await courseAuthoring.uploadNarration({ authorization: request.headers.authorization, form: await readForm(request, 25 * 1024 * 1024) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/ai/chat') {
       return sendJson(response, 200, await ai.chat({
