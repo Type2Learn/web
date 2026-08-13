@@ -38,6 +38,16 @@ const publicCourse = (record = {}) => ({
   narration: record.narration || { humanAudioCount: 0, fallback: 'device-text-to-speech' },
   backups: record.backups || { firebase: false, github: false, supabase: false, zip: false }
 });
+const publicSubmission = (record = {}) => ({
+  submissionId: record.submissionId || '',
+  status: record.status || 'submitted',
+  type: record.type || 'theory',
+  ownerOrganisationId: record.ownerOrganisationId || '',
+  submittedTitle: record.submittedTitle || '',
+  source: { originalName: record.source?.originalName || '', extraction: record.source?.extraction || '', bytes: record.source?.bytes || 0 },
+  createdAt: record.createdAt || '',
+  updatedAt: record.updatedAt || ''
+});
 
 const requireService = ({ firebase, config }) => {
   if (!config?.educatorWorkspaceEnabled) throw apiError(503, 'EDUCATOR_WORKSPACE_DISABLED', 'The private educator workspace is not enabled yet.');
@@ -162,6 +172,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         createdAt: nowIso(),
         updatedAt: nowIso(),
         status: 'submitted',
+        submittedTitle: clean(form?.get('title'), 160),
         source: {
           originalName: source.originalName,
           contentType: source.contentType,
@@ -174,14 +185,34 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       };
       await sourceCollection(firebase.firestore, 'submissions').doc(submissionId).set(record);
       await audit(firebase.firestore, { actorUid: account.uid, action: 'course-source-submitted', submissionId, organisationId, type });
-      return { submission: { submissionId, type, status: record.status, extraction: source.extraction, originalName: source.originalName } };
+      return { submission: publicSubmission(record) };
     },
 
     async listSubmissions({ authorization }) {
       const account = await accountFor(authorization);
       const snapshot = await sourceCollection(firebase.firestore, 'submissions').orderBy('updatedAt', 'desc').limit(100).get();
       const submissions = snapshot.docs.map((document) => document.data() || {}).filter((record) => canReadCourse(account, record));
-      return { submissions: submissions.map((record) => ({ submissionId: record.submissionId, status: record.status, type: record.type, ownerOrganisationId: record.ownerOrganisationId, source: { originalName: record.source?.originalName || '', extraction: record.source?.extraction || '', bytes: record.source?.bytes || 0 }, createdAt: record.createdAt, updatedAt: record.updatedAt })) };
+      return { submissions: submissions.map(publicSubmission) };
+    },
+
+    async submissionReview({ authorization, submissionId }) {
+      const admin = await requireAdmin(authorization);
+      const id = clean(submissionId, 96);
+      const snapshot = await sourceCollection(firebase.firestore, 'submissions').doc(id).get();
+      if (!snapshot.exists) throw apiError(404, 'SUBMISSION_NOT_FOUND', 'This course submission was not found.');
+      const record = snapshot.data() || {};
+      await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-source-review-opened', submissionId: id, organisationId: record.ownerOrganisationId });
+      return {
+        submission: publicSubmission(record),
+        extractedText: record.source?.extraction === 'safe-text-extracted' ? String(record.source?.extractedText || '') : '',
+        requiresAdminTranscription: record.source?.extraction !== 'safe-text-extracted'
+      };
+    },
+
+    async listCourses({ authorization }) {
+      const account = await accountFor(authorization);
+      const snapshot = await sourceCollection(firebase.firestore, 'courses').orderBy('updatedAt', 'desc').limit(100).get();
+      return { courses: snapshot.docs.map((document) => document.data() || {}).filter((record) => canReadCourse(account, record)).map(noSecrets) };
     },
 
     async saveMarkdown({ authorization, body }) {

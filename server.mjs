@@ -293,6 +293,13 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'GET' && pathname === '/api/v1/course-authoring/submissions') {
       return sendJson(response, 200, await courseAuthoring.listSubmissions({ authorization: request.headers.authorization }));
     }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/submission-review') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseAuthoring.submissionReview({ authorization: request.headers.authorization, submissionId: url.searchParams.get('submissionId') }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/courses') {
+      return sendJson(response, 200, await courseAuthoring.listCourses({ authorization: request.headers.authorization }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/markdown') {
       return sendJson(response, 200, await courseAuthoring.saveMarkdown({ authorization: request.headers.authorization, body: await readJson(request, 256 * 1024) }));
     }
