@@ -1,10 +1,45 @@
-# Admin, Teacher, Institute, and Theory-Publishing Handoff
+# Admin, Teacher, Institute, and Theory-Publishing Continuation README
 
 **Branch:** `work-after-hackatron-sub`  
 **Working checkout:** `H:\Type2Learn\Type2Learn-web\tmp\branch-dev`  
 **Read first:** `agent.md`, `context.md`, and `goal.md` in the repository root. The rules in `agent.md`, especially the exact-commit `zip/` archive rule, are mandatory.
 
 This document records the state of the educator-workspace and reusable theory-course work as it stands at the handoff. It is deliberately candid: the feature is a tested implementation slice behind configuration flags, not a claim that a school-data production service is fully configured or released.
+
+## Read this first: current handoff status
+
+**Last completed implementation commit:** `8e08e7a fix(review): submit narration uploads from admin workspace`
+
+**Branch state at handoff:** clean after that commit; it was pushed to `origin/work-after-hackatron-sub`.
+
+**Regression result:** `npm.cmd test` passed with **939 tests** after the final narration-form fix.
+**Offline archive:** `zip/type2learn-8e08e7a.zip` is the exact committed source archive and is intentionally ignored by Git.
+
+### What is complete in this implementation slice
+
+- The server-side access model, role/invite codes, revocation checks, theory-only enforcement, authoring format/compiler, review workflow, learner-safe manifests, generic course catalogue/player, course progress, human-narration intake, distribution controls, and backup publication gate are implemented and covered by automated tests.
+- The original Neurodivergent Conditions course has been migrated into the reviewed bilingual Markdown format and can be served through the generic learner-safe manifest path.
+- Admin, teacher, institute, redeem, catalogue, and generic-course routes have implemented UI shells and API integrations. The educator pages retain a `?demo=1` presentation mode for visual inspection only.
+
+### What is deliberately not complete or not yet proven
+
+- Real Firebase, Firebase Storage, GitHub backup, Supabase backup, Gemini/OpenAI, and browser-auth integration has not been exercised with production credentials. The feature flags and server-side gates intentionally keep these capabilities unavailable until configured.
+- The four-way backup gate is implemented, but a real publication must not be claimed until every external receipt is tested in the target environment.
+- The historical bare `/course/` prototype remains a compatibility path. The catalogue-selected route uses the new manifest player; fully consolidating both learners into one rendering engine is the next major technical decision.
+- Required browser evidence is incomplete: run the end-to-end educator journey and test keyboard-only operation, mobile, 200% zoom, 400% reflow, reduced motion, high contrast, screen-reader semantics, real microphone behaviour, narration playback, and audio assets in a configured browser.
+- School/child-data production readiness still needs owner-approved Firebase rules, least-privilege credentials, retention/deletion procedures, privacy/legal/safeguarding approval, monitoring, and incident response.
+
+### First files and commands for the next model
+
+Start in this order; it gives the quickest accurate picture without exposing private data:
+
+1. Read `agent.md`, `context.md`, `goal.md`, then this file. The first three define mandatory product and archive constraints.
+2. Run `git status --short` and `git log --oneline -15` on `work-after-hackatron-sub`; preserve user changes if the tree is no longer clean.
+3. Read `server.mjs` for the complete API wiring, then `server/config.mjs` for feature flags and required environment variables.
+4. For course lifecycle logic, read `server/course-workflow.mjs`, `server/course-authoring-service.mjs`, `server/theory-course-markdown.mjs`, `server/course-backup-service.mjs`, and `server/course-catalog-service.mjs` in that order.
+5. For learner rendering and legacy migration, read `course/course-router.js`, `course/dynamic-course.js`, `server/legacy-neurodivergent-migration.mjs`, and `course/authoring/neurodivergent-conditions.v1.md`.
+6. For educator UI, inspect `admin/index.html`, `teacher/index.html`, `institute/index.html`, `workspace.js`, and `workspace.css`; inspect `tests/course-authoring/workspace-form-contract.test.mjs` before changing form field names.
+7. Run `npm.cmd test`, then make a small verified change. After every future commit, create the required exact-HEAD archive in `zip/` before reporting success.
 
 ## What has been implemented
 
@@ -130,7 +165,7 @@ The suite uses Node’s test runner:
 npm.cmd test
 ```
 
-The complete suite passed with **938 tests** after the access-management and reviewed-Markdown migration work. Rerun the full command after checkout to obtain the current exact count.
+The complete suite passed with **939 tests** after the final narration-upload form-contract fix. Rerun the full command after checkout to obtain the current exact count.
 
 Important test folders:
 
@@ -170,9 +205,11 @@ a370d44 fix(course): enforce catalogue access for progress saves
 b7de08e feat(review): enforce human workflow approvals
 159f77d feat(course): apply supports to generic theory player
 d76a2b2 fix(access): make educator revocation enforceable
+76c6ac3 feat(course): migrate legacy source to reviewed Markdown
+8e08e7a fix(review): submit narration uploads from admin workspace
 ```
 
-The commit that adds this handoff file completes the small final audit fixes: working source-file lookup, full opaque IDs for code revocation, issued-code UI, roster-member revocation, and immediate role invalidation after membership revocation.
+The final two commits migrate the existing course to a reviewed Markdown source and correct the admin narration upload form so its `audioFile` field is actually submitted. The form-name contract is pinned by `tests/course-authoring/workspace-form-contract.test.mjs`.
 
 ## Recommended continuation order
 
