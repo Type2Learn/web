@@ -90,7 +90,7 @@ const validate = (value) => {
   return { evidence_found: evidence, missing_concept: missing, support_mode: mode, feedback, next_prompt: nextPrompt, improvement };
 };
 
-export const createAdaptiveRecallService = ({ config, firebase, ledger, provider }) => {
+export const createAdaptiveRecallService = ({ config, firebase, ledger, provider, contextResolver = null }) => {
   const available = () => Boolean(firebase.available && ledger && provider?.status?.().available);
   const status = () => ({ available: available(), requiresSignIn: true, structuredOutput: true, fallback: 'authored-current-step support' });
 
@@ -100,7 +100,14 @@ export const createAdaptiveRecallService = ({ config, firebase, ledger, provider
     // when the non-production AI_ALLOW_GUESTS preview flag is enabled. All
     // deployed requests continue to require a Firebase bearer token.
     const learner = localGuest || await firebase.verifyBearer(authorization);
-    const context = adaptiveRecallContext(body);
+    const recallBody = {
+      ...body,
+      page: { ...(body?.page || {}), phase: body?.page?.phase === 'type' ? 'read' : body?.page?.phase }
+    };
+    const resolvedPageContext = contextResolver?.resolve
+      ? await contextResolver.resolve({ authorization, body: recallBody })
+      : null;
+    const context = adaptiveRecallContext(body, resolvedPageContext);
     if (context.barrier && !BARRIERS.has(context.barrier)) throw apiError(400, 'INVALID_BARRIER', 'Choose one of the available support options.');
     if (hasPrivateData(context.response) || hasPrivateData(context.previousResponse)) throw apiError(400, 'PRIVATE_INFORMATION', 'Please remove private information before requesting learning support.');
     const instructions = instructionsFor(context);

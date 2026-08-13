@@ -39,8 +39,29 @@ test('the catalogue serves the reviewed legacy Markdown as a normal learner-safe
   assert.equal(JSON.stringify(result).includes('privateManifest'), false);
 });
 
-test('catalogue-selected legacy links use the generic manifest player while the bare historical route remains compatible', async () => {
+test('catalogue-selected reviewed links retain the rich compatibility player rather than switching learner UI', async () => {
   const router = await readFile(new URL('../../course/course-router.js', import.meta.url), 'utf8');
-  assert.match(router, /if \(!requested\) await import\('\.\/course\.js/);
-  assert.match(router, /else await import\('\.\/dynamic-course\.js/);
+  const richPlayer = await readFile(new URL('../../course/course.js', import.meta.url), 'utf8');
+  const courseClient = await readFile(new URL('../../course/ai-client.js', import.meta.url), 'utf8');
+  assert.match(router, /await import\('\.\/course\.js/);
+  assert.equal(router.includes("dynamic-course.js"), false);
+  assert.match(richPlayer, /hydrateReviewedCourseForRoute/);
+  assert.match(richPlayer, /progressCourseKey/);
+  assert.match(richPlayer, /activeCourseVersion/);
+  assert.match(richPlayer, /destination\.searchParams\.set\('version', COURSE\.version\)/);
+  assert.match(richPlayer, /entry\.get\('courseId'\) === COURSE\.id/);
+  assert.match(richPlayer, /checkReviewedManifestModuleAnswer/);
+  assert.match(richPlayer, /checkReviewedManifestFinalAnswer/);
+  assert.match(courseClient, /\/api\/v1\/course-manifest/);
+  assert.match(courseClient, /\/api\/v1\/courses\/check-answer/);
+});
+
+test('course preferences preserve the selected reviewed version on their round-trip', async () => {
+  const setup = await readFile(new URL('../../learn/learn.js', import.meta.url), 'utf8');
+  assert.match(setup, /selectedCourseVersion/);
+  assert.match(setup, /selectedCourseKey/);
+  assert.match(setup, /isSelectedReviewedCourse/);
+  assert.match(setup, /!supportedCourseIds\.has\(selectedCourseId\) && !isSelectedReviewedCourse/);
+  assert.match(setup, /destination\.searchParams\.set\('courseId', selectedCourseId\)/);
+  assert.match(setup, /destination\.searchParams\.set\('version', selectedCourseVersion\)/);
 });

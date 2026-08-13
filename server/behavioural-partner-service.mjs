@@ -7,9 +7,9 @@ import { createHash } from 'node:crypto';
 import { apiError } from './errors.mjs';
 import { adaptiveUsageCaps, usageEstimate } from './usage-ledger.mjs';
 
-const COURSE_ID = 'course-1-neurodivergent-conditions-v2';
+const LEGACY_COURSE_ID = 'course-1-neurodivergent-conditions-v2';
 const CONSENT_VERSION = 1;
-const MAX_MODULE_INDEX = 10;
+const MAX_MODULE_INDEX = 99;
 const ROLES = new Set(['calm-guide', 'learning-partner', 'self-challenge', 'visual-co-explorer']);
 const PHASES = new Set(['preview', 'read', 'type', 'check', 'apply', 'assessment', 'complete']);
 const PRESENCE = new Set(['quiet', 'available', 'involved']);
@@ -43,7 +43,7 @@ const partnerGaps = [
 // Authored, curriculum-bound fallbacks. They make the feature useful offline
 // and guard against malformed provider wording. They offer process support,
 // never a diagnosis, a score, an answer, or emotional pressure.
-const authored = ({ role, trigger, language, phase, moduleIndex }) => {
+const authored = ({ role, trigger, language, phase, moduleIndex, courseId }) => {
   const assessment = phase === 'assessment';
   const copy = {
     'calm-guide': {
@@ -55,7 +55,7 @@ const authored = ({ role, trigger, language, phase, moduleIndex }) => {
     'learning-partner': {
       'working-through-typing': assessment
         ? ['I can help with the process: read the prompt once, choose text or speech, then share your own answer. I cannot give an answer or hint.', 'میں عمل میں مدد کر سکتا ہوں: سوال ایک بار پڑھیں، متن یا آواز منتخب کریں، پھر اپنا جواب دیں۔ میں جواب یا اشارہ نہیں دے سکتا۔']
-        : partnerGaps[moduleIndex] || ['I understand this idea can affect learning. I am still unsure what one practical support could look like—can you explain that part in your own words?', 'میں سمجھتا ہوں کہ یہ خیال سیکھنے پر اثر ڈال سکتا ہے۔ مجھے ابھی یہ واضح نہیں کہ ایک عملی مدد کیسی ہو سکتی ہے—کیا آپ اسے اپنے الفاظ میں سمجھا سکتے ہیں؟'],
+        : ((courseId || LEGACY_COURSE_ID) === LEGACY_COURSE_ID ? partnerGaps[moduleIndex] : null) || ['I understand part of this idea. I am still unsure how it connects to a useful support—can you explain one link in your own words?', 'میں اس خیال کا ایک حصہ سمجھتا ہوں۔ مجھے ابھی یہ واضح نہیں کہ یہ مفید مدد سے کیسے جڑتا ہے—کیا آپ اپنے الفاظ میں ایک تعلق سمجھا سکتے ہیں؟'],
       're-reading': ['I noticed you are revisiting this idea. Tell me one relationship you can see between the idea and a support.', 'لگتا ہے آپ اس خیال کو دوبارہ دیکھ رہے ہیں۔ کیا آپ خیال اور مدد کے درمیان ایک تعلق بتا سکتے ہیں؟'],
       fallback: ['Help me complete one part of the idea in your own words. I will only reflect what you show me.', 'خیال کا ایک حصہ اپنے الفاظ میں مکمل کرنے میں میری مدد کریں۔ میں صرف وہی دہراؤں گا جو آپ دکھائیں گے۔']
     },
@@ -100,7 +100,7 @@ export const directiveForContext = (context) => {
   if (role === 'visual-co-explorer') action = 'open-visual';
   if (context.layout === 'focused') surface = 'quiet-trigger';
   if (context.presence === 'quiet') surface = 'quiet-trigger';
-  return { role, trigger, surface, action, reasonCategory: trigger, expires: 'task', message: authored({ role, trigger, language: context.language, phase, moduleIndex: context.moduleIndex }) };
+  return { role, trigger, surface, action, reasonCategory: trigger, expires: 'task', message: authored({ role, trigger, language: context.language, phase, moduleIndex: context.moduleIndex, courseId: context.courseId }) };
 };
 
 // Exported for the offline contract matrix. This remains server-only code; the
@@ -111,9 +111,15 @@ export const cleanContext = (body = {}) => {
   const controls = body.controls || {};
   const rawSignals = body.signals || {};
   const allowedSignals = ['delayedStart', 'returned', 'rereads', 'longReading', 'longTypingPause', 'retries', 'aiRequests', 'noTaskMovement', 'completed', 'assessmentUncertainty'];
+  const courseId = String(body.courseId || LEGACY_COURSE_ID).trim().toLowerCase();
+  const courseVersion = String(body.courseVersion || '').trim();
+  if (!/^[a-z0-9][a-z0-9-]{2,79}$/.test(courseId) || (courseVersion && !/^\d+\.\d+(?:\.\d+)?$/.test(courseVersion))) {
+    throw apiError(400, 'INVALID_COURSE_CONTEXT', 'This partner request is not for an available course.');
+  }
   return {
     schemaVersion: 1,
-    courseId: COURSE_ID,
+    courseId,
+    courseVersion,
     moduleIndex,
     phase: enumValue(body.phase, PHASES, 'read'),
     language: body.language === 'ur' ? 'ur' : 'en',

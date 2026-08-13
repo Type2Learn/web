@@ -78,7 +78,7 @@ const upstreamError = async (response) => {
     : apiError(502, 'AI_UPSTREAM_ERROR', 'The AI helper could not answer right now. Please try again later.');
 };
 
-export const createAiService = ({ config, firebase, ledger, provider = null }) => {
+export const createAiService = ({ config, firebase, ledger, provider = null, contextResolver = null }) => {
   // Course AI uses the shared Gemini-first provider whenever it is present.
   // The direct Responses implementation remains only as a compatibility path
   // for an isolated deployment/test that has no shared provider at all.
@@ -112,7 +112,9 @@ export const createAiService = ({ config, firebase, ledger, provider = null }) =
     if (!message) throw apiError(400, 'EMPTY_MESSAGE', 'Write a short question before sending it.');
     if (looksLikePrivateData(message)) throw apiError(400, 'PRIVATE_INFORMATION', 'Please remove private information and ask a course question instead.');
     if (attemptsInstructionOverride(message)) throw apiError(400, 'MESSAGE_NOT_SUPPORTED', 'I can help with the current course page, but not with that request.');
-    const context = coursePageContext(body);
+    const context = contextResolver?.resolve
+      ? await contextResolver.resolve({ authorization, body })
+      : coursePageContext(body);
     const history = normaliseConversation(body?.history);
     const instructions = assistantInstructions(context);
     const input = conversationInput(history, message);

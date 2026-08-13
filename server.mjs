@@ -19,6 +19,7 @@ import { createAccessService } from './server/access-service.mjs';
 import { createCourseAuthoringService } from './server/course-authoring-service.mjs';
 import { createCourseBackupService } from './server/course-backup-service.mjs';
 import { createCourseCatalogService } from './server/course-catalog-service.mjs';
+import { createCourseContextResolver } from './server/course-context.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -226,11 +227,12 @@ const buildRuntime = async () => {
   const modelProvider = createModelProvider(config);
   const access = createAccessService({ config, firebase });
   const courseCatalog = createCourseCatalogService({ config, firebase, access });
+  const courseContextResolver = createCourseContextResolver({ courseCatalog });
   return {
     config,
     modelProvider,
-    ai: createAiService({ config, firebase, ledger, provider: modelProvider }),
-    adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider }),
+    ai: createAiService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
+    adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
     speech: createSpeechService({ config, firebase, ledger }),
     courseProgress: createCourseProgressService({ firebase, assertCourseAccess: courseCatalog.assertProgressAccess }),
     // ADAPTIVE LEARNING: all three services independently enforce feature

@@ -28,6 +28,12 @@ test('assessment partner support remains process-only', () => {
   assert.doesNotMatch(directive.message, /correct answer|option/i);
 });
 
+test('published-course partner wording never inherits the historic condition script', () => {
+  const directive = directiveForContext(context({ courseId: 'published-learning-course', courseVersion: '1.0', signals: { ...context().signals } }));
+  assert.match(directive.message, /part of this idea|useful support/i);
+  assert.doesNotMatch(directive.message, /attention can feel different/i);
+});
+
 test('consented support states can inform a reversible proposal but not a learner result', () => {
   const candidate = adaptiveCandidateForSummary({
     phase: 'read', metrics: {}, behaviour: { states: ['re-reading'] }

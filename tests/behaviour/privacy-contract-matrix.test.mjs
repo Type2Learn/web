@@ -30,7 +30,7 @@ for (let index = 0; index < 100; index += 1) {
     const encoded = JSON.stringify(clean);
     assert.equal(encoded.includes(sentinel), false);
     assert.equal(Object.hasOwn(clean, key), false);
-    assert.deepEqual(Object.keys(clean).sort(), ['courseId', 'dismissed', 'enabled', 'language', 'layout', 'moduleIndex', 'objectiveIds', 'phase', 'presence', 'proactive', 'role', 'schemaVersion', 'signals', 'supportHistory'].sort());
+    assert.deepEqual(Object.keys(clean).sort(), ['courseId', 'courseVersion', 'dismissed', 'enabled', 'language', 'layout', 'moduleIndex', 'objectiveIds', 'phase', 'presence', 'proactive', 'role', 'schemaVersion', 'signals', 'supportHistory'].sort());
   });
 }
 

@@ -24,6 +24,16 @@ const partnerGaps = [
 const authoredPartnerGap = (snapshot, language) => {
   const index = Number(snapshot?.moduleIndex);
   const pair = partnerGaps[Number.isInteger(index) ? index : -1];
+  // These detailed gaps belong only to the historic reviewed course. Other
+  // teacher-published manifests retain the same partner interaction but use
+  // their current reviewed module title, rather than inheriting a misleading
+  // condition-specific prompt from the compatibility course.
+  if (snapshot?.courseId && snapshot.courseId !== 'course-1-neurodivergent-conditions-v2') {
+    const title = String(snapshot?.moduleTitle || '').trim();
+    return copy(language,
+      title ? `I understand part of “${title}”. Can you help me connect it to one practical support in your own words?` : 'I understand part of this idea. Can you help me connect it to one practical support in your own words?',
+      title ? `میں «${title}» کا ایک حصہ سمجھتا ہوں۔ کیا آپ اسے ایک عملی مدد سے اپنے الفاظ میں جوڑنے میں میری مدد کر سکتے ہیں؟` : 'میں اس خیال کا ایک حصہ سمجھتا ہوں۔ کیا آپ اسے ایک عملی مدد سے اپنے الفاظ میں جوڑنے میں میری مدد کر سکتے ہیں؟');
+  }
   return pair ? copy(language, pair[0], pair[1]) : copy(language,
     'I understand part of this idea. Can you help me connect it to one practical support in your own words?',
     'میں اس خیال کا ایک حصہ سمجھتا ہوں۔ کیا آپ اسے ایک عملی مدد سے اپنے الفاظ میں جوڑنے میں میری مدد کر سکتے ہیں؟');

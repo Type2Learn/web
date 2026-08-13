@@ -1,9 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { apiError } from './errors.mjs';
 
-const COURSE_ID = 'course-1-neurodivergent-conditions-v2';
+const LEGACY_COURSE_ID = 'course-1-neurodivergent-conditions-v2';
 const CONSENT_VERSION = 1;
-const MAX_MODULE_INDEX = 10;
+// Published courses are validated before release and can have more modules
+// than the historic eleven-module course. This is still a bounded aggregate,
+// not a browser-controlled document path.
+const MAX_MODULE_INDEX = 99;
 const MAX_DURATION_MS = 4 * 60 * 60 * 1000;
 const MAX_RETENTION_DAYS = 365;
 
@@ -13,6 +16,15 @@ const boundedNumber = (value, maximum = 1000000) => {
   return Number.isFinite(number) && number >= 0 ? Math.min(Math.round(number), maximum) : 0;
 };
 const boundedEnum = (value, values, fallback) => values.includes(value) ? value : fallback;
+const courseIdentity = (body = {}) => {
+  const courseId = String(body.courseId || LEGACY_COURSE_ID).trim().toLowerCase();
+  const courseVersion = String(body.courseVersion || '').trim();
+  if (!/^[a-z0-9][a-z0-9-]{2,79}$/.test(courseId) || (courseVersion && !/^\d+\.\d+(?:\.\d+)?$/.test(courseVersion))) {
+    throw apiError(400, 'INVALID_COURSE_CONTEXT', 'This learning summary is not for an available course.');
+  }
+  return { courseId, courseVersion };
+};
+const courseStorageKey = ({ courseId, courseVersion }) => courseVersion ? `${courseId}@${courseVersion}` : courseId;
 
 const metricsFor = (value = {}) => ({
   activeMs: boundedNumber(value.activeMs, MAX_DURATION_MS),
@@ -59,6 +71,7 @@ const cleanSummary = (body = {}) => {
     throw apiError(400, 'INVALID_MODULE', 'This learning summary is not for an available module.');
   }
   return {
+    ...courseIdentity(body),
     moduleIndex,
     phase: boundedEnum(body.phase, ['preview', 'read', 'type', 'check', 'apply', 'complete'], 'read'),
     language: body.language === 'ur' ? 'ur' : 'en',
@@ -78,9 +91,10 @@ const cleanSummary = (body = {}) => {
 export const createLearningAnalyticsService = ({ config, firebase }) => {
   const available = () => Boolean(config.adaptiveLearningEnabled && firebase.available && firebase.firestore);
   const profile = (uid) => firebase.firestore.collection('type2learnLearningProfiles').doc(userHash(uid));
-  const summary = (uid, moduleIndex) => profile(uid)
-    .collection('courses').doc(COURSE_ID)
+  const summary = (uid, courseKey, moduleIndex) => profile(uid)
+    .collection('courses').doc(courseKey)
     .collection('modules').doc(String(moduleIndex));
+  const courseDocument = (uid, courseKey) => profile(uid).collection('courses').doc(courseKey);
   // Assessment runs intentionally live separately from analytics summaries.
   // They still belong in the same export/delete control because they contain
   // bounded assessment outcomes derived from an opted-in learner response.
@@ -101,8 +115,8 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
   // Firestore TTL should be configured against `expiresAt` in the Firebase
   // console. The small opportunistic cleanup below ensures summaries are also
   // removed on the next learner write if TTL processing is delayed.
-  const trimExpiredSummaries = async (uid) => {
-    const expired = await profile(uid).collection('courses').doc(COURSE_ID).collection('modules')
+  const trimExpiredSummaries = async (uid, courseKey) => {
+    const expired = await profile(uid).collection('courses').doc(courseKey).collection('modules')
       .where('expiresAt', '<=', new Date()).limit(100).get().catch(() => null);
     if (!expired?.docs?.length) return;
     const batch = firebase.firestore.batch();
@@ -150,10 +164,21 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     }
     const clean = cleanSummary(body);
     const timestamp = new Date();
-    await trimExpiredSummaries(learner.uid);
-    await summary(learner.uid, clean.moduleIndex).set({
+    const courseKey = courseStorageKey(clean);
+    await trimExpiredSummaries(learner.uid, courseKey);
+    // Firestore does not reliably enumerate a parent document created only by
+    // a subcollection. Keep a minimal parent record so export/delete covers
+    // every selected reviewed version without storing course content.
+    await courseDocument(learner.uid, courseKey).set({
+      schemaVersion: 1,
+      courseId: clean.courseId,
+      courseVersion: clean.courseVersion || null,
+      updatedAt: timestamp
+    }, { merge: true });
+    await summary(learner.uid, courseKey, clean.moduleIndex).set({
       schemaVersion: 2,
-      courseId: COURSE_ID,
+      courseId: clean.courseId,
+      courseVersion: clean.courseVersion || null,
       moduleIndex: clean.moduleIndex,
       phase: clean.phase,
       language: clean.language,
@@ -164,14 +189,13 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
       updatedAt: timestamp,
       expiresAt: expiryDate(timestamp)
     }, { merge: true });
-    return { saved: true, moduleIndex: clean.moduleIndex };
+    return { saved: true, courseId: clean.courseId, courseVersion: clean.courseVersion || null, moduleIndex: clean.moduleIndex };
   };
 
   const clear = async ({ authorization }) => {
     if (!firebase.available || !firebase.firestore) throw apiError(503, 'ADAPTIVE_LEARNING_UNAVAILABLE', 'Adaptive learning support is not available right now.');
     const learner = await firebase.verifyBearer(authorization);
     const root = profile(learner.uid);
-    const course = root.collection('courses').doc(COURSE_ID);
     // Firestore batches are capped. Keep deleting bounded records in batches
     // so this privacy action remains complete even after many optional runs.
     const deleteCollection = async (collection) => {
@@ -183,13 +207,22 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
         await deletion.commit();
       }
     };
+    const listedCourses = await root.collection('courses').get();
+    // Include the legacy location as well: historic summaries were written
+    // before the parent record existed and must still be deleted on request.
+    const courses = new Map();
+    listedCourses.docs.forEach((document) => courses.set(document.id, document.ref));
+    const legacyKey = courseStorageKey({ courseId: LEGACY_COURSE_ID, courseVersion: '' });
+    courses.set(legacyKey, courseDocument(learner.uid, legacyKey));
     await Promise.all([
-      deleteCollection(course.collection('modules')),
-      deleteCollection(course.collection('adaptiveProposals')),
+      ...Array.from(courses.values()).flatMap((course) => [
+        deleteCollection(course.collection('modules')),
+        deleteCollection(course.collection('adaptiveProposals'))
+      ]),
       deleteCollection(assessmentRuns(learner.uid))
     ]);
     const batch = firebase.firestore.batch();
-    batch.delete(course);
+    courses.forEach((course) => batch.delete(course));
     batch.delete(assessmentRoot(learner.uid));
     batch.set(root, {
       schemaVersion: 1,
@@ -206,42 +239,56 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     if (!firebase.available || !firebase.firestore) throw apiError(503, 'ADAPTIVE_LEARNING_UNAVAILABLE', 'Adaptive learning support is not available right now.');
     const learner = await firebase.verifyBearer(authorization);
     const root = profile(learner.uid);
-    const course = root.collection('courses').doc(COURSE_ID);
-    const [profileSnapshot, moduleSnapshots, proposalSnapshots, assessmentSnapshots] = await Promise.all([
+    const [profileSnapshot, listedCourses, assessmentSnapshots] = await Promise.all([
       root.get(),
-      course.collection('modules').get(),
-      course.collection('adaptiveProposals').get(),
+      root.collection('courses').get(),
       assessmentRuns(learner.uid).get()
     ]);
     const profileData = profileSnapshot.data() || {};
+    const courses = new Map();
+    listedCourses.docs.forEach((document) => courses.set(document.id, document));
+    // Include pre-versioning summaries which may not have a parent record.
+    const legacyKey = courseStorageKey({ courseId: LEGACY_COURSE_ID, courseVersion: '' });
+    if (!courses.has(legacyKey)) courses.set(legacyKey, { id: legacyKey, ref: courseDocument(learner.uid, legacyKey), data: () => ({ courseId: LEGACY_COURSE_ID, courseVersion: null }) });
+    const courseExports = await Promise.all(Array.from(courses.values()).map(async (document) => {
+      const data = document.data() || {};
+      const [moduleSnapshots, proposalSnapshots] = await Promise.all([
+        document.ref.collection('modules').get(),
+        document.ref.collection('adaptiveProposals').get()
+      ]);
+      return {
+        courseId: String(data.courseId || LEGACY_COURSE_ID),
+        courseVersion: data.courseVersion ? String(data.courseVersion) : null,
+        modules: moduleSnapshots.docs.map((module) => {
+          const moduleData = module.data() || {};
+          return {
+            moduleIndex: Number(moduleData.moduleIndex) || 0,
+            phase: String(moduleData.phase || 'read'), language: moduleData.language === 'ur' ? 'ur' : 'en',
+            metrics: metricsFor(moduleData.metrics),
+            support: moduleData.support || {},
+            behaviour: behaviourFor(moduleData.behaviour)
+          };
+        }),
+        proposals: proposalSnapshots.docs.map((proposal) => {
+          const proposalData = proposal.data() || {};
+          return {
+            id: String(proposalData.id || proposal.id), moduleIndex: Number(proposalData.moduleIndex) || 0,
+            candidateId: String(proposalData.candidateId || ''), kind: String(proposalData.kind || ''),
+            status: String(proposalData.status || ''), preference: proposalData.preference || null
+          };
+        })
+      };
+    }));
     // This export is intentionally the same minimised data that can be
     // stored: aggregates and learner decisions only—never typed answers,
     // recordings, chat history, individual keystrokes, or model prompts.
     return {
-      schemaVersion: 1,
-      courseId: COURSE_ID,
+      schemaVersion: 2,
       consent: {
         enabled: profileData.adaptiveEnabled === true,
         consentVersion: Number(profileData.consentVersion) || null
       },
-      modules: moduleSnapshots.docs.map((document) => {
-        const data = document.data() || {};
-        return {
-          moduleIndex: Number(data.moduleIndex) || 0,
-          phase: String(data.phase || 'read'), language: data.language === 'ur' ? 'ur' : 'en',
-          metrics: metricsFor(data.metrics),
-          support: data.support || {},
-          behaviour: behaviourFor(data.behaviour)
-        };
-      }),
-      proposals: proposalSnapshots.docs.map((document) => {
-        const data = document.data() || {};
-        return {
-          id: String(data.id || document.id), moduleIndex: Number(data.moduleIndex) || 0,
-          candidateId: String(data.candidateId || ''), kind: String(data.kind || ''),
-          status: String(data.status || ''), preference: data.preference || null
-        };
-      }),
+      courses: courseExports,
       assessments: assessmentSnapshots.docs.map((document) => {
         const data = document.data() || {};
         return {

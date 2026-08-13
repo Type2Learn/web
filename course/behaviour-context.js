@@ -53,7 +53,7 @@ export const partnerRoleName = (role, language = 'en') => names[role]?.[language
 
 export class BehaviourContext {
   constructor() {
-    this.module = { moduleIndex: 0, phase: 'read', language: 'en', layout: 'balanced', objectiveIds: [] };
+    this.module = { courseId: '', courseVersion: '', moduleIndex: 0, phase: 'read', language: 'en', layout: 'balanced', objectiveIds: [] };
     this.controls = normalisePartnerControls();
     this.metrics = this.emptyMetrics();
     this.support = { assessmentHelp: false };
@@ -74,11 +74,16 @@ export class BehaviourContext {
     return { activeMs: 0, idleMs: 0, visibilityChanges: 0, firstActionMs: 0, returns: 0, rereads: 0, typingCharacters: 0, typingCorrectCharacters: 0, typingIncorrectCharacters: 0, typingBackspaces: 0, typingAbandons: 0, typingLongestPauseMs: 0, ttsStarts: 0, ttsCompleted: 0, speechStarts: 0, speechCompleted: 0, aiRequests: 0, aiActiveMs: 0 };
   }
 
-  begin({ moduleIndex, phase, language, layout, objectiveIds = [], controls }) {
-    const changed = this.module.moduleIndex !== Number(moduleIndex) || this.module.language !== (language === 'ur' ? 'ur' : 'en');
+  begin({ courseId = '', courseVersion = '', moduleIndex, phase, language, layout, objectiveIds = [], moduleTitle = '', controls }) {
+    const nextCourseId = String(courseId || '').slice(0, 80);
+    const nextCourseVersion = String(courseVersion || '').slice(0, 24);
+    const changed = this.module.courseId !== nextCourseId
+      || this.module.courseVersion !== nextCourseVersion
+      || this.module.moduleIndex !== Number(moduleIndex)
+      || this.module.language !== (language === 'ur' ? 'ur' : 'en');
     const phaseChanged = this.module.phase !== String(phase || this.module.phase);
     if (changed) {
-      this.module = { moduleIndex: Number(moduleIndex) || 0, phase: String(phase || 'read'), language: language === 'ur' ? 'ur' : 'en', layout: layout || 'balanced', objectiveIds: Array.isArray(objectiveIds) ? objectiveIds.slice(0, 3) : [] };
+      this.module = { courseId: nextCourseId, courseVersion: nextCourseVersion, moduleIndex: Number(moduleIndex) || 0, phase: String(phase || 'read'), language: language === 'ur' ? 'ur' : 'en', layout: layout || 'balanced', objectiveIds: Array.isArray(objectiveIds) ? objectiveIds.slice(0, 3) : [], moduleTitle: String(moduleTitle || '').slice(0, 180) };
       this.metrics = this.emptyMetrics();
       this.support = { assessmentHelp: false };
       this.completed = false;
@@ -91,6 +96,7 @@ export class BehaviourContext {
       this.module.phase = String(phase || this.module.phase);
       this.module.layout = layout || this.module.layout;
       this.module.objectiveIds = Array.isArray(objectiveIds) ? objectiveIds.slice(0, 3) : this.module.objectiveIds;
+      this.module.moduleTitle = String(moduleTitle || this.module.moduleTitle || '').slice(0, 180);
       if (phaseChanged) this.completed = false;
     }
     this.controls = normalisePartnerControls(controls);
@@ -141,8 +147,12 @@ export class BehaviourContext {
     const signals = deriveBehaviourSignals({ metrics: this.metrics, phase: this.module.phase, support: this.support, completed: completed || this.completed });
     const states = supportStatesForSignals(signals);
     return {
-      schemaVersion: 1, moduleIndex: this.module.moduleIndex, phase: this.module.phase,
+      schemaVersion: 1, courseId: this.module.courseId, courseVersion: this.module.courseVersion, moduleIndex: this.module.moduleIndex, phase: this.module.phase,
       language: this.module.language, layout: this.module.layout, objectiveIds: this.module.objectiveIds,
+      // A reviewed module title is browser-session context only. It lets the
+      // local Learning Partner stay truthful when another published course is
+      // open; telemetry intentionally does not persist this display copy.
+      moduleTitle: this.module.moduleTitle,
       controls: { enabled: this.controls.enabled, role: this.controls.role, presence: this.controls.presence, proactive: this.controls.proactive },
       metrics: { ...this.metrics }, signals,
       supportHistory: { accepted: this.history.accepted, dismissed: this.history.dismissed },

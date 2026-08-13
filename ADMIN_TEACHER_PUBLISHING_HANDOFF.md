@@ -8,12 +8,12 @@ This document records the state of the educator-workspace and reusable theory-co
 
 ## Read this first: current handoff status
 
-**Last completed implementation commit:** `8e08e7a fix(review): submit narration uploads from admin workspace`
+**State convention:** use `git log -1 --oneline` for the current implementation
+commit. Every completed commit has a matching exact-source archive in the
+ignored `zip/` directory.
 
-**Branch state at handoff:** clean after that commit; it was pushed to `origin/work-after-hackatron-sub`.
-
-**Regression result:** `npm.cmd test` passed with **939 tests** after the final narration-form fix.
-**Offline archive:** `zip/type2learn-8e08e7a.zip` is the exact committed source archive and is intentionally ignored by Git.
+**Regression result:** `npm test` passed with **950 tests** after the rich
+reviewed-manifest compatibility integration.
 
 ### What is complete in this implementation slice
 
@@ -21,11 +21,38 @@ This document records the state of the educator-workspace and reusable theory-co
 - The original Neurodivergent Conditions course has been migrated into the reviewed bilingual Markdown format and can be served through the generic learner-safe manifest path.
 - Admin, teacher, institute, redeem, catalogue, and generic-course routes have implemented UI shells and API integrations. The educator pages retain a `?demo=1` presentation mode for visual inspection only.
 
+### Compatibility consolidation completed on this branch
+
+Catalogue-selected reviewed theory courses now use the established rich
+`/course/` experience rather than switching to the generic player. The rich
+experience retrieves an authorised learner-safe manifest by `courseId` and
+version, adapts only reviewed display content to its existing course contract,
+and retains its mature settings, human/device narration fallback, completion
+flow, Urdu presentation, support controls, behavioural partner, and keyboard
+interaction.
+
+- Private answer keys remain only in the protected catalogue service. The
+  browser receives a learner-safe manifest; module and final MCQs are checked
+  through `/api/v1/courses/check-answer` and return only `complete` or
+  `try-again`.
+- Progress, optional adaptive summaries/proposals, and course-specific support
+  choices are versioned as `courseId@version`, so a new reviewed release does
+  not overwrite another release’s history or presentation choices. The privacy
+  export/delete control covers every stored course version.
+- Course AI and Adaptive Recall re-resolve the same access-checked manifest on
+  the server. Their context contains only current explanatory facts—not answer
+  keys, options, typing targets, raw uploads, or review material.
+- `course/dynamic-course.js` remains a useful generic-player reference, but
+  `course/course-router.js` now consistently loads the rich player.
+
 ### What is deliberately not complete or not yet proven
 
 - Real Firebase, Firebase Storage, GitHub backup, Supabase backup, Gemini/OpenAI, and browser-auth integration has not been exercised with production credentials. The feature flags and server-side gates intentionally keep these capabilities unavailable until configured.
 - The four-way backup gate is implemented, but a real publication must not be claimed until every external receipt is tested in the target environment.
-- The historical bare `/course/` prototype remains a compatibility path. The catalogue-selected route uses the new manifest player; fully consolidating both learners into one rendering engine is the next major technical decision.
+- The generic manifest player remains as a reference implementation, while
+  historical and catalogue-selected `/course/` routes now share the rich
+  rendering engine. Future course types still require their own reviewed
+  engine.
 - Required browser evidence is incomplete: run the end-to-end educator journey and test keyboard-only operation, mobile, 200% zoom, 400% reflow, reduced motion, high contrast, screen-reader semantics, real microphone behaviour, narration playback, and audio assets in a configured browser.
 - School/child-data production readiness still needs owner-approved Firebase rules, least-privilege credentials, retention/deletion procedures, privacy/legal/safeguarding approval, monitoring, and incident response.
 
@@ -37,7 +64,7 @@ Start in this order; it gives the quickest accurate picture without exposing pri
 2. Run `git status --short` and `git log --oneline -15` on `work-after-hackatron-sub`; preserve user changes if the tree is no longer clean.
 3. Read `server.mjs` for the complete API wiring, then `server/config.mjs` for feature flags and required environment variables.
 4. For course lifecycle logic, read `server/course-workflow.mjs`, `server/course-authoring-service.mjs`, `server/theory-course-markdown.mjs`, `server/course-backup-service.mjs`, and `server/course-catalog-service.mjs` in that order.
-5. For learner rendering and legacy migration, read `course/course-router.js`, `course/dynamic-course.js`, `server/legacy-neurodivergent-migration.mjs`, and `course/authoring/neurodivergent-conditions.v1.md`.
+5. For learner rendering and legacy migration, read `course/course-router.js`, `course/course.js`, `course/reviewed-manifest.js`, `server/course-catalog-service.mjs`, `server/course-context.mjs`, `server/legacy-neurodivergent-migration.mjs`, and `course/authoring/neurodivergent-conditions.v1.md`.
 6. For educator UI, inspect `admin/index.html`, `teacher/index.html`, `institute/index.html`, `workspace.js`, and `workspace.css`; inspect `tests/course-authoring/workspace-form-contract.test.mjs` before changing form field names.
 7. Run `npm.cmd test`, then make a small verified change. After every future commit, create the required exact-HEAD archive in `zip/` before reporting success.
 
@@ -92,25 +119,25 @@ Start in this order; it gives the quickest accurate picture without exposing pri
 ### 5. Reusable learner course player
 
 - `/courses/` uses `courses/index.html` and `courses/catalogue.js` to fetch accessible learner catalogue entries.
-- `course/dynamic-course.js` and `course/dynamic-course.css` render learner-safe theory manifests by `courseId`, persist progress through `server/course-progress-service.mjs`, run private answer checks server-side, and display optional supports through the existing shared support-settings model.
-- The player supports bounded content, reading, examples, hints, typed/alternative response routes, four-option checks, exams, results, and the current shared supports. It intentionally reuses existing learner settings instead of creating a separate educator-only support model.
+- `course/course-router.js`, `course/course.js`, and `course/reviewed-manifest.js` render learner-safe reviewed theory manifests in the same established learner UI. They retain shared layout, colour, narration, text-to-speech, completion, support, mascot, and accessibility behaviour instead of creating an educator-only settings model.
+- `course/dynamic-course.js` and `course/dynamic-course.css` remain a generic player reference. The protected catalogue endpoint still supplies the learner-safe manifest and privately checks reviewed MCQs.
 
 ## Legacy-course migration: reviewed Markdown is now the publishing source
 
-**Introduction to Neurodivergent Conditions** now lives in `course/authoring/neurodivergent-conditions.v1.md`. `server/legacy-neurodivergent-migration.mjs` reads that reviewed file, validates it, and deterministically compiles separate learner-safe and private answer-key manifests. The catalogue-selected route (`/course/?courseId=course-1-neurodivergent-conditions-v2&version=1.1`) therefore uses the generic manifest player and the protected answer-check API.
+**Introduction to Neurodivergent Conditions** now lives in `course/authoring/neurodivergent-conditions.v1.md`. `server/legacy-neurodivergent-migration.mjs` reads that reviewed file, validates it, and deterministically compiles separate learner-safe and private answer-key manifests. The catalogue-selected route (`/course/?courseId=course-1-neurodivergent-conditions-v2&version=1.1`) therefore uses the established rich player and the protected answer-check API.
 
-The bare historical `/course/` URL still opens the long-established browser prototype for backwards compatibility. That older UI still imports `course/course-content.js`; it is not the source used by the publishing pipeline. Retiring or adapting that compatibility route without losing its richer TTS, completion, and settings presentation is still a deliberate follow-up task.
+The bare historical `/course/` URL still opens the long-established browser experience for backwards compatibility. When a course ID and version are selected, that same UI imports the authorised learner-safe published manifest through `course/reviewed-manifest.js`. The reviewed Markdown remains the publishing source; the static legacy modules are only a compatibility fallback for the bare route.
 
 The relevant code is:
 
 | Purpose | Files |
 | --- | --- |
 | Reviewed source and compiler boundary | `course/authoring/neurodivergent-conditions.v1.md`, `server/legacy-neurodivergent-migration.mjs` |
-| Historical compatibility engine | `course/course.js`, `course/course-content.js`, `course/index.html` |
-| Catalogue and manifest route | `server/course-catalog-service.mjs`, `course/course-router.js` |
-| Generic manifest player | `course/dynamic-course.js`, `course/dynamic-course.css` |
+| Shared rich learner engine | `course/course.js`, `course/reviewed-manifest.js`, `course/course-content.js`, `course/index.html` |
+| Catalogue, manifest, and safe AI context route | `server/course-catalog-service.mjs`, `server/course-context.mjs`, `course/course-router.js` |
+| Generic manifest-player reference | `course/dynamic-course.js`, `course/dynamic-course.css` |
 
-Do **not** shortcut the remaining compatibility-route work by exposing private answer keys in a browser manifest. The private manifest remains server-only; the generic player asks the protected answer-check route for a result only.
+Do **not** expose private answer keys in a browser manifest. The private manifest remains server-only; the rich player asks the protected answer-check route for a result only.
 
 ## UI and route map
 
@@ -121,7 +148,7 @@ Do **not** shortcut the remaining compatibility-route work by exposing private a
 | `/institute/` | `institute/index.html`, `workspace.js`, `workspace.css` | institute owner |
 | `/redeem/` | `redeem/index.html`, `redeem/redeem.js` | signed-in code recipient |
 | `/courses/` | `courses/index.html`, `courses/catalogue.js` | learner catalogue |
-| `/course/?courseId=…` | `course/course-router.js`, `course/dynamic-course.js` | allowed learner course |
+| `/course/?courseId=…&version=…` | `course/course-router.js`, `course/course.js`, `course/reviewed-manifest.js` | allowed learner course |
 | Existing `/course/` | `course/index.html`, `course/course.js` | legacy neurodivergent prototype |
 
 `?demo=1` is available on the workspace pages for visual-only inspection. It is not an authentication or security substitute and must never make protected server actions available.
@@ -165,7 +192,7 @@ The suite uses Node’s test runner:
 npm.cmd test
 ```
 
-The complete suite passed with **939 tests** after the final narration-upload form-contract fix. Rerun the full command after checkout to obtain the current exact count.
+The complete suite passed with **949 tests** after the reviewed-manifest compatibility integration. Rerun the full command after checkout to obtain the current exact count.
 
 Important test folders:
 
@@ -174,7 +201,7 @@ Important test folders:
 | roles/codes/invites | `tests/access/` |
 | Markdown/compiler/intake/review | `tests/course-authoring/` |
 | catalogue/progress/publishing/backup | `tests/course-authoring/`, `tests/auth/` |
-| generic learner player and UI | `tests/ui/` |
+| shared learner player and UI | `tests/ui/`, `tests/course-authoring/rich-manifest-adapter.test.mjs` |
 | existing shared settings and course | existing root and course tests |
 
 Useful local commands:
@@ -213,11 +240,10 @@ The final two commits migrate the existing course to a reviewed Markdown source 
 
 ## Recommended continuation order
 
-1. **Finish compatibility-route consolidation.** The reviewed Markdown and generic-player pipeline are live for catalogue-selected legacy courses. Decide whether to retire the bare historical `/course/` route or adapt its richer UI to consume the same manifest without regressing accessible TTS, completion, or settings behaviour.
-2. **Add Firebase emulator/integration coverage.** Exercise bootstrap, code redemption/expiry/revocation, membership revocation, Firestore membership enforcement, Storage access, and audit receipts against real rules.
-3. **Exercise real admin review end to end.** Upload supported and scanned source examples; validate bilingual Markdown; review/accept AI drafts; upload human narration; verify all four backups; publish; assign; log in as a learner and complete a course.
-4. **Complete visual/accessibility evidence.** Capture browser screenshots for the required workflow states; test keyboard-only use, 320 px/mobile, 200% text zoom, 400% reflow, reduced motion, high contrast, and screen-reader semantics.
-5. **Before production data:** obtain owner decisions and legal/privacy/safeguarding approvals, configure least-privilege Firebase/Storage rules and private backup repositories, establish retention/deletion and monitoring practices, and make no claim that this is production-ready before those gates are complete.
+1. **Add Firebase emulator/integration coverage.** Exercise bootstrap, code redemption/expiry/revocation, membership revocation, Firestore membership enforcement, Storage access, catalogue-selected rich-player manifest retrieval, protected answer checks, and audit receipts against real rules.
+2. **Exercise real admin review end to end.** Upload supported and scanned source examples; validate bilingual Markdown; review/accept AI drafts; upload human narration; verify all four backups; publish; assign; log in as a learner and complete a course.
+3. **Complete visual/accessibility evidence.** Capture browser screenshots for the required workflow states; test keyboard-only use, 320 px/mobile, 200% text zoom, 400% reflow, reduced motion, high contrast, screen-reader semantics, and the selected-manifest rich course path.
+4. **Before production data:** obtain owner decisions and legal/privacy/safeguarding approvals, configure least-privilege Firebase/Storage rules and private backup repositories, establish retention/deletion and monitoring practices, and make no claim that this is production-ready before those gates are complete.
 
 ## Safe working practices for the next model
 
