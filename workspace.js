@@ -201,6 +201,9 @@ const bindAuthoring = () => {
       status('Fallback MCQ draft created for human review. It has four choices and cannot publish by itself.', 'success');
     } catch (error) { status(error.message, 'error'); }
   });
+  $('[data-begin-admin-review]')?.addEventListener('click', async () => {
+    try { await api('/api/v1/course-authoring/transition', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selectedCourse(), status: 'admin-review', reviewNote: 'Administrator is reviewing source, bilingual Markdown, learner preview, accessibility, and MCQs.' }) }); status('The course is now in administrator review. Review each learner-facing element before continuing.', 'success'); await loadCourses(); } catch (error) { status(error.message, 'error'); }
+  });
 };
 const bindPublishing = () => {
   $('[data-narration-form]')?.addEventListener('submit', async (event) => {
@@ -211,6 +214,9 @@ const bindPublishing = () => {
   });
   $('[data-verify-backups]')?.addEventListener('click', async () => {
     try { const result = await api('/api/v1/course-authoring/backups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selectedCourse()) }); status(result.exportReady ? 'All three remote backups verified. Download the immutable ZIP next to acknowledge it.' : 'Backup verification needs attention.', result.exportReady ? 'success' : 'warning'); await loadSubmissions(); } catch (error) { status(error.message, 'error'); }
+  });
+  $('[data-ready-for-backup]')?.addEventListener('click', async () => {
+    try { await api('/api/v1/course-authoring/transition', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selectedCourse(), status: 'backups-pending', reviewNote: 'Administrator completed review and selected the device text-to-speech fallback or reviewed narration.' }) }); status('Review is complete. The four backup receipts can now be verified.', 'success'); await loadCourses(); } catch (error) { status(error.message, 'error'); }
   });
   $('[data-download-export]')?.addEventListener('click', async () => {
     try {

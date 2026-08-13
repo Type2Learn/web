@@ -2,13 +2,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import { apiError } from './errors.mjs';
 import { isTheoryCourseType } from './access-policy.mjs';
 import { compileTheoryCourse, fallbackMcqDraft, parseTheoryMarkdown, validateTheoryCourse } from './theory-course-markdown.mjs';
+import { canTransitionCourseWorkflow, isWorkflowState } from './course-workflow.mjs';
 
 const ROOT = 'type2learnCourseAuthoring';
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 const MAX_MARKDOWN_CHARS = 220_000;
 const MAX_AI_SOURCE_CHARS = 12_000;
-const workflowStates = new Set(['submitted', 'source-reviewed', 'markdown-draft', 'validation-ready', 'ai-draft-ready', 'admin-review', 'audio-ready', 'backups-pending', 'backups-verified', 'approved', 'published', 'returned', 'rejected']);
-const adminReviewStates = new Set(['source-reviewed', 'markdown-draft', 'validation-ready', 'ai-draft-ready', 'admin-review', 'audio-ready', 'backups-pending', 'backups-verified', 'approved', 'published', 'returned', 'rejected']);
 const blockedSourceExtensions = new Set(['exe', 'dll', 'msi', 'bat', 'cmd', 'com', 'ps1', 'sh', 'jar', 'apk', 'app']);
 const supportedTextExtensions = new Set(['md', 'markdown', 'txt', 'csv']);
 const supportedAudioExtensions = new Set(['mp3', 'm4a', 'wav', 'ogg', 'webm']);
@@ -301,8 +300,9 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const admin = await requireAdmin(authorization);
       const { reference, record } = await courseFor(body?.courseId, body?.version);
       const status = String(body?.status || '');
-      if (!workflowStates.has(status) || !adminReviewStates.has(status)) throw apiError(400, 'WORKFLOW_STATUS_INVALID', 'Choose a valid administrator review state.');
+      if (!isWorkflowState(status) || status === 'submitted') throw apiError(400, 'WORKFLOW_STATUS_INVALID', 'Choose a valid administrator review state.');
       if (status === 'published') throw apiError(409, 'PUBLISH_THROUGH_RELEASE_GATE', 'Use the release gate to publish a course after all backups verify.');
+      if (!canTransitionCourseWorkflow(record.status, status)) throw apiError(409, 'WORKFLOW_TRANSITION_INVALID', `This course cannot move from ${record.status} to ${status} yet.`);
       if (status === 'approved' && (!record.validation?.valid || !record.learnerManifest || !record.privateManifest)) {
         throw apiError(409, 'COURSE_NOT_READY_FOR_APPROVAL', 'A valid bilingual Markdown manifest is required before approval.');
       }
