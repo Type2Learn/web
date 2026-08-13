@@ -17,6 +17,7 @@ import { createAssessmentService } from './server/assessment-service.mjs';
 import { createBehaviouralPartnerService } from './server/behavioural-partner-service.mjs';
 import { createAccessService } from './server/access-service.mjs';
 import { createCourseAuthoringService } from './server/course-authoring-service.mjs';
+import { createCourseBackupService } from './server/course-backup-service.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -238,12 +239,13 @@ const buildRuntime = async () => {
     assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider }),
     behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider }),
     access,
-    courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider })
+    courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider }),
+    courseBackups: createCourseBackupService({ config, firebase, access })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access, courseAuthoring } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access, courseAuthoring, courseBackups } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -260,6 +262,7 @@ const handleApi = async (request, response, pathname, runtime) => {
       courseProgress: courseProgress.status(),
       educatorWorkspace: access.status(),
       courseAuthoring: courseAuthoring.status(),
+      courseBackups: courseBackups.status(),
       model: config.openAiModel
     });
   }
@@ -308,6 +311,22 @@ const handleApi = async (request, response, pathname, runtime) => {
     }
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/narration') {
       return sendJson(response, 200, await courseAuthoring.uploadNarration({ authorization: request.headers.authorization, form: await readForm(request, 25 * 1024 * 1024) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/backups') {
+      return sendJson(response, 200, await courseBackups.verifyBackups({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/export') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      const result = await courseBackups.downloadExport({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') });
+      return send(response, 200, result.archive, {
+        ...securityHeaders('/api', { api: true }),
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${result.filename}"`,
+        'Content-Length': result.archive.length
+      });
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/publish') {
+      return sendJson(response, 200, await courseBackups.publish({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/ai/chat') {
       return sendJson(response, 200, await ai.chat({
