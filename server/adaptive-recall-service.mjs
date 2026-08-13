@@ -62,6 +62,7 @@ const instructionsFor = (context) => [
   'Never give a complete answer, reproduce or rewrite source text, reveal answers, or supply more than one support. The next prompt must invite the learner to think or apply the objective in their own words.',
   !context.response ? 'There is no learner attempt yet. Give only a starting strategy for the selected barrier; do not explain, paraphrase, or reveal the lesson objective.' : '',
   'If a barrier is supplied, adapt only the current step. Do not change the lesson, module, or plan.',
+  context.supportStates?.length ? 'Neutral task context: ' + context.supportStates.join(', ') + '. Use this only to choose the presentation of the one permitted support; it is not a learner trait, diagnosis, score, or readiness signal.' : '',
   context.language === 'ur' ? 'Reply in clear Urdu script only.' : 'Reply in clear English only.',
   `Current module: ${context.title}.`,
   `Approved objective: ${context.objective}.`,

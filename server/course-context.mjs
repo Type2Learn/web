@@ -3,6 +3,7 @@ import { COURSE_URDU } from '../course/course-urdu.js';
 import { apiError } from './errors.mjs';
 
 const supportedPhases = new Set(['preview', 'read', 'type', 'check', 'apply', 'complete', 'exam-intro', 'exam', 'exam-results']);
+const behaviourStates = new Set(['starting', 'returning', 're-reading', 'working-through-typing', 'using-support', 'ready-for-next-step', 'needs-a-choice']);
 
 const boundedText = (value, maximum = 1100) => String(value || '').replace(/\u0000/g, '').trim().slice(0, maximum);
 const listText = (value) => Array.isArray(value) ? value.filter(Boolean).join('; ') : boundedText(value);
@@ -86,12 +87,19 @@ export const adaptiveRecallContext = (body) => {
   const response = boundedText(body?.response, 1600);
   const previousResponse = boundedText(body?.previousResponse, 1600);
   const barrier = boundedText(body?.barrier, 80);
+  // Behaviour Context enters the recall engine only as a small allow-list of
+  // neutral task states. It is neither persisted here nor used as a score,
+  // readiness decision, learner characteristic, or input to answer judging.
+  const supportStates = Array.isArray(body?.behaviourStates)
+    ? body.behaviourStates.filter((state) => behaviourStates.has(state)).slice(0, 3)
+    : [];
   if (!response && !barrier) throw apiError(400, 'EMPTY_LEARNING_EVIDENCE', 'Write a response or choose what is getting in the way first.');
   return {
     ...context,
     response,
     previousResponse,
     barrier,
+    supportStates,
     objective: boundedText(context.facts[0] || context.title, 420),
     outline: context.facts.slice(0, 5)
   };

@@ -16,9 +16,6 @@ const BACKGROUND_NOISE_MAX_PERCENT = 60;
 const backgroundNoisePreview = { audio: null, type: 'pink', volume: 0, playing: false, fadeFrame: null, playRequest: 0 };
 const mascotAnimationUrls = ['/assets/2D%20Mascot/blinking.webp?v=20260804-loop1'];
 const mascotModuleUrl = '/course/mascot-2d.js?v=20260804-blink1';
-// 3D rollback reference: preserve the original model URL alongside the
-// untouched course/mascot-3d.js implementation.
-// const mascotModelUrl = '/assets/mascot/type2learn-companion.glb';
 let mascotAssetsWarmed = false;
 let mascotPreloadLinks = [];
 let mascotPreview = null;

@@ -2,8 +2,10 @@ import { COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { answerUnderstandingCheck, askCourseAi, decideAdaptiveProposal, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260809-adaptive-learning1';
+import { answerUnderstandingCheck, askCourseAi, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260811-behaviour-partner1';
 import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
+import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
+import { companionBubbleMarkup, companionDockMarkup, localCompanionDirective } from './learning-partner.js?v=20260811-behaviour-partner1';
 import { adaptiveProposalMarkup, taskInitiationMarkup } from './adaptive-support.js?v=20260809-adaptive-learning1';
 import { visualExplanationMarkup } from './visual-explanations.js?v=20260809-adaptive-learning1';
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
@@ -46,6 +48,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const adaptiveLearning = {
     available: false,
     assessmentsAvailable: false,
+    retentionDays: 90,
     consentKnown: false,
     consented: false,
     updatingConsent: false,
@@ -55,6 +58,22 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     taskInitiationTimer: null,
     visualOpen: false,
     lastTypingAt: 0
+  };
+  // BEHAVIOURAL LEARNING PARTNER: local session state is available without
+  // consent, but it produces authored local support only. The compact summary
+  // is sent to the server solely for signed-in, explicitly consented learners.
+  const behaviourPartner = {
+    enabled: false,
+    aiEnabled: false,
+    context: new BehaviourContext(),
+    directive: null,
+    requesting: false,
+    dataMessage: '',
+    draft: '',
+    recognition: null,
+    listening: false,
+    focusedOpen: false,
+    lastOfferKey: ''
   };
   // ADAPTIVE LEARNING: assessment answers are held only while the learner is
   // actively answering. The regular course save gets an opaque run id, never
@@ -272,6 +291,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     'background-noise-volume': '0',
     'text-to-speech': 'off',
     mascot: 'off',
+    'learning-partner': 'off',
+    'mascot-role': 'calm-guide',
+    'mascot-presence': 'available',
+    'mascot-proactive': 'on',
     'mascot-language': 'english',
     'mascot-language-explicit': false,
     'mascot-voice': 'text',
@@ -355,7 +378,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       // The retained 3D rollback renderer still accepts this presentation
       // value, although the current 2D companion does not expose it as a UI
       // preference.
-      behaviour: 'calm'
+      behaviour: choices['mascot-role'] || 'calm-guide',
+      presence: choices['mascot-presence'] || 'available',
+      proactive: choices['mascot-proactive'] !== 'off'
     };
   };
 
@@ -1044,6 +1069,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
   const recordSupportMoment = (kind, detail = {}) => {
     const moment = setSupportMoment(kind, detail);
+    // A completed course action is the only moment Self-Challenge Coach may
+    // offer an optional next mission. This stays local unless the learner has
+    // separately enabled adaptive summaries, and it never changes the task.
+    if (['section-complete', 'answer-correct', 'module-complete'].includes(kind)) {
+      behaviourPartner.context.action('complete');
+      syncBehaviourContext({ completed: true, requestAi: true });
+    }
     return supportMomentAnnouncement(moment);
   };
 
@@ -1092,6 +1124,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const requestedNoiseVolume = Number(choices['background-noise-volume']);
     const noiseVolume = Math.min(BACKGROUND_NOISE_MAX_VOLUME * 100, Math.max(0, Number.isFinite(requestedNoiseVolume) ? requestedNoiseVolume : 0));
     const mascotUnavailable = !mascotViewportQuery?.matches;
+    // BEHAVIOURAL LEARNING PARTNER: privacy controls stay available even
+    // after the learner hides the partner, so consent can always be reviewed,
+    // exported, deleted, or turned off from this one profile menu.
+    const partnerDataPanel = signedInLearner() && adaptiveLearning.available
+      ? '<section class="course-learning-partner-settings course-learning-partner-data"><p class="course-eyebrow">DATA &amp; PRIVACY</p><details class="course-adaptive-settings-explainer"><summary>What Type2Learn notices</summary><p>In this browser session it keeps only task and support categories: active or idle time, returns and rereads, optional read-aloud or visual use, aggregate typing pace and corrections, and partner offers you accept or dismiss. It never includes your typed words, individual keys, recordings, transcripts, chat messages, answer text, scores, IP address, or a profile of you.</p></details><p>With Adaptive learning support on, a compact module summary is saved to your account for up to ' + escapeHtml(String(adaptiveLearning.retentionDays || 90)) + ' days. You can delete it at any time.</p><div class="course-partner-data-actions"><button class="course-text-button" type="button" data-action="export-behaviour-data">Download my adaptive data</button><button class="course-text-button" type="button" data-action="delete-behaviour-data">Delete adaptive data</button></div>' + (behaviourPartner.dataMessage ? '<p class="course-partner-data-status" role="status">' + escapeHtml(behaviourPartner.dataMessage) + '</p>' : '') + '</section>'
+      : '<section class="course-learning-partner-settings course-learning-partner-data"><p class="course-eyebrow">DATA &amp; PRIVACY</p><p>Learning partner support stays in this browser session until you choose Adaptive learning support. It never saves typed words, recordings, chats, answer text, scores, or a personal profile.</p></section>';
     const controls = preferencesSaved ? [
       '<div class="course-settings-menu-controls">',
       settingsChoiceGroup('website-scheme', 'Website scheme', 'Choose the overall presentation for your learning space. Calm keeps the current look; Playful is bright, colourful, and kid-friendly.', [['calm', 'Calm'], ['playful', 'Playful']], choices['website-scheme']),
@@ -1112,8 +1150,19 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="' + (BACKGROUND_NOISE_MAX_VOLUME * 100) + '" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
       settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
       settingsSwitch('mascot', 'Mascot', mascotUnavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', choices.mascot === 'on', mascotUnavailable),
-      choices.mascot === 'on' ? settingsChoiceGroup('mascot-language', 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || supportLanguage()) : '',
-      choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice', 'Mascot Speech', 'Choose how your mascot will communicate with you.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '',
+      // BEHAVIOURAL LEARNING PARTNER: this is independent from the visual
+      // mascot switch. A learner can keep the mascot hidden and receive the
+      // same optional support through the accessible Course AI sheet.
+      settingsSwitch('learning-partner', 'Learning partner', 'Use a fictional, task-bound partner. With the mascot hidden, support opens in Course AI instead.', choices['learning-partner'] === 'on'),
+      choices['learning-partner'] === 'on' ? '<section class="course-learning-partner-settings"><p class="course-eyebrow">LEARNING PARTNER</p><p>Your partner is fictional and task-bound. You choose its role, how often it offers support, and what data stays optional.</p>'
+        + settingsChoiceGroup('mascot-role', 'Partner role', 'Choose the kind of support you want. Type2Learn can suggest a role, but never changes it for you.', [['calm-guide', 'Calm Guide'], ['learning-partner', 'Learning Partner'], ['self-challenge', 'Self-Challenge Coach'], ['visual-co-explorer', 'Visual Co-Explorer']], choices['mascot-role'])
+        + settingsChoiceGroup('mascot-presence', 'Partner presence', 'Choose how visibly your partner appears during a task.', [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']], choices['mascot-presence'])
+        + settingsSwitch('mascot-proactive', 'Proactive offers', 'Offer one optional support only after matched task signals. You can dismiss it for the current task.', choices['mascot-proactive'] !== 'off')
+        + '<details class="course-adaptive-settings-explainer"><summary>Why did this appear?</summary><p>Type2Learn looks for at least two neutral task signals, such as returning after a pause and rereading. It does not diagnose you, rank you, or change your settings automatically.</p></details>'
+        + '</section>' : '',
+      partnerDataPanel,
+      (choices.mascot === 'on' || choices['learning-partner'] === 'on') ? settingsChoiceGroup('mascot-language', choices['learning-partner'] === 'on' ? 'Partner language' : 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || supportLanguage()) : '',
+      (choices.mascot === 'on' || choices['learning-partner'] === 'on') ? settingsChoiceGroup('mascot-voice', choices['learning-partner'] === 'on' ? 'Partner response' : 'Mascot Speech', 'Choose text, voice input, or both. Voice words are always shown for review before sending.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '',
       choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice-language', 'Mascot voice', 'Choose the language your mascot will speak.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-voice-language']) : '',
       settingsSwitch('urdu-mode', 'Urdu mode', 'Show the course and Course AI in Urdu. The typing target stays in English.', choices['urdu-mode'] === 'on'),
       '</div>'
@@ -1385,6 +1434,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const controller = new AbortController();
     aiChat.requestController = controller;
     adaptiveLearning.telemetry?.action?.('ai-request');
+    recordBehaviourAction('ai-request');
     render();
     try {
       const reply = await askCourseAi({ user: authenticatedUser, message, history, ...aiPageRequestContext(), signal: controller.signal });
@@ -1658,6 +1708,8 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const mascotDialogue = () => {
+    const companion = behaviourPartner.directive;
+    if (companion?.message && mascotPresentation.enabled && !aiChat.open) return companion.message;
     const moment = activeSupportMoment;
     const urdu = mascotPresentation.language === 'urdu';
     if ((state.modal === 'help' || state.modal === 'explain') && mascotPresentation.enabled) {
@@ -1712,16 +1764,24 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const mascotLanguage = mascotPresentation.language === 'urdu' ? 'ur' : 'en';
     const mascotDirection = mascotPresentation.language === 'urdu' ? 'rtl' : 'ltr';
     const dialogue = mascotDialogue();
+    const companion = location === 'lesson' ? behaviourPartner.directive : null;
     const showAiPanel = location === 'lesson' && aiChat.open && canUseMascotAiPanel();
-    const dialogueMarkup = !showAiPanel && dialogue
+    const focusedPartner = selectedCourseLayout() === 'focused' && !behaviourPartner.focusedOpen;
+    const companionMarkup = !showAiPanel && companion
+      ? companionBubbleMarkup({ directive: companion, language: mascotLanguage, escapeHtml, focused: focusedPartner })
+      : '';
+    const dialogueMarkup = !showAiPanel && dialogue && !companion
       ? '<p class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '">' + escapeHtml(dialogue) + '</p>'
+      : '';
+    const dockMarkup = !showAiPanel && location === 'lesson' && companion && !focusedPartner
+      ? companionDockMarkup({ language: mascotLanguage, escapeHtml, draft: behaviourPartner.draft, canSpeak: browserSpeechRecognitionAvailable(), channel: partnerControls().channel, listening: behaviourPartner.listening })
       : '';
     if (showAiPanel) {
       // The assistant owns this rail while it is open: the animated mascot is
       // deliberately inside its bordered chat box, never a separate sibling.
       return '<aside class="course-mascot-rail course-mascot-rail--' + location + ' is-ai-open" data-course-mascot>' + courseAiChatMarkup('rail') + '</aside>';
     }
-    return '<aside class="course-mascot-rail course-mascot-rail--' + location + '" data-course-mascot><div class="course-mascot-stage" data-course-mascot-stage aria-hidden="true"></div>' + dialogueMarkup + '</aside>';
+    return '<aside class="course-mascot-rail course-mascot-rail--' + location + (companion ? ' has-learning-partner' : '') + '" data-course-mascot><div class="course-mascot-stage" data-course-mascot-stage aria-hidden="true"></div>' + companionMarkup + dialogueMarkup + dockMarkup + '</aside>';
   };
 
   const dashboardWithMascot = (content, location) => {
@@ -1780,7 +1840,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         // summaries again before saving them after a module.
         onFlush: (summary) => saveLearningSummary({
           user: authenticatedUser,
-          summary,
+          // The summary remains aggregate-only. The BehaviourContext adds
+          // chosen role/presence and aggregate support history, never raw
+          // language, voice, chat, answers, or individual keystrokes.
+          summary: { ...summary, behaviour: behaviourPartner.context.snapshot().behaviour },
           signal: requestTimeoutSignal(10000)
         })
       });
@@ -1797,6 +1860,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       language: courseUsesUrdu() ? 'ur' : 'en',
       enabled: true
     });
+    syncBehaviourContext({ requestAi: true });
     scheduleTaskInitiationOffer(telemetry);
   };
 
@@ -1833,8 +1897,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     try {
       const health = await getCourseAiStatus();
       const enabled = Boolean(health?.adaptiveLearning?.available && health?.adaptiveSupport?.available);
+      behaviourPartner.enabled = Boolean(health?.behaviouralPartner?.available);
+      behaviourPartner.aiEnabled = Boolean(health?.behaviouralPartner?.aiWordingEnabled);
       adaptiveLearning.available = enabled;
       adaptiveLearning.assessmentsAvailable = Boolean(health?.assessments?.available);
+      adaptiveLearning.retentionDays = Math.max(1, Math.min(365, Number(health?.adaptiveLearning?.retentionDays) || 90));
       if (!enabled) {
         adaptiveLearning.consented = false;
         adaptiveLearning.consentKnown = true;
@@ -1885,6 +1952,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       language: courseUsesUrdu() ? 'ur' : 'en',
       enabled: true
     });
+    syncBehaviourContext({ completed: true, requestAi: true });
     try {
       await telemetry.flush('module-complete');
       const response = await requestAdaptiveProposal({
@@ -2199,6 +2267,189 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     && state.reviewModuleIndex < COURSE.steps.length;
   const displayedModuleIndex = () => isReviewingModule() ? state.reviewModuleIndex : state.progress.lessonIndex;
   const currentStep = () => COURSE.steps[displayedModuleIndex()];
+  const partnerControls = () => {
+    const choices = learningChoices();
+    return normalisePartnerControls({
+      enabled: choices['learning-partner'] === 'on',
+      role: choices['mascot-role'],
+      presence: choices['mascot-presence'],
+      proactive: choices['mascot-proactive'] !== 'off',
+      channel: choices['mascot-voice']
+    });
+  };
+
+  const behaviourObjectiveIds = () => ['module-' + displayedModuleIndex() + '-core'];
+  const syncBehaviourContext = ({ completed = false, requestAi = true } = {}) => {
+    if (!state || state.view !== 'course' || isReviewingModule()) return;
+    const controls = partnerControls();
+    behaviourPartner.context.begin({
+      moduleIndex: displayedModuleIndex(), phase: state.progress.phase,
+      language: courseUsesUrdu() ? 'ur' : 'en', layout: selectedCourseLayout(),
+      objectiveIds: behaviourObjectiveIds(), controls
+    });
+    // The consented telemetry is already aggregate-only. Sharing only its
+    // numeric counters avoids a parallel raw-input path and keeps every
+    // adaptive surface grounded in one source of behaviour data.
+    if (adaptiveLearning.telemetry?.metrics) behaviourPartner.context.metrics = { ...adaptiveLearning.telemetry.metrics };
+    const snapshot = behaviourPartner.context.snapshot({ completed });
+    const local = controls.enabled ? localCompanionDirective(snapshot) : null;
+    const localKey = local ? [snapshot.moduleIndex, snapshot.phase, local.trigger, controls.role].join(':') : '';
+    if (local && !behaviourPartner.context.isDismissed(local.trigger)) {
+      behaviourPartner.directive = local;
+      if (behaviourPartner.lastOfferKey !== localKey) {
+        behaviourPartner.context.history.offered += 1;
+        behaviourPartner.lastOfferKey = localKey;
+      }
+    } else if (!local) {
+      behaviourPartner.directive = null;
+      behaviourPartner.lastOfferKey = '';
+    }
+    // Gemini wording is an optional progressive enhancement. The deterministic
+    // policy and authored message remain the immediate normal path. No request
+    // is made for guests, without consent, or while the feature flag is off.
+    const directiveKey = localKey;
+    if (requestAi && local && !behaviourPartner.requesting && adaptiveLearningIsActive() && behaviourPartner.enabled && behaviourPartner.aiEnabled && behaviourPartner.lastRequestKey !== directiveKey) {
+      behaviourPartner.requesting = true;
+      behaviourPartner.lastRequestKey = directiveKey;
+      void requestBehaviourDirective({ user: authenticatedUser, context: { ...snapshot, dismissed: behaviourPartner.context.isDismissed(local.trigger) }, signal: requestTimeoutSignal(10000) })
+        .then((result) => {
+          if (result?.directive && behaviourPartner.lastRequestKey === directiveKey && !behaviourPartner.context.isDismissed(result.directive.trigger)) {
+            behaviourPartner.directive = { ...local, ...result.directive, source: result.source || 'authored' };
+            render();
+          }
+        }).catch(() => {}).finally(() => { behaviourPartner.requesting = false; });
+    }
+  };
+
+  const recordBehaviourAction = (kind, detail = {}) => {
+    behaviourPartner.context.action(kind, detail);
+    syncBehaviourContext({ requestAi: true });
+  };
+
+  const companionMessage = (message) => {
+    const text = String(message || '').trim().replace(/\s+/g, ' ');
+    if (!text) return '';
+    // Companion bubbles stay deliberately short. This is a separate compact
+    // surface; the full Course AI chat remains available for a longer thread.
+    return text.split(/(?<=[.!?؟])\s+/).slice(0, 2).join(' ').slice(0, 300);
+  };
+
+  // Learning-partner voice uses the browser recogniser only after the learner
+  // presses Speak. It writes into the visible draft field first; nothing is
+  // sent to an AI service until the learner reviews and chooses Send.
+  const startCompanionDictation = () => {
+    if (behaviourPartner.listening) {
+      try { behaviourPartner.recognition?.stop?.(); } catch (_) { /* best effort */ }
+      return;
+    }
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      announce(courseUi('Voice input is unavailable here. You can type your message instead.', 'وائس اِن پٹ یہاں دستیاب نہیں۔ آپ اپنا پیغام ٹائپ کر سکتے ہیں۔'));
+      return;
+    }
+    let recognition;
+    try { recognition = new Recognition(); } catch (_) { return; }
+    const original = behaviourPartner.draft.trim();
+    let finalText = '';
+    recognition.lang = mascotPresentation.language === 'urdu' ? 'ur-PK' : 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results || []).map((result) => result[0]?.transcript || '').join(' ').trim();
+      if (transcript) behaviourPartner.draft = [original, transcript].filter(Boolean).join(original ? ' ' : '');
+      finalText = transcript || finalText;
+      const input = app.querySelector('[data-companion-input]');
+      if (input) input.value = behaviourPartner.draft;
+    };
+    recognition.onerror = () => {
+      behaviourPartner.listening = false;
+      behaviourPartner.recognition = null;
+      announce(courseUi('Voice input could not continue. You can type your message instead.', 'وائس اِن پٹ جاری نہیں رہ سکا۔ آپ اپنا پیغام ٹائپ کر سکتے ہیں۔'));
+      render();
+    };
+    recognition.onend = () => {
+      if (behaviourPartner.recognition !== recognition) return;
+      behaviourPartner.listening = false;
+      behaviourPartner.recognition = null;
+      if (finalText) recordBehaviourAction('return');
+      render();
+      app.querySelector('[data-companion-input]')?.focus?.({ preventScroll: true });
+    };
+    behaviourPartner.recognition = recognition;
+    behaviourPartner.listening = true;
+    try { recognition.start(); render(); } catch (_) {
+      behaviourPartner.listening = false;
+      behaviourPartner.recognition = null;
+    }
+  };
+
+  const sendCompanionMessage = async () => {
+    const message = behaviourPartner.draft.trim();
+    if (!message || !courseAiAccessAllowed() || behaviourPartner.requesting) return;
+    behaviourPartner.requesting = true;
+    recordBehaviourAction('ai-request');
+    try {
+      const reply = await askCourseAi({ user: authenticatedUser, message, history: [], ...aiPageRequestContext(), signal: requestTimeoutSignal(20000) });
+      const response = companionMessage(reply?.reply) || courseUi('I could not make that clear yet. Try sharing one smaller part of the idea.', 'میں اسے ابھی واضح نہیں بنا سکا۔ خیال کا ایک چھوٹا حصہ بتانے کی کوشش کریں۔');
+      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'teach-partner', surface: 'bubble', message: response, reasonCategory: 'using-support' };
+      behaviourPartner.draft = '';
+      behaviourPartner.context.accept('teach-partner');
+    } catch (error) {
+      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'return-to-task', surface: 'bubble', message: courseUi('Your partner could not reply right now. Your task is still here, and you can continue or open full chat later.', 'آپ کا ساتھی ابھی جواب نہیں دے سکا۔ آپ کا کام محفوظ ہے، اور آپ جاری رکھ سکتے ہیں یا بعد میں مکمل چیٹ کھول سکتے ہیں۔'), reasonCategory: 'system-error' };
+    } finally {
+      behaviourPartner.requesting = false;
+      render();
+    }
+  };
+
+  const openCompanionChat = (element) => {
+    const directive = behaviourPartner.directive;
+    // The full chat retains its own short in-session conversation. Add the
+    // concise partner support once so a small-screen learner receives the
+    // exact same assistance without a mascot asset or duplicate chat system.
+    if (directive?.message && !aiChat.messages.some((entry) => entry?.role === 'assistant' && entry?.content === directive.message)) {
+      aiChat.messages.push({ role: 'assistant', content: directive.message, companion: true });
+    }
+    aiChat.draft = behaviourPartner.draft;
+    openCourseAi(element);
+  };
+
+  const exportBehaviourData = async () => {
+    if (!signedInLearner()) return;
+    behaviourPartner.dataMessage = 'Preparing your compact adaptive-data export…';
+    render();
+    try {
+      const exported = await exportAdaptiveLearningData({ user: authenticatedUser, signal: requestTimeoutSignal(15000) });
+      const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url; anchor.download = 'type2learn-adaptive-data.json'; anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      behaviourPartner.dataMessage = 'Your compact adaptive-data export downloaded. It does not contain typing, recordings, chats, or answer text.';
+    } catch (error) {
+      behaviourPartner.dataMessage = error?.message || 'Your adaptive data could not be exported right now.';
+    }
+    render();
+  };
+
+  const deleteBehaviourData = async () => {
+    if (!signedInLearner()) return;
+    if (!window.confirm('Delete the optional adaptive summaries, partner history, and assessment outcomes saved to your account? This cannot be undone.')) return;
+    behaviourPartner.dataMessage = 'Deleting your adaptive data…';
+    render();
+    try {
+      await deleteAdaptiveLearningData({ user: authenticatedUser, signal: requestTimeoutSignal(15000) });
+      adaptiveLearning.consented = false;
+      stopAdaptiveLearningTelemetry();
+      behaviourPartner.context = new BehaviourContext();
+      behaviourPartner.directive = null;
+      behaviourPartner.dataMessage = 'Your optional adaptive data was deleted. Local course progress stays on this device.';
+    } catch (error) {
+      behaviourPartner.dataMessage = error?.message || 'Your adaptive data could not be deleted right now.';
+    }
+    render();
+  };
   const isLastStep = () => state.progress.lessonIndex === COURSE.steps.length - 1;
   const courseProgress = () => Math.round((state.progress.completedSteps.length / COURSE.steps.length) * 100);
   const isFinalExamPhase = () => state.progress.phase === 'assessment';
@@ -2320,7 +2571,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const explain = '<button class="course-task-explain" type="button" data-action="stuck">' + explainLabel + '</button>';
     const narrationControl = taskNarrationControlMarkup();
     const showPace = learningChoices().layout === 'open' || Boolean(narrationControl);
-    return '<span class="course-task-header-controls">' + narrationControl + visualExplanationControl() + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + explain + '</span>';
+    // Small screens never load the mascot. When a compact partner directive
+    // exists, this opens that same support in the accessible Course AI sheet
+    // rather than leaving the learner without the offer.
+    const mobilePartner = behaviourPartner.directive && !mascotCanAppear()
+      ? '<button class="course-task-explain" type="button" data-action="companion-open-chat">' + escapeHtml(courseUi('Learning partner', 'سیکھنے کا ساتھی')) + '</button>'
+      : '';
+    return '<span class="course-task-header-controls">' + narrationControl + visualExplanationControl() + (showPace ? '<span class="course-task-time">' + escapeHtml(paceCopy) + '</span>' : '') + mobilePartner + explain + '</span>';
   };
 
   const applyPreferences = () => {
@@ -3690,6 +3947,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         response: safeResponse,
         previousResponse: String(previousResponse || '').trim(),
         barrier,
+        // BEHAVIOURAL LEARNING PARTNER: Adaptive Recall receives only the
+        // consented, neutral state names—not behavioural counters or learner
+        // language—to choose the smallest useful presentation of its support.
+        behaviourStates: adaptiveLearningIsActive() ? behaviourPartner.context.snapshot().behaviour.states : [],
         signal: controller.signal
       });
       if (controller.signal.aborted) return;
@@ -5757,6 +6018,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (state.view !== 'course' || state.progress.phase !== 'type' || isReviewingModule()) stopVoiceInput();
     applyPreferences();
     syncAdaptiveLearningTelemetry();
+    // Session-only authored partner support stays available when consent is
+    // off. It never uploads or calls a model in that case.
+    if (!adaptiveLearningIsActive()) syncBehaviourContext({ requestAi: false });
     let content = '';
     if (state.view === 'dashboard') content = renderDashboard();
     else if (state.view === 'browse') content = renderBrowse();
@@ -6376,6 +6640,57 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         if (aiChat.status === 'recording') stopAiDictation();
         else void startAiDictation();
         break;
+      case 'companion-open':
+        behaviourPartner.focusedOpen = true;
+        render();
+        break;
+      case 'companion-dismiss':
+        if (behaviourPartner.directive?.trigger) behaviourPartner.context.dismiss(behaviourPartner.directive.trigger);
+        behaviourPartner.directive = null;
+        behaviourPartner.focusedOpen = false;
+        render();
+        announce(courseUi('Learning partner support is quiet for this task.', 'سیکھنے کے ساتھی کی مدد اس مرحلے کے لیے خاموش ہے۔'));
+        break;
+      case 'companion-why':
+        announce(courseUi('This appeared after at least two neutral task signals, such as returning, rereading, or taking a longer pause. It is not a diagnosis or a score.', 'یہ کم از کم دو غیر جانبدار تعلیمی اشاروں کے بعد ظاہر ہوا، جیسے واپس آنا، دوبارہ پڑھنا یا طویل وقفہ۔ یہ تشخیص یا اسکور نہیں ہے۔'));
+        break;
+      case 'companion-use': {
+        const partnerAction = String(element.dataset.companionAction || '');
+        behaviourPartner.context.accept(partnerAction);
+        if (partnerAction === 'open-visual') {
+          adaptiveLearning.visualOpen = true;
+          adaptiveLearning.telemetry?.action('visual-offered');
+          adaptiveLearning.telemetry?.action('visual-open');
+          recordBehaviourAction('return');
+        } else if (partnerAction === 'smaller-step') {
+          state.showSimple = true;
+          behaviourPartner.directive = null;
+          recordSupportMoment('task-entry', { result: 'simple-reading' });
+        } else if (partnerAction === 'teach-partner') {
+          const input = app.querySelector('[data-companion-input]');
+          if (input) input.focus();
+          else openCourseAi(element);
+        } else if (partnerAction === 'process-support') {
+          behaviourPartner.context.action('assessment-help');
+          openCourseModal('help', element, '[data-action="stuck"]');
+        } else if (partnerAction === 'optional-mission') {
+          behaviourPartner.directive = { ...behaviourPartner.directive, message: courseUi('You chose a meaningful mission. Connect one idea to a real situation when you are ready.', 'آپ نے ایک بامعنی مشن منتخب کیا ہے۔ جب تیار ہوں ایک خیال کو کسی حقیقی صورتحال سے جوڑیں۔'), trigger: 'mission-active', action: 'teach-partner' };
+        } else {
+          const focusTarget = app.querySelector('[data-typing-input], .course-reading-copy h3, #course-task-heading');
+          focusTarget?.focus?.({ preventScroll: true });
+        }
+        render();
+        break;
+      }
+      case 'companion-send': void sendCompanionMessage(); break;
+      case 'companion-dictation':
+        startCompanionDictation();
+        break;
+      case 'companion-open-chat':
+        openCompanionChat(element);
+        break;
+      case 'export-behaviour-data': void exportBehaviourData(); break;
+      case 'delete-behaviour-data': void deleteBehaviourData(); break;
       case 'stuck':
         state.helpOption = '';
         clearAdaptiveRecall();
@@ -6431,12 +6746,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'previous-reading-section':
         if (!smallerSectionsAreActive()) break;
         state.readingSectionIndex = Math.max(0, currentReadingSectionIndex() - 1);
+        adaptiveLearning.telemetry?.action('reread');
+        recordBehaviourAction('reread');
         save('The previous small reading section is ready.');
         retainReadingSectionPosition('[data-action="previous-reading-section"], [data-action="next-reading-section"], [data-action="read-complete"]');
         break;
       case 'next-reading-section':
         if (!smallerSectionsAreActive()) break;
         state.readingSectionIndex = Math.min(readingSections().length - 1, currentReadingSectionIndex() + 1);
+        adaptiveLearning.telemetry?.action('reread');
+        recordBehaviourAction('reread');
         save('The next small reading section is ready.');
         retainReadingSectionPosition('[data-action="next-reading-section"], [data-action="read-complete"]');
         break;
@@ -6446,6 +6765,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         state.showSimple = false;
         state.readingSectionIndex = 0;
         recordSupportMoment('task-entry', { result: 'typing' });
+        recordBehaviourAction('return');
         save();
         render();
         showCurrentTaskFromStart('#course-typing-input');
@@ -6461,6 +6781,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         state.progress.attempt = blankAttempt();
         state.readingSectionIndex = 0;
         recordSupportMoment('task-entry', { result: 'reading' });
+        recordBehaviourAction('return');
         save();
         render();
         showCurrentTaskFromStart();
@@ -6723,6 +7044,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       syncAiComposerState();
       return;
     }
+    if (event.target.matches('[data-companion-input]')) {
+      behaviourPartner.draft = event.target.value.slice(0, 900);
+      return;
+    }
     if (event.target.matches('[data-assessment-response]')) {
       // Assessment prose remains only in this ephemeral input state until the
       // learner submits it to the explicitly consented assessment endpoint.
@@ -6748,6 +7073,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const reference = activeTypingReference();
     const newlyCorrect = insertedLength === 1 && nextValue.charAt(previousLength) === reference.charAt(previousLength) ? 1 : 0;
     adaptiveLearning.telemetry?.action('typing', {
+      characters: insertedLength,
+      correctCharacters: newlyCorrect,
+      incorrectCharacters: insertedLength === 1 ? 1 - newlyCorrect : 0,
+      backspaces: removedLength,
+      pauseMs: typingPauseMs
+    });
+    recordBehaviourAction('typing', {
       characters: insertedLength,
       correctCharacters: newlyCorrect,
       incorrectCharacters: insertedLength === 1 ? 1 - newlyCorrect : 0,

@@ -14,6 +14,7 @@ import { createModelProvider } from './server/model-provider.mjs';
 import { createLearningAnalyticsService } from './server/learning-analytics-service.mjs';
 import { createAdaptiveSupportService } from './server/adaptive-support-service.mjs';
 import { createAssessmentService } from './server/assessment-service.mjs';
+import { createBehaviouralPartnerService } from './server/behavioural-partner-service.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const redirects = new Map([
@@ -231,12 +232,13 @@ const buildRuntime = async () => {
     // availability. They are present even while disabled for a staged rollout.
     learningAnalytics: createLearningAnalyticsService({ config, firebase }),
     adaptiveSupport: createAdaptiveSupportService({ config, firebase, ledger, provider: modelProvider }),
-    assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider })
+    assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider }),
+    behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider })
   };
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
@@ -246,6 +248,7 @@ const handleApi = async (request, response, pathname, runtime) => {
       adaptiveRecall: { ...adaptiveRecall.status(), localGuestPreview: config.allowLocalGuestAi },
       adaptiveLearning: learningAnalytics.status(),
       adaptiveSupport: adaptiveSupport.status(),
+      behaviouralPartner: behaviouralPartner.status(),
       assessments: assessments.status(),
       modelRouting: modelProvider.status(),
       speechToText: speech.status(),
@@ -279,6 +282,9 @@ const handleApi = async (request, response, pathname, runtime) => {
     }
     if (request.method === 'POST' && pathname === '/api/v1/learning-summary') {
       return sendJson(response, 200, await learningAnalytics.saveSummary({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/behaviour/directive') {
+      return sendJson(response, 200, await behaviouralPartner.directive({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/adaptive/proposal') {
       return sendJson(response, 200, await adaptiveSupport.proposal({ authorization: request.headers.authorization, body: await readJson(request) }));

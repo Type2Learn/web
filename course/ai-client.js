@@ -62,11 +62,13 @@ export const askCourseAi = async ({ user, message, history, courseId, page, lang
 // of an unrestricted chat call. The browser sends only the learner's current
 // attempt and current page identity; provider keys and model selection remain
 // server-only.
-export const requestAdaptiveRecall = async ({ user, courseId, page, language, response, previousResponse, barrier, signal }) => {
+export const requestAdaptiveRecall = async ({ user, courseId, page, language, response, previousResponse, barrier, behaviourStates = [], signal }) => {
   const requestOptions = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ courseId, page, language, response, previousResponse, barrier }),
+    // Behaviour states are a short allow-list (for example, "re-reading"),
+    // never timings, typed words, recordings, chat, answers, or a learner label.
+    body: JSON.stringify({ courseId, page, language, response, previousResponse, barrier, behaviourStates }),
     signal
   };
   // Local guest AI is an explicitly enabled preview path. It has no token and
@@ -138,6 +140,16 @@ export const deleteAdaptiveLearningData = async ({ user, signal }) => authentica
 
 export const exportAdaptiveLearningData = async ({ user, signal }) => authenticatedRequest(user, '/api/v1/privacy/adaptive-data-export', {
   method: 'POST',
+  signal
+});
+
+// BEHAVIOURAL LEARNING PARTNER: browser code supplies only a validated compact
+// aggregate. The endpoint is signed-in + adaptive-consent gated; guest/local
+// sessions always use authored local support instead.
+export const requestBehaviourDirective = async ({ user, context, signal }) => authenticatedRequest(user, '/api/v1/behaviour/directive', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(context),
   signal
 });
 

@@ -338,11 +338,13 @@ test('adaptive recall context has no assessment answers or exact typing target',
     courseId: COURSE_CONTENT.id,
     page: { moduleIndex: 0, phase: 'type' },
     language: 'en',
-    response: 'A learner response'
+    response: 'A learner response',
+    behaviourStates: ['re-reading', 'not-a-real-state', 'working-through-typing']
   });
   const supplied = context.outline.join(' ');
   assert.equal(supplied.includes(COURSE_CONTENT.steps[0].typing.target), false);
   assert.equal(supplied.includes(String(COURSE_CONTENT.steps[0].check.options[0][0])), false);
+  assert.deepEqual(context.supportStates, ['re-reading', 'working-through-typing']);
 });
 
 test('authored module assessment reserve is deterministic, bounded, and keeps answer keys server-only', () => {

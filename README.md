@@ -79,9 +79,10 @@ unrestricted chatbot as a substitute for curriculum or learner judgement.
 
 | Capability | What it does | What it will not do |
 | --- | --- | --- |
-| **Adaptive Recall** | Looks for curriculum concepts in a learner’s own explanation and offers one concise next support: a hint, simpler framing, example, or application prompt. | Write the answer before an attempt, diagnose a learner, reveal a rubric, or rank ability. |
+| **Adaptive Recall** | Looks for curriculum concepts in a learner’s own explanation and offers one concise next support: a hint, simpler framing, example, or application prompt. With consent, it may receive neutral Behaviour Context states to choose presentation—not to judge readiness. | Write the answer before an attempt, diagnose a learner, reveal a rubric, or rank ability. |
 | **I’m stuck** | Lets a learner name the barrier—unclear instructions, a task that feels too large, difficult words, uncertainty about starting, too much on screen, or worry about being wrong—then adjusts only the current step. | Regenerate the whole lesson or make a claim about the learner. |
 | **Adaptive presentation** | When a signed-in learner explicitly opts in, it can offer one small first-step prompt after a quiet preview, then one reversible reading/layout/encouragement proposal after a module. | Upload keystroke logs, raw audio, permanent chat history, or silently change a learner’s settings. |
+| **Behavioural Learning Partner** | Uses one local, privacy-first Behaviour Context to offer an optional Calm Guide, fictional Learning Partner, Self-Challenge Coach, or Visual Co-Explorer. Deterministic rules choose whether an offer is relevant; Gemini Flash-Lite may only refine its two-sentence wording, with Nano and authored fallbacks. | Infer a diagnosis or psychological profile, switch roles/settings without permission, pressure a learner emotionally, upload raw work without consent, or give assessment hints. |
 | **Understanding checks** | Delivers one question at a time from a reviewed or authored reserve. A deterministic objective-evidence monitor guides a precise review route; Mini may recognise a safe paraphrase, but never decides alone. | Expose correct answers, visible percentages, speed scores, raw answers, or a learner profile. |
 | **Visual explanations** | Provides authored, accessible concept maps in the visual/mascot rail. | Generate stereotyped learner images or make visuals the only way to learn. |
 
@@ -89,6 +90,10 @@ AI is **Gemini-first for ordinary course chat**, with bounded key rotation and
 server-only specialist OpenAI roles: **GPT-5.4 Nano** for prompt/JSON checks,
 **GPT-5.4 Mini** for bounded adaptive intent and assessment work, and
 **GPT-5.1** only for reviewer-triggered final assessment-bank generation.
+The Behavioural Learning Partner is more constrained: its deterministic policy
+chooses the role, trigger and permitted action; **Gemini Flash-Lite** can only
+phrase its compact message, then **GPT-5.4 Nano** may repair/verify it. It
+always has authored local wording, including when a learner has not opted in.
 Provider credentials, answer keys, hidden rubrics, and model prompts stay on
 the server. Every model response is schema-validated, constrained by a
 deterministic evidence check, and has an authored deterministic fallback.
@@ -109,6 +114,7 @@ feature flags, safeguards, and rollout requirements in
 | Manual learning controls | Yes | Learner-controlled; background audio and speech never start by themselves |
 | Course AI and Adaptive Recall | Yes | Signed-in learner plus configured provider and Firebase; local guest preview is intentionally development-only |
 | Consent-gated adaptive summaries/proposals | Implemented | `ADAPTIVE_LEARNING_ENABLED=true`, signed-in learner, Firebase, and learner opt-in |
+| Behavioural Learning Partner | Implemented behind flags | `BEHAVIOUR_CONTEXT_ENABLED=true`; local authored offers work without consent, while signed-in Gemini/Nano wording and 90-day summaries also require `ADAPTIVE_LEARNING_ENABLED=true`, consent, Firebase, and `MASCOT_PARTNER_AI_ENABLED=true` |
 | Reviewed assessment banks and fallback checks | Implemented | `AI_ASSESSMENTS_ENABLED=true`, adaptive consent, Firebase, and reviewer workflow for generated banks |
 | Objective-evidence monitor and targeted review | Implemented | Assessment runs store only question/objective IDs and bounded outcome categories; never an answer, option choice, score, or model rationale |
 | AI-generated visual assets | Intentionally disabled | Requires separate moderation, storage, retention, and curriculum-review work |
@@ -135,6 +141,8 @@ feature flags, safeguards, and rollout requirements in
 │   ├── course-urdu.js                 # Urdu course copy/presentation
 │   ├── learner-settings.js            # Course preference persistence and UI
 │   ├── learning-telemetry.js          # Consent-aware aggregate event collection
+│   ├── behaviour-context.js            # Local-only unified Behaviour Context (no raw learner content)
+│   ├── learning-partner.js             # Four role surfaces and authored partner prompts
 │   ├── visual-explanations.js         # Authored accessible concept-map rail
 │   ├── narration.js                   # Read-aloud and cue/highlighting support
 │   └── mascot-2d.js / mascot-3d.js    # Optional companion presentation
@@ -145,6 +153,7 @@ feature flags, safeguards, and rollout requirements in
 │   ├── ai-service.mjs                 # Bounded Course AI
 │   ├── adaptive-recall-service.mjs    # Structured recall feedback / barrier support
 │   ├── adaptive-support-service.mjs   # Consent-gated proposals and copy
+│   ├── behavioural-partner-service.mjs # Gemini-first, Nano-fallback companion directive wording
 │   ├── assessment-service.mjs         # One-question assessment runs and evaluation
 │   ├── assessment-evaluator.mjs       # Deterministic grounding guard around model evaluation
 │   ├── assessment-monitor.mjs         # Objective evidence, question order, and targeted review route
@@ -158,7 +167,8 @@ feature flags, safeguards, and rollout requirements in
 ├── tests/                              # Node, AI boundary, auth, voice, and UI test suites
 ├── render.yaml                         # Render Blueprint configuration
 ├── sitemap.xml and robots.txt          # Search-engine discovery rules
-└── AI_ADAPTIVE_LEARNING_README.md      # AI product, privacy, assessment, and rollout spec
+├── AI_ADAPTIVE_LEARNING_README.md      # AI product, privacy, assessment, and rollout spec
+└── BEHAVIOURAL_PARTNER_TEST_EVIDENCE.md # 693-case Behaviour Context verification matrix
 ```
 
 ## Important locations
@@ -174,6 +184,7 @@ feature flags, safeguards, and rollout requirements in
 | Login and Firebase client behaviour | `login/`, `firebase-auth.js`, `guest-session.js` |
 | AI routing, safety policy, API limits, and key rotation | `server/config.mjs`, `server/model-provider.mjs`, `server/ai-service.mjs` |
 | Adaptive-support, deterministic assessment evidence, and targeted review | `server/adaptive-policy.mjs`, `server/adaptive-support-service.mjs`, `server/assessment-evaluator.mjs`, `server/assessment-monitor.mjs`, `server/assessment-service.mjs` |
+| Learning-partner policy, privacy contract, and fallback dialogue | `course/behaviour-context.js`, `course/learning-partner.js`, `server/behavioural-partner-service.mjs` |
 | Deployment secrets | Render environment variables or ignored `security/api.env` — **never browser code** |
 
 ## Run locally
@@ -203,6 +214,9 @@ npm run dev       # restart automatically while developing
 npm test          # Node/unit test suite
 npm run test:ui   # focused UI test script
 ```
+
+The Behavioural Learning Partner matrix is documented in
+[`BEHAVIOURAL_PARTNER_TEST_EVIDENCE.md`](BEHAVIOURAL_PARTNER_TEST_EVIDENCE.md).
 
 ### Local configuration principles
 

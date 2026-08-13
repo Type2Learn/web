@@ -62,6 +62,10 @@ export const createModelProvider = (config) => {
     'json-repair',
     'component-planning'
   ]);
+  // Behavioural companion wording is intentionally Gemini-first. Nano is a
+  // bounded repair/verification fallback only; this flow must never consume a
+  // Mini or final-assessment model.
+  const geminiFirstNanoFallbackPurposes = new Set(['behavioural-partner']);
   const miniPurposes = new Set([
     'adaptive-recall',
     'adaptive-support',
@@ -74,6 +78,7 @@ export const createModelProvider = (config) => {
   ]);
 
   const modelForOpenAiPurpose = (purpose) => {
+    if (geminiFirstNanoFallbackPurposes.has(purpose)) return config.openAiModel;
     if (purpose === 'final-assessment-generation') return config.openAiTestModel || config.openAiMiniModel || config.openAiModel;
     if (miniPurposes.has(purpose)) return config.openAiMiniModel || config.openAiModel;
     return config.openAiModel;
@@ -207,7 +212,15 @@ export const createModelProvider = (config) => {
       ...request,
       heavy: Boolean(request?.heavy || request?.purpose === 'heavy')
     };
-    const preferOpenAi = openAiPrimaryPurposes.has(normalisedRequest.purpose);
+    // A compact behavioural-partner message normally begins with Gemini. If
+    // that response is malformed, its service may request one Nano-only JSON
+    // repair. No other feature can force a provider through this escape hatch.
+    if (normalisedRequest.purpose === 'behavioural-partner' && normalisedRequest.forceOpenAi === true) {
+      if (!openAiReady()) throw new Error('The Nano JSON-repair model is not available.');
+      return callOpenAi(normalisedRequest);
+    }
+    const preferOpenAi = openAiPrimaryPurposes.has(normalisedRequest.purpose)
+      && !geminiFirstNanoFallbackPurposes.has(normalisedRequest.purpose);
     let firstError;
     const first = preferOpenAi ? callOpenAi : callGemini;
     const second = preferOpenAi ? callGemini : callOpenAi;

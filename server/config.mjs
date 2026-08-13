@@ -153,6 +153,13 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // off by default. These flags must block server routes as well as UI, so a
     // hidden button cannot create learner data or provider spend.
     adaptiveLearningEnabled: booleanFrom(value('ADAPTIVE_LEARNING_ENABLED')),
+    // BEHAVIOURAL LEARNING PARTNER: this deliberately sits behind its own
+    // rollout flags. Behaviour support can provide local authored help without
+    // this flag, but no server-side directive or consented behaviour summary
+    // is available until it is explicitly enabled.
+    behaviourContextEnabled: booleanFrom(value('BEHAVIOUR_CONTEXT_ENABLED')),
+    mascotPartnerAiEnabled: booleanFrom(value('MASCOT_PARTNER_AI_ENABLED')),
+    adaptiveRetentionDays: numberFrom(value('ADAPTIVE_RETENTION_DAYS'), 90, { min: 1, max: 365 }),
     aiAssessmentsEnabled: booleanFrom(value('AI_ASSESSMENTS_ENABLED')),
     aiVisualsEnabled: booleanFrom(value('AI_VISUALS_ENABLED')),
     firebaseProjectId: value('FIREBASE_PROJECT_ID') || 'type2learn-defcc',

@@ -21,6 +21,11 @@ export const assessmentLearningSignals = (summary = {}) => {
   const longestPauseMs = bounded(metrics.typingLongestPauseMs, 10 * 60 * 1000);
   const rereads = bounded(metrics.rereads, 100);
   const returns = bounded(metrics.returns, 100);
+  // This is a temporary, consented support state—not a conclusion about the
+  // learner. It can only influence whether an open prompt or MCQ is placed
+  // first; objective evidence alone still determines the review route.
+  const behaviourStates = new Set(Array.isArray(summary?.behaviour?.states)
+    ? summary.behaviour.states.map((state) => String(state)) : []);
   return {
     // A brief course interaction prioritises a written explanation first so a
     // learner can show understanding in their own words rather than only pick
@@ -28,7 +33,12 @@ export const assessmentLearningSignals = (summary = {}) => {
     courseInteraction: activeMs < 75_000 && rereads === 0 ? 'brief' : activeMs >= 6 * 60 * 1000 || rereads > 0 ? 'extended' : 'typical',
     responseRhythm: longestPauseMs >= 45_000 ? 'paused' : typed >= 260 && activeMs <= 3 * 60 * 1000 ? 'quick' : 'typical',
     supportUse: support.textToSpeech || support.visualOpened ? 'used' : 'not-recorded',
-    returnCount: Math.min(9, returns + rereads)
+    returnCount: Math.min(9, returns + rereads),
+    supportState: behaviourStates.has('working-through-typing')
+      ? 'expression'
+      : behaviourStates.has('re-reading')
+        ? 're-reading'
+        : 'none'
   };
 };
 
@@ -44,6 +54,8 @@ export const prioritiseAssessmentItems = ({ items = [], runId, signals = {} }) =
     if (signals.courseInteraction === 'brief' && item.responseMode === 'open') priority += 3;
     if (signals.responseRhythm === 'quick' && item.responseMode === 'open') priority += 1;
     if (signals.supportUse === 'used' && item.responseMode === 'mcq') priority += 1;
+    if (signals.supportState === 'expression' && item.responseMode === 'open') priority += 1;
+    if (signals.supportState === 're-reading' && item.responseMode === 'mcq') priority += 1;
     return { item, priority, rank: stableRank(item.id, runId) };
   })
   .sort((left, right) => right.priority - left.priority || left.rank.localeCompare(right.rank))

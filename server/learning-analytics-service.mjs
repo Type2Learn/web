@@ -5,6 +5,7 @@ const COURSE_ID = 'course-1-neurodivergent-conditions-v2';
 const CONSENT_VERSION = 1;
 const MAX_MODULE_INDEX = 10;
 const MAX_DURATION_MS = 4 * 60 * 60 * 1000;
+const MAX_RETENTION_DAYS = 365;
 
 const userHash = (uid) => createHash('sha256').update(String(uid)).digest('hex');
 const boundedNumber = (value, maximum = 1000000) => {
@@ -33,6 +34,25 @@ const metricsFor = (value = {}) => ({
   aiActiveMs: boundedNumber(value.aiActiveMs, MAX_DURATION_MS)
 });
 
+// BEHAVIOUR CONTEXT: only an aggregate and learner-selected presentation
+// controls are retained. These fields intentionally exclude raw prose,
+// keystrokes, microphone data, chat content, answer text, scores, and any
+// inferred learner type.
+const behaviourFor = (value = {}) => ({
+  schemaVersion: 1,
+  role: boundedEnum(value.role, ['calm-guide', 'learning-partner', 'self-challenge', 'visual-co-explorer'], 'calm-guide'),
+  presence: boundedEnum(value.presence, ['quiet', 'available', 'involved'], 'available'),
+  proactive: value.proactive !== false,
+  states: Array.isArray(value.states) ? value.states.map((state) => String(state)).filter((state) => ['starting', 'returning', 're-reading', 'working-through-typing', 'using-support', 'ready-for-next-step', 'needs-a-choice'].includes(state)).slice(0, 7) : [],
+  companion: {
+    offered: boundedNumber(value.companion?.offered, 50),
+    accepted: boundedNumber(value.companion?.accepted, 50),
+    dismissed: boundedNumber(value.companion?.dismissed, 50),
+    visualsOpened: boundedNumber(value.companion?.visualsOpened, 50),
+    missionsCompleted: boundedNumber(value.companion?.missionsCompleted, 50)
+  }
+});
+
 const cleanSummary = (body = {}) => {
   const moduleIndex = Number(body.moduleIndex);
   if (!Number.isInteger(moduleIndex) || moduleIndex < 0 || moduleIndex > MAX_MODULE_INDEX) {
@@ -50,6 +70,7 @@ const cleanSummary = (body = {}) => {
       taskInitiationOffered: Boolean(body.support?.taskInitiationOffered),
       taskInitiationUsed: Boolean(body.support?.taskInitiationUsed)
     },
+    behaviour: behaviourFor(body.behaviour),
     clientSummaryId: String(body.clientSummaryId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || randomUUID()
   };
 };
@@ -71,8 +92,23 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
   const status = () => ({
     available: available(),
     consentVersion: CONSENT_VERSION,
-    requiresSignIn: true
+    requiresSignIn: true,
+    retentionDays: Math.min(MAX_RETENTION_DAYS, Number(config.adaptiveRetentionDays) || 90),
+    retentionField: 'expiresAt'
   });
+
+  const expiryDate = (timestamp = new Date()) => new Date(timestamp.getTime() + (Math.min(MAX_RETENTION_DAYS, Number(config.adaptiveRetentionDays) || 90) * 24 * 60 * 60 * 1000));
+  // Firestore TTL should be configured against `expiresAt` in the Firebase
+  // console. The small opportunistic cleanup below ensures summaries are also
+  // removed on the next learner write if TTL processing is delayed.
+  const trimExpiredSummaries = async (uid) => {
+    const expired = await profile(uid).collection('courses').doc(COURSE_ID).collection('modules')
+      .where('expiresAt', '<=', new Date()).limit(100).get().catch(() => null);
+    if (!expired?.docs?.length) return;
+    const batch = firebase.firestore.batch();
+    expired.docs.forEach((document) => batch.delete(document.ref));
+    await batch.commit();
+  };
 
   // ADAPTIVE LEARNING: this read-only check lets the course render the
   // learner's choice without creating a profile or collecting anything.
@@ -114,16 +150,19 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     }
     const clean = cleanSummary(body);
     const timestamp = new Date();
+    await trimExpiredSummaries(learner.uid);
     await summary(learner.uid, clean.moduleIndex).set({
-      schemaVersion: 1,
+      schemaVersion: 2,
       courseId: COURSE_ID,
       moduleIndex: clean.moduleIndex,
       phase: clean.phase,
       language: clean.language,
       metrics: clean.metrics,
       support: clean.support,
+      behaviour: clean.behaviour,
       clientSummaryId: clean.clientSummaryId,
-      updatedAt: timestamp
+      updatedAt: timestamp,
+      expiresAt: expiryDate(timestamp)
     }, { merge: true });
     return { saved: true, moduleIndex: clean.moduleIndex };
   };
@@ -190,7 +229,9 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
         return {
           moduleIndex: Number(data.moduleIndex) || 0,
           phase: String(data.phase || 'read'), language: data.language === 'ur' ? 'ur' : 'en',
-          metrics: metricsFor(data.metrics), support: data.support || {}
+          metrics: metricsFor(data.metrics),
+          support: data.support || {},
+          behaviour: behaviourFor(data.behaviour)
         };
       }),
       proposals: proposalSnapshots.docs.map((document) => {
