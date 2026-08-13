@@ -1,6 +1,19 @@
 import { apiError } from './errors.mjs';
+import { migratedLegacyTheoryCourse } from './legacy-neurodivergent-migration.mjs';
 
 const ROOT = 'type2learnCourseAuthoring';
+const legacyCompiled = migratedLegacyTheoryCourse();
+const LEGACY_RECORD = Object.freeze({
+  courseId: legacyCompiled.learnerManifest.id,
+  version: legacyCompiled.learnerManifest.version,
+  type: 'theory',
+  title: legacyCompiled.learnerManifest.title,
+  learnerManifest: legacyCompiled.learnerManifest,
+  privateManifest: legacyCompiled.privateManifest,
+  status: 'published',
+  requestedAudience: 'platform',
+  narration: { humanAudioCount: 0 }
+});
 const LEGACY_COURSE = Object.freeze({
   courseId: 'course-1-neurodivergent-conditions-v2',
   version: '1.1',
@@ -65,6 +78,9 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
     const safeCourseId = clean(courseId, 80);
     const safeVersion = clean(version, 24);
     if (!safeCourseId || !safeVersion) throw apiError(400, 'COURSE_REQUIRED', 'Choose a course and version.');
+    if (safeCourseId === LEGACY_RECORD.courseId && safeVersion === LEGACY_RECORD.version) {
+      return { reference: null, record: LEGACY_RECORD, source: 'reviewed-markdown' };
+    }
     const snapshot = await courseRecord(firebase.firestore, safeCourseId, safeVersion).get();
     if (!snapshot.exists) throw apiError(404, 'COURSE_NOT_FOUND', 'This reviewed course was not found.');
     return { reference: snapshot.ref, record: snapshot.data() || {} };
@@ -80,15 +96,12 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       const account = await accountFor(authorization);
       const snapshot = await courses(firebase.firestore).where('status', '==', 'published').limit(100).get();
       const published = snapshot.docs.map((document) => document.data() || {}).filter((record) => visibleToAccount(record, account)).map(learnerCourseProjection);
-      const legacy = account?.roles?.length ? [LEGACY_COURSE] : [];
+      const legacy = visibleToAccount(LEGACY_RECORD, account) ? [learnerCourseProjection(LEGACY_RECORD)] : [];
       return { courses: [...legacy, ...published], theoryOnly: true };
     },
 
     async manifest({ authorization, courseId, version }) {
       const account = await accountFor(authorization);
-      if (courseId === LEGACY_COURSE.courseId && version === LEGACY_COURSE.version) {
-        return { legacy: true, course: LEGACY_COURSE };
-      }
       const { record } = await load(courseId, version);
       assertVisible(record, account);
       // The learner-safe manifest contains no answer key, review note, source
@@ -100,14 +113,11 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       const account = await accountFor(authorization);
       const parsed = splitCourseKey(requestedCourseKey);
       if (!parsed) throw apiError(400, 'UNKNOWN_COURSE', 'Choose an available course before saving progress.');
-      if (parsed.courseId === LEGACY_COURSE.courseId && (!parsed.version || parsed.version === LEGACY_COURSE.version)) {
-        if (!account.roles?.length) throw apiError(403, 'COURSE_ACCESS_DENIED', 'This course is not available to this account.');
-        return { courseId: LEGACY_COURSE.courseId, version: LEGACY_COURSE.version };
-      }
-      if (!parsed.version) throw apiError(400, 'COURSE_VERSION_REQUIRED', 'Choose a versioned reviewed course before saving progress.');
-      const { record } = await load(parsed.courseId, parsed.version);
+      const version = parsed.courseId === LEGACY_RECORD.courseId && !parsed.version ? LEGACY_RECORD.version : parsed.version;
+      if (!version) throw apiError(400, 'COURSE_VERSION_REQUIRED', 'Choose a versioned reviewed course before saving progress.');
+      const { record } = await load(parsed.courseId, version);
       assertVisible(record, account);
-      return { courseId: parsed.courseId, version: parsed.version };
+      return { courseId: parsed.courseId, version };
     },
 
     async checkAnswer({ authorization, body }) {
@@ -130,6 +140,7 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
     async setDistribution({ authorization, body }) {
       const account = await accountFor(authorization);
       const { reference, record } = await load(body?.courseId, body?.version);
+      if (!reference) throw apiError(409, 'LEGACY_COURSE_DISTRIBUTION_LOCKED', 'This platform course is already publicly available through its reviewed Markdown source.');
       if (record.status !== 'published') throw apiError(409, 'COURSE_NOT_PUBLISHED', 'Only an approved published course can be assigned.');
       if (!canManageDistribution(record, account)) throw apiError(403, 'COURSE_DISTRIBUTION_DENIED', 'Only the owning institute, teacher, or administrator can change this course distribution.');
       const mode = body?.mode === 'assigned' ? 'assigned' : 'organisation';
@@ -149,6 +160,7 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
     async requestPlatformRelease({ authorization, body }) {
       const account = await accountFor(authorization);
       const { reference, record } = await load(body?.courseId, body?.version);
+      if (!reference) throw apiError(409, 'LEGACY_COURSE_RELEASE_LOCKED', 'This platform course is already publicly available through its reviewed Markdown source.');
       if (!canManageDistribution(record, account)) throw apiError(403, 'PLATFORM_REQUEST_DENIED', 'Only the owning institute, teacher, or administrator can request a platform release.');
       await reference.set({ platformReleaseRequest: { requestedAt: nowIso(), requestedBy: account.uid, status: 'pending-admin-review' } }, { merge: true });
       await audit(firebase.firestore, { actorUid: account.uid, action: 'course-platform-release-requested', courseId: record.courseId, version: record.version });

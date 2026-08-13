@@ -60,20 +60,22 @@ This document records the state of the educator-workspace and reusable theory-co
 - `course/dynamic-course.js` and `course/dynamic-course.css` render learner-safe theory manifests by `courseId`, persist progress through `server/course-progress-service.mjs`, run private answer checks server-side, and display optional supports through the existing shared support-settings model.
 - The player supports bounded content, reading, examples, hints, typed/alternative response routes, four-option checks, exams, results, and the current shared supports. It intentionally reuses existing learner settings instead of creating a separate educator-only support model.
 
-## Critical known limitation: the legacy course is not yet fully source-replaced
+## Legacy-course migration: reviewed Markdown is now the publishing source
 
-The existing **Introduction to Neurodivergent Conditions** learner experience has a deterministic Markdown migration object in `server/legacy-neurodivergent-migration.mjs`, and the catalogue route can recognise it as a legacy course. However, the established `/course/` experience still ultimately imports hard-coded content from `course/course-content.js` through `course/course.js`.
+**Introduction to Neurodivergent Conditions** now lives in `course/authoring/neurodivergent-conditions.v1.md`. `server/legacy-neurodivergent-migration.mjs` reads that reviewed file, validates it, and deterministically compiles separate learner-safe and private answer-key manifests. The catalogue-selected route (`/course/?courseId=course-1-neurodivergent-conditions-v2&version=1.1`) therefore uses the generic manifest player and the protected answer-check API.
+
+The bare historical `/course/` URL still opens the long-established browser prototype for backwards compatibility. That older UI still imports `course/course-content.js`; it is not the source used by the publishing pipeline. Retiring or adapting that compatibility route without losing its richer TTS, completion, and settings presentation is still a deliberate follow-up task.
 
 The relevant code is:
 
 | Purpose | Files |
 | --- | --- |
-| Existing legacy course engine/content | `course/course.js`, `course/course-content.js`, `course/index.html` |
-| Legacy migration object | `server/legacy-neurodivergent-migration.mjs` |
-| Catalogue and legacy guard | `server/course-catalog-service.mjs`, `course/course-router.js` |
+| Reviewed source and compiler boundary | `course/authoring/neurodivergent-conditions.v1.md`, `server/legacy-neurodivergent-migration.mjs` |
+| Historical compatibility engine | `course/course.js`, `course/course-content.js`, `course/index.html` |
+| Catalogue and manifest route | `server/course-catalog-service.mjs`, `course/course-router.js` |
 | Generic manifest player | `course/dynamic-course.js`, `course/dynamic-course.css` |
 
-The next implementation owner should deliberately complete this migration while preserving the proven learner UX and its settings, progress, TTS, and exam behaviour. Do **not** shortcut this by exposing private answer keys in a browser manifest. This is the largest remaining item relative to the original “replace hard-coded course source” requirement.
+Do **not** shortcut the remaining compatibility-route work by exposing private answer keys in a browser manifest. The private manifest remains server-only; the generic player asks the protected answer-check route for a result only.
 
 ## UI and route map
 
@@ -128,7 +130,7 @@ The suite uses Node’s test runner:
 npm.cmd test
 ```
 
-Before the current handoff changes, the complete suite passed with **935 tests**. The handoff commit adds an access-policy test for inactive memberships; rerun the full command after checkout to obtain the current exact count.
+The complete suite passed with **938 tests** after the access-management and reviewed-Markdown migration work. Rerun the full command after checkout to obtain the current exact count.
 
 Important test folders:
 
@@ -167,13 +169,14 @@ e95d9e9 feat(course): generalise catalogue, learner manifests, progress, and ass
 a370d44 fix(course): enforce catalogue access for progress saves
 b7de08e feat(review): enforce human workflow approvals
 159f77d feat(course): apply supports to generic theory player
+d76a2b2 fix(access): make educator revocation enforceable
 ```
 
 The commit that adds this handoff file completes the small final audit fixes: working source-file lookup, full opaque IDs for code revocation, issued-code UI, roster-member revocation, and immediate role invalidation after membership revocation.
 
 ## Recommended continuation order
 
-1. **Finish the intentional legacy-course migration.** Make `Introduction to Neurodivergent Conditions` a normal reviewed Markdown/manifest course without regressing its existing accessible learner experience or leaking answer keys.
+1. **Finish compatibility-route consolidation.** The reviewed Markdown and generic-player pipeline are live for catalogue-selected legacy courses. Decide whether to retire the bare historical `/course/` route or adapt its richer UI to consume the same manifest without regressing accessible TTS, completion, or settings behaviour.
 2. **Add Firebase emulator/integration coverage.** Exercise bootstrap, code redemption/expiry/revocation, membership revocation, Firestore membership enforcement, Storage access, and audit receipts against real rules.
 3. **Exercise real admin review end to end.** Upload supported and scanned source examples; validate bilingual Markdown; review/accept AI drafts; upload human narration; verify all four backups; publish; assign; log in as a learner and complete a course.
 4. **Complete visual/accessibility evidence.** Capture browser screenshots for the required workflow states; test keyboard-only use, 320 px/mobile, 200% text zoom, 400% reflow, reduced motion, high contrast, and screen-reader semantics.
