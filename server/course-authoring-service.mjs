@@ -339,7 +339,12 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         }, { merge: true });
       }
       await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-markdown-saved', courseId, version, status: record.status, validationErrors: validation.errors.length });
-      return { course: noSecrets(record), validation: record.validation };
+      // `learnerManifest` is already compiled without answer keys, rubrics,
+      // source material, or private authoring notes. Returning it here lets an
+      // administrator inspect the *actual* learner payload immediately after
+      // a direct Markdown upload or structured-form conversion. It is never
+      // returned by the public catalogue endpoint.
+      return { course: noSecrets(record), validation: record.validation, learnerManifest: record.learnerManifest || null };
     },
 
     async generateAiDraft({ authorization, body }) {
@@ -399,7 +404,16 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const account = await accountFor(authorization);
       const { record } = await courseFor(courseId, version);
       if (!canReadCourse(account, record)) throw apiError(403, 'COURSE_ACCESS_DENIED', 'This course is not available to your account.');
-      return { course: noSecrets(record), validation: record.validation || { valid: false, errors: [] }, aiDraft: record.aiDraft ? { ...record.aiDraft, sourceExcerpt: undefined } : null, deterministicDrafts: record.deterministicDrafts || [] };
+      // This endpoint is staff-authorised and still deliberately exposes only
+      // the learner-safe manifest. The private manifest, Markdown source,
+      // answer keys, rubrics, and upload references remain server-only.
+      return {
+        course: noSecrets(record),
+        validation: record.validation || { valid: false, errors: [] },
+        learnerManifest: record.learnerManifest || null,
+        aiDraft: record.aiDraft ? { ...record.aiDraft, sourceExcerpt: undefined } : null,
+        deterministicDrafts: record.deterministicDrafts || []
+      };
     },
 
     async uploadNarration({ authorization, form }) {

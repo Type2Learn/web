@@ -12,12 +12,13 @@ This document records the state of the educator-workspace and reusable theory-co
 commit. Every completed commit has a matching exact-source archive in the
 ignored `zip/` directory.
 
-**Regression result:** `npm test` passed with **950 tests** after the rich
-reviewed-manifest compatibility integration.
+**Regression result:** `npm test` passed with **992 tests** after the rich
+reviewed-manifest compatibility integration. Rerun it after checkout for the
+current exact count.
 
 ### What is complete in this implementation slice
 
-- The server-side access model, role/invite codes, revocation checks, theory-only enforcement, authoring format/compiler, review workflow, learner-safe manifests, generic course catalogue/player, course progress, human-narration intake, distribution controls, and backup publication gate are implemented and covered by automated tests.
+- The server-side access model, role/invite codes, revocation checks, theory-only enforcement, structured course form, direct reviewed-Markdown import, authoring format/compiler, review workflow, learner-safe manifests, generic course catalogue/player, course progress, human-narration intake, distribution controls, and backup publication gate are implemented and covered by automated tests.
 - The original Neurodivergent Conditions course has been migrated into the reviewed bilingual Markdown format and can be served through the generic learner-safe manifest path.
 - Admin, teacher, institute, redeem, catalogue, and generic-course routes have implemented UI shells and API integrations. The educator pages retain a `?demo=1` presentation mode for visual inspection only.
 
@@ -90,6 +91,14 @@ Start in this order; it gives the quickest accurate picture without exposing pri
 - It validates ordered modules, bilingual English/Urdu content, short reading sections, supports, activity/check structures, final exam structure, and four-option MCQs.
 - It compiles a **private authoring manifest** (review details and answer keys) and a **learner-safe manifest** (no answer keys, original uploads, or admin notes).
 - `server/course-authoring-service.mjs` accepts private source submissions, validates types/sizes/checksums, extracts safe text from supported textual formats, and keeps scanned/unknown material private with a requires-transcription state.
+- Platform administrators do **not** need a teacher or institute hand-off. In
+  `/admin/ → Course review`, they may either import an already reviewed
+  `.md`/`.markdown`/`.txt` file directly or use the structured bilingual
+  course form. The browser converts the form deterministically into the
+  canonical format, the server validates and compiles it, and the admin can
+  inspect its real learner-safe manifest before starting the normal approval
+  and backup gate. Direct uploads are not sent to source storage; only the
+  deliberate compile request persists the reviewed Markdown.
 - Upload intake exposes theory now. Theory + coding, interactive/project, and other types are visibly locked in the educator UI and rejected server-side.
 - `server/course-workflow.mjs` is the canonical state machine:
 
@@ -192,7 +201,7 @@ The suite uses Node’s test runner:
 npm.cmd test
 ```
 
-The complete suite passed with **949 tests** after the reviewed-manifest compatibility integration. Rerun the full command after checkout to obtain the current exact count.
+The complete suite passed with **992 tests** after the reviewed-manifest compatibility integration. Rerun the full command after checkout to obtain the current exact count.
 
 Important test folders:
 

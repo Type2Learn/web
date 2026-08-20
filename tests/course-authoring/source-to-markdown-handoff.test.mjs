@@ -125,6 +125,14 @@ test('a private non-text teacher source can be reviewed, downloaded by an admin,
   assert.equal(saved.validation.valid, true, saved.validation.errors.join('\n'));
   assert.equal(saved.course.status, 'validation-ready');
   assert.equal(JSON.stringify(saved.course).includes('correctOption'), false);
+  assert.equal(saved.learnerManifest.id, 'new-theory-course');
+  assert.equal(JSON.stringify(saved.learnerManifest).includes('correctOption'), false);
+  assert.equal(JSON.stringify(saved.learnerManifest).includes('%PDF-safe-course-source'), false);
+
+  const summary = await service.courseSummary({ authorization: authorisation, courseId: 'new-theory-course', version: '1.0.0' });
+  assert.equal(summary.learnerManifest.title.en, 'English course title');
+  assert.equal(JSON.stringify(summary.learnerManifest).includes('correctOption'), false);
+  assert.equal(JSON.stringify(summary).includes('%PDF-safe-course-source'), false);
 
   const submissionRecord = (await firestore.collection('type2learnCourseAuthoring').doc('workspace').collection('submissions').doc(source.submission.submissionId).get()).data();
   assert.equal(submissionRecord.status, 'validation-ready');
@@ -157,4 +165,31 @@ test('reviewed Markdown cannot silently diverge from the form identifiers or sou
     service.saveMarkdown({ authorization: authorisation, body: { courseId: 'valid-course-id', version: '1.0.0', ownerOrganisationId: 'another-org', submissionId: source.submission.submissionId, markdown } }),
     (error) => error?.code === 'SOURCE_OWNERSHIP_MISMATCH'
   );
+});
+
+test('an administrator can directly compile, inspect, and enter review for a reviewed Markdown course without a teacher submission', async () => {
+  const { service } = createService();
+  const markdown = THEORY_COURSE_TEMPLATE
+    .replace('id: replace-with-course-id', 'id: direct-admin-course')
+    .replace('English course title', 'Direct administrator course');
+  const saved = await service.saveMarkdown({
+    authorization: authorisation,
+    body: { courseId: 'direct-admin-course', version: '1.0.0', markdown }
+  });
+
+  assert.equal(saved.validation.valid, true, saved.validation.errors.join('\n'));
+  assert.equal(saved.course.ownerOrganisationId, '');
+  assert.equal(saved.learnerManifest.title.en, 'Direct administrator course');
+  assert.equal(JSON.stringify(saved.learnerManifest).includes('correctOption'), false);
+
+  const inspected = await service.courseSummary({ authorization: authorisation, courseId: 'direct-admin-course', version: '1.0.0' });
+  assert.equal(inspected.course.status, 'validation-ready');
+  assert.equal(inspected.learnerManifest.modules[0].en.title, 'One small idea');
+  assert.equal(JSON.stringify(inspected).includes('privateManifest'), false);
+
+  const review = await service.transition({
+    authorization: authorisation,
+    body: { courseId: 'direct-admin-course', version: '1.0.0', status: 'admin-review', reviewNote: 'Direct administrator Markdown review.' }
+  });
+  assert.equal(review.course.status, 'admin-review');
 });

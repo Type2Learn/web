@@ -57,6 +57,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .workspace-field { display: grid; gap: 7px; margin-top: 14px; color: var(--workspace-ink); font-size: 14px; font-weight: 800; }
 .workspace-field input, .workspace-field textarea, .workspace-field select { width: 100%; padding: 12px 13px; border: 1px solid #a9c7eb; border-radius: 10px; color: var(--workspace-ink); background: #fff; font-weight: 500; }
 .workspace-field textarea { min-height: 250px; resize: vertical; line-height: 1.45; }
+.authoring-builder { display: grid; gap: 18px; margin: 22px 0 26px; padding: clamp(16px, 2.5vw, 26px); border: 1px solid #9ed9bb; border-radius: 15px; background: linear-gradient(145deg, #fbfffc, #f1fbf6); }
+.authoring-builder-heading, .authoring-module-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.authoring-builder-heading h3, .authoring-module-heading h3 { margin: 0; }
+.authoring-builder-heading p:not(.workspace-eyebrow) { max-width: 72ch; margin: 7px 0 0; }
+.authoring-course-fields { padding-bottom: 4px; border-bottom: 1px solid #c8e9d5; }
+.authoring-module, .authoring-final-question { display: grid; gap: 16px; padding: clamp(16px, 2vw, 24px); border: 1px solid var(--workspace-line); border-radius: 14px; background: #fff; }
+.authoring-language { padding-top: 4px; }
+.authoring-language + .authoring-language { margin-top: 12px; padding-top: 20px; border-top: 1px dashed var(--workspace-line); }
+.authoring-language h4, .authoring-question h5 { margin: 0; color: var(--workspace-ink); font-size: 15px; letter-spacing: .01em; }
+.authoring-question { padding: 16px; border-radius: 12px; background: #f7fbff; }
+.authoring-question h5 { margin-bottom: 2px; }
+.authoring-builder .workspace-field { margin-top: 7px; }
+.authoring-builder .workspace-field textarea { min-height: 92px; }
+.authoring-builder-actions { padding: 0 2px; }
+[data-builder-errors] ul { margin: 8px 0 0; padding-left: 21px; }
 /* Reviewed Markdown deliberately mixes LTR metadata with Urdu learning
    content. `plaintext` lets each line choose its own bidi direction rather
    than breaking Urdu letters inside an otherwise LTR editor. */
@@ -103,5 +118,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .workspace-main { width: min(100% - 24px, 1440px); padding-top: 24px; }
   .workspace-grid, .workspace-grid--three, .workspace-split { grid-template-columns: 1fr; }
   .workspace-list > li { flex-direction: column; }
+  .authoring-builder-heading, .authoring-module-heading { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
