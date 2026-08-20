@@ -2,7 +2,7 @@ services:
   - type: web
     name: type2learn-web
     runtime: node
-    buildCommand: npm ci
+    buildCommand: npm ci && npm run verify
     startCommand: npm start
     healthCheckPath: /api/v1/health
     autoDeployTrigger: commit

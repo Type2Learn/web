@@ -409,6 +409,7 @@ a:focus-visible {
 
 .learning-mascot-details {
   grid-column: 1 / -1;
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 28px clamp(20px, 3vw, 42px);
@@ -544,9 +545,10 @@ body[data-setup-layout="open"] .learn-main--open .noise-preview-status {
 @media (min-width: 1181px) {
   .learn-main--with-mascot {
     position: relative;
-    /* Reserve the speech-bubble gutter as well as the companion itself so
-       it never covers a preference label or option. */
-    padding-right: clamp(620px, 52vw, 860px);
+    /* Reserve a companion rail without collapsing the control grid. The
+       earlier 52vw gutter made controls narrower than their contents on
+       normal laptop widths, which caused the Mascot details to overlap. */
+    padding-right: clamp(430px, 36vw, 640px);
   }
 
   .learn-main--with-mascot .learning-settings {
@@ -567,7 +569,7 @@ body[data-setup-layout="open"] .learn-main--open .noise-preview-status {
     right: clamp(28px, 3.5vw, 74px);
     /* Match the desktop course companion: a large right rail, vertically
        centered in the available screen rather than boxed into the setup. */
-    width: clamp(390px, 34vw, 620px);
+    width: clamp(320px, 29vw, 500px);
     height: calc(100dvh - 73px);
     display: block;
     transform: translateY(-50%);

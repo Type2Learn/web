@@ -7,8 +7,15 @@
   <title>Admin workspace · Type2Learn</title>
   <link rel="stylesheet" href="/workspace.css">
 </head>
-<body data-workspace="admin">
-  <div class="workspace-shell">
+<body data-workspace="admin" class="workspace-auth-pending">
+  <div class="workspace-access-gate" data-workspace-gate role="status" aria-live="polite" aria-busy="true">
+    <div>
+      <p class="workspace-eyebrow">Type2Learn</p>
+      <h1>Checking private workspace access…</h1>
+      <p data-workspace-gate-message>Please wait while access is verified.</p>
+    </div>
+  </div>
+  <div class="workspace-shell" data-workspace-shell aria-hidden="true" inert>
     <header class="workspace-header"><a class="workspace-brand" href="/"><span class="workspace-brand-mark">T2L</span> TYPE2LEARN</a><div class="workspace-header-actions"><span data-role-name class="workspace-tag">Checking access</span><button class="workspace-button workspace-button--quiet" data-view-learner type="button">View as learner</button><button class="workspace-button workspace-button--quiet" data-sign-out type="button">Sign out</button></div></header>
     <main class="workspace-main"><p class="workspace-eyebrow">Private administrator workspace</p><h1 class="workspace-title">Review courses before they reach learners.</h1><p class="workspace-intro">Human review remains in control. Source uploads stay private, AI creates drafts only, and publishing fails closed until every required backup is verified.</p><div data-workspace-status class="workspace-status" role="status" aria-live="polite" hidden></div>
       <div data-role-required class="workspace-status" data-kind="warning" hidden>This page is for a platform administrator. Use a valid setup code once, or redeem an authorised administrator role through the secure access flow.</div>

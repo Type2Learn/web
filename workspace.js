@@ -217,6 +217,26 @@ const show = (name) => {
 const hasRole = (role) => Boolean(account?.roles?.includes(role));
 const primaryOrganisation = () => account?.organisations?.find((organisation) => organisation.active !== false)?.organisationId || '';
 const allowedForPage = () => PAGE === 'admin' ? hasRole('platform-admin') : PAGE === 'teacher' ? hasRole('teacher') || hasRole('platform-admin') : PAGE === 'institute' ? hasRole('institute-owner') || hasRole('platform-admin') : true;
+// Do not reveal any private workspace markup until Firebase identity and the
+// corresponding server-managed role have both been checked. The static page
+// therefore never flashes an administrator workflow to a guest.
+const setWorkspaceGate = (mode = 'pending', message = 'Checking private workspace access…') => {
+  const gate = $('[data-workspace-gate]');
+  const gateMessage = $('[data-workspace-gate-message]');
+  const shell = $('[data-workspace-shell]');
+  if (gateMessage) gateMessage.textContent = message;
+  if (gate) gate.setAttribute('aria-busy', String(mode === 'pending'));
+  document.body.classList.toggle('workspace-auth-pending', mode === 'pending');
+  document.body.classList.toggle('workspace-access-denied', mode === 'denied');
+  if (mode === 'ready') {
+    shell?.removeAttribute('aria-hidden');
+    shell?.removeAttribute('inert');
+  } else {
+    shell?.setAttribute('aria-hidden', 'true');
+    shell?.setAttribute('inert', '');
+  }
+};
+const revealWorkspace = () => setWorkspaceGate('ready');
 
 const demoAccount = () => ({ roles: PAGE === 'admin' ? ['platform-admin'] : PAGE === 'institute' ? ['institute-owner'] : ['teacher'], organisations: [{ organisationId: 'demo-learning-group', membershipRole: PAGE === 'institute' ? 'institute-owner' : 'teacher', active: true }] });
 const renderIdentity = () => {
@@ -785,9 +805,26 @@ const bindShared = () => {
 
 const initialise = async () => {
   bindNavigation(); bindCourseSelectors(); bindShared(); bindRoleCodes(); bindSubmission(); bindAuthoring(); bindPublishing(); bindRoster(); bindDistribution(); bindBootstrap(); bindRedeem();
-  if (DEMO) { account = demoAccount(); renderIdentity(); renderWorkspace(); await loadSubmissions(); status('Preview mode shows the interface only. It cannot access a learner record or call protected APIs.', 'warning'); return; }
+  if (DEMO) { account = demoAccount(); revealWorkspace(); renderIdentity(); renderWorkspace(); await loadSubmissions(); status('Preview mode shows the interface only. It cannot access a learner record or call protected APIs.', 'warning'); return; }
   user = await waitForType2LearnUser();
-  if (!user) { location.assign(`/login/?next=${encodeURIComponent(location.pathname + location.hash)}`); return; }
-  try { await refreshRole(); renderWorkspace(); await loadSubmissions(); await loadCourses(); } catch (error) { status(error.message, 'error'); }
+  if (!user) {
+    setWorkspaceGate('pending', 'Sign in is required before opening this private workspace.');
+    location.replace(`/login/?next=${encodeURIComponent(location.pathname + location.hash)}`);
+    return;
+  }
+  try {
+    await refreshRole();
+    if (!allowedForPage()) {
+      setWorkspaceGate('denied', 'This account does not have access to this workspace. Returning to learning…');
+      window.setTimeout(() => location.replace('/course/'), 450);
+      return;
+    }
+    revealWorkspace();
+    renderWorkspace();
+    await loadSubmissions();
+    await loadCourses();
+  } catch (_) {
+    setWorkspaceGate('denied', 'Private workspace access could not be verified. Please sign in again.');
+  }
 };
 initialise();

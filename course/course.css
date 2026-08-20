@@ -1495,6 +1495,23 @@ body[data-course-direction="rtl"] .course-catalogue-lock {
     line-height: 1.45;
   }
 
+  .course-mascot-dialogue p { margin: 0; }
+  .course-mascot-listen {
+    position: relative;
+    z-index: 1;
+    min-height: 30px;
+    margin-top: 9px;
+    border: 1px solid var(--course-line-strong);
+    border-radius: 999px;
+    padding: 4px 10px;
+    color: var(--course-ink);
+    background: var(--course-paper);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
   .course-mascot-dialogue::after {
     position: absolute;
     top: 50%;

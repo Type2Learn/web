@@ -1,0 +1,5 @@
+#!/bin/sh
+# Do not push a tree that fails the deterministic release suite or falls below
+# the project-wide minimum test baseline. Render runs the same command.
+set -eu
+npm run verify

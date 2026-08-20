@@ -23,6 +23,14 @@ button, .button { cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--workspace-blue); outline-offset: 3px; }
 
 .workspace-shell { min-height: 100vh; }
+.workspace-access-gate { display: none; min-height: 100vh; place-items: center; padding: 28px; background: var(--workspace-page); text-align: center; }
+.workspace-access-gate > div { width: min(100%, 480px); padding: 34px; border: 1px solid var(--workspace-line); border-radius: var(--workspace-radius); background: var(--workspace-panel); }
+.workspace-access-gate h1 { margin: 0; font-size: clamp(24px, 4vw, 36px); letter-spacing: -.035em; }
+.workspace-access-gate p:not(.workspace-eyebrow) { margin: 12px 0 0; color: var(--workspace-copy); line-height: 1.5; }
+body.workspace-auth-pending .workspace-shell,
+body.workspace-access-denied .workspace-shell { display: none !important; }
+body.workspace-auth-pending .workspace-access-gate,
+body.workspace-access-denied .workspace-access-gate { display: grid; }
 .workspace-header { position: sticky; top: 0; z-index: 5; min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px clamp(18px, 4vw, 54px); background: #fff; border-bottom: 1px solid var(--workspace-line); }
 .workspace-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--workspace-ink); font-weight: 900; text-decoration: none; letter-spacing: .08em; white-space: nowrap; }
 .workspace-brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid var(--workspace-ink); border-radius: 9px; color: var(--workspace-green); font-size: 17px; letter-spacing: -0.15em; }

@@ -226,8 +226,16 @@ Useful commands:
 ```bash
 npm run dev       # restart automatically while developing
 npm test          # Node/unit test suite
+npm run verify    # release gate: every test must pass and the suite must retain at least 748 checks
 npm run test:ui   # focused UI test script
 ```
+
+The current release gate runs **1,002 deterministic automated checks** across
+access roles, authentication, public/Urdu content, learner settings, guided
+typing, audio and speech, AI boundaries, Behaviour Context privacy, assessment
+monitoring, reviewed-course authoring, publishing, and learner-safe manifests.
+It fails on any failed check or if the suite drops below the 748-test baseline.
+The executable Git pre-push hook and Render build both invoke this exact gate.
 
 The Behavioural Learning Partner matrix is documented in
 [`BEHAVIOURAL_PARTNER_TEST_EVIDENCE.md`](BEHAVIOURAL_PARTNER_TEST_EVIDENCE.md).
@@ -246,8 +254,9 @@ The Behavioural Learning Partner matrix is documented in
 ## Deploy on Render
 
 The repository includes a Render Blueprint in
-[render.yaml](render.yaml). It installs dependencies with `npm ci`, runs
-`npm start`, and checks `/api/v1/health`.
+[render.yaml](render.yaml). It installs dependencies with `npm ci`, runs the
+same blocking `npm run verify` release gate, then runs `npm start` and checks
+`/api/v1/health`.
 
 1. Create a Render Blueprint from the `main` branch of this repository.
 2. Add the necessary encrypted environment variables in Render—not in Git.

@@ -130,7 +130,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     volume: 0,
     isPlaying: false,
     fadeFrame: null,
-    settleTimer: null
+    settleTimer: null,
+    // Every explicit start or sound-type change gets a token. A slow play()
+    // promise from the previous loop must never mark the newly-selected loop
+    // as playing (the cause of intermittent silent Brown noise).
+    requestId: 0
   };
   // The optional 3D companion is deliberately lazy-loaded. On smaller
   // screens—or when it is switched off—the model, texture, Three.js, and
@@ -537,6 +541,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const pauseBackgroundNoise = (announceChange = false) => {
+    backgroundNoise.requestId += 1;
     cancelBackgroundNoiseFade();
     if (backgroundNoise.audio) backgroundNoise.audio.pause();
     const wasPlaying = backgroundNoise.isPlaying;
@@ -548,6 +553,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (!backgroundNoise.enabled) return;
     const audio = prepareBackgroundNoiseAudio();
     if (!audio) return;
+    const requestId = ++backgroundNoise.requestId;
     cancelBackgroundNoiseFade();
     // Keep the course player consistent with first-run preferences: background
     // noise always starts muted. The learner explicitly chooses any audible
@@ -556,10 +562,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     audio.volume = 0;
     try {
       await audio.play();
+      if (requestId !== backgroundNoise.requestId || audio !== backgroundNoise.audio) {
+        audio.pause();
+        return;
+      }
       backgroundNoise.isPlaying = true;
       const startedAt = window.performance.now();
       const fadeIn = (timestamp) => {
-        if (!backgroundNoise.isPlaying || audio !== backgroundNoise.audio) return;
+        if (!backgroundNoise.isPlaying || requestId !== backgroundNoise.requestId || audio !== backgroundNoise.audio) return;
         const progress = Math.min(1, (timestamp - startedAt) / 420);
         audio.volume = backgroundNoise.volume * progress;
         if (progress < 1) backgroundNoise.fadeFrame = window.requestAnimationFrame(fadeIn);
@@ -567,13 +577,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       };
       backgroundNoise.fadeFrame = window.requestAnimationFrame(fadeIn);
       backgroundNoise.settleTimer = window.setTimeout(() => {
-        if (!backgroundNoise.isPlaying || audio !== backgroundNoise.audio) return;
+        if (!backgroundNoise.isPlaying || requestId !== backgroundNoise.requestId || audio !== backgroundNoise.audio) return;
         audio.volume = backgroundNoise.volume;
         backgroundNoise.settleTimer = null;
       }, 520);
       if (announceChange) announce('Background noise started at the selected low volume.');
     } catch (_) {
-      backgroundNoise.isPlaying = false;
+      if (requestId === backgroundNoise.requestId && audio === backgroundNoise.audio) backgroundNoise.isPlaying = false;
       if (announceChange) announce('Background noise is ready. Select Start background noise to try again.');
     }
   };
@@ -1444,13 +1454,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }).join('');
   };
 
-  // Local guest AI is deliberately a development-only preview controlled by
-  // the server. The browser never assumes that guests can use AI: it enables
-  // this composer only after the health response confirms that preview flag.
-  const courseAiAccessAllowed = () => Boolean(
-    signedInLearner()
-    || (authenticatedUser?.isGuest && aiChat.connection.localGuestPreview)
-  );
+  // Guest learning deliberately keeps authored help available, but never
+  // sends a guest's text to Course AI. This is enforced in the UI as well as
+  // on the API boundary so a local-preview flag cannot accidentally expose it.
+  const courseAiAccessAllowed = () => signedInLearner();
 
   const syncAiComposerState = () => {
     const busy = ['checking', 'sending', 'recording', 'transcribing'].includes(aiChat.status);
@@ -1532,6 +1539,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const openCourseAi = (trigger) => {
+    if (authenticatedUser?.isGuest) {
+      openCourseModal('guest-ai', trigger, '[data-action="call-ai"]');
+      return;
+    }
     if (!signedInLearner() && !authenticatedUser?.isGuest) {
       announce('Log in required to use Course AI.');
       return;
@@ -1908,6 +1919,34 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     return messages[moment.kind] || '';
   };
 
+  const mascotSpeechCanPlay = () => Boolean(
+    mascotPresentation.enabled
+    && (mascotPresentation.voice === 'speech' || mascotPresentation.voice === 'both' || learningChoices()['text-to-speech'] === 'on')
+    && typeof window.SpeechSynthesisUtterance === 'function'
+    && window.speechSynthesis
+  );
+
+  // Mascot speech is always initiated by the learner through the visible
+  // Listen control. It never autoplays merely because a preference is on.
+  const speakMascotDialogue = () => {
+    const dialogue = mascotDialogue();
+    if (!dialogue || !mascotSpeechCanPlay()) {
+      announce(courseUi('Mascot speech is not available in this browser yet.', 'اس براؤزر میں ماسکٹ کی آواز ابھی دستیاب نہیں۔'));
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(dialogue);
+      utterance.lang = mascotPresentation.language === 'urdu' ? 'ur-PK' : 'en-US';
+      utterance.rate = 0.92;
+      utterance.volume = Math.min(1, Math.max(0.1, Number(state.preferences.narrationVolume) || 0.72));
+      window.speechSynthesis.speak(utterance);
+      announce(courseUi('Mascot speech has started.', 'ماسکٹ کی آواز شروع ہو گئی ہے۔'));
+    } catch (_) {
+      announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
+    }
+  };
+
   const courseMascotMarkup = (location) => {
     // ADAPTIVE LEARNING: an opted-in learner can request a reviewed visual
     // explanation. It uses the companion rail when present, rather than
@@ -1928,7 +1967,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       ? companionBubbleMarkup({ directive: companion, language: mascotLanguage, escapeHtml, focused: focusedPartner })
       : '';
     const dialogueMarkup = !showAiPanel && dialogue && !companion
-      ? '<p class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '">' + escapeHtml(dialogue) + '</p>'
+      ? '<div class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '"><p>' + escapeHtml(dialogue) + '</p>' + (mascotSpeechCanPlay() ? '<button class="course-mascot-listen" type="button" data-action="mascot-speak">' + escapeHtml(courseUi('Listen', 'سنیں')) + '</button>' : '') + '</div>'
       : '';
     const dockMarkup = !showAiPanel && location === 'lesson' && companion && !focusedPartner
       ? companionDockMarkup({ language: mascotLanguage, escapeHtml, draft: behaviourPartner.draft, canSpeak: browserSpeechRecognitionAvailable(), channel: partnerControls().channel, listening: behaviourPartner.listening })
@@ -2435,10 +2474,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
   };
 
-  // The API itself keeps guest AI disabled unless the local preview feature
-  // flag is enabled. This only lets a guest reach that guarded endpoint so
-  // Playwright/local preview can exercise the same "I’m stuck" UI path.
-  const canRequestAdaptiveRecall = () => Boolean(authenticatedUser && (authenticatedUser.isGuest || signedInLearner()));
+  // Adaptive Recall can only process a signed-in learner's opted-in request.
+  // Guests receive the deterministic, current-step fallback below instead.
+  const canRequestAdaptiveRecall = () => signedInLearner();
   const requestTimeoutSignal = (milliseconds) => (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
     ? AbortSignal.timeout(milliseconds)
     : undefined);
@@ -3900,26 +3938,38 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     if (response.length <= previous.length) return;
 
+    const insertedCharacters = response.slice(previous.length);
+    const referenceCharacters = Array.from(activeTypingReference() || '');
+    const firstMismatchOffset = insertedCharacters.findIndex((character, offset) => character !== referenceCharacters[previous.length + offset]);
     const character = response[response.length - 1];
     const position = response.length - 1;
-    const expected = Array.from(activeTypingReference() || '')[position];
+    const expected = referenceCharacters[position];
     const correct = character === expected;
 
     // Any incoming character invalidates a prompt for the previous position.
     // This lets a learner move past an ignored typo instead of getting stuck.
     if (typingGuidance.currentRole === 'target') stopTypingGuidanceAudio();
 
+    if (insertedCharacters.length > 1) typingGuidance.fastMode = true;
     if (typingGuidance.fastMode) {
-      if (!correct) {
+      // Fast input commonly arrives as a single `input` event containing a
+      // burst of characters. Advance through the burst deterministically and
+      // cue only the first mismatch; never leave the narrator waiting on an
+      // already-correct character.
+      const mismatchPosition = firstMismatchOffset < 0 ? -1 : previous.length + firstMismatchOffset;
+      typingGuidance.expectedIndex = mismatchPosition >= 0 ? mismatchPosition : response.length;
+      if (mismatchPosition >= 0) {
         stopTypingGuidanceAudio();
-        typingGuidance.expectedIndex = position;
         typingGuidance.phase = 'correction';
-        playTypingGuidanceSource(typingCharacterClip('target', expected), 'target', () => {
+        playTypingGuidanceSource(typingCharacterClip('target', referenceCharacters[mismatchPosition]), 'target', () => {
           if (typingGuidance.active && !typingGuidance.paused) {
             typingGuidance.phase = 'waiting';
             syncTaskNarrationControl();
           }
         });
+      } else {
+        typingGuidance.phase = 'waiting';
+        syncTaskNarrationControl();
       }
       return;
     }
@@ -4246,8 +4296,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       : '';
   };
 
-  const adaptiveFallback = (barrier = '') => {
+  const adaptiveFallback = (barrier = '', response = '', previousResponse = '') => {
     const urdu = courseUsesUrdu();
+    const words = String(response || '').trim().split(/\s+/).filter(Boolean);
+    const previousWords = String(previousResponse || '').trim().split(/\s+/).filter(Boolean);
+    const section = usesLessonSectionTyping() ? activeLessonTypingSection()?.section?.heading : '';
+    const focus = section || currentStep().title || (urdu ? 'موجودہ خیال' : 'the current idea');
+    const started = words.length > 0;
+    const changed = started && previousWords.length > 0 && String(response).trim() !== String(previousResponse).trim();
     const next = {
       instruction: urdu ? 'صرف موجودہ ہدایت کا پہلا حصہ دیکھیں۔' : 'Look at only the first part of the current instruction.',
       'too-large': urdu ? 'ایک جملے یا ایک خیال سے آغاز کریں۔' : 'Start with one sentence or one idea.',
@@ -4256,13 +4312,20 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       'too-much-on-screen': urdu ? 'صرف موجودہ عنوان اور اس کے نیچے متن کو دیکھیں۔' : 'Look only at the current heading and the text beneath it.',
       'worried-about-wrong': urdu ? 'اپنا پہلا خیال لکھیں؛ بعد میں اسے بدل سکتے ہیں۔' : 'Write a first thought; you can change it afterwards.'
     }[barrier] || (urdu ? 'اپنے الفاظ میں ایک مرکزی خیال بیان کریں۔' : 'Name one main idea in your own words.');
+    const feedback = !started
+      ? (urdu ? 'آپ ابھی ایک خیال سے آغاز کر سکتے ہیں۔' : 'You can begin with one idea when you are ready.')
+      : changed
+        ? (urdu ? 'آپ نے اپنے جواب میں تبدیلی کی ہے۔ اب اسے موجودہ خیال سے جوڑیں۔' : 'You changed your response. Now connect it to the current idea.')
+        : words.length < 8
+          ? (urdu ? 'آپ نے آغاز کر دیا ہے۔ ایک اور مکمل جملہ شامل کرنے کی کوشش کریں۔' : 'You have started. Try adding one more complete sentence.')
+          : (urdu ? 'آپ نے ایک مکمل خیال شامل کیا ہے۔ اب اسے اگلے حصے سے جوڑیں۔' : 'You added a complete thought. Now connect it to the next part.');
     return {
-      evidence_found: [],
-      missing_concept: urdu ? 'اس مرحلے کا مرکزی خیال' : 'the main idea in this step',
+      evidence_found: started ? [urdu ? 'آپ کی اپنی وضاحت' : 'your own explanation'] : [],
+      missing_concept: focus,
       support_mode: 'hint',
-      feedback: urdu ? 'آپ کا کام موجود ہے۔ ایک واضح خیال سے آگے بڑھیں۔' : 'Your work is still here. Continue with one clear idea.',
+      feedback,
       next_prompt: next,
-      improvement: ''
+      improvement: changed ? (urdu ? 'آپ کا نیا جواب پہلے جواب سے مختلف ہے۔' : 'Your new response differs from your earlier response.') : ''
     };
   };
 
@@ -4302,7 +4365,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     adaptiveRecall.controller = controller;
     recordUnifiedBehaviourAction('ai-request');
     render();
-    const fallback = adaptiveFallback(barrier);
+    const fallback = adaptiveFallback(barrier, safeResponse, previousResponse);
     try {
       if (!canRequestAdaptiveRecall()) throw new Error(courseUi('Sign in to use the adaptive check. Current-step support is still available.', 'تطبیقی جانچ کے لیے لاگ اِن کریں۔ موجودہ مرحلے کی مدد پھر بھی دستیاب ہے۔'));
       const payload = await requestAdaptiveRecall({
@@ -4619,9 +4682,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const overlay = field?.querySelector('[data-typing-overlay]');
     if (!overlay) return;
     const previousValue = input.dataset.typingPreviousValue ?? input.value;
+    const previousCharacters = Array.from(previousValue || '');
+    const inputCharacters = Array.from(input.value || '');
     const addedOneCharacter = animateNewestCharacter
-      && input.value.length === previousValue.length + 1;
-    overlay.innerHTML = renderTypingCharacters(activeTypingReference(), input.value, addedOneCharacter ? input.value.length - 1 : -1);
+      && inputCharacters.length === previousCharacters.length + 1;
+    overlay.innerHTML = renderTypingCharacters(activeTypingReference(), input.value, addedOneCharacter ? inputCharacters.length - 1 : -1);
     input.dataset.typingPreviousValue = input.value;
     overlay.scrollTop = input.scrollTop;
     overlay.scrollLeft = input.scrollLeft;
@@ -6260,6 +6325,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const renderModal = () => {
     if (!state.modal) return '';
+    if (state.modal === 'guest-ai') {
+      const urdu = courseUsesUrdu();
+      return '<div class="course-modal-backdrop" role="presentation"><section class="course-modal course-help-modal" role="dialog" aria-modal="true" aria-labelledby="guest-ai-title"' + (urdu ? ' lang="ur" dir="rtl"' : '') + '><button class="course-modal-close" type="button" data-action="close-modal" aria-label="' + escapeHtml(urdu ? 'پیغام بند کریں' : 'Close message') + '">×</button><p class="course-eyebrow">' + escapeHtml(urdu ? 'مہمان موڈ' : 'Guest mode') + '</p><h2 id="guest-ai-title" tabindex="-1">' + escapeHtml(urdu ? 'کورس اے آئی کے لیے سائن اِن کریں' : 'Sign in to use Course AI') + '</h2><p>' + escapeHtml(urdu ? 'مہمان موڈ میں آپ کا سیکھنا نجی طور پر اس براؤزر میں رہتا ہے۔ کورس اے آئی اور اس کے پیغامات استعمال کرنے کے لیے سائن اِن درکار ہے۔ موجودہ مرحلے کی مدد، مثالیں اور وضاحتیں پھر بھی دستیاب ہیں۔' : 'Guest learning stays private to this browser. Sign in to use Course AI and send a message. Current-step help, examples, and explanations are still available.') + '</p><div class="course-modal-actions"><a class="course-primary-button" href="/login/?next=' + encodeURIComponent(window.location.pathname + window.location.search) + '">' + escapeHtml(urdu ? 'سائن اِن کریں' : 'Sign in') + '</a><button class="course-secondary-button" type="button" data-action="close-modal">' + escapeHtml(urdu ? 'سیکھتے رہیں' : 'Keep learning') + '</button></div></section></div>';
+    }
     if (state.modal === 'ai-chat') {
       // On compact screens this is a dedicated full-screen course view rather
       // than a squeezed modal. The learner can return without losing the
@@ -7186,6 +7255,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'narration-jump': startNarration(Number(element.dataset.narrationIndex)); break;
       case 'pause': openCourseModal('pause', element, '[data-action="pause"]'); break;
       case 'call-ai': openCourseAi(element); break;
+      case 'mascot-speak': speakMascotDialogue(); break;
       case 'close-ai-chat': closeCourseAi(); break;
       case 'ai-send': void sendAiMessage(); break;
       case 'ai-speak-message': void speakAiMessage(Number(element.dataset.aiMessageIndex)); break;
@@ -7641,10 +7711,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     if (!event.target.matches('[data-typing-input]')) return;
     const input = event.target;
-    const previousLength = state.progress.attempt.response.length;
+    const previousCharacters = Array.from(state.progress.attempt.response || '');
     const nextValue = input.value;
-    const insertedLength = Math.max(0, nextValue.length - previousLength);
-    const removedLength = Math.max(0, previousLength - nextValue.length);
+    const nextCharacters = Array.from(nextValue || '');
+    const insertedLength = Math.max(0, nextCharacters.length - previousCharacters.length);
+    const removedLength = Math.max(0, previousCharacters.length - nextCharacters.length);
     const usesAlternativeInput = usingAlternativeInput();
     const isComposition = Boolean(event.isComposing) || /composition/i.test(event.inputType || '');
     const isUnexpectedInsertion = event.inputType === 'insertFromPaste' || event.inputType === 'insertFromDrop';
@@ -7654,12 +7725,19 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const typingNow = performance.now();
     const typingPauseMs = adaptiveLearning.lastTypingAt > 0 ? typingNow - adaptiveLearning.lastTypingAt : 0;
     adaptiveLearning.lastTypingAt = typingNow;
-    const reference = activeTypingReference();
-    const newlyCorrect = insertedLength === 1 && nextValue.charAt(previousLength) === reference.charAt(previousLength) ? 1 : 0;
+    const referenceCharacters = Array.from(activeTypingReference() || '');
+    // `input` may contain multiple characters from a fast keyboard, IME, or
+    // accessibility input. Count every inserted character immediately using
+    // Unicode-safe indexes, instead of treating the whole burst as a failure
+    // and leaving the guided overlay behind.
+    const insertedCharacters = nextCharacters.slice(previousCharacters.length);
+    const newlyCorrect = insertedCharacters.reduce((total, character, offset) => (
+      total + (character === referenceCharacters[previousCharacters.length + offset] ? 1 : 0)
+    ), 0);
     recordUnifiedBehaviourAction('typing', {
       characters: insertedLength,
       correctCharacters: newlyCorrect,
-      incorrectCharacters: insertedLength === 1 ? 1 - newlyCorrect : 0,
+      incorrectCharacters: Math.max(0, insertedLength - newlyCorrect),
       backspaces: removedLength,
       pauseMs: typingPauseMs
     });

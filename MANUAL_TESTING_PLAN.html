@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Type2Learn Manual Test Plan</title>
+  <style>
+    :root { --ink:#0d1b3d; --muted:#48617e; --line:#b9cce3; --paper:#f4f8fc; --green:#0cbd65; --blue:#1769ff; --amber:#b86900; --red:#b42318; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:14px/1.5 Arial, Helvetica, sans-serif; }
+    main { width:min(1120px, calc(100% - 48px)); margin:0 auto; padding:48px 0 64px; }
+    .cover { min-height:620px; display:flex; flex-direction:column; justify-content:space-between; padding:44px; background:linear-gradient(135deg,#fff 0%,#eef7ff 66%,#e7fff1 100%); border:1px solid var(--line); border-top:10px solid var(--green); }
+    .eyebrow { color:#076fc5; font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    h1,h2,h3 { margin:0; line-height:1.1; }
+    h1 { max-width:820px; font-family:Georgia,serif; font-size:54px; font-weight:500; letter-spacing:-.045em; }
+    h2 { margin-top:44px; padding-top:12px; border-top:2px solid var(--blue); font-size:28px; }
+    h3 { margin-top:28px; font-size:18px; }
+    p { margin:10px 0; }
+    .lead { max-width:760px; color:#243f61; font-size:20px; }
+    .meta { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:28px; }
+    .meta div,.callout { padding:14px; border:1px solid var(--line); background:#fff; }
+    .meta b { display:block; color:#0675cd; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+    .callout { border-left:5px solid var(--green); background:#f1fff7; }
+    .warning { border-left-color:var(--amber); background:#fff8e9; }
+    .danger { border-left-color:var(--red); background:#fff2f2; }
+    table { width:100%; margin:16px 0; border-collapse:collapse; background:#fff; break-inside:avoid; }
+    th,td { padding:10px; vertical-align:top; border:1px solid var(--line); text-align:left; }
+    th { background:#eaf3ff; font-size:12px; }
+    .test-id { color:#075ec8; font-weight:800; white-space:nowrap; }
+    .person-a { border-left:6px solid #1769ff; }
+    .person-b { border-left:6px solid #0cbd65; }
+    .person-c { border-left:6px solid #9b51e0; }
+    ol,ul { margin:8px 0; padding-left:22px; }
+    li { margin:4px 0; }
+    code { padding:1px 4px; border-radius:3px; background:#edf2f7; color:#152c4e; font:12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .small { color:var(--muted); font-size:12px; }
+    .page-break { break-before:page; }
+    .check { font-weight:700; color:#087844; }
+    .status { display:inline-block; padding:2px 7px; border:1px solid currentColor; border-radius:999px; font-size:11px; font-weight:700; }
+    .required { color:#087844; } .conditional { color:#9b5d00; } .blocked { color:#a51f17; }
+    @media print { @page { size:A4; margin:14mm; } body { background:#fff; font-size:10.2pt; } main { width:auto; padding:0; } .cover { min-height:255mm; } h1 { font-size:40pt; } h2 { font-size:22pt; break-after:avoid; } h3 { break-after:avoid; } table { font-size:8.6pt; } tr { break-inside:avoid; } .page-break { break-before:page; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="cover">
+    <div>
+      <p class="eyebrow">Release-readiness manual test plan · version 1.0</p>
+      <h1>Type2Learn<br>three-person manual test run</h1>
+      <p class="lead">A step-by-step, evidence-led plan for the public website, learner experience, AI-supported learning, assessment, privacy, and educator publishing workflow.</p>
+    </div>
+    <div>
+      <div class="meta">
+        <div><b>Test window</b>Choose a 1–2 day window with a stable staging deployment.</div>
+        <div><b>Participants</b>Tester A · Public & access<br>Tester B · Learner & AI<br>Tester C · Educator & release</div>
+        <div><b>Evidence location</b>One shared folder, named <code>ID_device_result.png</code> or <code>ID_device_result.mp4</code>.</div>
+      </div>
+      <p class="small">Scope is deliberately broader than a visual review. It confirms both what a learner sees and the boundaries that must hold when a feature, model, provider, or integration is unavailable.</p>
+    </div>
+  </section>
+
+  <h2>1. Rules for the whole test run</h2>
+  <div class="callout">
+    <strong>Use test data only.</strong> Do not upload real learner work, real classroom records, personal health information, production API keys, or voice recordings. Use the disposable test accounts and source material described below.
+  </div>
+  <table>
+    <thead><tr><th>Before anyone starts</th><th>Required check</th><th>Evidence / decision</th></tr></thead>
+    <tbody>
+      <tr><td>Build identity</td><td>Record Git commit, deployment URL, date/time, tester browser, operating system, screen size, and enabled environment flags.</td><td>Put the information at the top of the shared test sheet. A finding cannot be accepted without the build identifier.</td></tr>
+      <tr><td>Accounts</td><td>Create or confirm six disposable accounts: learner, guest browser profile, teacher, institute owner, platform admin, and a second learner for assignment checks.</td><td>Never share passwords in screenshots. Delete or reset all test accounts after sign-off.</td></tr>
+      <tr><td>Providers</td><td>Record whether Firebase Auth, Firestore/Admin, Gemini, OpenAI fallback, text-to-speech, storage, GitHub backup, and Supabase backup are configured in this environment.</td><td>Mark an unavailable integration <span class="status conditional">CONDITIONAL</span>, then test the authored fallback instead of treating it as a failure.</td></tr>
+      <tr><td>Browsers / screens</td><td>Use at least: Chromium desktop 1440×900, Chromium laptop 1366×768, Firefox or Safari equivalent, Android/iPhone-sized browser, and one keyboard-only pass.</td><td>Capture any clipping, overlap, unreadable contrast, unexpected scroll lock, focus loss, or motion that ignores settings.</td></tr>
+      <tr><td>Evidence standard</td><td>For every test: mark Pass / Fail / Conditional / Blocked; save one screenshot for visual tests and one request/response or log excerpt for API/provider tests.</td><td>File defects immediately with test ID, exact action, expected result, actual result, severity, evidence link, and build ID.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Severity and stop rules</h3>
+  <table>
+    <thead><tr><th>Severity</th><th>Examples</th><th>Release consequence</th></tr></thead>
+    <tbody>
+      <tr><td><b>P0 — stop</b></td><td>Private answer key reaches a learner, unauthenticated admin access, raw learner content is uploaded without consent, account takeover, unsafe AI answer disclosure, published course bypasses approval.</td><td>Stop the run; disable the affected feature and fix before release.</td></tr>
+      <tr><td><b>P1 — must fix</b></td><td>Learner cannot continue, save or sign in; navigation sends users to the wrong route; key course path fails; Urdu content is unreadable; an accessibility blocker has no alternative.</td><td>Do not approve release until fixed and retested.</td></tr>
+      <tr><td><b>P2 — fix or explicitly accept</b></td><td>Incorrect copy, a non-blocking visual collision, a conditional integration message that is unclear, missing focus indication.</td><td>Owner records a resolution or time-bound exception.</td></tr>
+      <tr><td><b>P3 — polish</b></td><td>Minor spacing, wording, or animation polish with no impact on task completion, privacy, or accessibility.</td><td>Log for the next release.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. Division of work</h2>
+  <table>
+    <thead><tr><th>Tester</th><th>Primary ownership</th><th>Estimated active time</th><th>Must hand off</th></tr></thead>
+    <tbody>
+      <tr class="person-a"><td><b>Tester A</b><br>Public site & access</td><td>Landing copy, navigation, English/Urdu, participation record, team, policies, responsive public UI, login and guest entry.</td><td>4–5 hours</td><td>Working learner/admin credentials and every public-route defect to B/C.</td></tr>
+      <tr class="person-b"><td><b>Tester B</b><br>Learner & AI</td><td>Preferences, course activity, audio/TTS, mascot, behavioural support, “I’m stuck,” Course AI, Adaptive Recall, assessment, accessibility.</td><td>6–8 hours</td><td>One completed learner run, consent status, and all support/assessment findings to C.</td></tr>
+      <tr class="person-c"><td><b>Tester C</b><br>Educator, privacy & release</td><td>Roles, invitations, structured authoring, reviewed Markdown, workflow gate, distribution, course catalogue, export/delete, API/deployment boundaries.</td><td>6–8 hours</td><td>One course package through every permitted gate, publishing decision, and final release checklist.</td></tr>
+    </tbody>
+  </table>
+  <p class="small">Run the three streams in parallel. A/B/C meet twice: once after their first critical path and once for final sign-off. Tester C owns the final Go / No-Go decision log, but cannot waive a P0/P1 defect alone.</p>
+
+  <h2 class="page-break">3. Shared test data and evidence</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Use it for</th><th>Safe sample</th></tr></thead>
+    <tbody>
+      <tr><td>Course response</td><td>Typing, Adaptive Recall, assessment feedback</td><td>“ADHD can affect attention and starting tasks. A visible first step can make beginning easier.”</td></tr>
+      <tr><td>Partially correct response</td><td>Bounded support and targeted review</td><td>“ADHD can affect attention.”</td></tr>
+      <tr><td>Incorrect response</td><td>Recovery language and no-shame feedback</td><td>“ADHD means someone is lazy.”</td></tr>
+      <tr><td>Authoring source</td><td>Teacher/institute/admin import</td><td>A three-module, non-sensitive theory lesson: “How plants use light,” with English and Urdu text, objectives, one reading section, one application, and four-option MCQs.</td></tr>
+      <tr><td>Negative source files</td><td>Intake validation</td><td>An empty file, malformed Markdown, oversize/unsupported file, missing Urdu module, and an HTML/script payload. Do not use a real malware sample.</td></tr>
+      <tr><td>Voice test</td><td>Speech input / TTS</td><td>Use only a tester’s consented sentence. Confirm transcript before sending; do not retain a recording.</td></tr>
+    </tbody>
+  </table>
+  <div class="warning callout"><strong>AI test discipline:</strong> save only the returned structured category and the screenshot needed to reproduce a fault. Never paste a provider key, full model prompt, private answer key, raw learner answer, or full chat transcript into the issue tracker.</div>
+
+  <h2 class="page-break">4. Tester A — public website and access</h2>
+  <p><b>Goal:</b> confirm that a visitor can understand what Type2Learn is, find the participation record and team, use a mirrored Urdu experience, and enter learning safely.</p>
+  <table>
+    <thead><tr><th>ID</th><th>Steps</th><th>Expected result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td class="test-id">A-01<br>Landing story</td><td><ol><li>Open <code>/</code> at 1440×900 with a clean browser profile.</li><li>Read each visible heading while scrolling through hero, interactive demo, learning loop, product, controls, audience, evidence, FAQ, and closing CTA.</li><li>Use each primary CTA.</li></ol></td><td>The page explains active learning, learner controls, bounded AI, reviewed publishing, and the public participation boundary. No claim says formal co-design or clinical validation is complete. CTAs route to login or the intended on-page/route destination.</td><td>Full-page screenshot; URLs reached by both CTAs; copy issue IDs if any.</td></tr>
+      <tr><td class="test-id">A-02<br>Navigation & crawlability</td><td><ol><li>Open every header/footer link: How it works, Learning together, Participation & trust, Team, policies, login.</li><li>Open <code>/sitemap.xml</code> and <code>/robots.txt</code>.</li><li>From landing, reach Participation & trust in one click.</li></ol></td><td>No broken links, loops, or 404s. Participation & trust is plainly reachable and describes early participation precisely. Sitemap/robots respond successfully and include public canonical routes.</td><td>Route checklist with status codes and screenshots of Participation & trust.</td></tr>
+      <tr><td class="test-id">A-03<br>Participation / trust accuracy</td><td><ol><li>Inspect the participation record, interviews/reviews, terminology, and links to source material.</li><li>Confirm the public count is presented as early evidence, not proof of a formal study.</li><li>Open source links in a new tab.</li></ol></td><td>The published wording distinguishes documented early input from a completed study, endorsement, diagnosis, or clinical claim. Links work and do not expose private information.</td><td>One screenshot of the record and a list of working source URLs.</td></tr>
+      <tr><td class="test-id">A-04<br>Team / identity</td><td><ol><li>Open Team and scroll/drag through every profile.</li><li>Confirm Muhammad Taha Bin Zaeem is “Founder and Development Lead.”</li><li>Confirm Lameea Mubashir Khan is “UI/UX Design Lead” and is clearly a non-human placeholder profile.</li></ol></td><td>All six profiles are reachable, names/roles match, cards do not crop or overlap, and edited/placeholder imagery is labelled accurately.</td><td>Screenshot of first, Lameea, and final cards at desktop and 1366×768.</td></tr>
+      <tr><td class="test-id">A-05<br>English / Urdu mirror</td><td><ol><li>Switch to Urdu from the landing page.</li><li>Repeat A-01–A-04 at minimum depth.</li><li>Check <code>html[dir=rtl]</code>, Urdu navigation, Type2Learn branding in English, punctuation, cards, and CTA directions.</li></ol></td><td>Urdu pages are real mirrored routes, not mixed-language placeholders. Text is legible, no LTR/RTL overlap occurs, and product name remains Type2Learn.</td><td>English/Urdu paired screenshots of hero, controls, evidence, and Team.</td></tr>
+      <tr><td class="test-id">A-06<br>Motion & responsive public UI</td><td><ol><li>Test 1920×1080, 1440×900, 1366×768, 768×1024, and 390×844.</li><li>Use mouse wheel, trackpad, drag, arrow keys, and touch where available.</li><li>Turn Motion off; also enable browser reduced motion.</li></ol></td><td>No text/image crops, collisions, trapped scroll, or inaccessible scroll story. Motion-off/reduced-motion has no decorative animation or scroll hijacking while content remains usable.</td><td>One screenshot per breakpoint; video only for a motion defect.</td></tr>
+      <tr><td class="test-id">A-07<br>Login / account routes</td><td><ol><li>Open Login, Register, Reset password, and Continue as Guest.</li><li>Validate blank/invalid email and password feedback.</li><li>Use a disposable email/password account; try Google sign-in if configured.</li><li>After login, sign out and confirm protected pages no longer expose data.</li></ol></td><td>Errors are clear and non-revealing. Password visibility control is aligned and works. Guest routes to allowed learner preview; sign-out clears protected state. Google/Firebase failures are clear, not silent.</td><td>Screenshot of each major state; conditionally capture auth provider error without secrets.</td></tr>
+      <tr><td class="test-id">A-08<br>Public accessibility smoke</td><td><ol><li>Navigate home, a text page, Team, and Login using Tab/Shift+Tab/Enter only.</li><li>Zoom to 200% and reflow at 400%/320 CSS px.</li><li>Use browser find, page landmarks, and visible focus.</li></ol></td><td>Logical reading/focus order, visible focus, no keyboard trap, meaningful button/link names, and reflow without horizontal content loss. Decorative images do not become required content.</td><td>Keyboard sequence notes and two zoom screenshots.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="page-break">5. Tester B — learner, support, AI, and assessment</h2>
+  <p><b>Goal:</b> complete a realistic learner journey with and without optional supports, confirming that no learner is judged by speed and every support remains controllable.</p>
+  <table>
+    <thead><tr><th>ID</th><th>Steps</th><th>Expected result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td class="test-id">B-01<br>Guest and learner entry</td><td><ol><li>Open the course as a guest in a fresh profile.</li><li>Repeat as a signed-in learner.</li><li>Confirm guest data stays browser-local and that signed-in progress has an understandable save state.</li></ol></td><td>Guest can use the intended preview/course features without needing hidden credentials. Sign-in boundary is clear. No guest gets access to privileged teacher/admin routes.</td><td>Route screenshots and browser-storage/clear-data result; no private data dump.</td></tr>
+      <tr><td class="test-id">B-02<br>Course selection and preferences</td><td><ol><li>Choose Introduction to Neurodivergent Conditions.</li><li>Confirm preferences appear only on first course choice; continue, return, and reopen settings from profile.</li><li>Exercise Focused, Balanced, Open; Flat, Balanced, Vivid; spacing; encouragement; animation; noise; TTS; mascot; language.</li></ol></td><td>Each choice is visibly distinct and applies immediately where designed. Balanced stays visually plain compared with Vivid. Open uses available width. Preferences remain course-specific and are editable later. Disabled/small-screen mascot explains why it is unavailable.</td><td>Screenshot matrix: each layout × colour; settings panel; persistence after refresh.</td></tr>
+      <tr><td class="test-id">B-03<br>Background sound and narration</td><td><ol><li>Enable Background noise. Choose white, pink, and brown.</li><li>Confirm each begins only after an explicit choice and starts at 0 volume.</li><li>Raise/lower volume; navigate, pause/save, refresh, and return.</li><li>Enable read-aloud and test start/pause/stop/restart on reading content.</li></ol></td><td>No autoplay or loud start. Selected loop remains stable across ordinary navigation. Volume range obeys its max. Read-aloud has visible state and never starts on its own. If unavailable, it explains the browser limitation.</td><td>Screen recording of controls; note device/browser audio result.</td></tr>
+      <tr><td class="test-id">B-04<br>Reading and typing loop</td><td><ol><li>Complete a reading section; use “Explain this step,” visual explanation, and skip where allowed.</li><li>On the five guided typing sections, type a correct response, a wrong character, backspace, wrap lines, and complete the section.</li><li>Try paste, keyboard-only operation, and a long response.</li></ol></td><td>Only reading/preview steps can be skipped. Typing/MCQ cannot be skipped. Guided caret follows the next required character through wrapping; correct text is green, wrong text is red without false red markings. No score or speed pressure is shown.</td><td>Screenshot of correct/wrong/wrapped typing and each support state.</td></tr>
+      <tr><td class="test-id">B-05<br>Checks, application, pause</td><td><ol><li>Submit correct and incorrect MCQs.</li><li>Complete application activity, then pause/save from top bar/logo.</li><li>Refresh/reopen and resume.</li><li>Confirm “restart” is absent where it has no purpose.</li></ol></td><td>Incorrect feedback is calm, identifies a recovery action, and does not shame/shake/flash. Pause preserves the permitted state. No visible percentage, ranking, answer key, or time requirement appears.</td><td>Correct/incorrect screenshots and resumed task screenshot.</td></tr>
+      <tr><td class="test-id">B-06<br>Support surfaces</td><td><ol><li>Open “I’m stuck.” Choose every barrier: instruction, too large, difficult words, start, too much on screen, worry about wrong answer.</li><li>Use “Talk to AI” from that chooser and open full Course AI.</li><li>Send a harmless curriculum question; then cancel/dismiss support and return to task.</li></ol></td><td>Each barrier changes only the current step and gives a bounded relevant support. Full chat remains available. Output does not diagnose, give the complete target answer before an attempt, or become a generic chatbot. Dismissal does not reappear in the same task.</td><td>One screenshot per barrier; AI request category/result or authored fallback message.</td></tr>
+      <tr><td class="test-id">B-07<br>Adaptive Recall and provider fallbacks</td><td><ol><li>Submit the partial, correct, and incorrect sample responses from section 3.</li><li>Trigger Adaptive Recall after a genuine attempt.</li><li>Temporarily use an environment with AI disabled/unavailable, if safe, or use a known fallback test route.</li></ol></td><td>Feedback names one demonstrated strength, one missing idea, and one next action in at most two sentences. It never provides a full answer first. Invalid/unavailable provider produces deterministic authored support and allows progress. No raw prompt/key is exposed in the browser.</td><td>Structured response/fallback evidence with raw learner content redacted.</td></tr>
+      <tr><td class="test-id">B-08<br>Behavioural Learning Partner</td><td><ol><li>Turn on each role: Calm Guide, Learning Partner, Self-Challenge Coach, Visual Co-Explorer.</li><li>Try Quiet, Available, Involved; proactive offers on/off; text, voice, both.</li><li>Simulate two neutral signals safely: delayed start plus return, reread plus pause, or typing pause plus retry.</li><li>Open “Why did this appear?”, dismiss it, and repeat the task.</li></ol></td><td>Roles feel distinct and remain fictional/task-bound. It offers support only after two relevant neutral signals and only one surface per task. It never claims to be a child/person, guilt-trips, diagnoses, or silently changes a setting. Dismissal suppresses that offer for the task. Mobile uses accessible chat instead of loading the mascot.</td><td>Role screenshots, reason panel, dismissal evidence, mobile result.</td></tr>
+      <tr><td class="test-id">B-09<br>Consent and data panel</td><td><ol><li>Use behaviour/adaptive support with consent off.</li><li>Turn adaptive consent on and inspect “What Type2Learn notices.”</li><li>Request export, then delete/turn off; refresh and verify the clear state.</li></ol></td><td>Without consent, only local authored support operates; no upload is claimed. With consent, the panel names compact categories—not raw answers, keystrokes, recordings, chat, or psychological labels. Export/delete controls are understandable and effective when Firebase is configured.</td><td>Before/after screenshots; conditional backend confirmation with UID redacted.</td></tr>
+      <tr><td class="test-id">B-10<br>Assessment and targeted review</td><td><ol><li>Reach a module understanding check.</li><li>Answer open questions without a translucent target answer; test text and speech path.</li><li>Complete MCQs with correct/incorrect answers.</li><li>Force a weak evidence route using partial/incorrect samples; follow review and recheck.</li><li>Repeat final course check where available.</li></ol></td><td>One question at a time. Module limits never exceed 4 open + 5 MCQ; final never exceeds 9 open + 12 MCQ. No score, percentage, answer key, or model rationale is shown. A weak result gives a supportive specific review route and bounded recheck; it does not silently fail or trap the learner.</td><td>Question sequence log, no-score screenshots, review-route screenshot, server run IDs if available.</td></tr>
+      <tr><td class="test-id">B-11<br>Course accessibility and resilience</td><td><ol><li>Run Focused, Balanced, and Open with keyboard only, reduced motion, 200% zoom, and mobile viewport.</li><li>Toggle settings popover and click outside/reclick profile to close it.</li><li>Disconnect network after page load for a local fallback attempt.</li></ol></td><td>Focused keeps one dominant task; Balanced keeps route visible; Open uses the intended width. Focus is never lost, popup closes appropriately, and no essential content is mascot-only. Offline/provider failure preserves work and gives a calm recoverable message.</td><td>Keyboard/zoom/mobile screenshots and one offline fallback result.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="page-break">6. Tester C — educator, publishing, privacy, and release gates</h2>
+  <p><b>Goal:</b> prove that theory-course content can move from a human-controlled source into the established learner UI without exposing private material or bypassing review.</p>
+  <table>
+    <thead><tr><th>ID</th><th>Steps</th><th>Expected result</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td class="test-id">C-01<br>Role boundaries</td><td><ol><li>Open <code>/admin/</code>, <code>/teacher/</code>, <code>/institute/</code>, <code>/redeem/</code>, and <code>/courses/</code as signed out, learner, teacher, institute owner, and admin.</li><li>Attempt direct URL/API access outside each role.</li></ol></td><td>Only the correct role reaches protected actions. Demo mode is visual only and cannot mutate data. Direct URLs/APIs deny access without leaking workflow content, rosters, codes, or other organisations.</td><td>Access matrix with expected HTTP/UI result for every role.</td></tr>
+      <tr><td class="test-id">C-02<br>Codes, invite and revocation</td><td><ol><li>Bootstrap only in a test environment if not already complete.</li><li>As admin, issue teacher, institute, and learner codes with expiration.</li><li>Redeem once; retry; revoke an unused code; revoke membership.</li></ol></td><td>Raw code is shown only at creation; reused/revoked/expired codes fail. Roles refresh after redemption/revocation. A revoked person loses protected access but no unrelated account data is altered.</td><td>Masked code receipt, audit record, and before/after access screenshots.</td></tr>
+      <tr><td class="test-id">C-03<br>Theory-only intake</td><td><ol><li>As teacher/institute, select Theory and submit the safe sample source.</li><li>Try Theory + coding, interactive/project, other, unsupported file, empty file, malformed file.</li><li>As admin, submit reviewed Markdown directly.</li></ol></td><td>Theory is accepted through the intended review path. Non-theory routes are visibly locked and server-rejected. Invalid sources are not published and give specific safe validation feedback. Admin direct Markdown uses the same review gate.</td><td>Form state screenshots and server validation results with filenames only.</td></tr>
+      <tr><td class="test-id">C-04<br>Structured form → Markdown</td><td><ol><li>Use the bilingual structured course form.</li><li>Add title, learning outcome, modules, English/Urdu reading, supports, activities, MCQs, and final check.</li><li>Generate/copy the canonical Markdown and validate it.</li><li>Deliberately omit Urdu, objective, MCQ option, or required section.</li></ol></td><td>Form deterministically creates <code>type2learn-theory-course/v1</code>. Missing/invalid information cannot move to a valid review state. Generated material is easy to inspect and contains no browser-only answer-key leak.</td><td>Generated Markdown file, validator result, and invalid-field screenshots.</td></tr>
+      <tr><td class="test-id">C-05<br>Review and AI draft boundary</td><td><ol><li>As admin, review a submission and move it through permitted states.</li><li>If configured, request an AI draft for missing summary/example/hint/MCQ material.</li><li>Inspect label, edit/reject it, and try to publish without human acceptance.</li></ol></td><td>Workflow permits only legal transitions. AI content is labelled draft and requires human review. It cannot create learner-visible content, remove a boundary, or approve itself. Provider failure leaves a reviewable deterministic fallback or clear status.</td><td>State-transition timeline and draft label screenshot.</td></tr>
+      <tr><td class="test-id">C-06<br>Narration and backup gate</td><td><ol><li>Add required narration assets or choose labelled device-TTS fallback according to current policy.</li><li>Attempt approval/publication before audio and all backup receipts.</li><li>Add/verify Firebase, private GitHub metadata, Supabase package, and downloadable ZIP receipts in the configured test environment.</li></ol></td><td>Publication is blocked until every mandatory gate is satisfied. A missing receipt names the missing system, not a generic error. Backup artifacts do not include credentials, raw source uploads, learner data, or answer keys in learner-accessible locations.</td><td>Gate-blocked screenshot and masked receipt list.</td></tr>
+      <tr><td class="test-id">C-07<br>Approval, distribution and learner-safe manifest</td><td><ol><li>Approve/publish the safe sample course.</li><li>Set distribution: everyone, organisation only, and selected learner.</li><li>Check catalogue as each learner/account.</li><li>Open the selected course in <code>/course/?courseId=…&amp;version=…</code>.</li></ol></td><td>Only assigned learners see/access restricted courses. The selected reviewed course uses the established rich learner UI and its supports. Browser payload contains no private uploads, review notes, answer keys, or MCQ correct options. Checked answers return only safe completion/retry states.</td><td>Catalogue comparison and a redacted network-response inspection.</td></tr>
+      <tr><td class="test-id">C-08<br>Progress, versioning and deletion</td><td><ol><li>Complete part of version 1; publish a reviewed version 2.</li><li>Verify settings/progress are versioned and do not overwrite each other.</li><li>Request privacy export and deletion for the test learner.</li></ol></td><td>Course progress/preferences are scoped by course/version. Export covers the learner’s allowed records. Delete removes the documented records and future retrieval returns the expected empty/limited state.</td><td>Version comparison and deletion confirmation with identifiers masked.</td></tr>
+      <tr><td class="test-id">C-09<br>Health, flags and failure handling</td><td><ol><li>Open the health endpoint and record enabled/disabled capabilities.</li><li>Test an unavailable service: Firebase, Gemini, OpenAI fallback, backup target, or storage, in a non-production environment.</li><li>Review server response headers and browser console.</li></ol></td><td>Health states accurately report availability. Disabled features fail closed with a useful message; no stack trace, secret, raw provider response, or private path reaches the browser. Core public site remains available when optional AI is unavailable.</td><td>Redacted health response, error screenshot, browser console export.</td></tr>
+      <tr><td class="test-id">C-10<br>Final release rehearsal</td><td><ol><li>Run one complete source → review → approve → publish → assigned learner → course completion path.</li><li>Use Tester B’s learner account for final handoff.</li><li>Confirm an admin can view as learner without becoming the learner or changing their data.</li></ol></td><td>One complete theory course becomes usable through the same rich learner experience with existing settings/TTS/completion intact. Human approval and distribution boundaries remain visible at every stage.</td><td>One chronological evidence folder, release checklist, and Go/No-Go signature.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="page-break">7. Cross-person verification matrix</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Primary tester</th><th>Independent cross-check</th><th>Pass condition</th></tr></thead>
+    <tbody>
+      <tr><td>Public participation claims</td><td>A</td><td>C</td><td>Public wording matches documented early evidence and no route overclaims formal results.</td></tr>
+      <tr><td>Preferences / presentation</td><td>B</td><td>A</td><td>Every setting has a visible, reversible effect; supports do not alter an academic objective.</td></tr>
+      <tr><td>AI and authored fallback</td><td>B</td><td>C</td><td>AI is structured, objective-bound, safe, and replaceable by authored support when disabled.</td></tr>
+      <tr><td>Behaviour Context</td><td>B</td><td>C</td><td>No raw content upload without consent; one optional support surface; no diagnosis, label, or automatic preference change.</td></tr>
+      <tr><td>Understanding checks</td><td>B</td><td>C</td><td>Question limits, no visible scoring, targeted review, and safe answer handling hold for authored and reviewed banks.</td></tr>
+      <tr><td>Course authoring workflow</td><td>C</td><td>B</td><td>Structured form/Markdown compiles to learner-safe manifest and preserves rich player behaviour.</td></tr>
+      <tr><td>Responsive / accessibility</td><td>A</td><td>B</td><td>Keyboard, zoom/reflow, Urdu RTL, reduced motion, and small screens retain core task completion.</td></tr>
+      <tr><td>Security / privacy</td><td>C</td><td>A</td><td>Role and consent gates fail closed; export/delete and sign-out have clear, verifiable outcomes.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>8. Defect report template</h2>
+  <div class="callout">
+    <p><b>Title:</b> <code>[ID] concise observable failure</code></p>
+    <p><b>Build / route / account:</b> commit, URL, role or guest, browser, viewport, flags.</p>
+    <p><b>Steps:</b> numbered actions starting from a clean state.</p>
+    <p><b>Expected:</b> the exact expected result from this plan.</p>
+    <p><b>Actual:</b> what happened; include whether it is repeatable.</p>
+    <p><b>Severity:</b> P0 / P1 / P2 / P3. <b>Evidence:</b> screenshot/video/request with private data redacted.</p>
+  </div>
+
+  <h2>9. Final sign-off</h2>
+  <table>
+    <thead><tr><th>Decision gate</th><th>Owner</th><th>Sign only when all are true</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Public release</td><td>Tester A</td><td>All public/Urdu routes work; participation language is accurate; no P0/P1 visual/accessibility issue remains.</td><td>Pass / Fail / Conditional</td></tr>
+      <tr><td>Learner release</td><td>Tester B</td><td>A learner can enter, control presentation, learn, receive bounded help, save/return, and complete support/assessment paths without a visible score or coercive behaviour.</td><td>Pass / Fail / Conditional</td></tr>
+      <tr><td>Educator release</td><td>Tester C</td><td>Permissions, review, backups, publishing, distribution, and learner-safe manifest boundaries are demonstrated end-to-end.</td><td>Pass / Fail / Conditional</td></tr>
+      <tr><td>Release owner</td><td>Named product owner</td><td>No unresolved P0/P1; conditional integrations are explicitly disabled or verified; evidence folder is complete; rollback contact is known.</td><td>Go / No-Go</td></tr>
+    </tbody>
+  </table>
+  <p class="small">A conditional result is not a pass by itself. It is acceptable only when the unavailable integration is intentionally disabled, the learner has a safe fallback, and the release owner records the deployment condition needed to enable it.</p>
+</main>
+</body>
+</html>
