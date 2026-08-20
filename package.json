@@ -11,7 +11,9 @@
     "dev": "node --watch server.mjs",
     "test": "node --test tests/**/*.test.mjs",
     "verify": "node scripts/verify-release.mjs",
-    "test:ui": "node tests/ui/ai-chat-visual.mjs"
+    "test:ui": "node tests/ui/ai-chat-visual.mjs",
+    "test:offline": "node tests/ui/offline-learning-package.mjs",
+    "test:sign-image": "node tests/ui/sign-language-image-probe.mjs"
   },
   "dependencies": {
     "firebase-admin": "^13.5.0"

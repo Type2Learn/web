@@ -1,6 +1,10 @@
 (() => {
   "use strict";
 
+  // OFFLINE LEARNING: registration is silent and never downloads content or
+  // requests persistent storage until a learner explicitly asks from settings.
+  void import('/offline-client.js?v=20260821-offline1');
+
   const route = document.body.dataset.route || "home";
   const locale = document.body.dataset.locale || document.documentElement.lang || "en";
   const isUrdu = locale.toLowerCase().startsWith("ur");

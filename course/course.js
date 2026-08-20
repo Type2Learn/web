@@ -12,6 +12,7 @@ import { visualExplanationMarkup } from './visual-explanations.js?v=20260809-ada
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
+import { downloadLearningForOffline, getOfflineStatus, registerOffline } from '/offline-client.js?v=20260821-offline1';
 
 (() => {
   'use strict';
@@ -135,6 +136,15 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     // promise from the previous loop must never mark the newly-selected loop
     // as playing (the cause of intermittent silent Brown noise).
     requestId: 0
+  };
+  // OFFLINE LEARNING: only public shell/course assets can be downloaded. AI,
+  // private courses, account data, and assessment answers always stay online.
+  const offlineLearning = {
+    supported: false,
+    checking: false,
+    downloading: false,
+    downloaded: false,
+    status: ''
   };
   // The optional 3D companion is deliberately lazy-loaded. On smaller
   // screens—or when it is switched off—the model, texture, Three.js, and
@@ -1281,6 +1291,12 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const settingsSwitch = (id, label, description, checked, disabled = false) => '<button class="course-settings-switch" type="button" role="switch" aria-checked="' + String(checked) + '" data-settings-toggle="' + escapeHtml(id) + '"' + (disabled ? ' disabled' : '') + '><span><strong>' + escapeHtml(label) + '</strong><small>' + escapeHtml(description) + '</small></span><i aria-hidden="true"><b></b></i></button>';
 
+  const offlineLearningMarkup = () => '<section class="course-learning-partner-settings course-offline-learning"><p class="course-eyebrow">OFFLINE LEARNING</p><p>Download the current public course package for this browser. Your local progress, lesson text, background noise, and learner controls will stay available without a connection. Course AI, sign-in, private teacher courses, and cloud sync still need the internet.</p>'
+    + (offlineLearning.supported
+      ? '<button class="course-text-button" type="button" data-offline-download' + (offlineLearning.downloading ? ' disabled' : '') + '>' + escapeHtml(offlineLearning.downloading ? 'Downloading learning package…' : offlineLearning.downloaded ? 'Downloaded for offline use' : 'Download learning for offline use') + '</button>'
+      : '<p class="course-settings-menu-gate">Offline download is not supported in this browser. You can still keep learning while this page remains open.</p>')
+    + (offlineLearning.status ? '<p class="course-partner-data-status" role="status">' + escapeHtml(offlineLearning.status) + '</p>' : '') + '</section>';
+
   const courseSettingsMenu = () => {
     if (!state.settingsMenu) return '';
     const preferencesSaved = coursePreferencesAreSaved();
@@ -1315,6 +1331,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       settingsChoiceGroup('reading-surface', 'Reading surface', 'Choose a low-glare surface for lesson text. It does not change the lesson wording.', [['paper', 'Paper'], ['soft-blue', 'Soft blue'], ['warm-cream', 'Warm cream']], ['paper', 'soft-blue', 'warm-cream'].includes(choices['reading-surface']) ? choices['reading-surface'] : 'paper'),
       settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It starts muted; you choose the volume.', choices['background-noise'] === 'on'),
       choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="' + (BACKGROUND_NOISE_MAX_VOLUME * 100) + '" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
+      offlineLearningMarkup(),
       settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
       settingsSwitch('mascot', 'Mascot', mascotUnavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', choices.mascot === 'on', mascotUnavailable),
       // BEHAVIOURAL LEARNING PARTNER: this is independent from the visual
@@ -7156,6 +7173,40 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     window.location.assign(destination.pathname + destination.search);
   };
 
+  const refreshOfflineLearningStatus = async () => {
+    offlineLearning.checking = true;
+    try {
+      const status = await getOfflineStatus();
+      offlineLearning.supported = Boolean(status.supported && status.installed);
+      offlineLearning.downloaded = Boolean(status.downloaded);
+    } catch (_) {
+      offlineLearning.supported = false;
+    } finally {
+      offlineLearning.checking = false;
+    }
+  };
+
+  const downloadOfflineLearning = async () => {
+    if (offlineLearning.downloading) return;
+    offlineLearning.downloading = true;
+    offlineLearning.status = 'Preparing the learning package for this browser…';
+    render();
+    try {
+      const result = await downloadLearningForOffline();
+      offlineLearning.downloaded = true;
+      offlineLearning.status = result.failures?.length
+        ? 'Core learning is downloaded. A few optional files can refresh the next time you are online.'
+        : 'Learning is downloaded for offline use on this browser.';
+      announce('Learning package downloaded for offline use.');
+    } catch (error) {
+      offlineLearning.status = error?.message || 'The learning package could not be downloaded. Your current work is unchanged.';
+      announce(offlineLearning.status);
+    } finally {
+      offlineLearning.downloading = false;
+      render();
+    }
+  };
+
   const saveCourseLearningChoice = (key, value) => {
     const choices = learningChoices();
     choices[key] = value;
@@ -7505,6 +7556,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       }
       const current = learningChoices()[key] === 'on';
       saveCourseLearningChoice(key, current ? 'off' : 'on');
+      return;
+    }
+    const offlineDownload = event.target.closest('[data-offline-download]');
+    if (offlineDownload && !offlineDownload.disabled) {
+      void downloadOfflineLearning();
       return;
     }
     const control = event.target.closest('[data-action]');
@@ -7949,6 +8005,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     }
     syncBackgroundNoisePreferences();
     syncMascotPreferences();
+    void registerOffline().then(refreshOfflineLearningStatus).then(() => {
+      if (state.settingsMenu) render();
+    });
     if (upgradeLegacyNarrationVoice()) save();
     render();
     // Adaptive support is loaded after the normal course renders. A failed or

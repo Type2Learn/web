@@ -1,4 +1,10 @@
 import { getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
+import { registerOffline } from '/offline-client.js?v=20260821-offline1';
+
+// Keep the learning-entry routes offline-capable even when a learner opens
+// them directly rather than arriving from the public landing page. This only
+// registers the worker; it never downloads a course package automatically.
+void registerOffline();
 
 const app = document.getElementById('learn-app');
 const preferenceStoragePrefix = 'type2learn-course-preferences-v1:';

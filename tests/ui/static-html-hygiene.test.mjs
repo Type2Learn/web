@@ -5,7 +5,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const excludedDirectories = new Set(['.git', '.research', 'node_modules', 'vendor']);
+// `tmp/` contains deliberately untracked investigation/check fixtures. It is
+// never shipped by this repository, so release hygiene must scan the product
+// tree rather than third-party research copies placed beside it locally.
+const excludedDirectories = new Set(['.git', '.research', 'node_modules', 'tmp', 'vendor']);
 const localAssetPattern = /\.(?:avif|css|glb|ico|jpe?g|js|mjs|mp3|ogg|pdf|png|svg|ttf|webp|woff2?)(?:$|[?#])/i;
 
 async function walk(directory) {

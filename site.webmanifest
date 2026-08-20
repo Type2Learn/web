@@ -1,0 +1,11 @@
+{
+  "name": "Type2Learn",
+  "short_name": "Type2Learn",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5faff",
+  "theme_color": "#f5faff",
+  "icons": [
+    { "src": "/assets/type2learn-favicon.png", "sizes": "any", "type": "image/png" }
+  ]
+}

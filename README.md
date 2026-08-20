@@ -119,6 +119,27 @@ feature flags, safeguards, and rollout requirements in
 | Objective-evidence monitor and targeted review | Implemented | Assessment runs store only question/objective IDs and bounded outcome categories; never an answer, option choice, score, or model rationale |
 | AI-generated visual assets | Intentionally disabled | Requires separate moderation, storage, retention, and curriculum-review work |
 | Structured and direct-reviewed theory-course authoring | Implemented behind private server configuration | Admins may use the bilingual form or import reviewed Markdown directly; Firebase, human review, narration/TTS choice, and all four backup receipts remain required before publication |
+| Offline public learning package | Implemented | A learner explicitly downloads the shipped public course, local controls, offline-capable audio, mascot assets, and public site shell to one browser. AI, authentication, cloud sync, private teacher content, and unpublished/reviewed answer material stay online-only. |
+| PSL-ready on-device sign input foundation | Implemented, intentionally not surfaced in the learner UI yet | Browser-local MediaPipe landmark extraction is tested with a real hand image. It makes **no** sign or translation claim until an evaluated Pakistani Sign Language temporal model is approved and installed. |
+
+## Private by design: offline learning and sign input
+
+**Offline learning** is an explicit course-setting download, not an automatic
+cache. It keeps the public course player, shipped lesson material, selected
+controls, background-noise loops, and local browser progress usable without a
+connection. It deliberately excludes API responses, Firebase credentials,
+account data, Course AI, cloud syncing, private educator packages, uploads,
+answer keys, and review notes.
+
+**Sign input is being built carefully.** The repository includes a
+PSL-ready, on-device landmark contract that extracts hand geometry locally in
+the browser. It currently exists only as a tested technical foundation—not as
+a translator and not as a learner-facing feature. A still image can validate
+landmark ingestion; it cannot establish sign meaning. Word-level support will
+remain disabled until Type2Learn has an evaluated, licensed Pakistani Sign
+Language sequence model, a transparent error policy, and curriculum review.
+See [sign-language/README.md](sign-language/README.md) for the scope,
+privacy boundary, model gate, and third-party notices.
 
 ## Private educator and course-publishing workspace
 
