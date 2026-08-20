@@ -240,8 +240,8 @@ const buildRuntime = async () => {
     // availability. They are present even while disabled for a staged rollout.
     learningAnalytics: createLearningAnalyticsService({ config, firebase }),
     adaptiveSupport: createAdaptiveSupportService({ config, firebase, ledger, provider: modelProvider }),
-    assessments: createAssessmentService({ config, firebase, ledger, provider: modelProvider }),
-    behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider }),
+    assessments: createAssessmentService({ config, firebase, ledger, courseCatalog, provider: modelProvider }),
+    behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
     access,
     courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider }),
     courseBackups: createCourseBackupService({ config, firebase, access }),
@@ -308,6 +308,17 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'GET' && pathname === '/api/v1/course-authoring/submission-review') {
       const url = new URL(request.url || '/', 'http://localhost');
       return sendJson(response, 200, await courseAuthoring.submissionReview({ authorization: request.headers.authorization, submissionId: url.searchParams.get('submissionId') }));
+    }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/source-download') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      const result = await courseAuthoring.downloadSource({ authorization: request.headers.authorization, submissionId: url.searchParams.get('submissionId') });
+      const safeFilename = String(result.filename || 'course-source').replace(/[\\/\r\n"]/g, '_');
+      return send(response, 200, result.buffer, {
+        ...securityHeaders('/api', { api: true }),
+        'Content-Type': result.contentType || 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${safeFilename}"`,
+        'Content-Length': result.buffer.length
+      });
     }
     if (request.method === 'GET' && pathname === '/api/v1/course-authoring/courses') {
       return sendJson(response, 200, await courseAuthoring.listCourses({ authorization: request.headers.authorization }));
@@ -423,6 +434,19 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'POST' && pathname === '/api/v1/assessment/drafts') {
       return sendJson(response, 200, await assessments.createDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
+    if (request.method === 'GET' && pathname === '/api/v1/assessment/drafts') {
+      return sendJson(response, 200, await assessments.getDraft({
+        authorization: request.headers.authorization,
+        query: {
+          draftId: url.searchParams.get('draftId'),
+          courseId: url.searchParams.get('courseId'),
+          courseVersion: url.searchParams.get('courseVersion'),
+          scope: url.searchParams.get('scope'),
+          moduleIndex: url.searchParams.get('moduleIndex'),
+          language: url.searchParams.get('language')
+        }
+      }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/assessment/publish') {
       return sendJson(response, 200, await assessments.publishDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
@@ -430,6 +454,10 @@ const handleApi = async (request, response, pathname, runtime) => {
       return sendJson(response, 200, await assessments.start({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     const assessmentRun = pathname.match(/^\/api\/v1\/assessment\/([A-Za-z0-9_-]{1,100})$/);
+    const assessmentReview = pathname.match(/^\/api\/v1\/assessment\/([A-Za-z0-9_-]{1,100})\/reviewed$/);
+    if (assessmentReview && request.method === 'POST') {
+      return sendJson(response, 200, await assessments.acknowledgeReview({ authorization: request.headers.authorization, runId: assessmentReview[1] }));
+    }
     if (assessmentRun && request.method === 'GET') {
       return sendJson(response, 200, await assessments.getRun({ authorization: request.headers.authorization, runId: assessmentRun[1] }));
     }

@@ -53,7 +53,6 @@ export const createModelProvider = (config) => {
   const openAiReady = () => Boolean(config.openAiApiKey && config.openAiResponsesUrl);
   const openAiPrimaryPurposes = new Set([
     'adaptive-recall',
-    'adaptive-support',
     'assessment-evaluation',
     'assessment-generation',
     'final-assessment-generation',
@@ -65,10 +64,15 @@ export const createModelProvider = (config) => {
   // Behavioural companion wording is intentionally Gemini-first. Nano is a
   // bounded repair/verification fallback only; this flow must never consume a
   // Mini or final-assessment model.
-  const geminiFirstNanoFallbackPurposes = new Set(['behavioural-partner']);
+  const geminiFirstNanoFallbackPurposes = new Set([
+    'behavioural-partner',
+    // A preference proposal is behavioural wording, not a complex judgment.
+    // It therefore follows the same inexpensive, privacy-bounded routing as
+    // the fictional partner: Flash-Lite first and Nano only as fallback.
+    'adaptive-support'
+  ]);
   const miniPurposes = new Set([
     'adaptive-recall',
-    'adaptive-support',
     'assessment-evaluation',
     'assessment-generation',
     'intent-generation',

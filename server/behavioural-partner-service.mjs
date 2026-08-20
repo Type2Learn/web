@@ -43,8 +43,21 @@ const partnerGaps = [
 // Authored, curriculum-bound fallbacks. They make the feature useful offline
 // and guard against malformed provider wording. They offer process support,
 // never a diagnosis, a score, an answer, or emotional pressure.
-const authored = ({ role, trigger, language, phase, moduleIndex, courseId }) => {
+const authored = ({ role, trigger, language, phase, moduleIndex, courseId, moduleTitle = '' }) => {
   const assessment = phase === 'assessment';
+  const trustedTitle = String(moduleTitle || '').trim().slice(0, 180);
+  const publishedPartnerPair = [
+    trustedTitle
+      ? `I am working through “${trustedTitle}”. I understand the first part, but I am still unsure how it connects to the next idea. Can you explain one connection in your own words?`
+      : 'I understand part of this idea. I am still unsure how it connects to the next idea. Can you explain one connection in your own words?',
+    trustedTitle
+      ? `میں «${trustedTitle}» پر کام کر رہا ہوں۔ میں پہلا حصہ سمجھتا ہوں، مگر ابھی یہ واضح نہیں کہ یہ اگلے خیال سے کیسے جڑتا ہے۔ کیا آپ اپنے الفاظ میں ایک تعلق سمجھا سکتے ہیں؟`
+      : 'میں اس خیال کا ایک حصہ سمجھتا ہوں، مگر ابھی یہ واضح نہیں کہ یہ اگلے خیال سے کیسے جڑتا ہے۔ کیا آپ اپنے الفاظ میں ایک تعلق سمجھا سکتے ہیں؟'
+  ];
+  const publishedRereadPair = [
+    trustedTitle ? `You are revisiting “${trustedTitle}”. What is one relationship you can see between two ideas on this page?` : 'You are revisiting this idea. What is one relationship you can see between two ideas on this page?',
+    trustedTitle ? `آپ «${trustedTitle}» کو دوبارہ دیکھ رہے ہیں۔ اس صفحے کے دو خیالات کے درمیان ایک تعلق کیا ہے؟` : 'آپ اس خیال کو دوبارہ دیکھ رہے ہیں۔ اس صفحے کے دو خیالات کے درمیان ایک تعلق کیا ہے؟'
+  ];
   const copy = {
     'calm-guide': {
       starting: ['Start with the first visible sentence only. You can decide what comes next after that.', 'صرف پہلے نظر آنے والے جملے سے شروع کریں۔ اس کے بعد کیا کرنا ہے آپ خود طے کر سکتے ہیں۔'],
@@ -55,8 +68,10 @@ const authored = ({ role, trigger, language, phase, moduleIndex, courseId }) => 
     'learning-partner': {
       'working-through-typing': assessment
         ? ['I can help with the process: read the prompt once, choose text or speech, then share your own answer. I cannot give an answer or hint.', 'میں عمل میں مدد کر سکتا ہوں: سوال ایک بار پڑھیں، متن یا آواز منتخب کریں، پھر اپنا جواب دیں۔ میں جواب یا اشارہ نہیں دے سکتا۔']
-        : ((courseId || LEGACY_COURSE_ID) === LEGACY_COURSE_ID ? partnerGaps[moduleIndex] : null) || ['I understand part of this idea. I am still unsure how it connects to a useful support—can you explain one link in your own words?', 'میں اس خیال کا ایک حصہ سمجھتا ہوں۔ مجھے ابھی یہ واضح نہیں کہ یہ مفید مدد سے کیسے جڑتا ہے—کیا آپ اپنے الفاظ میں ایک تعلق سمجھا سکتے ہیں؟'],
-      're-reading': ['I noticed you are revisiting this idea. Tell me one relationship you can see between the idea and a support.', 'لگتا ہے آپ اس خیال کو دوبارہ دیکھ رہے ہیں۔ کیا آپ خیال اور مدد کے درمیان ایک تعلق بتا سکتے ہیں؟'],
+        : ((courseId || LEGACY_COURSE_ID) === LEGACY_COURSE_ID ? partnerGaps[moduleIndex] : null) || publishedPartnerPair,
+      're-reading': (courseId || LEGACY_COURSE_ID) === LEGACY_COURSE_ID
+        ? ['I noticed you are revisiting this idea. Tell me one relationship you can see between the idea and a support.', 'لگتا ہے آپ اس خیال کو دوبارہ دیکھ رہے ہیں۔ کیا آپ خیال اور مدد کے درمیان ایک تعلق بتا سکتے ہیں؟']
+        : publishedRereadPair,
       fallback: ['Help me complete one part of the idea in your own words. I will only reflect what you show me.', 'خیال کا ایک حصہ اپنے الفاظ میں مکمل کرنے میں میری مدد کریں۔ میں صرف وہی دہراؤں گا جو آپ دکھائیں گے۔']
     },
     'self-challenge': {
@@ -100,7 +115,7 @@ export const directiveForContext = (context) => {
   if (role === 'visual-co-explorer') action = 'open-visual';
   if (context.layout === 'focused') surface = 'quiet-trigger';
   if (context.presence === 'quiet') surface = 'quiet-trigger';
-  return { role, trigger, surface, action, reasonCategory: trigger, expires: 'task', message: authored({ role, trigger, language: context.language, phase, moduleIndex: context.moduleIndex, courseId: context.courseId }) };
+  return { role, trigger, surface, action, reasonCategory: trigger, expires: 'task', message: authored({ role, trigger, language: context.language, phase, moduleIndex: context.moduleIndex, courseId: context.courseId, moduleTitle: context.moduleTitle }) };
 };
 
 // Exported for the offline contract matrix. This remains server-only code; the
@@ -151,7 +166,7 @@ export const validModelMessage = (value) => {
   return text;
 };
 
-export const createBehaviouralPartnerService = ({ config, firebase, ledger, provider }) => {
+export const createBehaviouralPartnerService = ({ config, firebase, ledger, provider, contextResolver = null }) => {
   const enabled = () => Boolean(config.behaviourContextEnabled && config.adaptiveLearningEnabled);
   const available = () => Boolean(enabled() && firebase.available && firebase.firestore);
   const profile = (uid) => firebase.firestore.collection('type2learnLearningProfiles').doc(hash(uid));
@@ -170,7 +185,32 @@ export const createBehaviouralPartnerService = ({ config, firebase, ledger, prov
   };
   const directive = async ({ authorization, body }) => {
     const learner = await assertConsent(authorization);
-    const context = cleanContext(body);
+    const rawContext = cleanContext(body);
+    // COURSE-BOUND COMPANION CONTEXT: never use a title, objective, or lesson
+    // phrase supplied by the browser when a model may phrase the partner. The
+    // same authenticated resolver used by Course AI loads only the visible
+    // reviewed manifest and refuses typing targets, checks, or answer keys.
+    // The partner receives one trusted module title—not learner work or full
+    // course content—so it can stay truthful without becoming a hint engine.
+    let trustedPage = null;
+    if (contextResolver?.resolve) {
+      trustedPage = await contextResolver.resolve({
+        authorization,
+        body: {
+          courseId: rawContext.courseId,
+          courseVersion: rawContext.courseVersion,
+          language: rawContext.language,
+          page: { moduleIndex: rawContext.moduleIndex, phase: rawContext.phase }
+        }
+      });
+    }
+    const context = {
+      ...rawContext,
+      moduleTitle: String(trustedPage?.title || '').slice(0, 180),
+      // Objectives are stable identifiers only. Client-provided labels never
+      // decide what the companion says or what it considers demonstrated.
+      objectiveIds: [`${rawContext.courseId}-m${rawContext.moduleIndex + 1}`]
+    };
     const deterministic = directiveForContext(context);
     if (!deterministic || !context.proactive) return { directive: null, source: 'authored' };
     let message = deterministic.message;

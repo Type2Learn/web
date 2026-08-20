@@ -47,18 +47,30 @@ export const deterministicAssessmentEvaluation = ({ item, curriculum, answer }) 
   const raw = String(answer || '').trim();
   const answerTerms = terms(raw);
   const sourceTerms = terms(curriculum?.source);
-  const rubricTerms = terms([item?.answerGuide, ...(item?.rubric || [])].join(' '));
+  // The entire approved source can contain more than one course idea—most
+  // noticeably in a final check. Treat the item's guide and rubric as the
+  // objective-specific anchor so unrelated lesson vocabulary alone can never
+  // look like evidence for the question currently being answered.
+  const objectiveTerms = terms([item?.answerGuide, ...(item?.rubric || [])].join(' '));
   const sourceEvidence = intersection(answerTerms, sourceTerms);
-  const rubricEvidence = intersection(answerTerms, rubricTerms);
+  const objectiveEvidence = intersection(answerTerms, objectiveTerms);
   const words = normalise(raw).split(' ').filter(Boolean);
   const repeated = repeatedPhrase(raw);
   const quality = qualityBand({ words: words.length, characters: raw.length, repeated });
-  const contentEvidence = sourceEvidence.length + rubricEvidence.length;
+  const contentEvidence = sourceEvidence.length + objectiveEvidence.length;
   const signal = {
     responseDepth: quality,
-    courseGrounding: contentEvidence >= 4 ? 'strong' : contentEvidence >= 2 ? 'some' : 'limited',
+    // This is evidence about the response *against this objective*, not a
+    // learner score. Persisting the bounded count lets a later audit verify
+    // why an authored fallback chose review without storing the response.
+    courseGrounding: objectiveEvidence.length >= 2 && contentEvidence >= 4
+      ? 'strong'
+      : objectiveEvidence.length >= 1 && contentEvidence >= 2
+        ? 'some'
+        : 'limited',
     sourceTermsMatched: Math.min(sourceEvidence.length, 8),
-    rubricTermsMatched: Math.min(rubricEvidence.length, 6)
+    rubricTermsMatched: Math.min(objectiveEvidence.length, 6),
+    objectiveTermsMatched: Math.min(objectiveEvidence.length, 6)
   };
   const objectiveIds = Array.isArray(item?.objectiveIds) ? item.objectiveIds : [];
 
@@ -69,7 +81,8 @@ export const deterministicAssessmentEvaluation = ({ item, curriculum, answer }) 
       signal
     };
   }
-  if (quality === 'substantive' && contentEvidence >= 3 && sourceEvidence.length >= 1) {
+  if (quality === 'substantive' && contentEvidence >= 3
+    && sourceEvidence.length >= 1 && objectiveEvidence.length >= 2) {
     return {
       outcome: 'demonstrated', demonstratedObjectiveIds: objectiveIds, needsReviewObjectiveIds: [],
       feedback: 'Result under review. Your response connects to the course idea. You can continue when you are ready.',

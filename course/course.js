@@ -2,11 +2,11 @@ import { COURSE_CONTENT as DEFAULT_COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU as DEFAULT_COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260813-rich-manifest2';
+import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260813-rich-manifest2';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
 import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
 import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
-import { companionBubbleMarkup, companionDockMarkup, localCompanionDirective } from './learning-partner.js?v=20260811-behaviour-partner1';
+import { companionBubbleMarkup, companionDockMarkup, localCompanionDirective } from './learning-partner.js?v=20260814-course-bound-partner1';
 import { adaptiveProposalMarkup, taskInitiationMarkup } from './adaptive-support.js?v=20260809-adaptive-learning1';
 import { visualExplanationMarkup } from './visual-explanations.js?v=20260809-adaptive-learning1';
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
@@ -91,7 +91,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     error: '',
     feedback: '',
     response: '',
-    selectedOption: ''
+    selectedOption: '',
+    recognition: null,
+    listening: false,
+    // A separate aggregate rhythm clock prevents a gap from an earlier
+    // guided-typing activity being misclassified as assessment hesitation.
+    // The clock itself is never persisted.
+    lastInputAt: 0
   };
   // Typing narration is deliberately a separate state machine. A normal
   // playlist cannot wait for, react to, or correct individual keystrokes.
@@ -396,6 +402,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     layout: 'balanced',
     encouragement: 'subtle',
     animations: 'gentle',
+    // Reading presentation remains an explicit, course-scoped learner choice.
+    // It is deliberately separate from the website colour style: this low-glare
+    // surface affects lesson text only and is never inferred or changed by AI.
+    'reading-surface': 'paper',
+    'reading-text-size': 'standard',
+    'reading-spacing': 'standard',
+    'reading-width': 'comfortable',
+    'reading-contrast': 'off',
     'background-noise': 'off',
     'background-noise-type': 'pink',
     'background-noise-volume': '0',
@@ -535,11 +549,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const audio = prepareBackgroundNoiseAudio();
     if (!audio) return;
     cancelBackgroundNoiseFade();
-    // A route transition can delay requestAnimationFrame on some browsers.
-    // Start at a deliberately low non-zero level, then smoothly rise to the
-    // learner's selected (and capped) value. This prevents a silent control
-    // that says “Pause” when the initial fade frame has not run yet.
-    audio.volume = Math.min(backgroundNoise.volume, 0.055);
+    // Keep the course player consistent with first-run preferences: background
+    // noise always starts muted. The learner explicitly chooses any audible
+    // level with the capped volume control; the short fade only prevents a
+    // sudden jump once a non-zero level has been selected.
+    audio.volume = 0;
     try {
       await audio.play();
       backgroundNoise.isPlaying = true;
@@ -802,6 +816,27 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         sharedSettings = saveLearnerSettings(
           storageKeys.learnerId,
           setUserOverride(sharedSettings, 'readAloud', savedChoices['text-to-speech'] === 'on')
+        );
+      }
+      // The setup page and in-course profile menu share these exact values.
+      // Apply an explicitly saved reading choice immediately, rather than
+      // waiting for the learner to reopen settings after entering the course.
+      const savedReadingChoices = [
+        ['reading-text-size', 'textSize', ['standard', 'large', 'extra-large']],
+        ['reading-spacing', 'spacing', ['standard', 'relaxed']],
+        ['reading-width', 'readingWidth', ['narrow', 'comfortable', 'wide']]
+      ];
+      savedReadingChoices.forEach(([choiceKey, settingKey, allowed]) => {
+        if (!hasOwn(savedChoices, choiceKey) || !allowed.includes(savedChoices[choiceKey])) return;
+        sharedSettings = saveLearnerSettings(
+          storageKeys.learnerId,
+          setUserOverride(sharedSettings, settingKey, savedChoices[choiceKey])
+        );
+      });
+      if (hasOwn(savedChoices, 'reading-contrast') && ['on', 'off'].includes(savedChoices['reading-contrast'])) {
+        sharedSettings = saveLearnerSettings(
+          storageKeys.learnerId,
+          setUserOverride(sharedSettings, 'highContrast', savedChoices['reading-contrast'] === 'on')
         );
       }
       return normaliseState(savedCourse, sharedSettings);
@@ -1264,8 +1299,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
           ? '<p class="course-settings-menu-gate">Adaptive learning support is not available right now.</p>'
           : '',
       settingsChoiceGroup('reading-text-size', 'Reading text size', 'Change text size immediately for this course.', [['standard', 'Standard'], ['large', 'Larger'], ['extra-large', 'Extra large']], state.preferences.textSize),
+      settingsChoiceGroup('reading-spacing', 'Reading rhythm', 'Choose standard or roomier line and paragraph spacing for lesson text.', [['standard', 'Standard'], ['relaxed', 'More room']], state.preferences.spacing),
       settingsChoiceGroup('reading-width', 'Reading width', 'Choose shorter or wider reading lines.', [['narrow', 'Short lines'], ['comfortable', 'Comfortable'], ['wide', 'Wide lines']], state.preferences.readingWidth),
       settingsChoiceGroup('reading-contrast', 'Reading contrast', 'Use a higher-contrast reading surface when that feels clearer.', [['off', 'Standard'], ['on', 'Higher contrast']], state.preferences.highContrast ? 'on' : 'off'),
+      settingsChoiceGroup('reading-surface', 'Reading surface', 'Choose a low-glare surface for lesson text. It does not change the lesson wording.', [['paper', 'Paper'], ['soft-blue', 'Soft blue'], ['warm-cream', 'Warm cream']], ['paper', 'soft-blue', 'warm-cream'].includes(choices['reading-surface']) ? choices['reading-surface'] : 'paper'),
       settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It starts muted; you choose the volume.', choices['background-noise'] === 'on'),
       choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="' + (BACKGROUND_NOISE_MAX_VOLUME * 100) + '" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
       settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
@@ -1363,7 +1400,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const resetAiChat = ({ close = true } = {}) => {
     // ADAPTIVE LEARNING: close the aggregate AI-use interval before clearing
     // the session.  The telemetry never receives the learner's messages.
-    adaptiveLearning.telemetry?.action?.('ai-close');
+    recordUnifiedBehaviourAction('ai-close');
     abortAiRequest();
     stopAiReplyAudio();
     discardAiDictation();
@@ -1507,7 +1544,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       aiChat.error = '';
       // ADAPTIVE LEARNING: this is only an aggregate visible-panel duration,
       // used to offer an optional one-step return suggestion after a module.
-      adaptiveLearning.telemetry?.action?.('ai-open');
+      recordUnifiedBehaviourAction('ai-open');
     }
     if (canUseMascotAiPanel()) {
       state.modal = '';
@@ -1554,8 +1591,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const contextKey = aiChat.contextKey;
     const controller = new AbortController();
     aiChat.requestController = controller;
-    adaptiveLearning.telemetry?.action?.('ai-request');
-    recordBehaviourAction('ai-request');
+    recordUnifiedBehaviourAction('ai-request');
     render();
     try {
       const reply = await askCourseAi({ user: authenticatedUser, message, history, ...aiPageRequestContext(), signal: controller.signal });
@@ -1964,7 +2000,32 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
           // The summary remains aggregate-only. The BehaviourContext adds
           // chosen role/presence and aggregate support history, never raw
           // language, voice, chat, answers, or individual keystrokes.
-          summary: { ...summary, courseId: COURSE.id, courseVersion: activeCourseVersion(), behaviour: behaviourPartner.context.snapshot().behaviour },
+          summary: (() => {
+            const behaviourSnapshot = behaviourPartner.context.snapshot();
+            return {
+              ...summary,
+              // The telemetry boundary owns its course identity. This avoids
+              // attributing a queued module flush to a different reviewed
+              // course if a learner changes course before the network returns.
+              courseId: summary.courseId || COURSE.id,
+              courseVersion: summary.courseVersion || activeCourseVersion(),
+              // The two local collectors observe the same learner action.
+              // Keep the telemetry transport as the canonical aggregate, then
+              // merge only feature-use flags from BehaviourContext. No text,
+              // transcript, response, chat, answer key, or score crosses this
+              // boundary.
+              support: {
+                ...summary.support,
+                ...Object.fromEntries(Object.entries(behaviourSnapshot.support || {})
+                  .filter(([key]) => key !== 'assessmentHelp')
+                  .map(([key, value]) => [key, Boolean(summary.support?.[key] || value)]))
+              },
+              // The server's learner-summary validator persists only the
+              // compact behaviour object below. `behaviourSnapshot.metrics`
+              // and its session-only title never leave this browser.
+              behaviour: behaviourSnapshot.behaviour
+            };
+          })(),
           signal: requestTimeoutSignal(10000)
         })
       });
@@ -2003,7 +2064,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         || state.progress.phase !== 'preview' || displayedModuleIndex() !== moduleIndex
         || adaptiveLearning.taskInitiation || telemetry.hasRecordedFirstAction()) return;
       adaptiveLearning.taskInitiation = true;
-      telemetry.action('task-initiation-offered');
+      recordUnifiedBehaviourAction('task-initiation-offered');
       recordSupportMoment('task-entry', { result: 'optional-first-step' });
       render();
     }, 90_000);
@@ -2098,10 +2159,79 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   // ADAPTIVE LEARNING: all assessment navigation is one-question-at-a-time.
   // The browser never gets answer keys, numeric scores, or internal rubric.
   const resetUnderstandingCheckResponse = () => {
+    stopAssessmentDictation();
     understandingCheck.response = '';
     understandingCheck.selectedOption = '';
     understandingCheck.error = '';
     understandingCheck.feedback = '';
+    understandingCheck.lastInputAt = 0;
+  };
+
+  // ASSESSMENT VOICE INPUT: browser recognition begins only after an explicit
+  // learner click. Its words are placed in the same editable response box and
+  // are never retained in the behaviour context or stored until submission.
+  const stopAssessmentDictation = () => {
+    const recognition = understandingCheck.recognition;
+    understandingCheck.recognition = null;
+    understandingCheck.listening = false;
+    if (recognition) {
+      try { recognition.stop(); } catch (_) { /* Best effort only. */ }
+    }
+  };
+
+  const startAssessmentDictation = () => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      understandingCheck.error = courseUi('Speech input is not available in this browser. You can type your response instead.', 'اس براؤزر میں آواز سے جواب دستیاب نہیں ہے۔ آپ اپنا جواب ٹائپ کر سکتے ہیں۔');
+      renderUnderstandingCheck('[data-assessment-response]');
+      return;
+    }
+    stopAssessmentDictation();
+    let recognition;
+    try { recognition = new Recognition(); } catch (_) {
+      understandingCheck.error = courseUi('Speech input could not start. You can type your response instead.', 'آواز سے جواب شروع نہیں ہو سکا۔ آپ اپنا جواب ٹائپ کر سکتے ہیں۔');
+      renderUnderstandingCheck('[data-assessment-response]');
+      return;
+    }
+    const initial = understandingCheck.response.trim();
+    recognition.lang = courseUsesUrdu() ? 'ur-PK' : 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    understandingCheck.recognition = recognition;
+    understandingCheck.listening = true;
+    understandingCheck.error = '';
+    recognition.onresult = (event) => {
+      if (understandingCheck.recognition !== recognition) return;
+      const words = Array.from(event.results || []).map((result) => result[0]?.transcript || '').join(' ').trim();
+      if (!words) return;
+      understandingCheck.response = [initial, words].filter(Boolean).join(initial ? ' ' : '').slice(0, 1400);
+      const input = app.querySelector('[data-assessment-response]');
+      if (input) input.value = understandingCheck.response;
+    };
+    recognition.onerror = (event) => {
+      if (understandingCheck.recognition !== recognition) return;
+      const denied = ['not-allowed', 'service-not-allowed'].includes(String(event?.error || ''));
+      understandingCheck.error = denied
+        ? courseUi('Allow microphone access to speak a response, or type instead.', 'آواز سے جواب کے لیے مائیکروفون کی اجازت دیں، یا جواب ٹائپ کریں۔')
+        : courseUi('Speech input stopped. Your editable words are still here.', 'آواز سے جواب رک گیا ہے۔ آپ کے قابلِ تدوین الفاظ ابھی موجود ہیں۔');
+    };
+    recognition.onend = () => {
+      if (understandingCheck.recognition !== recognition) return;
+      understandingCheck.recognition = null;
+      understandingCheck.listening = false;
+      recordUnifiedBehaviourAction('speech-complete');
+      renderUnderstandingCheck('[data-assessment-response]');
+    };
+    try { recognition.start(); } catch (_) {
+      understandingCheck.recognition = null;
+      understandingCheck.listening = false;
+      understandingCheck.error = courseUi('Speech input could not start. You can type your response instead.', 'آواز سے جواب شروع نہیں ہو سکا۔ آپ اپنا جواب ٹائپ کر سکتے ہیں۔');
+      renderUnderstandingCheck('[data-assessment-response]');
+      return;
+    }
+    recordUnifiedBehaviourAction('speech-start');
+    renderUnderstandingCheck('[data-assessment-response]');
   };
 
   const renderUnderstandingCheck = (focusSelector = '') => {
@@ -2123,7 +2253,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       const savedRunId = state.progress.assessmentRunId;
       const result = resume && savedRunId
         ? await loadUnderstandingCheck({ user: authenticatedUser, runId: savedRunId, signal: requestTimeoutSignal(12000) })
-        : await startUnderstandingCheck({ user: authenticatedUser, moduleIndex: state.progress.lessonIndex, scope: state.progress.assessmentScope, language: courseUsesUrdu() ? 'ur' : 'en', signal: requestTimeoutSignal(12000) });
+        : await startUnderstandingCheck({ user: authenticatedUser, courseId: COURSE.id, courseVersion: activeCourseVersion(), moduleIndex: state.progress.lessonIndex, scope: state.progress.assessmentScope, language: courseUsesUrdu() ? 'ur' : 'en', signal: requestTimeoutSignal(12000) });
       const run = result?.run;
       if (!run?.runId) throw new Error(courseUi('This understanding check could not be opened.', 'یہ سمجھ جانچ نہیں کھولی جا سکی۔'));
       understandingCheck.run = run;
@@ -2194,6 +2324,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const finishUnderstandingCheck = () => {
+    // A completed check with one reviewed objective deliberately stays on its
+    // recovery route. The learner can save/leave at any time, but cannot
+    // accidentally skip the specific revisit + bounded recheck by using the
+    // normal next-module control.
+    if (understandingCheck.run?.completionKind === 'review') {
+      reviewUnderstandingModule();
+      return;
+    }
     const finalScope = state.progress.assessmentScope === 'final';
     state.progress.assessmentRunId = '';
     state.progress.assessmentScope = 'module';
@@ -2220,10 +2358,39 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const reviewUnderstandingModule = () => {
     const moduleIndex = Number(understandingCheck.run?.reviewModuleIndex);
     if (!Number.isInteger(moduleIndex) || moduleIndex < 0 || moduleIndex >= COURSE.steps.length) return;
+    // This is an aggregate-only return to course material. It helps the local
+    // support policy avoid offering a second surface while a learner is
+    // deliberately revisiting an objective; it never records what they read.
+    recordUnifiedBehaviourAction('reread');
     state.reviewModuleIndex = moduleIndex;
     save(courseUi('That course idea is open for review. Your check is saved.', 'یہ کورس کا خیال دوبارہ دیکھنے کے لیے کھلا ہے۔ آپ کی جانچ محفوظ ہے۔'));
     render();
     focusCurrentTask();
+  };
+
+  // ADAPTIVE ASSESSMENT: reviewing an objective must not discard the completed
+  // no-score check. The learner can return to that exact saved outcome and
+  // choose a bounded fresh check only after looking over the related module.
+  const returnToUnderstandingCheck = async () => {
+    if (!understandingCheck.run?.runId) return;
+    try {
+      const result = await acknowledgeUnderstandingReview({
+        user: authenticatedUser,
+        runId: understandingCheck.run.runId,
+        signal: requestTimeoutSignal(10000)
+      });
+      understandingCheck.run = result?.run || { ...understandingCheck.run, reviewAcknowledged: true };
+      // The learner has chosen to return after a targeted revisit. Keep this
+      // as a bounded navigation aggregate, not an assertion that they read a
+      // particular sentence or understood a particular concept.
+      recordUnifiedBehaviourAction('return');
+      state.reviewModuleIndex = null;
+      state.progress.phase = 'assessment';
+      save(courseUi('Your saved understanding check is ready when you are.', 'آپ کی محفوظ سمجھ جانچ جب چاہیں تیار ہے۔'));
+      renderUnderstandingCheck('[data-action="restart-understanding-check"]');
+    } catch (error) {
+      announce(error?.message || courseUi('Your review is still open. Return to the saved check when you are ready.', 'آپ کا جائزہ ابھی کھلا ہے۔ جب تیار ہوں محفوظ جانچ پر واپس جائیں۔'));
+    }
   };
 
   const restartUnderstandingCheck = () => {
@@ -2423,7 +2590,20 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     // The consented telemetry is already aggregate-only. Sharing only its
     // numeric counters avoids a parallel raw-input path and keeps every
     // adaptive surface grounded in one source of behaviour data.
-    if (adaptiveLearning.telemetry?.metrics) behaviourPartner.context.metrics = { ...adaptiveLearning.telemetry.metrics };
+    if (adaptiveLearning.telemetry?.metrics) {
+      // Both the legacy adaptive telemetry and the partner context collect
+      // aggregates from the same learner actions. Merge by highest observed
+      // value instead of replacing the context: a consent-gated upload path
+      // must never erase a local, privacy-safe support action (for example a
+      // spoken draft) before the support policy can consider it.
+      const currentMetrics = behaviourPartner.context.metrics || {};
+      const telemetryMetrics = adaptiveLearning.telemetry.metrics || {};
+      const metricNames = new Set([...Object.keys(currentMetrics), ...Object.keys(telemetryMetrics)]);
+      behaviourPartner.context.metrics = Object.fromEntries([...metricNames].map((name) => [name, Math.max(
+        Number(currentMetrics[name]) || 0,
+        Number(telemetryMetrics[name]) || 0
+      )]));
+    }
     const snapshot = behaviourPartner.context.snapshot({ completed });
     const local = controls.enabled ? localCompanionDirective(snapshot) : null;
     const localKey = local ? [snapshot.moduleIndex, snapshot.phase, local.trigger, controls.role].join(':') : '';
@@ -2457,6 +2637,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const recordBehaviourAction = (kind, detail = {}) => {
     behaviourPartner.context.action(kind, detail);
     syncBehaviourContext({ requestAi: true });
+  };
+
+  // UNIFIED BEHAVIOUR EVENT: every adaptive surface observes the same
+  // deliberately-minimised action. LearningTelemetry is the consent-gated
+  // upload transport; BehaviourContext keeps the local session view. Calling
+  // this helper never passes a learner's words, transcript, answer, audio, or
+  // score to either collector.
+  const recordUnifiedBehaviourAction = (kind, detail = {}) => {
+    adaptiveLearning.telemetry?.action(kind, detail);
+    recordBehaviourAction(kind, detail);
   };
 
   const companionMessage = (message) => {
@@ -2505,13 +2695,22 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       if (behaviourPartner.recognition !== recognition) return;
       behaviourPartner.listening = false;
       behaviourPartner.recognition = null;
-      if (finalText) recordBehaviourAction('return');
+      if (finalText) {
+        // The transcript remains in the editable local draft. Behaviour data
+        // sees only that a learner completed an optional speech interaction.
+        recordUnifiedBehaviourAction('speech-complete');
+        recordUnifiedBehaviourAction('return');
+      }
       render();
       app.querySelector('[data-companion-input]')?.focus?.({ preventScroll: true });
     };
     behaviourPartner.recognition = recognition;
     behaviourPartner.listening = true;
-    try { recognition.start(); render(); } catch (_) {
+    try {
+      recognition.start();
+      recordUnifiedBehaviourAction('speech-start');
+      render();
+    } catch (_) {
       behaviourPartner.listening = false;
       behaviourPartner.recognition = null;
     }
@@ -2521,7 +2720,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const message = behaviourPartner.draft.trim();
     if (!message || !courseAiAccessAllowed() || behaviourPartner.requesting) return;
     behaviourPartner.requesting = true;
-    recordBehaviourAction('ai-request');
+    recordUnifiedBehaviourAction('ai-request');
     try {
       const reply = await askCourseAi({ user: authenticatedUser, message, history: [], ...aiPageRequestContext(), signal: requestTimeoutSignal(20000) });
       const response = companionMessage(reply?.reply) || courseUi('I could not make that clear yet. Try sharing one smaller part of the idea.', 'میں اسے ابھی واضح نہیں بنا سکا۔ خیال کا ایک چھوٹا حصہ بتانے کی کوشش کریں۔');
@@ -2690,7 +2889,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   };
 
   const visualExplanationControl = () => {
-    if (!adaptiveLearningIsActive() || !['preview', 'read'].includes(state.progress.phase)) return '';
+    // This is a reviewed, authored course map—not an AI-generated response.
+    // It remains available without adaptive consent so learners can ask to see
+    // the current idea another way while all behaviour stays local.
+    if (!['preview', 'read'].includes(state.progress.phase)) return '';
     const label = adaptiveLearning.visualOpen
       ? courseUi('Hide visual', 'بصری وضاحت چھپائیں')
       : courseUi('Show a visual', 'بصری وضاحت دکھائیں');
@@ -2755,6 +2957,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     document.body.dataset.courseTextSize = state.preferences.textSize;
     document.body.dataset.courseSpacing = state.preferences.spacing;
     document.body.dataset.courseReadingWidth = state.preferences.readingWidth;
+    document.body.dataset.courseReadingSurface = ['paper', 'soft-blue', 'warm-cream'].includes(courseChoices['reading-surface'])
+      ? courseChoices['reading-surface']
+      : 'paper';
     document.body.dataset.courseNumericProgress = state.preferences.numericProgress;
     document.body.classList.toggle('course-high-contrast', Boolean(state.preferences.highContrast));
     document.body.classList.toggle('course-large-controls', Boolean(state.preferences.largerControls));
@@ -3950,7 +4155,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
 
   const reviewModuleTask = () => {
     const urdu = urduStep();
-    return '<article class="course-task-card course-review-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Completed module review', 'مکمل ماڈیول کا جائزہ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy(currentStep().title, urdu?.title) + '</h2><p>' + bilingualCopy('You are reviewing a completed module. Your current task is still saved and will be ready when you return.', 'آپ مکمل ماڈیول کا جائزہ لے رہے ہیں۔ آپ کا موجودہ کام محفوظ ہے اور واپسی پر تیار ہوگا۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-reading-copy" data-structured="true">' + readingContentMarkup(false) + '</div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="return-from-module-review">' + courseUi('Return to current task', 'موجودہ کام پر واپس جائیں') + ' <span aria-hidden="true">→</span></button></div></article>';
+    const returnToCheck = understandingCheck.run?.status === 'complete'
+      && Number(understandingCheck.run?.reviewModuleIndex) === displayedModuleIndex()
+      ? '<button class="course-secondary-button" type="button" data-action="return-to-understanding-check">' + courseUi('Return to saved understanding check', 'محفوظ سمجھ جانچ پر واپس جائیں') + '</button>'
+      : '';
+    return '<article class="course-task-card course-review-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Completed module review', 'مکمل ماڈیول کا جائزہ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy(currentStep().title, urdu?.title) + '</h2><p>' + bilingualCopy('You are reviewing a completed module. Your current task is still saved and will be ready when you return.', 'آپ مکمل ماڈیول کا جائزہ لے رہے ہیں۔ آپ کا موجودہ کام محفوظ ہے اور واپسی پر تیار ہوگا۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-reading-copy" data-structured="true">' + readingContentMarkup(false) + '</div><div class="course-task-actions">' + returnToCheck + '<button class="course-primary-button" type="button" data-action="return-from-module-review">' + courseUi('Return to current task', 'موجودہ کام پر واپس جائیں') + ' <span aria-hidden="true">→</span></button></div></article>';
   };
 
   const inputMethodLabels = {
@@ -4091,7 +4300,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const controller = new AbortController();
     adaptiveRecall.controller?.abort?.();
     adaptiveRecall.controller = controller;
-    adaptiveLearning.telemetry?.action('ai-request');
+    recordUnifiedBehaviourAction('ai-request');
     render();
     const fallback = adaptiveFallback(barrier);
     try {
@@ -4262,7 +4471,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   // objectives can be different. Its established UI still uses the protected
   // one-question /courses/check-answer endpoint for the final review.
   const reviewedManifestFinalAvailable = () => usesReviewedManifest() && finalExamQuestionCount() > 0;
-  const moduleUnderstandingChecksAvailable = () => understandingChecksAvailable() && !usesReviewedManifest();
+  // Dynamic checks now resolve the selected reviewed manifest on the server.
+  // Teacher-created theory courses therefore receive the same one-question,
+  // no-score assessment flow as the historic Type2Learn course.
+  const moduleUnderstandingChecksAvailable = () => understandingChecksAvailable();
 
   const assessmentQuestionMarkup = (question) => {
     if (question?.responseMode === 'mcq') {
@@ -4270,7 +4482,11 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       return '<fieldset class="course-check-options"><legend>' + escapeHtml(question.prompt) + '</legend>'
         + question.options.map((option, index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="understanding-check-answer" value="' + index + '" data-assessment-option' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(option) + '</span></label>').join('') + '</fieldset>';
     }
-    return '<label class="course-input-label" for="course-assessment-response">' + escapeHtml(courseUi('Your response', 'آپ کا جواب')) + '</label><textarea id="course-assessment-response" data-assessment-response rows="5" maxlength="1400" autocomplete="off" spellcheck="true" placeholder="' + escapeHtml(courseUi('Answer in your own words.', 'اپنے الفاظ میں جواب دیں۔')) + '">' + escapeHtml(understandingCheck.response) + '</textarea><p class="course-input-help">' + escapeHtml(courseUi('There is no target text, timer, or score. Your response stays editable until you submit it.', 'کوئی ہدف متن، ٹائمر یا اسکور نہیں ہے۔ جمع کرنے تک آپ اپنا جواب بدل سکتے ہیں۔')) + '</p>';
+    const canSpeak = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    const speech = canSpeak
+      ? '<div class="course-assessment-input-tools"><button class="course-secondary-button" type="button" data-action="assessment-dictation"' + (understandingCheck.listening ? ' aria-pressed="true"' : '') + '>' + escapeHtml(understandingCheck.listening ? courseUi('Listening…', 'سن رہا ہے…') : courseUi('Speak response', 'آواز سے جواب دیں')) + '</button><p class="course-input-help">' + escapeHtml(courseUi('Your spoken words appear here for you to review and edit before submitting.', 'آپ کے بولے گئے الفاظ یہاں آئیں گے تاکہ آپ جمع کرنے سے پہلے انہیں دیکھ اور بدل سکیں۔')) + '</p></div>'
+      : '';
+    return '<label class="course-input-label" for="course-assessment-response">' + escapeHtml(courseUi('Your response', 'آپ کا جواب')) + '</label><textarea id="course-assessment-response" data-assessment-response rows="5" maxlength="1400" autocomplete="off" spellcheck="true" placeholder="' + escapeHtml(courseUi('Answer in your own words.', 'اپنے الفاظ میں جواب دیں۔')) + '">' + escapeHtml(understandingCheck.response) + '</textarea>' + speech + '<p class="course-input-help">' + escapeHtml(courseUi('There is no target text, timer, or score. Your response stays editable until you submit it.', 'کوئی ہدف متن، ٹائمر یا اسکور نہیں ہے۔ جمع کرنے تک آپ اپنا جواب بدل سکتے ہیں۔')) + '</p>';
   };
 
   const understandingCheckTask = () => {
@@ -4294,9 +4510,16 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         ? courseUi('Return to learning overview', 'سیکھنے کے خلاصے پر واپس جائیں')
         : courseUi('Continue to next module', 'اگلے ماڈیول کی طرف جائیں');
       const recovery = needsReview
-        ? '<p class="course-assessment-recovery">' + escapeHtml(courseUi('You can revisit one related module or try another calm check. This is not a score or a judgement.', 'آپ ایک متعلقہ ماڈیول دوبارہ دیکھ سکتے ہیں یا ایک اور پُرسکون جانچ آزما سکتے ہیں۔ یہ اسکور یا فیصلہ نہیں ہے۔')) + '</p><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="review-understanding-module">' + escapeHtml(courseUi('Review this course idea', 'اس کورس کے خیال کا جائزہ لیں')) + '</button><button class="course-secondary-button" type="button" data-action="restart-understanding-check">' + escapeHtml(courseUi('Try another calm check', 'ایک اور پُرسکون جانچ آزمائیں')) + '</button>'
-        : '<div class="course-task-actions">';
-      return '<article class="course-task-card course-complete-card course-assessment-task"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(courseUi('Understanding check complete', 'سمجھ جانچ مکمل')) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(next) + '</h2><p>' + escapeHtml(understandingCheck.feedback || courseUi('Your response was recorded. Choose the next step when you are ready.', 'آپ کا جواب محفوظ ہو گیا ہے۔ جب تیار ہوں اگلا مرحلہ منتخب کریں۔')) + '</p></div>' + taskHeaderControls() + '</div>' + recovery + '<button class="course-primary-button" type="button" data-action="finish-understanding-check">' + escapeHtml(continueLabel) + ' <span aria-hidden="true">→</span></button></div></article>';
+        ? '<p class="course-assessment-recovery">' + escapeHtml(run.recheckAvailable
+          ? courseUi('You can revisit one related module, then choose one more calm check. This is not a score or a judgement.', 'آپ ایک متعلقہ ماڈیول دوبارہ دیکھ سکتے ہیں، پھر ایک اور پُرسکون جانچ منتخب کر سکتے ہیں۔ یہ اسکور یا فیصلہ نہیں ہے۔')
+          : courseUi('Revisit the related course idea before choosing another calm check. This check is saved; it is not a score or a judgement.', 'ایک اور پُرسکون جانچ منتخب کرنے سے پہلے متعلقہ کورس کے خیال کا جائزہ لیں۔ یہ جانچ محفوظ ہے؛ یہ اسکور یا فیصلہ نہیں ہے۔')) + '</p>'
+        : '';
+      const completionAction = needsReview
+        ? (run.recheckAvailable
+          ? '<button class="course-primary-button" type="button" data-action="restart-understanding-check">' + escapeHtml(courseUi('Try another calm check', 'ایک اور پُرسکون جانچ آزمائیں')) + ' <span aria-hidden="true">→</span></button>'
+          : '<button class="course-primary-button" type="button" data-action="review-understanding-module">' + escapeHtml(courseUi('Review this course idea', 'اس کورس کے خیال کا جائزہ لیں')) + ' <span aria-hidden="true">→</span></button>')
+        : '<button class="course-primary-button" type="button" data-action="finish-understanding-check">' + escapeHtml(continueLabel) + ' <span aria-hidden="true">→</span></button>';
+      return '<article class="course-task-card course-complete-card course-assessment-task"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(courseUi('Understanding check complete', 'سمجھ جانچ مکمل')) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(next) + '</h2><p>' + escapeHtml(understandingCheck.feedback || courseUi('Your response was recorded. Choose the next step when you are ready.', 'آپ کا جواب محفوظ ہو گیا ہے۔ جب تیار ہوں اگلا مرحلہ منتخب کریں۔')) + '</p></div>' + taskHeaderControls() + '</div>' + recovery + completionAction + '</div></article>';
     }
     const question = run.currentQuestion;
     const ready = question?.responseMode === 'mcq' ? understandingCheck.selectedOption !== '' : understandingCheck.response.trim().length >= 2;
@@ -4308,8 +4531,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     const assessmentAction = moduleUnderstandingChecksAvailable()
       ? '<button class="course-primary-button" type="button" data-action="start-understanding-check">' + escapeHtml(courseUi('Continue to understanding check', 'سمجھ جانچ کی طرف بڑھیں')) + ' <span aria-hidden="true">→</span></button>'
       : '';
-    const continueClass = assessmentAction ? 'course-secondary-button' : 'course-primary-button';
-    return '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Progress update', 'پیش رفت کی تازہ کاری') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('One small step complete.', 'ایک مختصر مرحلہ مکمل ہو گیا۔') + '</h2><p>' + bilingualCopy('Your next step is ready whenever you are.', 'آپ کا اگلا مرحلہ جب چاہیں تیار ہے۔') + '</p></div>' + taskHeaderControls() + '</div>' + proposal + '<div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button>' + assessmentAction + '<button class="' + continueClass + '" type="button" data-action="next-step">' + courseUi('Continue to step ' + (state.progress.lessonIndex + 2), 'مرحلہ ' + (state.progress.lessonIndex + 2) + ' جاری رکھیں') + ' <span aria-hidden="true">→</span></button></div></article>';
+    const nextStepAction = assessmentAction
+      ? ''
+      : '<button class="course-primary-button" type="button" data-action="next-step">' + courseUi('Continue to step ' + (state.progress.lessonIndex + 2), 'مرحلہ ' + (state.progress.lessonIndex + 2) + ' جاری رکھیں') + ' <span aria-hidden="true">→</span></button>';
+    const readinessCopy = assessmentAction
+      ? bilingualCopy('Your learning is saved. When you are ready, use one calm understanding check before the next module.', 'آپ کی تعلیم محفوظ ہے۔ جب تیار ہوں، اگلے ماڈیول سے پہلے ایک پُرسکون سمجھ جانچ استعمال کریں۔')
+      : bilingualCopy('Your next step is ready whenever you are.', 'آپ کا اگلا مرحلہ جب چاہیں تیار ہے۔');
+    return '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Progress update', 'پیش رفت کی تازہ کاری') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('One small step complete.', 'ایک مختصر مرحلہ مکمل ہو گیا۔') + '</h2><p>' + readinessCopy + '</p></div>' + taskHeaderControls() + '</div>' + proposal + '<div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button>' + assessmentAction + nextStepAction + '</div></article>';
   };
 
   const finalModuleCompleteTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('The 11 learning modules are complete.', 'سیکھنے کے 11 ماڈیولز مکمل ہو گئے ہیں।') + '</h2><p>' + bilingualCopy('Your completed modules and settings are saved locally. When you are ready, complete the final exam one question at a time. It has ' + finalExamQuestionCount() + ' questions and no timer.', 'آپ کے مکمل ماڈیولز اور ترتیبات مقامی طور پر محفوظ ہیں۔ جب تیار ہوں، آخری امتحان ایک وقت میں ایک سوال مکمل کریں۔ اس میں ' + finalExamQuestionCount() + ' سوال ہیں اور کوئی ٹائمر نہیں ہے۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="start-final-exam">' + courseUi('Start final exam', 'آخری امتحان شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
@@ -4326,7 +4554,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const finalModuleSavedTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Your course work is saved.', 'آپ کا کورس ورک محفوظ ہے۔') + '</h2><p>' + bilingualCopy('The optional understanding check is not available in this session. You can return to your learning overview without losing your completed modules.', 'اختیاری سمجھ جانچ اس سیشن میں دستیاب نہیں ہے۔ آپ مکمل ماڈیولز کھوئے بغیر سیکھنے کے خلاصے پر واپس جا سکتے ہیں۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="dashboard">' + courseUi('Return to learning overview', 'سیکھنے کے خلاصے پر واپس جائیں') + ' <span aria-hidden="true">→</span></button></div></article>';
 
   const completionTask = () => isLastStep()
-    ? (reviewedManifestFinalAvailable() ? reviewedFinalCompleteTask() : understandingChecksAvailable() ? finalUnderstandingCompleteTask() : finalModuleSavedTask())
+    ? (understandingChecksAvailable() ? finalUnderstandingCompleteTask() : reviewedManifestFinalAvailable() ? reviewedFinalCompleteTask() : finalModuleSavedTask())
     : completeTask();
 
   const examOptionState = (index, selected, correctIndex, submitted) => {
@@ -4640,6 +4868,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
   const stopVoiceInput = (message = '', nextStatus = 'stopped') => {
     const recognition = voiceInput.recognition;
     const recorder = voiceInput.recorder;
+    const hadActiveSpeech = Boolean(recognition || recorder || voiceInput.listening);
     voiceInput.stopRequested = true;
     voiceInput.sessionId += 1;
     if (voiceInput.restartTimer) {
@@ -4675,6 +4904,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (recorder && recorder.state !== 'inactive') {
       try { recorder.stop(); } catch (_) { /* Stopping a recorder is best-effort. */ }
     }
+    // A stopped microphone is still a completed *interaction*, not proof of
+    // understanding. The unified context records only that the learner used
+    // an optional input method; it never receives the audio or transcript.
+    if (hadActiveSpeech) recordUnifiedBehaviourAction('speech-complete');
     renderVoiceInputState(nextStatus, message);
   };
 
@@ -4889,6 +5122,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     voiceInput.finalTranscript = '';
     voiceInput.finalResultIndexes = new Set();
     renderVoiceInputState('listening', detail || 'Starting microphone input. Spoken words appear in the box as you speak.');
+    recordUnifiedBehaviourAction('speech-start');
     beginVoiceRecognitionCycle(sessionId);
   };
 
@@ -4954,6 +5188,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       renderVoiceInputState('stopped', canonical.corrected
         ? 'A close spoken match was aligned with the visible course sentence.'
         : 'Your recording is now editable in the response field.');
+      recordUnifiedBehaviourAction('speech-complete');
     } catch (error) {
       if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
       if (voiceRecognitionConstructor()) {
@@ -4988,6 +5223,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       recorder.addEventListener('stop', () => { void finishSpeechmaticsTypingInput(sessionId); }, { once: true });
       state.progress.attempt.inputMethod = 'voice';
       state.progress.attempt.alternativeInput = true;
+      recordUnifiedBehaviourAction('speech-start');
       recorder.start(250);
       clearSpeechmaticsTypingTimer();
       voiceInput.recordingTimer = window.setTimeout(() => stopSpeechmaticsTypingInput(), 45000);
@@ -5367,7 +5603,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         if (status === 'playing') announce('Text to speech started from the selected section.');
         else if (status === 'paused') announce('Text to speech paused.');
         else if (status === 'finished') {
-          adaptiveLearning.telemetry?.action('tts-complete');
+          recordUnifiedBehaviourAction('tts-complete');
           announce('Text to speech finished.');
         }
         else if (status === 'unsupported') announce('Text to speech is not available in this browser. You can use your device’s usual reading support.');
@@ -5508,7 +5744,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       volume: Number(state.preferences.narrationVolume)
     });
     const startIndex = Number.isInteger(index) ? index : (narration.status === 'finished' ? 0 : undefined);
-    adaptiveLearning.telemetry?.action('tts-start');
+    recordUnifiedBehaviourAction('tts-start');
     service.start(startIndex);
     save('Text to speech preference saved.');
   };
@@ -6482,10 +6718,13 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       // The final route is the guarded, backend-only understanding check: up
       // to nine own-words prompts and twelve MCQs from a reviewed bank. The
       // old client-only exam must not provide a parallel score-like pathway.
-      if (reviewedManifestFinalAvailable()) {
-        startFinalExam();
-      } else if (understandingChecksAvailable()) {
+      if (understandingChecksAvailable()) {
         void openUnderstandingCheck({ scope: 'final' });
+      } else if (reviewedManifestFinalAvailable()) {
+        // A reviewed manifest may still use its established final screen as
+        // an offline publishing fallback. When the guarded assessment service
+        // is configured, however, it is always the single final route.
+        startFinalExam();
       } else {
         goTo('dashboard', courseUi('Your course modules are complete. Your learning overview is ready.', 'آپ کے کورس ماڈیول مکمل ہیں۔ آپ کا سیکھنے کا خلاصہ تیار ہے۔'));
       }
@@ -6500,7 +6739,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     recordSupportMoment('task-entry', { result: 'module-entry' });
     save();
     render();
-    if (adaptiveLearning.taskInitiation) adaptiveLearning.telemetry?.action('task-initiation-offered');
+    if (adaptiveLearning.taskInitiation) recordUnifiedBehaviourAction('task-initiation-offered');
     showCurrentTaskFromStart();
   };
 
@@ -6657,9 +6896,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     recordSupportMoment('module-complete', { result: 'reviewed-module' });
     save();
     render();
-    // A catalogue manifest can define objectives unrelated to the historical
-    // adaptive assessment bank. Keep its completion local and reviewed rather
-    // than sending an incompatible module index to that legacy service.
+    // A reviewed manifest has its own curriculum identity. The same compact
+    // module aggregate therefore flows to its reviewed assessment bank using
+    // courseId + courseVersion—never into the historical static bank.
+    void finishAdaptiveModuleSummary();
   };
 
   const continueCheck = () => {
@@ -6760,6 +7000,10 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         : typing.target;
     const acceptedAccuracy = typingAccuracy(target, state.progress.attempt.response);
     if (normaliseTypingMatch(target) !== normaliseTypingMatch(response) && acceptedAccuracy < TYPING_AUTO_ACCEPT_ACCURACY) {
+      // This is a task retry marker, not a judgement. It lets the local
+      // support policy offer one smaller next step after a long pause/retry;
+      // it is never a score and never includes the typed response.
+      recordUnifiedBehaviourAction('typing-retry');
       state.progress.attempt.feedback = recordSupportMoment('typing-incomplete', { result: 'typing' });
       save();
       render();
@@ -6864,6 +7108,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     // on or off. The optional adaptive layer may only propose the allow-listed
     // course controls; the learner always applies them here.
     if (key === 'reading-text-size' && ['standard', 'large', 'extra-large'].includes(value)) setCourseSetting('textSize', value);
+    if (key === 'reading-spacing' && ['standard', 'relaxed'].includes(value)) setCourseSetting('spacing', value);
     if (key === 'reading-width' && ['narrow', 'comfortable', 'wide'].includes(value)) setCourseSetting('readingWidth', value);
     if (key === 'reading-contrast') setCourseSetting('highContrast', value === 'on');
 
@@ -6967,9 +7212,9 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         behaviourPartner.context.accept(partnerAction);
         if (partnerAction === 'open-visual') {
           adaptiveLearning.visualOpen = true;
-          adaptiveLearning.telemetry?.action('visual-offered');
-          adaptiveLearning.telemetry?.action('visual-open');
-          recordBehaviourAction('return');
+          recordUnifiedBehaviourAction('visual-offered');
+          recordUnifiedBehaviourAction('visual-open');
+          recordUnifiedBehaviourAction('return');
         } else if (partnerAction === 'smaller-step') {
           state.showSimple = true;
           behaviourPartner.directive = null;
@@ -7021,14 +7266,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         break;
       case 'dismiss-task-initiation':
         adaptiveLearning.taskInitiation = false;
-        adaptiveLearning.telemetry?.action('task-initiation-used');
+        recordUnifiedBehaviourAction('task-initiation-used');
         render();
         break;
       case 'toggle-visual-explanation':
         adaptiveLearning.visualOpen = !adaptiveLearning.visualOpen;
         if (adaptiveLearning.visualOpen) {
-          adaptiveLearning.telemetry?.action('visual-offered');
-          adaptiveLearning.telemetry?.action('visual-open');
+          recordUnifiedBehaviourAction('visual-offered');
+          recordUnifiedBehaviourAction('visual-open');
         }
         render();
         break;
@@ -7054,16 +7299,14 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'previous-reading-section':
         if (!smallerSectionsAreActive()) break;
         state.readingSectionIndex = Math.max(0, currentReadingSectionIndex() - 1);
-        adaptiveLearning.telemetry?.action('reread');
-        recordBehaviourAction('reread');
+        recordUnifiedBehaviourAction('reread');
         save('The previous small reading section is ready.');
         retainReadingSectionPosition('[data-action="previous-reading-section"], [data-action="next-reading-section"], [data-action="read-complete"]');
         break;
       case 'next-reading-section':
         if (!smallerSectionsAreActive()) break;
         state.readingSectionIndex = Math.min(readingSections().length - 1, currentReadingSectionIndex() + 1);
-        adaptiveLearning.telemetry?.action('reread');
-        recordBehaviourAction('reread');
+        recordUnifiedBehaviourAction('reread');
         save('The next small reading section is ready.');
         retainReadingSectionPosition('[data-action="next-reading-section"], [data-action="read-complete"]');
         break;
@@ -7073,7 +7316,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         state.showSimple = false;
         state.readingSectionIndex = 0;
         recordSupportMoment('task-entry', { result: 'typing' });
-        recordBehaviourAction('return');
+        recordUnifiedBehaviourAction('return');
         save();
         render();
         showCurrentTaskFromStart('#course-typing-input');
@@ -7089,7 +7332,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
         state.progress.attempt = blankAttempt();
         state.readingSectionIndex = 0;
         recordSupportMoment('task-entry', { result: 'reading' });
-        recordBehaviourAction('return');
+        recordUnifiedBehaviourAction('return');
         save();
         render();
         showCurrentTaskFromStart();
@@ -7109,15 +7352,25 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
       case 'resume-understanding-check': void openUnderstandingCheck({ resume: true, scope: state.progress.assessmentScope }); break;
       case 'start-final-understanding-check': void openUnderstandingCheck({ scope: 'final' }); break;
       case 'submit-understanding-check': void submitUnderstandingCheck(); break;
+      case 'assessment-dictation':
+        if (understandingCheck.listening) {
+          stopAssessmentDictation();
+          // Store only the completed input mode, never the recognised text.
+          recordUnifiedBehaviourAction('speech-complete');
+          renderUnderstandingCheck('[data-assessment-response]');
+        }
+        else startAssessmentDictation();
+        break;
       case 'return-from-understanding-check': leaveUnderstandingCheck(); break;
       case 'review-understanding-module': reviewUnderstandingModule(); break;
+      case 'return-to-understanding-check': void returnToUnderstandingCheck(); break;
       case 'restart-understanding-check': restartUnderstandingCheck(); break;
       case 'finish-understanding-check': finishUnderstandingCheck(); break;
       case 'start-final-exam':
         // A reviewed manifest retains the established exam screen but checks
         // each response through the protected reviewed-course endpoint.
-        if (reviewedManifestFinalAvailable()) startFinalExam();
-        else if (understandingChecksAvailable()) void openUnderstandingCheck({ scope: 'final' });
+        if (understandingChecksAvailable()) void openUnderstandingCheck({ scope: 'final' });
+        else if (reviewedManifestFinalAvailable()) startFinalExam();
         else goTo('dashboard', courseUi('Your course modules are complete.', 'آپ کے کورس ماڈیول مکمل ہیں۔'));
         break;
       case 'submit-exam-answer': submitFinalExamAnswer(); break;
@@ -7363,7 +7616,26 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     if (event.target.matches('[data-assessment-response]')) {
       // Assessment prose remains only in this ephemeral input state until the
       // learner submits it to the explicitly consented assessment endpoint.
-      understandingCheck.response = event.target.value.slice(0, 1400);
+      // The unified Behaviour Context receives only bounded interaction
+      // aggregates; it never receives the answer, words, or a transcript.
+      const nextResponse = event.target.value.slice(0, 1400);
+      const previousLength = understandingCheck.response.length;
+      const insertedLength = Math.max(0, nextResponse.length - previousLength);
+      const removedLength = Math.max(0, previousLength - nextResponse.length);
+      const inputAt = performance.now();
+      const pauseMs = understandingCheck.lastInputAt > 0 ? inputAt - understandingCheck.lastInputAt : 0;
+      understandingCheck.lastInputAt = inputAt;
+      const aggregate = {
+        characters: insertedLength,
+        // An own-words assessment has no canonical target, so no character
+        // is labelled correct or incorrect at input time.
+        correctCharacters: 0,
+        incorrectCharacters: 0,
+        backspaces: removedLength,
+        pauseMs
+      };
+      recordUnifiedBehaviourAction('typing', aggregate);
+      understandingCheck.response = nextResponse;
       understandingCheck.error = '';
       return;
     }
@@ -7384,14 +7656,7 @@ import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20
     adaptiveLearning.lastTypingAt = typingNow;
     const reference = activeTypingReference();
     const newlyCorrect = insertedLength === 1 && nextValue.charAt(previousLength) === reference.charAt(previousLength) ? 1 : 0;
-    adaptiveLearning.telemetry?.action('typing', {
-      characters: insertedLength,
-      correctCharacters: newlyCorrect,
-      incorrectCharacters: insertedLength === 1 ? 1 - newlyCorrect : 0,
-      backspaces: removedLength,
-      pauseMs: typingPauseMs
-    });
-    recordBehaviourAction('typing', {
+    recordUnifiedBehaviourAction('typing', {
       characters: insertedLength,
       correctCharacters: newlyCorrect,
       incorrectCharacters: insertedLength === 1 ? 1 - newlyCorrect : 0,

@@ -48,6 +48,147 @@ const sourceForStep = (step) => {
   ].map((entry) => safeText(entry, 1300)).filter(Boolean).join('\n');
 };
 
+// Reviewed theory manifests are already validated before publication. Build an
+// assessment-only curriculum from that learner-safe projection rather than
+// maintaining a second copy of a teacher's course in this service. Answer keys
+// are never part of the input to this function.
+const manifestSourceForUnit = (unit = {}) => sourceForStep({
+  content: unit.content,
+  simple: unit.simple,
+  example: unit.example
+});
+
+const safeManifestIdentifier = (value, fallback) => {
+  const cleaned = String(value || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 64);
+  return cleaned || fallback;
+};
+
+const manifestObjectives = (manifest = {}, language = 'en') => (Array.isArray(manifest.modules) ? manifest.modules : [])
+  .map((module, index) => {
+    const unit = language === 'ur' ? module?.ur : module?.en;
+    const title = safeText(unit?.title, 180) || `Module ${index + 1}`;
+    return {
+      // Keep the m01- prefix so a precise review route can be resolved without
+      // inferring anything from a learner. The rest is a reviewed module id.
+      id: `m${String(index + 1).padStart(2, '0')}-${safeManifestIdentifier(module?.id, `module-${index + 1}`)}`,
+      description: `Explain the central reviewed idea in “${title}” and connect it to one appropriate example, support, or next action.`
+    };
+  });
+
+// These answer-key projections are created only inside the server process by
+// course-catalog-service.assessmentContext(). They let the deterministic
+// reserve reuse a human-reviewed course question when model generation is
+// unavailable. This data is deliberately absent when a curriculum is built
+// from a learner manifest alone, and public assessment items strip it again.
+const reviewedFallbackQuestion = (learnerQuestion, privateQuestion, fallbackId) => {
+  const question = safeText(learnerQuestion?.question, 520);
+  const options = safeList(learnerQuestion?.options, 4);
+  const correctOptionIndex = Number(privateQuestion?.correctOption);
+  const privateOptions = safeList(privateQuestion?.options, 4);
+  if (question.length < 12 || options.length !== 4 || privateOptions.length !== 4
+    || !Number.isInteger(correctOptionIndex) || correctOptionIndex < 0 || correctOptionIndex >= 4
+    || options.some((option, index) => option !== privateOptions[index])) return null;
+  return { id: fallbackId, prompt: question, options, correctOptionIndex };
+};
+
+const reviewedFallbackChecks = (manifest, privateManifest, language, moduleIndex) => {
+  if (!privateManifest || privateManifest.format !== manifest?.format
+    || privateManifest.id !== manifest?.id || privateManifest.version !== manifest?.version) return null;
+  const locale = language === 'ur' ? 'ur' : 'en';
+  const modules = Array.isArray(manifest?.modules) ? manifest.modules : [];
+  const privateModules = Array.isArray(privateManifest?.answerKeys?.modules) ? privateManifest.answerKeys.modules : [];
+  const moduleQuestion = (index) => {
+    const learnerModule = modules[index];
+    const privateModule = privateModules.find((candidate) => candidate?.id === learnerModule?.id);
+    return reviewedFallbackQuestion(learnerModule?.[locale]?.check, privateModule?.[locale], `module-check-${index + 1}`);
+  };
+  const finalQuestions = (Array.isArray(manifest?.finalExam?.[locale]) ? manifest.finalExam[locale] : [])
+    .map((question, index) => reviewedFallbackQuestion(
+      question,
+      Array.isArray(privateManifest?.answerKeys?.finalExam?.[locale])
+        ? privateManifest.answerKeys.finalExam[locale][index]
+        : null,
+      `final-check-${index + 1}`
+    )).filter(Boolean);
+  return {
+    module: Number.isInteger(Number(moduleIndex)) ? moduleQuestion(Number(moduleIndex)) : null,
+    // Final reserve may use the reviewed final questions first, then a
+    // reviewed module check when the author supplied fewer than twelve.
+    final: [...finalQuestions, ...modules.map((_, index) => moduleQuestion(index)).filter(Boolean)]
+  };
+};
+
+export const isReviewedTheoryManifest = (manifest) => Boolean(
+  manifest
+  && manifest.format === 'type2learn-theory-course/v1'
+  && /^[a-z0-9][a-z0-9-]{2,79}$/.test(String(manifest.id || ''))
+  && /^\d+\.\d+(?:\.\d+)?$/.test(String(manifest.version || ''))
+  && Array.isArray(manifest.modules)
+  && manifest.modules.length
+);
+
+/**
+ * Builds the same constrained assessment contract for a reviewed published
+ * course as the legacy course receives. This intentionally works from the
+ * learner-safe manifest: no private source uploads or answer keys are needed
+ * for generated questions, evaluation, or recovery routing.
+ */
+export const assessmentCurriculumFromManifest = (manifest, moduleIndex, language = 'en', { privateManifest = null } = {}) => {
+  if (!isReviewedTheoryManifest(manifest)) {
+    throw apiError(400, 'INVALID_REVIEWED_COURSE', 'This published course is not ready for an understanding check.');
+  }
+  const requestedLanguage = ASSESSMENT_LANGUAGES.has(language) ? language : 'en';
+  const objectives = manifestObjectives(manifest, requestedLanguage);
+  const fallbackChecks = reviewedFallbackChecks(manifest, privateManifest, requestedLanguage, moduleIndex);
+  if (fallbackChecks?.module && moduleIndex !== 'final') fallbackChecks.module.objectiveId = objectives[Number(moduleIndex)]?.id || '';
+  if (Array.isArray(fallbackChecks?.final)) {
+    fallbackChecks.final = fallbackChecks.final.map((check, index) => ({
+      ...check,
+      // Authored final questions are reviewed learning material. When their
+      // Markdown source does not declare an explicit objective mapping, use a
+      // stable coverage rotation rather than inventing a concept or storing a
+      // learner response.
+      objectiveId: objectives[index % objectives.length]?.id || ''
+    })).filter((check) => check.objectiveId);
+  }
+  if (moduleIndex === 'final') {
+    return {
+      courseId: String(manifest.id),
+      curriculumVersion: String(manifest.version),
+      moduleIndex: 'final',
+      scope: 'final',
+      reviewedManifest: true,
+      language: requestedLanguage,
+      moduleTitle: requestedLanguage === 'ur' ? 'آخری سمجھ جانچ' : 'Final course understanding check',
+      objectives,
+      source: manifest.modules.map((module, index) => {
+        const unit = requestedLanguage === 'ur' ? module?.ur : module?.en;
+        return `Module ${index + 1}: ${manifestSourceForUnit(unit)}`;
+      }).join('\n\n').slice(0, 15000),
+      // This field is internal-only: generationInput(), published banks and
+      // publicAssessmentItem() never serialize it to a learner.
+      fallbackChecks
+    };
+  }
+  const index = Number(moduleIndex);
+  if (!Number.isInteger(index) || index < 0 || index >= manifest.modules.length) {
+    throw apiError(400, 'INVALID_MODULE', 'This assessment is not for an available course module.');
+  }
+  const unit = requestedLanguage === 'ur' ? manifest.modules[index]?.ur : manifest.modules[index]?.en;
+  return {
+    courseId: String(manifest.id),
+    curriculumVersion: String(manifest.version),
+    moduleIndex: index,
+    scope: 'module',
+    reviewedManifest: true,
+    language: requestedLanguage,
+    moduleTitle: safeText(unit?.title, 180) || `Module ${index + 1}`,
+    objectives: [objectives[index]],
+    source: manifestSourceForUnit(unit),
+    fallbackChecks
+  };
+};
+
 export const assessmentCurriculum = (moduleIndex, language = 'en') => {
   const requestedLanguage = ASSESSMENT_LANGUAGES.has(language) ? language : 'en';
   if (moduleIndex === 'final') {
@@ -111,7 +252,9 @@ export const assessmentBankJsonSchema = (curriculum) => ({
       }
     },
     coverageMap: {
-      type: 'array', minItems: 1, maxItems: curriculum.scope === 'final' ? 11 : 4,
+      type: 'array', minItems: 1, maxItems: curriculum.scope === 'final'
+        ? Math.min(100, Math.max(1, curriculum.objectives.length))
+        : 4,
       items: {
         type: 'object', additionalProperties: false,
         required: ['objectiveId', 'itemIds'],

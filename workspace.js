@@ -13,15 +13,11 @@ const status = (message, kind = 'info') => {
 };
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 const humanise = (value) => String(value || '').replace(/-/g, ' ');
-const defaultTemplate = `---\nformat: type2learn-theory-course/v1\nid: new-theory-course\nversion: 1.0.0\ntitle.en: New theory course\ntitle.ur: نیا نظریاتی کورس\nlabel.en: Introduction\nlabel.ur: تعارف\nnotice.en: This course gives general educational information.\nnotice.ur: یہ کورس عمومی تعلیمی معلومات فراہم کرتا ہے۔\n---\n\n# Module: First idea\n\n## English\n### Definition\nWrite a short explanation.\n### Daily life\nDescribe a practical situation.\n### Strengths\nDescribe a strength.\n### Challenges\nDescribe a challenge.\n### Supports\nDescribe a support.\n### Simple\nWrite a plain-language version.\n### Example\nWrite one example.\n### Hint\nWrite a short hint.\n### Typing\nlevel: Key idea\nprompt: Type the key idea.\ntarget: A short key idea.\n### Check\nquestion: Which statement is correct?\n- [x] Correct answer\n- [ ] Incorrect answer one\n- [ ] Incorrect answer two\n- [ ] Incorrect answer three\n\n## Urdu\n### Definition\nمختصر وضاحت لکھیں۔\n### Daily life\nروزمرہ کی مثال لکھیں۔\n### Strengths\nایک خوبی لکھیں۔\n### Challenges\nایک چیلنج لکھیں۔\n### Supports\nایک مدد لکھیں۔\n### Simple\nسادہ وضاحت لکھیں۔\n### Example\nایک مثال لکھیں۔\n### Hint\nمختصر اشارہ لکھیں۔\n### Typing\nlevel: Key idea\nprompt: اہم بات لکھیں۔\ntarget: ایک مختصر اہم بات۔\n### Check\nquestion: درست بیان کون سا ہے؟\n- [x] درست جواب\n- [ ] غلط جواب ایک\n- [ ] غلط جواب دو\n- [ ] غلط جواب تین\n\n# Final exam\n## English\n### Question\nquestion: What is the key idea?\n- [x] Correct answer\n- [ ] Incorrect answer one\n- [ ] Incorrect answer two\n- [ ] Incorrect answer three\n## Urdu\n### Question\nquestion: اہم بات کیا ہے؟\n- [x] درست جواب\n- [ ] غلط جواب ایک\n- [ ] غلط جواب دو\n- [ ] غلط جواب تین\n`;
-const reviewedTemplate = defaultTemplate
-  .replace('## English\\n### Definition', '## English\\n### Title\\nOne small idea\\n### Definition')
-  .replace('### Challenges\\nDescribe a challenge.\\n### Supports\\nDescribe a support.', '### Challenges\\n- One possible challenge\\n- Another possible challenge\\n### Supports\\n- One respectful support\\n- Another respectful support.')
-  .replace('level: Key idea\\n', 'level: Key idea typing\\n')
-  .replace('## Urdu\\n### Definition', '## Urdu\\n### Title\\nایک چھوٹا خیال\\n### Definition')
-  .replace('### Challenges\\nایک چیلنج لکھیں۔\\n### Supports\\nایک مدد لکھیں۔', '### Challenges\\n- ایک ممکنہ مشکل\\n- دوسری ممکنہ مشکل\\n### Supports\\n- ایک باعزت مدد\\n- دوسری باعزت مدد.')
-  .replace('## English\\n### Question', '## English\\n### Question 1')
-  .replace('## Urdu\\n### Question', '## Urdu\\n### Question 1');
+// This is a deliberately complete, valid file rather than a collection of
+// browser-side string replacements. Administrators can safely begin from it,
+// validate immediately, then replace the instructional text with reviewed
+// bilingual content. The strict server parser remains the source of truth.
+const reviewedTemplate = `---\nformat: type2learn-theory-course/v1\nid: new-theory-course\nversion: 1.0.0\ntitle.en: New theory course\ntitle.ur: نیا نظریاتی کورس\nlabel.en: Introduction\nlabel.ur: تعارف\nnotice.en: This course gives general educational information.\nnotice.ur: یہ کورس عمومی تعلیمی معلومات فراہم کرتا ہے۔\n---\n\n# Module: first-idea\n\n## English\n### Title\nOne small idea\n### Definition\nWrite a short, reviewed explanation.\n### Daily life\nDescribe one practical situation.\n### Strengths\nDescribe one possible strength without making assumptions about every learner.\n### Challenges\n- One possible challenge\n- Another possible challenge\n### Supports\n- One respectful support\n- Another respectful support\n### Simple\nWrite a plain-language version.\n### Example\nWrite one concrete example.\n### Hint\nWrite one optional, brief hint.\n### Typing\nlevel: Key idea typing\nprompt: Type the key idea.\ntarget: A short reviewed key idea.\n### Check\nquestion: Which statement is correct?\n- [x] The reviewed correct response\n- [ ] A plausible but incorrect response\n- [ ] Another incorrect response\n- [ ] Another incorrect response\n\n## Urdu\n### Title\nایک چھوٹا خیال\n### Definition\nمختصر، جائزہ شدہ وضاحت لکھیں۔\n### Daily life\nروزمرہ کی ایک عملی صورت بیان کریں۔\n### Strengths\nہر سیکھنے والے کے بارے میں مفروضہ کیے بغیر ایک ممکنہ طاقت لکھیں۔\n### Challenges\n- ایک ممکنہ مشکل\n- دوسری ممکنہ مشکل\n### Supports\n- ایک باعزت مدد\n- دوسری باعزت مدد\n### Simple\nسادہ زبان میں وضاحت لکھیں۔\n### Example\nایک واضح مثال لکھیں۔\n### Hint\nایک مختصر اختیاری اشارہ لکھیں۔\n### Typing\nlevel: Key idea typing\nprompt: اہم خیال لکھیں۔\ntarget: ایک مختصر جائزہ شدہ اہم خیال۔\n### Check\nquestion: درست بیان کون سا ہے؟\n- [x] جائزہ شدہ درست جواب\n- [ ] بظاہر درست مگر غلط جواب\n- [ ] ایک اور غلط جواب\n- [ ] ایک اور غلط جواب\n\n# Final exam\n\n## English\n### Question 1\nquestion: What is the key idea?\n- [x] The reviewed correct response\n- [ ] A plausible but incorrect response\n- [ ] Another incorrect response\n- [ ] Another incorrect response\n\n## Urdu\n### Question 1\nquestion: اہم خیال کیا ہے؟\n- [x] جائزہ شدہ درست جواب\n- [ ] بظاہر درست مگر غلط جواب\n- [ ] ایک اور غلط جواب\n- [ ] ایک اور غلط جواب\n`;
 
 let user = null;
 let account = null;
@@ -65,7 +61,7 @@ const renderSubmissions = () => {
     list.innerHTML = '<li class="workspace-empty">No course submissions are visible yet. Theory-course source material stays private until an administrator reviews it.</li>';
     return;
   }
-  list.innerHTML = submissions.map((entry) => `<li><div><strong>${escapeHtml(entry.submittedTitle || entry.source?.originalName || 'Untitled source submission')}</strong><small>Submission ${escapeHtml(entry.submissionId)} · ${escapeHtml(entry.type)} · ${escapeHtml(entry.source?.extraction || 'private source')} · Organisation ${escapeHtml(entry.ownerOrganisationId || 'not set')} · Updated ${escapeHtml(entry.updatedAt || 'just now')}</small></div><span class="workspace-tag" data-state="${escapeHtml(entry.status)}">${escapeHtml(humanise(entry.status))}</span></li>`).join('');
+  list.innerHTML = submissions.map((entry) => `<li><div><strong>${escapeHtml(entry.submittedTitle || entry.source?.originalName || 'Untitled source submission')}</strong><small>Submission ${escapeHtml(entry.submissionId)} · ${escapeHtml(entry.type)} · ${escapeHtml(entry.source?.extraction || 'private source')} · Organisation ${escapeHtml(entry.ownerOrganisationId || 'not set')} · Updated ${escapeHtml(entry.updatedAt || 'just now')}</small></div><span class="workspace-tag" data-state="${escapeHtml(entry.status)}">${escapeHtml(humanise(entry.status))}</span>${PAGE === 'admin' ? `<button class="workspace-button workspace-button--quiet" type="button" data-review-submission="${escapeHtml(entry.submissionId)}">Review source</button>` : ''}</li>`).join('');
 };
 const renderCourses = () => {
   const options = `<option value="">Choose a validated course</option>${courses.map((entry) => `<option value="${escapeHtml(entry.courseId)}@${escapeHtml(entry.version)}">${escapeHtml(entry.title?.en || entry.courseId)} · ${escapeHtml(entry.version)}</option>`).join('')}`;
@@ -204,18 +200,44 @@ const bindSubmission = () => {
 };
 const bindAuthoring = () => {
   const template = $('[data-markdown]');
-  $('[data-use-template]')?.addEventListener('click', () => { if (template) template.value = reviewedTemplate; });
-  $('[data-open-source-review]')?.addEventListener('click', async () => {
-    const submissionId = String($('[data-authoring-submission]')?.value || '').trim();
+  const openSourceReview = async (requestedSubmissionId = '') => {
+    const submissionId = String(requestedSubmissionId || $('[data-authoring-submission]')?.value || '').trim();
     if (!submissionId) { status('Enter the private source submission ID first.', 'warning'); return; }
     try {
       const result = await api(`/api/v1/course-authoring/submission-review?submissionId=${encodeURIComponent(submissionId)}`);
+      $('[data-authoring-submission]').value = result.submission?.submissionId || submissionId;
       $('[data-source-review-output]').textContent = result.requiresAdminTranscription
-        ? 'This private source needs administrator transcription before it can become reviewed Markdown. Its original upload remains private.'
+        ? 'This private source needs administrator transcription before it can become reviewed Markdown. Download the original source only if you need it for review.'
         : result.extractedText || 'No safe text was extracted.';
       if ($('[data-ai-source-excerpt]') && result.extractedText) $('[data-ai-source-excerpt]').value = result.extractedText.slice(0, 12000);
       if ($('[data-authoring-organisation]') && !($('[data-authoring-organisation]').value)) $('[data-authoring-organisation]').value = result.submission?.ownerOrganisationId || '';
       status('Private source review opened for the administrator. It is never exposed to learner pages.', 'success');
+      await loadSubmissions();
+    } catch (error) { status(error.message, 'error'); }
+  };
+  $('[data-use-template]')?.addEventListener('click', () => { if (template) template.value = reviewedTemplate; });
+  $('[data-open-source-review]')?.addEventListener('click', () => { openSourceReview(); });
+  $('[data-submission-list]')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-review-submission]');
+    if (!button) return;
+    $('[data-authoring-submission]').value = button.dataset.reviewSubmission || '';
+    show('review');
+    openSourceReview(button.dataset.reviewSubmission);
+  });
+  $('[data-download-source]')?.addEventListener('click', async () => {
+    const submissionId = String($('[data-authoring-submission]')?.value || '').trim();
+    if (!submissionId) { status('Enter the private source submission ID first.', 'warning'); return; }
+    try {
+      const response = await api(`/api/v1/course-authoring/source-download?submissionId=${encodeURIComponent(submissionId)}`);
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') || '';
+      const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] || 'course-source';
+      const anchor = document.createElement('a');
+      anchor.href = URL.createObjectURL(blob);
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(anchor.href);
+      status('The original source was downloaded privately for administrator review.', 'success');
     } catch (error) { status(error.message, 'error'); }
   });
   $('[data-markdown-form]')?.addEventListener('submit', async (event) => {
@@ -255,6 +277,98 @@ const bindAuthoring = () => {
       });
       $('[data-ai-draft-output]').textContent = JSON.stringify(result, null, 2);
       status('Fallback MCQ draft created from the reviewed facts. Copy only approved wording into Markdown and validate it again.', 'success');
+    } catch (error) { status(error.message, 'error'); }
+  });
+  // ASSESSMENT BANK REVIEW: assessment generation is intentionally separated
+  // from course Markdown authoring. The server keeps keys/rubrics private to
+  // authorised reviewers; learners only ever receive public question DTOs.
+  const assessmentRequest = () => {
+    const form = $('[data-assessment-draft-form]');
+    const values = form ? new FormData(form) : new FormData();
+    const selected = selectedCourse();
+    const scope = values.get('scope') === 'final' ? 'final' : 'module';
+    const moduleNumber = Number(values.get('moduleNumber'));
+    if (scope !== 'final' && (!Number.isInteger(moduleNumber) || moduleNumber < 1 || moduleNumber > 21)) {
+      throw new Error('Choose a module number from 1 to 21.');
+    }
+    return {
+      ...selected,
+      scope,
+      moduleIndex: scope === 'final' ? 'final' : moduleNumber - 1,
+      language: values.get('language') === 'ur' ? 'ur' : 'en'
+    };
+  };
+  const displayAssessmentDraft = (draft) => {
+    const output = $('[data-assessment-draft-output]');
+    if (!output) return;
+    output.textContent = JSON.stringify({
+      id: draft?.id,
+      status: draft?.status,
+      provider: draft?.provider || 'reviewed reserve',
+      model: draft?.model || 'deterministic',
+      course: `${draft?.courseId || ''}@${draft?.courseVersion || ''}`,
+      scope: draft?.scope,
+      moduleIndex: draft?.moduleIndex,
+      language: draft?.language,
+      items: (draft?.bank?.items || []).map((item) => ({
+        id: item.id,
+        mode: item.responseMode,
+        objectiveIds: item.objectiveIds,
+        prompt: item.prompt,
+        options: item.options,
+        correctOptionIndex: item.correctOptionIndex,
+        answerGuide: item.answerGuide,
+        rubric: item.rubric,
+        feedback: item.feedback
+      }))
+    }, null, 2);
+  };
+  const moduleWrap = $('[data-assessment-module-wrap]');
+  $('[data-assessment-draft-form] [name="scope"]')?.addEventListener('change', (event) => {
+    if (moduleWrap) moduleWrap.hidden = event.currentTarget.value === 'final';
+  });
+  $('[data-assessment-draft-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      const request = assessmentRequest();
+      if (DEMO) {
+        const draft = { id: 'preview-review-only-bank', status: 'preview-only', ...request, bank: { items: [] } };
+        $('[data-assessment-draft-id]').value = draft.id;
+        displayAssessmentDraft(draft);
+        status('Preview mode shows the human-review workflow only; it cannot generate or publish a bank.', 'warning');
+        return;
+      }
+      const result = await api('/api/v1/assessment/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
+      const draft = result.draft || {};
+      $('[data-assessment-draft-id]').value = draft.id || '';
+      $('[data-assessment-draft-output]').textContent = `Candidate ${draft.id || 'created'} is awaiting human review. Open it to inspect every question, answer guide, and rubric before publishing.`;
+      status('Assessment candidate created. It is still private and not learner-visible.', 'success');
+    } catch (error) { status(error.message, 'error'); }
+  });
+  $('[data-open-assessment-draft]')?.addEventListener('click', async () => {
+    try {
+      const request = assessmentRequest();
+      const draftId = String($('[data-assessment-draft-id]')?.value || '').trim();
+      if (!draftId) throw new Error('Enter the reviewed assessment draft ID first.');
+      if (DEMO) {
+        displayAssessmentDraft({ id: draftId, status: 'preview-only', ...request, bank: { items: [] } });
+        return;
+      }
+      const query = new URLSearchParams({ ...request, draftId });
+      const result = await api(`/api/v1/assessment/drafts?${query.toString()}`);
+      displayAssessmentDraft(result.draft);
+      status('Assessment candidate opened for human review. It remains unpublished.', 'success');
+    } catch (error) { status(error.message, 'error'); }
+  });
+  $('[data-publish-assessment-draft]')?.addEventListener('click', async () => {
+    try {
+      const request = assessmentRequest();
+      const draftId = String($('[data-assessment-draft-id]')?.value || '').trim();
+      if (!draftId) throw new Error('Open and review a draft before publishing it.');
+      if (DEMO) { status('Preview mode cannot publish an assessment bank.', 'warning'); return; }
+      if (!confirm('Publish this reviewed assessment bank? Learners will receive questions but never its answer keys or score.')) return;
+      const result = await api('/api/v1/assessment/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...request, draftId }) });
+      status(`Reviewed ${result.itemCount}-question assessment bank published. Learners still see no score or answer key.`, 'success');
     } catch (error) { status(error.message, 'error'); }
   });
   $('[data-begin-admin-review]')?.addEventListener('click', async () => {

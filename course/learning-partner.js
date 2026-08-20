@@ -31,8 +31,8 @@ const authoredPartnerGap = (snapshot, language) => {
   if (snapshot?.courseId && snapshot.courseId !== 'course-1-neurodivergent-conditions-v2') {
     const title = String(snapshot?.moduleTitle || '').trim();
     return copy(language,
-      title ? `I understand part of “${title}”. Can you help me connect it to one practical support in your own words?` : 'I understand part of this idea. Can you help me connect it to one practical support in your own words?',
-      title ? `میں «${title}» کا ایک حصہ سمجھتا ہوں۔ کیا آپ اسے ایک عملی مدد سے اپنے الفاظ میں جوڑنے میں میری مدد کر سکتے ہیں؟` : 'میں اس خیال کا ایک حصہ سمجھتا ہوں۔ کیا آپ اسے ایک عملی مدد سے اپنے الفاظ میں جوڑنے میں میری مدد کر سکتے ہیں؟');
+      title ? `I am working through “${title}”. I understand the first part, but I am still unsure how it connects to the next idea. Can you explain one connection in your own words?` : 'I understand part of this idea. Can you help me connect it to the next idea in your own words?',
+      title ? `میں «${title}» پر کام کر رہا ہوں۔ میں پہلا حصہ سمجھتا ہوں، مگر ابھی یہ واضح نہیں کہ یہ اگلے خیال سے کیسے جڑتا ہے۔ کیا آپ اپنے الفاظ میں ایک تعلق سمجھا سکتے ہیں؟` : 'میں اس خیال کا ایک حصہ سمجھتا ہوں۔ کیا آپ اسے اپنے الفاظ میں اگلے خیال سے جوڑنے میں میری مدد کر سکتے ہیں؟');
   }
   return pair ? copy(language, pair[0], pair[1]) : copy(language,
     'I understand part of this idea. Can you help me connect it to one practical support in your own words?',

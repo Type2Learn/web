@@ -298,10 +298,18 @@ export const validateTheoryCourse = (parsed) => {
     return { id: module.id, English: moduleLanguage('English', module, errors), Urdu: moduleLanguage('Urdu', module, errors) };
   });
   if (!modules.length) errors.push('Add at least one module.');
+  // A final check has at most 21 questions (nine open plus twelve MCQ) and
+  // each published module needs explicit objective coverage. Keep authoring
+  // within the reviewable, learner-friendly scope rather than silently
+  // dropping later modules from a course-level understanding check.
+  if (modules.length > 21) errors.push('Theory courses currently support up to 21 modules per reviewed course. Split a larger course into clear parts before publishing.');
   const englishExam = (parsed?.finalExam?.English || []).map((question, index) => validateQuestion(question.content, `English final question ${index + 1}`, errors));
   const urduExam = (parsed?.finalExam?.Urdu || []).map((question, index) => validateQuestion(question.content, `Urdu final question ${index + 1}`, errors));
   if (!englishExam.length || !urduExam.length) errors.push('Both English and Urdu final exams need at least one question.');
   if (englishExam.length !== urduExam.length) errors.push('English and Urdu final exams must have the same number of questions.');
+  if (englishExam.length > 21 || urduExam.length > 21) {
+    errors.push('Final checks support up to 21 reviewed questions (up to nine open responses and twelve MCQs). Split a larger final check into clear course parts before publishing.');
+  }
   return { valid: errors.length === 0, errors, metadata, modules, finalExam: { English: englishExam, Urdu: urduExam } };
 };
 

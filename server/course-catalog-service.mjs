@@ -123,6 +123,22 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       return { legacy: false, course: learnerCourseProjection(record), manifest: record.learnerManifest };
     },
 
+    // SERVER-ONLY ASSESSMENT CONTEXT: assessment-service uses this narrow
+    // internal hand-off when it must build an offline reserve from a reviewed
+    // course. It is intentionally not an HTTP route and is never returned to
+    // the course player. The private manifest remains inside the server
+    // process; learner-visible assessment DTOs still strip every answer key.
+    async assessmentContext({ authorization, courseId, version }) {
+      const account = await accountFor(authorization);
+      const { record } = await load(courseId, version);
+      assertVisible(record, account);
+      return {
+        course: learnerCourseProjection(record),
+        manifest: record.learnerManifest,
+        privateManifest: record.privateManifest || null
+      };
+    },
+
     // Human narration stays in private Firebase Storage. A learner who can
     // already open the reviewed manifest may request one short-lived URL for
     // the current module; object paths and storage credentials never enter

@@ -44,15 +44,20 @@ export class LearningTelemetry {
 
   begin(context) {
     // A module is the aggregation boundary. Moving between reading, typing,
-    // and checking must not create a stream of task-level uploads.
-    const key = [context?.moduleIndex, context?.language].join(':');
-    const oldKey = this.context && [this.context.moduleIndex, this.context.language].join(':');
+    // and checking must not create a stream of task-level uploads. Course
+    // identity is part of that boundary too: a reviewed course can share a
+    // module index and language with another course without sharing a single
+    // learner summary.
+    const courseId = String(context?.courseId || '').slice(0, 80);
+    const courseVersion = String(context?.courseVersion || '').slice(0, 24);
+    const key = [courseId, courseVersion, context?.moduleIndex, context?.language].join(':');
+    const oldKey = this.context && [this.context.courseId, this.context.courseVersion, this.context.moduleIndex, this.context.language].join(':');
     if (oldKey && oldKey !== key) {
       this.finishAiInterval();
       void this.flush('task-change');
     }
     if (oldKey !== key) {
-      this.context = { moduleIndex: Number(context?.moduleIndex) || 0, phase: String(context?.phase || 'read'), language: context?.language === 'ur' ? 'ur' : 'en' };
+      this.context = { courseId, courseVersion, moduleIndex: Number(context?.moduleIndex) || 0, phase: String(context?.phase || 'read'), language: context?.language === 'ur' ? 'ur' : 'en' };
       this.metrics = this.emptyMetrics();
       this.support = this.emptySupport();
       this.contextStartedAt = now();
@@ -100,6 +105,7 @@ export class LearningTelemetry {
     if (kind === 'tts-complete') this.metrics.ttsCompleted += 1;
     if (kind === 'speech-start') this.metrics.speechStarts += 1;
     if (kind === 'speech-complete') this.metrics.speechCompleted += 1;
+    if (kind === 'typing-retry') this.metrics.typingAbandons += 1;
     if (kind === 'ai-request') this.metrics.aiRequests += 1;
     if (kind === 'ai-open') {
       this.aiSessionOpen = true;
@@ -136,6 +142,8 @@ export class LearningTelemetry {
     if (!this.enabled || !this.context) return null;
     return {
       clientSummaryId: [this.context.moduleIndex, this.context.phase, Math.round(now()), reason].join('-').replace(/[^A-Za-z0-9_-]/g, ''),
+      courseId: this.context.courseId,
+      courseVersion: this.context.courseVersion,
       moduleIndex: this.context.moduleIndex,
       phase: this.context.phase,
       language: this.context.language,

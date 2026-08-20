@@ -56,13 +56,17 @@ export class BehaviourContext {
     this.module = { courseId: '', courseVersion: '', moduleIndex: 0, phase: 'read', language: 'en', layout: 'balanced', objectiveIds: [] };
     this.controls = normalisePartnerControls();
     this.metrics = this.emptyMetrics();
-    this.support = { assessmentHelp: false };
+    this.support = this.emptySupport();
     this.completed = false;
     this.history = { offered: 0, accepted: 0, dismissed: 0, visualsOpened: 0, missionsCompleted: 0 };
     this.dismissed = new Set();
     this.startedAt = now();
     this.lastActionAt = this.startedAt;
     this.lastTickAt = this.startedAt;
+    // Course AI can stay open while the learner reads or composes a question.
+    // Keep only that bounded elapsed time; the context never sees the thread,
+    // prompt, reply, or an input transcript.
+    this.aiSessionStartedAt = 0;
     this.visibilityHandler = () => {
       this.metrics.visibilityChanges += 1;
       this.tick();
@@ -72,6 +76,21 @@ export class BehaviourContext {
 
   emptyMetrics() {
     return { activeMs: 0, idleMs: 0, visibilityChanges: 0, firstActionMs: 0, returns: 0, rereads: 0, typingCharacters: 0, typingCorrectCharacters: 0, typingIncorrectCharacters: 0, typingBackspaces: 0, typingAbandons: 0, typingLongestPauseMs: 0, ttsStarts: 0, ttsCompleted: 0, speechStarts: 0, speechCompleted: 0, aiRequests: 0, aiActiveMs: 0 };
+  }
+
+  // Support use is kept separately from interaction rhythm. These are
+  // learner-initiated feature switches, not an inference about why a learner
+  // used them. The same bounded flags are safe to use for an optional next
+  // offer and, after consent, for one compact module summary.
+  emptySupport() {
+    return {
+      assessmentHelp: false,
+      textToSpeech: false,
+      visualOffered: false,
+      visualOpened: false,
+      taskInitiationOffered: false,
+      taskInitiationUsed: false
+    };
   }
 
   begin({ courseId = '', courseVersion = '', moduleIndex, phase, language, layout, objectiveIds = [], moduleTitle = '', controls }) {
@@ -85,13 +104,14 @@ export class BehaviourContext {
     if (changed) {
       this.module = { courseId: nextCourseId, courseVersion: nextCourseVersion, moduleIndex: Number(moduleIndex) || 0, phase: String(phase || 'read'), language: language === 'ur' ? 'ur' : 'en', layout: layout || 'balanced', objectiveIds: Array.isArray(objectiveIds) ? objectiveIds.slice(0, 3) : [], moduleTitle: String(moduleTitle || '').slice(0, 180) };
       this.metrics = this.emptyMetrics();
-      this.support = { assessmentHelp: false };
+      this.support = this.emptySupport();
       this.completed = false;
       this.history = { offered: 0, accepted: 0, dismissed: 0, visualsOpened: 0, missionsCompleted: 0 };
       this.dismissed.clear();
       this.startedAt = now();
       this.lastActionAt = this.startedAt;
       this.lastTickAt = this.startedAt;
+      this.aiSessionStartedAt = 0;
     } else {
       this.module.phase = String(phase || this.module.phase);
       this.module.layout = layout || this.module.layout;
@@ -111,6 +131,13 @@ export class BehaviourContext {
     if (kind === 'reread') this.metrics.rereads += 1;
     if (kind === 'ai-request') this.metrics.aiRequests += 1;
     if (kind === 'tts-start') this.metrics.ttsStarts += 1;
+    if (kind === 'tts-complete') this.metrics.ttsCompleted += 1;
+    if (kind === 'speech-start') this.metrics.speechStarts += 1;
+    if (kind === 'speech-complete') this.metrics.speechCompleted += 1;
+    if (kind === 'ai-open') this.aiSessionStartedAt = at;
+    if (kind === 'ai-close' && this.aiSessionStartedAt) {
+      this.aiSessionStartedAt = 0;
+    }
     if (kind === 'typing') {
       this.metrics.typingCharacters += bounded(detail.characters, 12000);
       this.metrics.typingCorrectCharacters += bounded(detail.correctCharacters, 12000);
@@ -120,6 +147,11 @@ export class BehaviourContext {
     }
     if (kind === 'typing-retry') this.metrics.typingAbandons += 1;
     if (kind === 'assessment-help') this.support.assessmentHelp = true;
+    if (kind === 'tts-start') this.support.textToSpeech = true;
+    if (kind === 'visual-offered') this.support.visualOffered = true;
+    if (kind === 'visual-open') this.support.visualOpened = true;
+    if (kind === 'task-initiation-offered') this.support.taskInitiationOffered = true;
+    if (kind === 'task-initiation-used') this.support.taskInitiationUsed = true;
     if (kind === 'complete') this.completed = true;
   }
 
@@ -127,6 +159,10 @@ export class BehaviourContext {
     const at = now();
     const elapsed = Math.max(0, at - this.lastTickAt);
     this.lastTickAt = at;
+    if (this.aiSessionStartedAt && document.visibilityState === 'visible') {
+      this.metrics.aiActiveMs += bounded(at - this.aiSessionStartedAt, 30 * 60 * 1000);
+      this.aiSessionStartedAt = at;
+    }
     // “Active” remains intentionally conservative: a visible page is active
     // only shortly after a real course action; the rest is aggregate idle time.
     if (document.visibilityState === 'visible' && at - this.lastActionAt <= 45000) this.metrics.activeMs += bounded(elapsed, 4 * 60 * 60 * 1000);
@@ -154,7 +190,7 @@ export class BehaviourContext {
       // open; telemetry intentionally does not persist this display copy.
       moduleTitle: this.module.moduleTitle,
       controls: { enabled: this.controls.enabled, role: this.controls.role, presence: this.controls.presence, proactive: this.controls.proactive },
-      metrics: { ...this.metrics }, signals,
+      metrics: { ...this.metrics }, support: { ...this.support }, signals,
       supportHistory: { accepted: this.history.accepted, dismissed: this.history.dismissed },
       behaviour: { role: this.controls.role, presence: this.controls.presence, proactive: this.controls.proactive, states, companion: { ...this.history } }
     };

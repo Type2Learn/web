@@ -44,9 +44,10 @@ export const createAdaptiveSupportService = ({ config, firebase, ledger, provide
   const status = () => ({
     available: available(),
     requiresSignIn: true,
-    // Mini produces bounded wording for the already-deterministic policy. The
-    // provider never selects the setting change or applies it by itself.
-    model: provider.status().miniModel || provider.status().chatModel,
+    // The deterministic policy selects the setting. Flash-Lite only phrases
+    // the optional wording; Nano is the bounded fallback, never Mini.
+    model: provider.status().chatModel,
+    fallbackModel: provider.status().nanoModel,
     provider: provider.status().primary || provider.status().fallback
   });
   const assertAvailable = () => {

@@ -109,6 +109,42 @@ test('Behaviour Context resets aggregates and dismissed offers for a new module'
   context.dispose();
 });
 
+test('Behaviour Context exposes feature use as compact booleans without copying learner content', () => {
+  const context = new BehaviourContext();
+  context.begin({ moduleIndex: 3, phase: 'read', language: 'en', layout: 'balanced', objectiveIds: ['module-3-core'], controls: { enabled: true } });
+  context.action('tts-start');
+  context.action('visual-offered');
+  context.action('visual-open');
+  context.action('task-initiation-offered');
+  context.action('task-initiation-used');
+  context.action('assessment-help', { answer: 'must not be included' });
+  const snapshot = context.snapshot();
+  assert.deepEqual(snapshot.support, {
+    assessmentHelp: true,
+    textToSpeech: true,
+    visualOffered: true,
+    visualOpened: true,
+    taskInitiationOffered: true,
+    taskInitiationUsed: true
+  });
+  assert.equal(JSON.stringify(snapshot).includes('must not be included'), false);
+  context.dispose();
+});
+
+test('Behaviour Context tracks only an aggregate Course AI panel interval', () => {
+  const context = new BehaviourContext();
+  context.begin({ moduleIndex: 1, phase: 'type', language: 'en', layout: 'focused', objectiveIds: ['module-1-core'], controls: { enabled: true } });
+  context.action('ai-open', { message: 'not retained' });
+  // Give the same session a small artificial elapsed interval without a real
+  // timer or a conversation payload.
+  context.aiSessionStartedAt -= 25;
+  context.action('ai-close');
+  const snapshot = context.snapshot();
+  assert.equal(snapshot.metrics.aiActiveMs >= 20, true);
+  assert.equal(JSON.stringify(snapshot).includes('not retained'), false);
+  context.dispose();
+});
+
 test('Behaviour Context records visibility only as an aggregate count', () => {
   const context = new BehaviourContext();
   const listener = documentListeners.get('visibilitychange');

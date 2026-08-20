@@ -8,7 +8,9 @@ const bounded = (value, maximum = 1000000) => Math.max(0, Math.min(maximum, Math
 const objectiveModuleIndex = (objectiveId) => {
   const match = String(objectiveId || '').match(/^m(\d{2})-/);
   const index = Number(match?.[1]) - 1;
-  return Number.isInteger(index) && index >= 0 && index <= 10 ? index : null;
+  // Reviewed theory courses may contain up to 100 modules. The compact
+  // objective identifier remains the only source for a review route.
+  return Number.isInteger(index) && index >= 0 && index <= 99 ? index : null;
 };
 
 // These labels describe only a course interaction pattern. They never claim
@@ -56,10 +58,55 @@ export const prioritiseAssessmentItems = ({ items = [], runId, signals = {} }) =
     if (signals.supportUse === 'used' && item.responseMode === 'mcq') priority += 1;
     if (signals.supportState === 'expression' && item.responseMode === 'open') priority += 1;
     if (signals.supportState === 're-reading' && item.responseMode === 'mcq') priority += 1;
+    // Prior module evidence can make the final check start with the one
+    // course objective that needs the clearest fresh evidence. This is not a
+    // score or a prediction: it only reorders already approved questions.
+    const focusIndex = Array.isArray(signals.objectiveFocusIds)
+      ? signals.objectiveFocusIds.findIndex((objectiveId) => item?.objectiveIds?.includes(objectiveId))
+      : -1;
+    if (focusIndex >= 0) priority += Math.max(2, 7 - focusIndex);
     return { item, priority, rank: stableRank(item.id, runId) };
   })
   .sort((left, right) => right.priority - left.priority || left.rank.localeCompare(right.rank))
   .map(({ item }) => item.id);
+
+// FINAL-CHECK PRIORITISATION: aggregate only stored objective outcomes from
+// already completed module checks. A later demonstrated response supersedes a
+// previous needs-review outcome for the same objective. There are no learner
+// answers, model rationales, scores, typing logs, or labels in this input.
+export const objectiveFocusFromModuleEvidence = ({ curriculum, moduleRuns = [] }) => {
+  const allowed = new Set(Array.isArray(curriculum?.objectives) ? curriculum.objectives.map((objective) => objective.id) : []);
+  const states = new Map([...allowed].map((objectiveId) => [objectiveId, 'not-yet-observed']));
+  const rank = { 'not-yet-observed': 0, uncertain: 1, review: 2, demonstrated: 3 };
+  (Array.isArray(moduleRuns) ? moduleRuns : []).forEach((run) => {
+    (Array.isArray(run?.outcomes) ? run.outcomes : []).forEach((outcome) => {
+      const demonstrated = Array.isArray(outcome?.demonstratedObjectiveIds) ? outcome.demonstratedObjectiveIds : [];
+      const review = Array.isArray(outcome?.needsReviewObjectiveIds) ? outcome.needsReviewObjectiveIds : [];
+      const asked = Array.isArray(outcome?.askedObjectiveIds) ? outcome.askedObjectiveIds : [];
+      [...new Set([...asked, ...review, ...demonstrated])].forEach((objectiveId) => {
+        if (!allowed.has(objectiveId)) return;
+        const incoming = demonstrated.includes(objectiveId)
+          ? 'demonstrated'
+          : review.includes(objectiveId)
+            ? 'review'
+            : outcome?.outcome === 'uncertain' && asked.includes(objectiveId)
+              ? 'uncertain'
+              : 'not-yet-observed';
+        // A demonstrated answer closes an earlier gap. Otherwise retain the
+        // most useful non-diagnostic evidence category seen for this course.
+        const previous = states.get(objectiveId) || 'not-yet-observed';
+        if (incoming === 'demonstrated' || rank[incoming] >= rank[previous]) states.set(objectiveId, incoming);
+      });
+    });
+  });
+  const priority = { review: 0, uncertain: 1, 'not-yet-observed': 2, demonstrated: 3 };
+  const evidence = [...states.entries()].map(([objectiveId, status]) => ({ objectiveId, status }));
+  const focusObjectiveIds = evidence
+    .filter((entry) => entry.status !== 'demonstrated')
+    .sort((left, right) => priority[left.status] - priority[right.status] || left.objectiveId.localeCompare(right.objectiveId))
+    .map((entry) => entry.objectiveId);
+  return { focusObjectiveIds, evidence };
+};
 
 const evidenceForObjective = (objectiveId, outcomes) => {
   const relevant = outcomes.filter((outcome) => {
@@ -93,7 +140,10 @@ const evidenceForObjective = (objectiveId, outcomes) => {
   };
 };
 
-export const assessmentProgressDecision = ({ curriculum, outcomes = [] }) => {
+// Rechecks remain learner-led and bounded. This prevents an assessment from
+// becoming an endless hidden score loop while still allowing a learner to
+// revisit one idea and show fresh evidence after they choose to return.
+export const assessmentProgressDecision = ({ curriculum, outcomes = [], recheckNumber = 0, maxRechecks = 2 }) => {
   const objectives = Array.isArray(curriculum?.objectives) ? curriculum.objectives : [];
   const evidence = objectives.map((objective) => evidenceForObjective(objective.id, outcomes));
   const missingObjectiveIds = evidence.filter((item) => item.status !== 'demonstrated').map((item) => item.objectiveId);
@@ -104,6 +154,8 @@ export const assessmentProgressDecision = ({ curriculum, outcomes = [] }) => {
   const reviewFocusObjectiveId = reviewCandidate?.objectiveId || '';
   const reviewModuleIndex = reviewFocusObjectiveId ? objectiveModuleIndex(reviewFocusObjectiveId) : null;
   const ready = objectives.length > 0 && missingObjectiveIds.length === 0;
+  const boundedRecheckNumber = Math.max(0, Math.min(maxRechecks, Number(recheckNumber) || 0));
+  const recheckAvailable = !ready && boundedRecheckNumber < maxRechecks;
   return {
     completionKind: ready ? 'ready' : 'review',
     missingObjectiveIds,
@@ -112,6 +164,8 @@ export const assessmentProgressDecision = ({ curriculum, outcomes = [] }) => {
     // This is an internal decision trail, not a learner score. It supports
     // audit, export, and a specific return route without profiling a person.
     evidence,
-    nextAction: ready ? 'continue' : 'revisit-one-objective'
+    recheckNumber: boundedRecheckNumber,
+    recheckAvailable,
+    nextAction: ready ? 'continue' : recheckAvailable ? 'revisit-one-objective' : 'continue-with-review-note'
   };
 };

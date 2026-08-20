@@ -151,3 +151,12 @@ test('validation rejects unsupported typing levels and unsafe identifiers', () =
   const invalidTyping = validateTheoryCourse(parseTheoryMarkdown(course().replace('level: Key idea typing', 'level: Type everything')));
   assert.ok(invalidTyping.errors.some((error) => /typing level/.test(error)));
 });
+
+test('validation keeps the final understanding check within its reviewed 21-question ceiling', () => {
+  const extraEnglish = Array.from({ length: 21 }, (_, index) => `\n### Question ${index + 2}\nquestion: Extra English question ${index + 2}?\n- [x] Reviewed answer\n- [ ] Incorrect one\n- [ ] Incorrect two\n- [ ] Incorrect three`).join('');
+  const extraUrdu = Array.from({ length: 21 }, (_, index) => `\n### Question ${index + 2}\nquestion: اضافی اردو سوال ${index + 2}؟\n- [x] جائزہ شدہ جواب\n- [ ] غلط ایک\n- [ ] غلط دو\n- [ ] غلط تین`).join('');
+  const oversized = course().replace('\n## Urdu\n### Question 1', `${extraEnglish}\n## Urdu\n### Question 1`).replace(/(\n## Urdu\n### Question 1[\s\S]*)$/, `$1${extraUrdu}`);
+  const validation = validateTheoryCourse(parseTheoryMarkdown(oversized));
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((error) => /up to 21 reviewed questions/.test(error)));
+});

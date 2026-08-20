@@ -29,9 +29,17 @@ test('assessment partner support remains process-only', () => {
 });
 
 test('published-course partner wording never inherits the historic condition script', () => {
-  const directive = directiveForContext(context({ courseId: 'published-learning-course', courseVersion: '1.0', signals: { ...context().signals } }));
-  assert.match(directive.message, /part of this idea|useful support/i);
+  const directive = directiveForContext(context({ courseId: 'published-learning-course', courseVersion: '1.0', moduleTitle: 'Learning through examples', signals: { ...context().signals } }));
+  assert.match(directive.message, /Learning through examples/i);
+  assert.match(directive.message, /next idea/i);
   assert.doesNotMatch(directive.message, /attention can feel different/i);
+});
+
+test('published-course partner asks for a connection without supplying a support or answer', () => {
+  const directive = directiveForContext(context({ courseId: 'published-learning-course', courseVersion: '1.0', moduleTitle: 'Reading source material' }));
+  assert.match(directive.message, /Reading source material/i);
+  assert.match(directive.message, /explain one connection/i);
+  assert.doesNotMatch(directive.message, /support|correct answer|option/i);
 });
 
 test('consented support states can inform a reversible proposal but not a learner result', () => {

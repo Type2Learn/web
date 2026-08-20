@@ -49,3 +49,18 @@ test('assessment monitor routes an uncertain answer to the objective that was as
   assert.equal(decision.reviewFocusObjectiveId, 'm03-c');
   assert.equal(decision.reviewModuleIndex, 2);
 });
+
+test('assessment monitor allows exactly two learner-led rechecks before retaining only the review route', () => {
+  const input = {
+    curriculum: { objectives: [{ id: 'm04-a' }] },
+    outcomes: [{ outcome: 'needs-review', askedObjectiveIds: ['m04-a'], demonstratedObjectiveIds: [], needsReviewObjectiveIds: ['m04-a'] }]
+  };
+  const first = assessmentProgressDecision({ ...input, recheckNumber: 0, maxRechecks: 2 });
+  const second = assessmentProgressDecision({ ...input, recheckNumber: 1, maxRechecks: 2 });
+  const final = assessmentProgressDecision({ ...input, recheckNumber: 2, maxRechecks: 2 });
+  assert.equal(first.recheckAvailable, true);
+  assert.equal(second.recheckAvailable, true);
+  assert.equal(final.recheckAvailable, false);
+  assert.equal(final.nextAction, 'continue-with-review-note');
+  assert.equal(Object.hasOwn(final, 'score'), false);
+});

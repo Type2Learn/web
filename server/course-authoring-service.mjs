@@ -14,7 +14,12 @@ const supportedAudioExtensions = new Set(['mp3', 'm4a', 'wav', 'ogg', 'webm']);
 
 const nowIso = () => new Date().toISOString();
 const clean = (value, limit = 200) => String(value || '').trim().replace(/\s+/g, ' ').slice(0, limit);
+// Course and module identifiers intentionally remain hyphen-only because they
+// become learner-route keys. Workspace identifiers are different: access-code
+// redemption creates organisation IDs such as `org_…`, and source submissions
+// use `sub_…`. Never run those IDs through the course slug normaliser.
 const identifier = (value, limit = 80) => String(value || '').trim().replace(/[^a-z0-9-]/gi, '').slice(0, limit).toLowerCase();
+const workspaceIdentifier = (value, limit = 96) => String(value || '').trim().replace(/[^a-z0-9_-]/gi, '').slice(0, limit).toLowerCase();
 const slug = (value) => identifier(value, 80).replace(/^-+|-+$/g, '');
 const extensionOf = (name) => {
   const match = String(name || '').toLowerCase().match(/\.([a-z0-9]{1,12})$/);
@@ -163,7 +168,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       if (!firebase.storage) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private course-source storage is not configured yet.');
       const type = String(form?.get('courseType') || '');
       if (!isTheoryCourseType(type)) throw apiError(400, 'COURSE_TYPE_LOCKED', 'Only theory courses are supported at this time.');
-      const organisationId = identifier(form?.get('organisationId')) || account.organisations.find((entry) => entry.active !== false)?.organisationId || '';
+      const organisationId = workspaceIdentifier(form?.get('organisationId')) || account.organisations.find((entry) => entry.active !== false)?.organisationId || '';
       if (!organisationId) throw apiError(400, 'ORGANISATION_REQUIRED', 'Choose the organisation that owns this course submission.');
       await access.assertOrganisationAccess(authorization, organisationId);
       const source = await sourceFileInfo(form?.get('sourceFile'));
@@ -207,15 +212,48 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
 
     async submissionReview({ authorization, submissionId }) {
       const admin = await requireAdmin(authorization);
-      const id = clean(submissionId, 96);
+      const id = workspaceIdentifier(submissionId);
+      const reference = sourceCollection(firebase.firestore, 'submissions').doc(id);
+      const snapshot = await reference.get();
+      if (!snapshot.exists) throw apiError(404, 'SUBMISSION_NOT_FOUND', 'This course submission was not found.');
+      const record = snapshot.data() || {};
+      // Opening the secure review route is the explicit human hand-off from a
+      // teacher or institute to the administrator. Keep the original upload
+      // private, but record that a human reviewer has started the conversion.
+      if (record.status === 'submitted') {
+        await reference.set({ status: 'source-reviewed', updatedAt: nowIso(), reviewedBy: admin.uid, reviewedAt: nowIso() }, { merge: true });
+      }
+      await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-source-review-opened', submissionId: id, organisationId: record.ownerOrganisationId });
+      return {
+        submission: publicSubmission({ ...record, status: record.status === 'submitted' ? 'source-reviewed' : record.status }),
+        extractedText: record.source?.extraction === 'safe-text-extracted' ? String(record.source?.extractedText || '') : '',
+        requiresAdminTranscription: record.source?.extraction !== 'safe-text-extracted',
+        downloadAvailable: Boolean(firebase.storage && record.source?.objectPath)
+      };
+    },
+
+    // The original teacher/institute upload never becomes public course
+    // content. Administrators may download it through this authenticated route
+    // for transcription/review, while learners only ever receive the compiled
+    // learner manifest after publication.
+    async downloadSource({ authorization, submissionId }) {
+      const admin = await requireAdmin(authorization);
+      if (!firebase.storage) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private course-source storage is not configured yet.');
+      const id = workspaceIdentifier(submissionId);
       const snapshot = await sourceCollection(firebase.firestore, 'submissions').doc(id).get();
       if (!snapshot.exists) throw apiError(404, 'SUBMISSION_NOT_FOUND', 'This course submission was not found.');
       const record = snapshot.data() || {};
-      await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-source-review-opened', submissionId: id, organisationId: record.ownerOrganisationId });
+      const objectPath = String(record.source?.objectPath || '');
+      if (!objectPath) throw apiError(409, 'SOURCE_FILE_UNAVAILABLE', 'This source submission has no private file to download.');
+      let buffer;
+      try { [buffer] = await firebase.storage.file(objectPath).download(); } catch {
+        throw apiError(503, 'SOURCE_FILE_UNAVAILABLE', 'The private source file could not be opened right now.');
+      }
+      await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-source-downloaded-for-review', submissionId: id, organisationId: record.ownerOrganisationId });
       return {
-        submission: publicSubmission(record),
-        extractedText: record.source?.extraction === 'safe-text-extracted' ? String(record.source?.extractedText || '') : '',
-        requiresAdminTranscription: record.source?.extraction !== 'safe-text-extracted'
+        buffer,
+        contentType: String(record.source?.contentType || 'application/octet-stream'),
+        filename: String(record.source?.originalName || 'course-source')
       };
     },
 
@@ -232,20 +270,50 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const parsed = parseTheoryMarkdown(markdown);
       const validation = validateTheoryCourse(parsed);
       const metadata = validation.metadata || {};
-      const courseId = identifier(body?.courseId || metadata.id);
-      const version = clean(body?.version || metadata.version, 32);
+      // Markdown is the canonical reviewed course definition. Do not silently
+      // create a record under a different form-field ID or version: that would
+      // separate the human-reviewed text from the course later published.
+      const courseId = identifier(metadata.id);
+      const version = clean(metadata.version, 32);
+      const requestedCourseId = identifier(body?.courseId);
+      const requestedVersion = clean(body?.version, 32);
+      if (requestedCourseId && requestedCourseId !== courseId) throw apiError(400, 'MARKDOWN_COURSE_ID_MISMATCH', 'The course ID field must match the reviewed Markdown metadata id.');
+      if (requestedVersion && requestedVersion !== version) throw apiError(400, 'MARKDOWN_VERSION_MISMATCH', 'The version field must match the reviewed Markdown metadata version.');
       if (!courseId || !version) throw apiError(400, 'COURSE_ID_AND_VERSION_REQUIRED', 'Markdown metadata needs a valid course id and version.');
+      const submissionId = workspaceIdentifier(body?.submissionId);
+      let submissionReference = null;
+      let sourceSubmission = null;
+      if (submissionId) {
+        submissionReference = sourceCollection(firebase.firestore, 'submissions').doc(submissionId);
+        const submissionSnapshot = await submissionReference.get();
+        if (!submissionSnapshot.exists) throw apiError(404, 'SUBMISSION_NOT_FOUND', 'The linked private source submission was not found.');
+        sourceSubmission = submissionSnapshot.data() || {};
+        const linkedCourseId = identifier(sourceSubmission.courseId);
+        const linkedVersion = clean(sourceSubmission.version, 32);
+        if (linkedCourseId && (linkedCourseId !== courseId || linkedVersion !== version)) {
+          throw apiError(409, 'SUBMISSION_ALREADY_LINKED', 'This private source is already linked to a different reviewed course version.');
+        }
+      }
       let compiled = null;
       if (validation.valid) compiled = compileTheoryCourse(validation);
       const existing = await courseDoc(firebase.firestore, courseId, version).get();
       const existingRecord = existing.exists ? existing.data() || {} : {};
+      const requestedOwnerOrganisationId = workspaceIdentifier(body?.ownerOrganisationId);
+      const sourceOwnerOrganisationId = workspaceIdentifier(sourceSubmission?.ownerOrganisationId);
+      if (requestedOwnerOrganisationId && sourceOwnerOrganisationId && requestedOwnerOrganisationId !== sourceOwnerOrganisationId) {
+        throw apiError(409, 'SOURCE_OWNERSHIP_MISMATCH', 'The reviewed course owner must match the organisation that submitted the private source.');
+      }
+      const ownerOrganisationId = requestedOwnerOrganisationId || sourceOwnerOrganisationId || workspaceIdentifier(existingRecord.ownerOrganisationId);
       const record = {
         ...existingRecord,
         courseId,
         version,
         type: 'theory',
-        ownerOrganisationId: identifier(body?.ownerOrganisationId || existingRecord.ownerOrganisationId),
-        submissionId: identifier(body?.submissionId || existingRecord.submissionId),
+        ownerOrganisationId,
+        // Submission IDs are workspace identifiers (`sub_…`), not course
+        // slugs. A later Markdown edit may omit the form field, so preserve
+        // the exact existing private-source link instead of stripping `_`.
+        submissionId: submissionId || workspaceIdentifier(existingRecord.submissionId),
         createdBy: existingRecord.createdBy || admin.uid,
         createdAt: existingRecord.createdAt || nowIso(),
         updatedAt: nowIso(),
@@ -261,6 +329,15 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         requestedAudience: existingRecord.requestedAudience || 'organisation'
       };
       await courseDoc(firebase.firestore, courseId, version).set(record);
+      if (submissionReference) {
+        await submissionReference.set({
+          status: validation.valid ? 'validation-ready' : 'markdown-draft',
+          courseId,
+          version,
+          updatedAt: nowIso(),
+          reviewedBy: admin.uid
+        }, { merge: true });
+      }
       await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-markdown-saved', courseId, version, status: record.status, validationErrors: validation.errors.length });
       return { course: noSecrets(record), validation: record.validation };
     },

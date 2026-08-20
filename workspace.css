@@ -48,7 +48,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .workspace-card h3 { margin: 0 0 6px; font-size: 18px; }
 .workspace-card p { margin: 0; font-size: 14px; }
 .workspace-card.is-locked { position: relative; background: #f5f8fc; color: #536b8d; }
-.workspace-card.is-locked::after { content: "Locked"; display: inline-block; margin-top: 14px; padding: 4px 8px; border: 1px solid var(--workspace-line); border-radius: 999px; color: #536b8d; font-size: 12px; font-weight: 800; }
+.workspace-card.is-locked .workspace-button[disabled] { border-color: #b6c6dc; color: #607493; background: #edf3fb; cursor: not-allowed; opacity: 1; }
 .workspace-card.is-selected { border: 2px solid var(--workspace-green); background: var(--workspace-green-wash); }
 .workspace-card button { margin-top: 15px; }
 .workspace-card small { display: block; margin-top: 9px; color: var(--workspace-copy); }
@@ -57,7 +57,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .workspace-field { display: grid; gap: 7px; margin-top: 14px; color: var(--workspace-ink); font-size: 14px; font-weight: 800; }
 .workspace-field input, .workspace-field textarea, .workspace-field select { width: 100%; padding: 12px 13px; border: 1px solid #a9c7eb; border-radius: 10px; color: var(--workspace-ink); background: #fff; font-weight: 500; }
 .workspace-field textarea { min-height: 250px; resize: vertical; line-height: 1.45; }
+/* Reviewed Markdown deliberately mixes LTR metadata with Urdu learning
+   content. `plaintext` lets each line choose its own bidi direction rather
+   than breaking Urdu letters inside an otherwise LTR editor. */
+[data-markdown] { font-family: ui-monospace, "Noto Naskh Arabic", "Noto Nastaliq Urdu", "Segoe UI", monospace; letter-spacing: normal; unicode-bidi: plaintext; }
 .workspace-field span { color: var(--workspace-copy); font-weight: 500; font-size: 13px; }
+.workspace-field--grow { flex: 1 1 280px; }
 .workspace-button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 7px; padding: 9px 14px; border: 1px solid var(--workspace-blue); border-radius: 10px; color: #074bad; background: #fff; font-weight: 850; text-decoration: none; }
 .workspace-button:hover { background: var(--workspace-blue-wash); }
 .workspace-button--primary { color: #03250f; border-color: #00bf67; background: #11cf6a; }
@@ -75,7 +80,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .workspace-list small { display: block; margin-top: 4px; color: var(--workspace-copy); }
 .workspace-tag { flex: none; display: inline-flex; align-items: center; min-height: 28px; padding: 4px 9px; border-radius: 999px; background: var(--workspace-blue-wash); color: #0b54bd; font-size: 12px; font-weight: 900; text-transform: capitalize; }
 .workspace-tag[data-state="published"], .workspace-tag[data-state="approved"], .workspace-tag[data-state="backups-verified"] { background: var(--workspace-green-wash); color: #08713e; }
-.workspace-note { padding: 16px; border: 1px solid var(--workspace-line); border-radius: 12px; background: #f8fbff; }
+.workspace-note { padding: 16px; border: 1px solid var(--workspace-line); border-radius: 12px; background: #f8fbff; overflow-wrap: anywhere; white-space: normal; }
+.workspace-code { max-height: 440px; overflow: auto; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.55; }
 .workspace-note p { margin: 5px 0 0; font-size: 14px; }
 .workspace-empty { padding: 22px; border: 1px dashed #9dbce0; border-radius: 12px; color: var(--workspace-copy); text-align: center; }
 .workspace-preview { border: 1px solid var(--workspace-line); border-radius: 16px; overflow: hidden; background: #fff; }

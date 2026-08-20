@@ -11,6 +11,11 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /name="sectionId"/);
   assert.match(admin, /data-narration-section-hint/);
   assert.match(admin, /data-mcq-draft-form/);
+  assert.match(admin, /data-assessment-draft-form/);
+  assert.match(admin, /data-open-assessment-draft/);
+  assert.match(admin, /data-publish-assessment-draft/);
+  assert.match(admin, /data-download-source/);
+  assert.match(admin, /Generated banks require a configured reviewer/);
   assert.match(admin, /name="distractor3"/);
   assert.match(workspace, /form\.get\('sourceFile'\)\?\.size/);
   assert.match(workspace, /form\.get\('audioFile'\)\?\.size/);
@@ -19,5 +24,10 @@ test('private educator upload controls use the same source and narration field n
   assert.match(workspace, /courseId', course\.courseId/);
   assert.match(workspace, /form\.get\('answer'\)/);
   assert.match(workspace, /distractors: \['distractor1', 'distractor2', 'distractor3'\]/);
+  assert.match(workspace, /\/api\/v1\/assessment\/drafts/);
+  assert.match(workspace, /\/api\/v1\/assessment\/publish/);
+  assert.match(workspace, /\/api\/v1\/course-authoring\/source-download/);
+  assert.match(workspace, /Open and review a draft before publishing it/);
+  assert.match(workspace, /correctOptionIndex/);
   assert.doesNotMatch(workspace, /prompt: 'Which answer best matches the reviewed key idea\?'/);
 });

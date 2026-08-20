@@ -191,10 +191,10 @@ export const requestBehaviourDirective = async ({ user, context, signal }) => au
 // Assessment runs are intentionally separate from guided lesson typing. The
 // server returns only the current question and short supportive feedback; it
 // never returns an answer key, score, or hidden evaluation rubric.
-export const startUnderstandingCheck = async ({ user, moduleIndex, language, scope = 'module', signal }) => authenticatedRequest(user, '/api/v1/assessment/start', {
+export const startUnderstandingCheck = async ({ user, courseId, courseVersion, moduleIndex, language, scope = 'module', signal }) => authenticatedRequest(user, '/api/v1/assessment/start', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ moduleIndex, scope: scope === 'final' ? 'final' : 'module', language: language === 'ur' ? 'ur' : 'en' }),
+  body: JSON.stringify({ courseId, courseVersion, moduleIndex, scope: scope === 'final' ? 'final' : 'module', language: language === 'ur' ? 'ur' : 'en' }),
   signal
 });
 
@@ -204,6 +204,14 @@ export const answerUnderstandingCheck = async ({ user, runId, answer, signal }) 
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ answer }),
+  signal
+});
+
+// A recheck is deliberately learner-led. This records only that the linked
+// reviewed module was opened before a fresh no-score check; it never sends
+// the reading position, response, answer key, or assessment result.
+export const acknowledgeUnderstandingReview = async ({ user, runId, signal }) => authenticatedRequest(user, '/api/v1/assessment/' + encodeURIComponent(runId) + '/reviewed', {
+  method: 'POST',
   signal
 });
 

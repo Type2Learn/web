@@ -18,6 +18,18 @@ test('deterministic evaluator sends an unrelated response to calm review rather 
   assert.deepEqual(result.needsReviewObjectiveIds, ['m01-attention-support']);
 });
 
+test('deterministic evaluator does not mistake another lesson’s vocabulary for evidence of this objective', () => {
+  const broadCurriculum = {
+    source: 'ADHD can affect planning and task management. Dyslexia can affect reading and spelling. Clear written instructions can support participation.'
+  };
+  const response = 'Dyslexia can affect reading and spelling, so clear written instructions can support reading.';
+  const result = deterministicAssessmentEvaluation({ item, curriculum: broadCurriculum, answer: response });
+
+  assert.notEqual(result.outcome, 'demonstrated');
+  assert.equal(result.signal.objectiveTermsMatched, 1);
+  assert.notEqual(result.signal.courseGrounding, 'strong');
+});
+
 test('model output cannot promote a response that is too small to assess', () => {
   const deterministic = deterministicAssessmentEvaluation({ item, curriculum, answer: 'help please' });
   const result = constrainAssessmentEvaluation({ candidate: { outcome: 'demonstrated', demonstratedObjectiveIds: ['m01-attention-support'], needsReviewObjectiveIds: [], feedback: 'You showed the idea clearly.' }, deterministic, item });

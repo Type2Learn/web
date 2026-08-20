@@ -1880,6 +1880,34 @@ body[data-course-layout="open"] .course-learning-shell:not(.has-course-mascot) .
 .course-reading-copy > p { margin: 0; color: var(--course-ink-soft); font-size: var(--course-reading-font-size); line-height: var(--course-line-height); }
 .course-reading-copy > p + p { margin-top: var(--course-paragraph-gap); }
 
+/* READING ACCESS: low-glare surfaces are opt-in, lesson-only presentation
+   choices. They do not recolour controls, affect answer meaning, or change
+   the website colour mode. Keeping the treatment on the reading region makes
+   it useful for rereading without overwhelming a task or assessment. */
+body[data-course-reading-surface="soft-blue"] .course-reading-copy {
+  margin-inline: -14px;
+  border: 1px solid #c5def3;
+  border-radius: 14px;
+  padding: 16px 14px;
+  background: #f0f8ff;
+}
+
+body[data-course-reading-surface="warm-cream"] .course-reading-copy {
+  margin-inline: -14px;
+  border: 1px solid #e8d7b8;
+  border-radius: 14px;
+  padding: 16px 14px;
+  background: #fff9ed;
+}
+
+body.course-high-contrast .course-reading-copy {
+  margin-inline: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
 .course-simple-copy,
 .course-example {
   margin-top: 18px;

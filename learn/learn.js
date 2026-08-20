@@ -40,6 +40,14 @@ const preferenceControls = [
   { id: 'colours', label: 'Color style', description: 'How much color appears around the task.', choices: [['flat', 'Flat'], ['balanced', 'Balanced'], ['vivid', 'Vivid']] },
   { id: 'encouragement', label: 'Encouragement', description: 'How visible supportive moments feel.', choices: [['subtle', 'Subtle'], ['balanced', 'Balanced'], ['expressive', 'Expressive']] },
   { id: 'animations', label: 'Animations', description: 'How much supportive movement you would like to see.', choices: [['still', 'Still'], ['gentle', 'Gentle'], ['lively', 'Lively']] },
+  // Reading access is deliberately separate from colour and layout. These
+  // are direct learner choices, saved with this course, and are never changed
+  // automatically by the adaptive layer.
+  { id: 'reading-text-size', label: 'Reading text size', description: 'Choose the text size that feels clearest for this course.', choices: [['standard', 'Standard'], ['large', 'Larger'], ['extra-large', 'Extra large']] },
+  { id: 'reading-spacing', label: 'Reading rhythm', description: 'Choose standard or roomier line and paragraph spacing for lesson text.', choices: [['standard', 'Standard'], ['relaxed', 'More room']] },
+  { id: 'reading-width', label: 'Reading width', description: 'Choose shorter or wider lines for lesson text.', choices: [['narrow', 'Short lines'], ['comfortable', 'Comfortable'], ['wide', 'Wide lines']] },
+  { id: 'reading-contrast', label: 'Reading contrast', description: 'Choose a higher-contrast reading surface when it feels clearer.', choices: [['off', 'Standard'], ['on', 'Higher contrast']] },
+  { id: 'reading-surface', label: 'Reading surface', description: 'Choose a low-glare surface for lesson text. It does not change the lesson wording.', choices: [['paper', 'Paper'], ['soft-blue', 'Soft blue'], ['warm-cream', 'Warm cream']] },
   { id: 'background-noise', label: 'Background noise', description: 'Optional looping sound, always off to start.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'text-to-speech', label: 'Text to speech', description: 'Optional read-aloud support.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'urdu-mode', label: 'Urdu mode', description: 'Show the course and Course AI in Urdu. The typing target stays in English.', choices: [['off', 'Off'], ['on', 'On']] },
@@ -54,6 +62,11 @@ const defaultChoices = {
   'mascot-language-explicit': false,
   'mascot-voice': 'text',
   'mascot-voice-language': 'english',
+  'reading-text-size': 'standard',
+  'reading-spacing': 'standard',
+  'reading-width': 'comfortable',
+  'reading-contrast': 'off',
+  'reading-surface': 'paper',
   'background-noise-type': 'pink',
   // Turning background noise on never starts sound at an assumed loudness.
   // It begins at 0% and the learner chooses a level up to the shared 60% cap.
@@ -174,6 +187,11 @@ const localizedControls = {
     colours: { label: 'رنگوں کا انداز', description: 'سرگرمی کے گرد رنگ کی مقدار۔', choices: [['flat', 'سادہ'], ['balanced', 'متوازن'], ['vivid', 'نمایاں']] },
     encouragement: { label: 'حوصلہ افزائی', description: 'مددگار لمحات کتنے نمایاں محسوس ہوں۔', choices: [['subtle', 'ہلکی'], ['balanced', 'متوازن'], ['expressive', 'نمایاں']] },
     animations: { label: 'حرکت', description: 'مددگار حرکت کی مقدار جو آپ دیکھنا چاہیں۔', choices: [['still', 'بغیر حرکت'], ['gentle', 'نرم'], ['lively', 'زیادہ']] },
+    'reading-text-size': { label: 'پڑھنے کے متن کا سائز', description: 'اس کورس کے لیے وہ متن کا سائز منتخب کریں جو سب سے واضح لگے۔', choices: [['standard', 'معیاری'], ['large', 'بڑا'], ['extra-large', 'بہت بڑا']] },
+    'reading-spacing': { label: 'پڑھنے کی جگہ', description: 'سبق کے متن کے لیے معیاری یا زیادہ کھلی سطری اور پیراگراف کی جگہ منتخب کریں۔', choices: [['standard', 'معیاری'], ['relaxed', 'زیادہ جگہ']] },
+    'reading-width': { label: 'پڑھنے کی چوڑائی', description: 'سبق کے متن کے لیے مختصر یا زیادہ چوڑی سطریں منتخب کریں۔', choices: [['narrow', 'مختصر سطریں'], ['comfortable', 'آرام دہ'], ['wide', 'چوڑی سطریں']] },
+    'reading-contrast': { label: 'پڑھنے کا تضاد', description: 'جب زیادہ واضح لگے تو زیادہ تضاد والی سطح منتخب کریں۔', choices: [['off', 'معیاری'], ['on', 'زیادہ تضاد']] },
+    'reading-surface': { label: 'پڑھنے کی سطح', description: 'سبق کے متن کے لیے کم چمک والی سطح منتخب کریں۔ اس سے سبق کے الفاظ نہیں بدلتے۔', choices: [['paper', 'کاغذ'], ['soft-blue', 'ہلکا نیلا'], ['warm-cream', 'ہلکا کریم']] },
     'background-noise': { label: 'پس منظر کی آواز', description: 'اختیاری مسلسل آواز، شروع میں ہمیشہ بند۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     'text-to-speech': { label: 'متن سے آواز', description: 'اختیاری پڑھ کر سنانے کی مدد۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     'urdu-mode': { label: 'اردو موڈ', description: 'کورس اور کورس کی مصنوعی ذہانت اردو میں دکھائیں۔ ٹائپنگ کا متن انگریزی میں رہتا ہے۔', choices: [['off', 'بند'], ['on', 'چالو']] },
@@ -379,6 +397,11 @@ const focusedSteps = (choices) => {
     { id: 'colours' },
     { id: 'encouragement' },
     { id: 'animations' },
+    { id: 'reading-text-size' },
+    { id: 'reading-spacing' },
+    { id: 'reading-width' },
+    { id: 'reading-contrast' },
+    { id: 'reading-surface' },
     { id: 'background-noise' }
   ];
   if (choices['background-noise'] === 'on') steps.push({ id: 'noise-details' });

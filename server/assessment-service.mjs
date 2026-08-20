@@ -4,11 +4,12 @@ import { assessmentUsageCaps, assessmentUsageEstimate } from './usage-ledger.mjs
 import { createModelProvider } from './model-provider.mjs';
 import { createFallbackAssessmentBank } from './fallback-assessment-bank.mjs';
 import { constrainAssessmentEvaluation, deterministicAssessmentEvaluation } from './assessment-evaluator.mjs';
-import { assessmentLearningSignals, assessmentProgressDecision, prioritiseAssessmentItems } from './assessment-monitor.mjs';
+import { assessmentLearningSignals, assessmentProgressDecision, objectiveFocusFromModuleEvidence, prioritiseAssessmentItems } from './assessment-monitor.mjs';
 import {
   ASSESSMENT_COURSE_ID,
   assessmentBankJsonSchema,
   assessmentCurriculum,
+  assessmentCurriculumFromManifest,
   publicAssessmentItem,
   responseEvaluationJsonSchema,
   validateAssessmentAnswer,
@@ -20,6 +21,8 @@ const hash = (value) => createHash('sha256').update(String(value)).digest('hex')
 const cleanIdentifier = (value, maximum = 100) => String(value || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, maximum);
 const estimateTokens = (text) => Math.ceil(String(text || '').length / 3);
 const MAX_RUN_ITEMS = 21;
+const MAX_RECHECKS_PER_SCOPE = 2;
+const MAX_RETENTION_DAYS = 365;
 
 const stableModuleId = (moduleIndex) => moduleIndex === 'final' ? 'final' : `module-${Number(moduleIndex) + 1}`;
 const nowDate = () => new Date();
@@ -72,12 +75,18 @@ const visibleRun = (run, bank) => {
     : null;
   return {
     runId: String(run?.id || ''),
-    courseId: ASSESSMENT_COURSE_ID,
+    courseId: String(run?.courseId || ASSESSMENT_COURSE_ID),
+    courseVersion: String(run?.curriculumVersion || ''),
     moduleIndex: run?.moduleIndex === 'final' ? 'final' : Number(run?.moduleIndex) || 0,
     scope: run?.moduleIndex === 'final' ? 'final' : 'module',
     language: run?.language === 'ur' ? 'ur' : 'en',
     status: completed ? 'complete' : 'active',
     completionKind: completed && run?.completionKind === 'ready' ? 'ready' : completed ? 'review' : '',
+    recheckNumber: Math.max(0, Math.min(MAX_RECHECKS_PER_SCOPE, Number(run?.recheckNumber) || 0)),
+    recheckAvailable: completed && run?.completionKind === 'review'
+      ? Number(run?.recheckNumber || 0) < MAX_RECHECKS_PER_SCOPE && Boolean(run?.reviewAcknowledgedAt)
+      : false,
+    reviewAcknowledged: completed && run?.completionKind === 'review' ? Boolean(run?.reviewAcknowledgedAt) : false,
     reviewModuleIndex,
     reviewFocusObjectiveId: completed && run?.completionKind === 'review' ? String(run?.reviewFocusObjectiveId || '') : '',
     currentQuestion: completed || !item ? null : publicAssessmentItem(item),
@@ -91,11 +100,31 @@ const visibleRun = (run, bank) => {
   };
 };
 
-export const createAssessmentService = ({ config, firebase, ledger, provider = createModelProvider({ config }) }) => {
+export const createAssessmentService = ({ config, firebase, ledger, courseCatalog = null, provider = createModelProvider({ config }) }) => {
   const assessmentBanks = () => firebase.firestore.collection('type2learnAssessmentBanks');
   const bankModuleRef = (curriculum) => assessmentBanks().doc(bankKey(curriculum)).collection('modules').doc(stableModuleId(curriculum.moduleIndex));
   const runCollection = (uid) => firebase.firestore.collection('type2learnAssessmentRuns').doc(hash(uid)).collection('runs');
   const learningProfile = (uid) => firebase.firestore.collection('type2learnLearningProfiles').doc(hash(uid));
+  // Assessment outcomes are optional learner records too. Keep their lifetime
+  // aligned with the consented behavioural summaries rather than leaving a
+  // separate, indefinite assessment trail behind.
+  const retentionDays = () => Math.max(1, Math.min(MAX_RETENTION_DAYS, Number(config.adaptiveRetentionDays) || 90));
+  const runExpiry = (timestamp = nowDate()) => new Date(timestamp.getTime() + (retentionDays() * 24 * 60 * 60 * 1000));
+  const isExpired = (run = {}, timestamp = nowDate()) => {
+    const expiresAt = run?.expiresAt;
+    const expiry = expiresAt?.toDate?.() || (expiresAt instanceof Date ? expiresAt : new Date(expiresAt));
+    return Number.isFinite(expiry?.getTime?.()) && expiry.getTime() <= timestamp.getTime();
+  };
+  // Firestore TTL is configured on `expiresAt` in production. This bounded
+  // cleanup is intentionally opportunistic so learner-owned records are also
+  // removed when TTL delivery is delayed, without a broad background scan.
+  const trimExpiredRuns = async (uid) => {
+    const expired = await runCollection(uid).where('expiresAt', '<=', nowDate()).limit(100).get().catch(() => null);
+    if (!expired?.docs?.length) return;
+    const batch = firebase.firestore.batch();
+    expired.docs.forEach((document) => batch.delete(document.ref));
+    await batch.commit();
+  };
   const hasReviewerConfiguration = () => config.assessmentReviewerUids instanceof Set && config.assessmentReviewerUids.size > 0;
   const available = () => Boolean(config.aiAssessmentsEnabled && firebase.available && firebase.firestore);
   const status = () => ({
@@ -105,7 +134,9 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     draftModel: provider.status().heavyModel,
       evaluationModel: provider.status().miniModel || provider.status().chatModel,
       monitoring: 'objective-evidence-without-scores',
-      authoredReserveAvailable: true
+      authoredReserveAvailable: true,
+      retentionDays: retentionDays(),
+      retentionField: 'expiresAt'
   });
   const assertAvailable = () => {
     if (!config.aiAssessmentsEnabled) throw apiError(503, 'ASSESSMENTS_UNAVAILABLE', 'Understanding checks are not available right now.');
@@ -122,6 +153,97 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
   const signedInAccount = async (authorization) => {
     assertAvailable();
     return firebase.verifyBearer(authorization);
+  };
+  // ASSESSMENT CURRICULUM RESOLUTION: the legacy course retains its stable
+  // authored bank. Every reviewed teacher course is resolved through the
+  // same access-controlled learner manifest that powers the course player.
+  // A browser can therefore never substitute a different lesson's content
+  // into an assessment request.
+  const curriculumFor = async ({ authorization, courseId, courseVersion, moduleIndex, language }) => {
+    const requestedModule = moduleIndex === 'final' ? 'final' : moduleIndex;
+    const requestedCourseId = String(courseId || '').trim().toLowerCase();
+    const requestedVersion = String(courseVersion || '').trim();
+    // The historical course keeps its stable authored curriculum only when a
+    // version is not supplied. An explicitly requested reviewed version must
+    // be resolved through the protected manifest just like every new course.
+    if (!requestedCourseId || (requestedCourseId === ASSESSMENT_COURSE_ID && !requestedVersion)) {
+      return assessmentCurriculum(requestedModule, language);
+    }
+    if (!requestedVersion || (typeof courseCatalog?.assessmentContext !== 'function' && typeof courseCatalog?.manifest !== 'function')) {
+      throw apiError(400, 'ASSESSMENT_COURSE_REQUIRED', 'Choose a published reviewed course before starting its understanding check.');
+    }
+    const loader = typeof courseCatalog?.assessmentContext === 'function'
+      ? courseCatalog.assessmentContext.bind(courseCatalog)
+      : courseCatalog.manifest.bind(courseCatalog);
+    const loaded = await loader({ authorization, courseId: requestedCourseId, version: requestedVersion });
+    return assessmentCurriculumFromManifest(loaded?.manifest, requestedModule, language, { privateManifest: loaded?.privateManifest || null });
+  };
+  const learningSummaryRef = (uid, curriculum) => {
+    const courseKey = curriculum.curriculumVersion
+      ? `${curriculum.courseId}@${curriculum.curriculumVersion}`
+      : curriculum.courseId;
+    return learningProfile(uid).collection('courses').doc(courseKey).collection('modules').doc(String(curriculum.moduleIndex));
+  };
+  const courseSummaryCollection = (uid, curriculum) => {
+    const courseKey = curriculum.curriculumVersion
+      ? `${curriculum.courseId}@${curriculum.curriculumVersion}`
+      : curriculum.courseId;
+    return learningProfile(uid).collection('courses').doc(courseKey).collection('modules');
+  };
+  // Behaviour-aware final checks use the same compact, consented aggregate
+  // schema as a module. It cannot add raw learner language to an assessment
+  // run, and it only influences format/order—not any objective result.
+  const finalSummary = async (uid, curriculum) => {
+    const snapshot = await courseSummaryCollection(uid, curriculum).limit(100).get();
+    // A delayed Firestore TTL deletion must not let an expired behavioural
+    // summary influence final-question ordering in the meantime.
+    const summaries = snapshot.docs.map((document) => document.data() || {}).filter((summary) => !isExpired(summary));
+    const metric = (name, maximum) => Math.min(maximum, summaries.reduce((total, item) => total + Math.max(0, Number(item?.metrics?.[name]) || 0), 0));
+    return {
+      metrics: {
+        activeMs: metric('activeMs', 4 * 60 * 60 * 1000),
+        typingCharacters: metric('typingCharacters', 12000),
+        // Math.min(...[]) becomes Infinity when a learner reaches the final
+        // check without consented module summaries. A missing signal must be
+        // neutral, not interpreted as an extremely long pause.
+        typingLongestPauseMs: summaries.reduce((longest, item) => Math.max(
+          longest,
+          Math.min(10 * 60 * 1000, Math.max(0, Number(item?.metrics?.typingLongestPauseMs) || 0))
+        ), 0),
+        rereads: metric('rereads', 100),
+        returns: metric('returns', 100)
+      },
+      support: {
+        textToSpeech: summaries.some((item) => item?.support?.textToSpeech === true),
+        visualOpened: summaries.some((item) => item?.support?.visualOpened === true)
+      },
+      behaviour: {
+        states: [...new Set(summaries.flatMap((item) => Array.isArray(item?.behaviour?.states) ? item.behaviour.states : []))].slice(0, 6)
+      }
+    };
+  };
+  const completedModuleEvidence = async (uid, curriculum) => {
+    if (curriculum.scope !== 'final') return [];
+    // One indexed equality query and an in-memory bounded filter avoids a
+    // composite index requirement while keeping the final-check request small.
+    const snapshot = await runCollection(uid).where('courseId', '==', curriculum.courseId).limit(200).get();
+    return snapshot.docs.map((document) => document.data() || {}).filter((run) => (
+      run?.status === 'complete'
+      && run?.moduleIndex !== 'final'
+      && String(run?.curriculumVersion || '') === String(curriculum.curriculumVersion || '')
+      && !isExpired(run)
+      && Array.isArray(run?.outcomes)
+    )).map((run) => ({ outcomes: run.outcomes.slice(0, 9) }));
+  };
+  const completedScopeRuns = async (uid, curriculum) => {
+    const snapshot = await runCollection(uid).where('courseId', '==', curriculum.courseId).limit(200).get();
+    return snapshot.docs.map((document) => document.data() || {}).filter((run) => (
+      run?.status === 'complete'
+      && String(run?.curriculumVersion || '') === String(curriculum.curriculumVersion || '')
+      && String(run?.language || 'en') === String(curriculum.language || 'en')
+      && !isExpired(run)
+      && String(run?.moduleIndex) === String(curriculum.moduleIndex)
+    ));
   };
   const learner = async (authorization) => {
     const account = await signedInAccount(authorization);
@@ -170,7 +292,7 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
   const createDraft = async ({ authorization, body }) => {
     const account = await reviewer(authorization);
     assertGenerationAvailable();
-    const curriculum = assessmentCurriculum(body?.scope === 'final' ? 'final' : body?.moduleIndex, body?.language);
+    const curriculum = await curriculumFor({ authorization, courseId: body?.courseId, courseVersion: body?.courseVersion, moduleIndex: body?.scope === 'final' ? 'final' : body?.moduleIndex, language: body?.language });
     const moduleRef = bankModuleRef(curriculum);
     const generationRef = moduleRef.collection('generationRequests').doc(String(Math.floor(Date.now() / config.assessmentGenerationIntervalMs)));
     try {
@@ -220,9 +342,47 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     }
   };
 
+  // HUMAN REVIEW ONLY: a reviewer can reopen a generated bank before it is
+  // published. This is the only API projection that includes the internal
+  // answer key/rubric fields; no learner endpoint shares this representation.
+  const getDraft = async ({ authorization, query }) => {
+    await reviewer(authorization);
+    const curriculum = await curriculumFor({
+      authorization,
+      courseId: query?.courseId,
+      courseVersion: query?.courseVersion,
+      moduleIndex: query?.scope === 'final' ? 'final' : query?.moduleIndex,
+      language: query?.language
+    });
+    const id = cleanIdentifier(query?.draftId);
+    if (!id) throw apiError(400, 'INVALID_ASSESSMENT_DRAFT', 'Choose a valid reviewed draft.');
+    const snapshot = await bankModuleRef(curriculum).collection('drafts').doc(id).get();
+    if (!snapshot.exists) throw apiError(404, 'ASSESSMENT_DRAFT_NOT_FOUND', 'That assessment draft is not available.');
+    const draft = snapshot.data() || {};
+    const bank = validateAssessmentBank(draft.bank, curriculum);
+    return {
+      draft: {
+        id,
+        status: String(draft.status || ''),
+        createdAt: draft.createdAt || null,
+        provider: String(draft.provider || ''),
+        model: String(draft.model || ''),
+        courseId: curriculum.courseId,
+        courseVersion: curriculum.curriculumVersion,
+        scope: curriculum.scope,
+        moduleIndex: curriculum.moduleIndex,
+        language: curriculum.language,
+        // Reviewers need the complete question/answer-key pairing to approve
+        // a bank. The response is protected by reviewer() and never cached in
+        // the course player or returned by /assessment/start.
+        bank
+      }
+    };
+  };
+
   const publishDraft = async ({ authorization, body }) => {
     await reviewer(authorization);
-    const curriculum = assessmentCurriculum(body?.scope === 'final' ? 'final' : body?.moduleIndex, body?.language);
+    const curriculum = await curriculumFor({ authorization, courseId: body?.courseId, courseVersion: body?.courseVersion, moduleIndex: body?.scope === 'final' ? 'final' : body?.moduleIndex, language: body?.language });
     const id = cleanIdentifier(body?.draftId);
     if (!id) throw apiError(400, 'INVALID_ASSESSMENT_DRAFT', 'Choose a valid reviewed draft.');
     const moduleRef = bankModuleRef(curriculum);
@@ -250,13 +410,40 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
 
   const start = async ({ authorization, body }) => {
     const account = await learner(authorization);
-    const curriculum = assessmentCurriculum(body?.scope === 'final' ? 'final' : body?.moduleIndex, body?.language);
+    await trimExpiredRuns(account.uid);
+    const curriculum = await curriculumFor({ authorization, courseId: body?.courseId, courseVersion: body?.courseVersion, moduleIndex: body?.scope === 'final' ? 'final' : body?.moduleIndex, language: body?.language });
     const bank = await activeBank(curriculum);
+    const priorScopeRuns = await completedScopeRuns(account.uid, curriculum);
+    if (priorScopeRuns.some((run) => run?.completionKind === 'ready')) {
+      throw apiError(409, 'ASSESSMENT_ALREADY_READY', 'This understanding check is already complete. Continue with the next course step when you are ready.');
+    }
+    const recheckNumber = priorScopeRuns.filter((run) => run?.completionKind === 'review').length;
+    const latestReview = priorScopeRuns
+      .filter((run) => run?.completionKind === 'review')
+      .sort((left, right) => Number(right?.recheckNumber || 0) - Number(left?.recheckNumber || 0))[0] || null;
+    // A learner chooses whether to revisit the precise objective first. A
+    // browser cannot bypass that review merely by invoking the start endpoint.
+    if (latestReview && !latestReview.reviewAcknowledgedAt) {
+      throw apiError(409, 'ASSESSMENT_REVIEW_REQUIRED', 'Open the related course idea before choosing another calm check.');
+    }
+    // `recheckNumber` is the number of completed review outcomes before this
+    // run. Permit the initial run plus two calm rechecks, then protect the
+    // limit on a direct API call as well as in the UI.
+    if (recheckNumber > MAX_RECHECKS_PER_SCOPE) {
+      throw apiError(409, 'ASSESSMENT_RECHECK_LIMIT', 'This check is saved. Return to the related course idea before starting a new check.');
+    }
     const id = randomUUID();
-    const summarySnapshot = curriculum.scope === 'final'
+    const moduleSummary = curriculum.scope === 'final'
       ? null
-      : await learningProfile(account.uid).collection('courses').doc(curriculum.courseId).collection('modules').doc(String(curriculum.moduleIndex)).get();
-    const assessmentSignals = assessmentLearningSignals(summarySnapshot?.data?.() || {});
+      : (await learningSummaryRef(account.uid, curriculum).get()).data() || {};
+    const summaryData = curriculum.scope === 'final'
+      ? await finalSummary(account.uid, curriculum)
+      : isExpired(moduleSummary) ? {} : moduleSummary;
+    const assessmentSignals = assessmentLearningSignals(summaryData);
+    const objectiveFocus = curriculum.scope === 'final'
+      ? objectiveFocusFromModuleEvidence({ curriculum, moduleRuns: await completedModuleEvidence(account.uid, curriculum) })
+      : { focusObjectiveIds: [], evidence: [] };
+    assessmentSignals.objectiveFocusIds = objectiveFocus.focusObjectiveIds.slice(0, 8);
     // The reviewed bank never changes. A run uses only compact, consented
     // summary signals to choose whether an own-words explanation or an MCQ is
     // shown first. No behaviour signal can decide a learner's result.
@@ -265,7 +452,12 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
       schemaVersion: 1, id, status: 'active', courseId: curriculum.courseId,
       curriculumVersion: curriculum.curriculumVersion, moduleIndex: curriculum.moduleIndex,
       language: curriculum.language, bankId: bank.bankVersion, itemOrder, assessmentSignals,
-      currentIndex: 0, outcomes: [], createdAt: nowDate(), updatedAt: nowDate()
+      recheckNumber,
+      // Stored as a bounded audit trace for the learner's export/delete path.
+      // It says which reviewed objectives were prioritised, never why a
+      // learner performed a certain way and never contains a score.
+      finalEvidenceFocus: curriculum.scope === 'final' ? objectiveFocus.evidence : [],
+      currentIndex: 0, outcomes: [], createdAt: nowDate(), updatedAt: nowDate(), expiresAt: runExpiry()
     };
     await runCollection(account.uid).doc(id).create(run);
     return { run: visibleRun(run, bank) };
@@ -300,8 +492,9 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     const snapshot = await ref.get();
     if (!snapshot.exists) throw apiError(404, 'ASSESSMENT_RUN_NOT_FOUND', 'That understanding check is not available.');
     const run = snapshot.data() || {};
+    if (isExpired(run)) throw apiError(410, 'ASSESSMENT_RUN_EXPIRED', 'This saved understanding check has expired. You can start a new calm check when you are ready.');
     if (run.status !== 'active') throw apiError(409, 'ASSESSMENT_ALREADY_COMPLETE', 'This understanding check is already complete.');
-    const curriculum = assessmentCurriculum(run.moduleIndex, run.language);
+    const curriculum = await curriculumFor({ authorization, courseId: run.courseId, courseVersion: run.curriculumVersion, moduleIndex: run.moduleIndex, language: run.language });
     const bank = await activeBank(curriculum);
     const item = bank.items.find((candidate) => candidate.id === run.itemOrder?.[run.currentIndex]);
     if (!item) throw apiError(409, 'ASSESSMENT_ITEM_NOT_AVAILABLE', 'This understanding check needs to be restarted safely.');
@@ -326,7 +519,8 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
         responseDepth: String(evaluation.signal?.responseDepth || 'unknown'),
         courseGrounding: String(evaluation.signal?.courseGrounding || 'unknown'),
         sourceTermsMatched: Math.max(0, Math.min(8, Number(evaluation.signal?.sourceTermsMatched) || 0)),
-        rubricTermsMatched: Math.max(0, Math.min(6, Number(evaluation.signal?.rubricTermsMatched) || 0))
+        rubricTermsMatched: Math.max(0, Math.min(6, Number(evaluation.signal?.rubricTermsMatched) || 0)),
+        objectiveTermsMatched: Math.max(0, Math.min(6, Number(evaluation.signal?.objectiveTermsMatched) || 0))
       },
       answeredAt: nowDate()
     }];
@@ -336,7 +530,7 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     // of demonstrated evidence. Requiring every individual question to be
     // perfect would turn this into a score by another name and make the calm
     // fallback impossible to complete when model evaluation is unavailable.
-    const decision = complete ? assessmentProgressDecision({ curriculum, outcomes }) : null;
+    const decision = complete ? assessmentProgressDecision({ curriculum, outcomes, recheckNumber: run.recheckNumber, maxRechecks: MAX_RECHECKS_PER_SCOPE }) : null;
     const updated = {
       ...run,
       currentIndex: nextIndex,
@@ -346,6 +540,7 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
       missingObjectiveIds: complete ? decision.missingObjectiveIds : [],
       reviewFocusObjectiveId: complete ? decision.reviewFocusObjectiveId : '',
       reviewModuleIndex: complete ? decision.reviewModuleIndex : null,
+      recheckNumber: Number(run.recheckNumber) || 0,
       // A bounded objective-evidence trail supports a human audit and a
       // precise return route. It is not a numerical grade and contains none
       // of the raw response, selected option, answer key, or model reasoning.
@@ -359,6 +554,7 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
       completionKind: updated.completionKind, missingObjectiveIds: updated.missingObjectiveIds,
       reviewFocusObjectiveId: updated.reviewFocusObjectiveId,
       reviewModuleIndex: updated.reviewModuleIndex,
+      recheckNumber: updated.recheckNumber,
       monitoring: updated.monitoring,
       updatedAt: updated.updatedAt
     }, { merge: true });
@@ -374,9 +570,27 @@ export const createAssessmentService = ({ config, firebase, ledger, provider = c
     const snapshot = await runCollection(account.uid).doc(id).get();
     if (!snapshot.exists) throw apiError(404, 'ASSESSMENT_RUN_NOT_FOUND', 'That understanding check is not available.');
     const run = snapshot.data() || {};
-    const curriculum = assessmentCurriculum(run.moduleIndex, run.language);
+    if (isExpired(run)) throw apiError(410, 'ASSESSMENT_RUN_EXPIRED', 'This saved understanding check has expired. You can start a new calm check when you are ready.');
+    const curriculum = await curriculumFor({ authorization, courseId: run.courseId, courseVersion: run.curriculumVersion, moduleIndex: run.moduleIndex, language: run.language });
     return { run: visibleRun(run, await activeBank(curriculum)) };
   };
 
-  return { status, createDraft, publishDraft, start, answer, getRun };
+  const acknowledgeReview = async ({ authorization, runId }) => {
+    const account = await learner(authorization);
+    const id = cleanIdentifier(runId);
+    if (!id) throw apiError(400, 'INVALID_ASSESSMENT_RUN', 'That understanding check is not available.');
+    const ref = runCollection(account.uid).doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) throw apiError(404, 'ASSESSMENT_RUN_NOT_FOUND', 'That understanding check is not available.');
+    const run = snapshot.data() || {};
+    if (isExpired(run)) throw apiError(410, 'ASSESSMENT_RUN_EXPIRED', 'This saved understanding check has expired. You can start a new calm check when you are ready.');
+    if (run.status !== 'complete' || run.completionKind !== 'review' || !Number.isInteger(Number(run.reviewModuleIndex))) {
+      throw apiError(409, 'ASSESSMENT_REVIEW_NOT_AVAILABLE', 'There is no related course idea waiting for review.');
+    }
+    if (!run.reviewAcknowledgedAt) await ref.set({ reviewAcknowledgedAt: nowDate(), updatedAt: nowDate() }, { merge: true });
+    const curriculum = await curriculumFor({ authorization, courseId: run.courseId, courseVersion: run.curriculumVersion, moduleIndex: run.moduleIndex, language: run.language });
+    return { run: visibleRun({ ...run, reviewAcknowledgedAt: run.reviewAcknowledgedAt || nowDate() }, await activeBank(curriculum)) };
+  };
+
+  return { status, createDraft, getDraft, publishDraft, start, answer, getRun, acknowledgeReview };
 };

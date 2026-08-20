@@ -23,7 +23,139 @@ const objectivePhrase = (objective) => String(objective?.description || '')
   .replace(/^Recognise that\s+/i, '')
   .replace(/\.$/, '');
 
+const reviewedFallbackAvailable = (curriculum) => curriculum?.reviewedManifest === true;
+
+const cleanStatement = (value) => String(value || '')
+  .replace(/^\s*[^:\n]{1,90}:\s*/, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+// Reviewed lessons do not need a model to form a safe reserve: their approved
+// prose already supplies factual statements. This creates recognition checks
+// from that prose only, while preserving an author-reviewed MCQ whenever one
+// is present. It is deliberately generic across subjects—unlike the legacy
+// accessibility reserve below—so a science or humanities course is never
+// assessed with assumptions from the neurodivergence course.
+const reviewedSourceStatements = (source) => {
+  const candidates = String(source || '')
+    .split(/\n+|(?<=[.!?])\s+/u)
+    .map(cleanStatement)
+    .filter((statement) => statement.length >= 18 && statement.length <= 260);
+  return [...new Set(candidates.map((item) => item.replace(/[.!?]+$/, '')))].slice(0, 12);
+};
+
+const genericDistractors = [
+  'The lesson says the idea has no connection to the topic being studied.',
+  'The lesson says examples and relationships are not useful for understanding.',
+  'The lesson says the main idea should be ignored when applying the topic.',
+  'The lesson says there is only one possible way to explain every topic.'
+];
+
+const reviewedOpenItems = (curriculum, objectives) => {
+  const prompts = [
+    ['Explain the central reviewed idea in your own words.', 'A response accurately explains the approved main idea using the learner’s own words.'],
+    ['Name one detail from this module that helps make the main idea clearer.', 'A response connects one approved detail to the reviewed main idea.'],
+    ['Give one example, relationship, or next action that fits this module.', 'A response uses an example, relationship, or application grounded in the approved module.'],
+    ['What is one important distinction this module asks a learner to notice?', 'A response identifies one meaningful course-grounded distinction or connection.'],
+    ['How would you explain this idea to someone beginning the topic?', 'A response gives a clear, accurate explanation without adding unsupported claims.'],
+    ['What part of this module would you check again before using the idea?', 'A response names a relevant approved detail or relationship.'],
+    ['Connect the main idea to a familiar situation or another course idea.', 'A response makes a plausible connection that remains within the reviewed source.'],
+    ['Summarise the module in one or two useful sentences.', 'A response accurately summarises the approved lesson idea.'],
+    ['What question could help someone think further about this idea?', 'A response asks a relevant question grounded in the reviewed topic.']
+  ];
+  return prompts.map(([prompt, answerGuide], index) => ({
+    id: idFor('reviewed-open', index + 1),
+    objectiveIds: [objectives[index % objectives.length].id],
+    responseMode: 'open',
+    prompt,
+    options: [],
+    correctOptionIndex: -1,
+    answerGuide,
+    rubric: ['Uses an approved course idea.', 'Keeps the explanation clear and relevant.'],
+    feedback: 'Result under review. You can continue to the next small question when you are ready.'
+  }));
+};
+
+const reviewedMcqItem = ({ id, objectiveId, prompt, options, correctOptionIndex }) => ({
+  id,
+  objectiveIds: [objectiveId],
+  responseMode: 'mcq',
+  prompt,
+  options,
+  correctOptionIndex,
+  answerGuide: '',
+  rubric: [],
+  feedback: 'Your choice is recorded. You can continue to the next small question when you are ready.'
+});
+
+const reviewedSourceMcqs = (curriculum, objectiveId, amount = 8, prefix = 'reviewed-source') => {
+  const statements = reviewedSourceStatements(curriculum.source);
+  const supplied = statements.length ? statements : ['The reviewed module presents one central idea and supporting details.'];
+  return Array.from({ length: amount }, (_, index) => {
+    const statement = supplied[index % supplied.length];
+    return reviewedMcqItem({
+      id: idFor(prefix, index + 1),
+      objectiveId,
+      prompt: index % 2 === 0
+        ? 'Which statement is supported by the reviewed lesson?'
+        : 'Which statement matches the approved course material?',
+      options: [statement, ...genericDistractors.slice(0, 3)],
+      correctOptionIndex: 0
+    });
+  });
+};
+
+const reviewedModuleItems = (curriculum) => {
+  const objective = curriculum.objectives[0];
+  const authored = curriculum?.fallbackChecks?.module;
+  const authoredItem = authored && Array.isArray(authored.options) && Number.isInteger(authored.correctOptionIndex)
+    ? [reviewedMcqItem({ id: authored.id || 'reviewed-module-check', objectiveId: objective.id, prompt: authored.prompt, options: authored.options, correctOptionIndex: authored.correctOptionIndex })]
+    : [];
+  return [
+    ...reviewedOpenItems(curriculum, [objective]),
+    ...authoredItem,
+    ...reviewedSourceMcqs(curriculum, objective.id, 8, 'reviewed-module-source')
+  ];
+};
+
+const reviewedFinalItems = (curriculum) => {
+  const objectives = curriculum.objectives;
+  const open = reviewedOpenItems(curriculum, objectives).slice(0, 9).map((item, index) => ({
+    ...item,
+    id: idFor('reviewed-final-open', index + 1)
+  }));
+  const authored = (Array.isArray(curriculum?.fallbackChecks?.final) ? curriculum.fallbackChecks.final : [])
+    .filter((check) => Array.isArray(check?.options) && Number.isInteger(check?.correctOptionIndex) && check.objectiveId)
+    .map((check, index) => reviewedMcqItem({
+      id: `reviewed-final-check-${index + 1}`,
+      objectiveId: check.objectiveId,
+      prompt: check.prompt,
+      options: check.options,
+      correctOptionIndex: check.correctOptionIndex
+    }));
+  const sourceItems = objectives.flatMap((objective, index) => {
+    const unitSource = String(curriculum.source || '').split(/\n\n+/u)[index] || curriculum.source;
+    return reviewedSourceMcqs({ ...curriculum, source: unitSource }, objective.id, 2, `reviewed-final-source-${index + 1}`);
+  });
+  const openObjectiveIds = new Set(open.flatMap((item) => item.objectiveIds));
+  const primaryCoverage = objectives
+    .filter((objective) => !openObjectiveIds.has(objective.id))
+    .map((objective) => sourceItems.find((item) => item.objectiveIds.includes(objective.id)))
+    .filter(Boolean);
+  // A final check has a fixed learner-facing rhythm. Author-approved final
+  // questions are included, while source-grounded items first cover every
+  // approved objective that is not already represented by an open response.
+  // This is what keeps a multi-module course auditable even offline.
+  const mcq = [...primaryCoverage, ...authored, ...sourceItems];
+  const selected = Array.from({ length: 12 }, (_, index) => mcq[index % Math.max(1, mcq.length)]).map((item, index) => ({
+    ...item,
+    id: idFor('reviewed-final-mcq', index + 1)
+  }));
+  return [...open, ...selected];
+};
+
 const moduleItems = (curriculum) => {
+  if (reviewedFallbackAvailable(curriculum)) return reviewedModuleItems(curriculum);
   const objective = curriculum.objectives[0];
   const phrase = objectivePhrase(objective);
   const support = supportFromSource(curriculum.source);
@@ -76,15 +208,23 @@ const moduleItems = (curriculum) => {
 };
 
 const finalItems = (curriculum) => {
+  if (reviewedFallbackAvailable(curriculum)) return reviewedFinalItems(curriculum);
   const objectives = curriculum.objectives;
-  const open = objectives.slice(0, 9).map((objective, index) => ({
+  // A short reviewed course can have fewer than nine objectives. A final
+  // check still needs its fixed, calm 8–9 open-response shape, so reuse an
+  // approved objective with a differently-worded prompt rather than silently
+  // producing an invalid bank or inventing new curriculum material.
+  const open = Array.from({ length: 9 }, (_, index) => {
+    const objective = objectives[index % objectives.length];
+    return ({
     id: idFor('final-open', index + 1), objectiveIds: [objective.id], responseMode: 'open',
     prompt: `In your own words, explain one useful idea about ${objectivePhrase(objective)}.`,
     options: [], correctOptionIndex: -1,
     answerGuide: 'A response accurately describes the approved objective without diagnosing or making claims about a person.',
     rubric: ['Uses the relevant approved objective.', 'Keeps the explanation respectful and practical.'],
     feedback: 'Result under review. You can continue whenever you are ready.'
-  }));
+    });
+  });
   const mcq = Array.from({ length: 12 }, (_, index) => {
     const objective = objectives[index % objectives.length];
     return {
