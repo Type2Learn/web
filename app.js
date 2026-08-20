@@ -234,7 +234,7 @@
       ['Accessibility', 'Task-level access, assistive technology testing, language, and recovery.'],
       ['Education engineering', 'Reliable learning systems, protected progress, privacy, and secure delivery.']
     ].map((role, index) => '<article class="collaborator-role reveal" data-delay="' + index + '"><span>0' + (index + 1) + '</span><h3>' + role[0] + '</h3><p>' + role[1] + '</p></article>').join('');
-    return shell(pageHero('Team', 'Built with learners. Led with accountability.', 'Type2Learn brings product, research, accessibility, and engineering together around active learning that respects different minds and paths to confidence.', 'Profile standard', 'The founder portrait is supplied. Supporting collaborator photography is clearly labelled as illustrative until approved profiles are available.') + '<section class="page-section founder-section"><div class="content-wrap"><div class="founder-feature" data-team-feature><figure class="founder-portrait"><img src="/assets/team/founder-muhammad-taha.webp" alt="Muhammad Taha Bin Zaeem, Founder and Development Lead of Type2Learn"></figure><div class="founder-copy"><p class="section-kicker">Founder · Development Lead</p><h2>Muhammad Taha Bin Zaeem</h2><p class="founder-statement">“Learning technology should make the next meaningful action clearer without making a learner smaller.”</p><p>He leads Type2Learn’s vision, product development, partnerships, and responsible growth—connecting the learning experience to clear standards for evidence, privacy, accessibility, and learner dignity.</p><div class="founder-responsibilities"><span>Vision & strategy</span><span>Product development</span><span>Responsible growth</span></div></div></div></div></section><section class="page-section is-pale collaborators-section"><div class="content-wrap"><div class="collaborator-intro"><p class="section-kicker">The team being built</p><h2>Multidisciplinary by design.</h2><p>No one discipline can decide what meaningful, accessible learning should feel like. Research, lived experience, education practice, accessibility, and engineering need equal authority at the table.</p></div><figure class="collaborator-visual" data-team-feature><img src="/assets/team/illustrative-collaborators.webp" alt="Illustrative group of learning research, accessibility, and education engineering collaborators"><figcaption>Illustrative collaborator photography · Temporary until approved team profiles are published.</figcaption></figure><div class="collaborator-roles">' + roles + '</div></div></section><section class="page-section"><div class="content-wrap"><div class="support-panel"><p class="section-kicker">Made with, not for</p><h2>Participation should change the product.</h2><p>Type2Learn should involve learners, educators, families, accessibility specialists, and professionals in identifying barriers, testing flows, reviewing language, and deciding what changes. Participation is voluntary, safe, accessible, and appropriately recognized.</p><div class="support-items"><div class="support-item"><strong>Listen</strong><span>Start from real barriers, routines, and goals.</span></div><div class="support-item"><strong>Prototype</strong><span>Test language, flow, sensory load, and usefulness.</span></div><div class="support-item"><strong>Measure</strong><span>Look beyond speed to comprehension and independence.</span></div><div class="support-item"><strong>Publish limits</strong><span>Separate evidence, inference, prototype, and plan.</span></div></div></div></div></section>');
+    return shell(pageHero('Team', 'Informed by early participation. Led with accountability.', 'Type2Learn brings product, research, accessibility, UI/UX design, and engineering together around active learning that respects different minds and paths to confidence.', 'Public boundary', 'Early contributions inform product decisions. They are not presented as formal co-design findings, clinical validation, or endorsement.') + '<section class="page-section founder-section"><div class="content-wrap"><div class="founder-feature" data-team-feature><figure class="founder-portrait"><img src="/assets/team/founder-muhammad-taha.webp" alt="Muhammad Taha Bin Zaeem, Founder and Development Lead of Type2Learn"></figure><div class="founder-copy"><p class="section-kicker">Founder · Development Lead</p><h2>Muhammad Taha Bin Zaeem</h2><p class="founder-statement">“Learning technology should make the next meaningful action clearer without making a learner smaller.”</p><p>He leads Type2Learn’s vision, product development, partnerships, and responsible growth—connecting the learning experience to clear standards for evidence, privacy, accessibility, and learner dignity.</p><div class="founder-responsibilities"><span>Vision & strategy</span><span>Product development</span><span>Responsible growth</span></div></div></div></div></section><section class="page-section is-pale collaborators-section"><div class="content-wrap"><div class="collaborator-intro"><p class="section-kicker">The team being built</p><h2>Multidisciplinary by design.</h2><p>No one discipline can decide what meaningful, accessible learning should feel like. Research, lived experience, education practice, accessibility, design, and engineering need equal authority at the table.</p></div><figure class="collaborator-visual" data-team-feature><img src="/assets/team/illustrative-collaborators.webp" alt="Illustrative group of learning research, accessibility, and education engineering collaborators"><figcaption>Illustrative collaborator photography · Temporary until approved team profiles are published.</figcaption></figure><div class="collaborator-roles">' + roles + '</div></div></section><section class="page-section"><div class="content-wrap"><div class="support-panel"><p class="section-kicker">Early input, clear limits</p><h2>Participation should change the product.</h2><p>Early learner, teacher, professional, and review input already informs specific product decisions. Formal co-design involves its own consent, safeguards, method, and published limitations; Type2Learn does not blur those categories.</p><div class="support-items"><div class="support-item"><strong>Listen</strong><span>Start from real barriers, routines, and goals.</span></div><div class="support-item"><strong>Trace</strong><span>Record the decision a contribution informed.</span></div><div class="support-item"><strong>Test</strong><span>Use a defined method before making an outcome claim.</span></div><div class="support-item"><strong>Publish limits</strong><span>Separate early input, formal evidence, prototype, and plan.</span></div></div></div></div></section>');
   };
 
   const community = () => shell(pageHero('Community', 'Bring a question, insight, or challenge that makes learning better.', 'Type2Learn aims to grow through respectful collaboration with learners, families, educators, specialists, researchers, and contributors. No one needs a public social profile to use ordinary learner features.', 'Official channels', 'Follow Type2Learn on LinkedIn and explore the organization’s public work on GitHub.') + '<section class="page-section"><div class="content-wrap"><h2>Different expertise, one standard: respect the learner.</h2><p>Collaboration must improve product decisions rather than become a testimonial or a request to disclose sensitive information.</p><div class="page-grid">' + card('users', 'Lived experience', 'Feedback can identify barriers, test controls, and challenge assumptions.', ['Voluntary participation', 'No required public attribution', 'No pressure to disclose diagnoses']) + card('school', 'Education practice', 'Teachers and school leaders can test curricular fit, clarity, and daily workflow.', ['Clear implementation questions', 'Age-respectful content', 'No claims without permission']) + card('flask', 'Research and accessibility', 'Specialists can review evidence, language, measurement, access, and safety.', ['Appropriate scope', 'Compensate where possible', 'Traceable decisions']) + '</div></div></section><section class="page-section is-pale"><div class="content-wrap"><div class="status-banner community-social-banner">' + icon('message') + '<div><strong>Connect through the official Type2Learn channels</strong><p>Follow organizational updates on <a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">LinkedIn<span class="sr-only"> (opens in a new tab)</span></a> or review public repositories on <a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">GitHub<span class="sr-only"> (opens in a new tab)</span></a>. A monitored learner-support channel remains in preparation.</p></div></div></div></section><section class="page-section" id="support"><div class="content-wrap"><h2>Help should end in a calm next step.</h2><p>Support stays plain-language, accessible, and connected to the actual product state. It asks only for the information needed to recover from a barrier.</p><div class="page-grid">' + card('home', 'Getting started', 'Choose a path, adjust controls, understand the first objective, and begin safely.', ['What the demo does', 'Where settings live', 'How to reset a preview']) + card('sliders', 'Controls and access', 'Use motion, sound, text, spacing, focus, literal-instruction, and input options.', ['Keyboard help', 'Pause and resume', 'Accessible recovery']) + card('shield', 'Privacy and escalation', 'Know when to involve a parent, school, or accountable support route without oversharing.', ['Privacy request boundary', 'Accessibility barrier route', 'School support ownership']) + '</div><div class="status-banner support-status">' + icon('message') + '<div><strong>Monitored support channel pending configuration</strong><p>This preview intentionally has no contact form. A live support route requires accountable ownership, response targets, privacy review, accessibility checks, and escalation handling.</p></div></div></div></section>');
@@ -277,7 +277,8 @@
       ['Muhammad Hamiz Bin Kashif', 'شریک بانی · انجینئرنگ', '/assets/team/muhammad-hamiz-bin-kashif-studio.webp', 'سرمئی اسٹوڈیو پس منظر میں Type2Learn کے انجینئرنگ سربراہ Muhammad Hamiz Bin Kashif', 'edited', 'ان کا کردار قابلِ اعتماد انجینئرنگ، محفوظ پیش رفت، رسائی، محفوظ ترسیل اور تعلیمی رکاوٹ کے بعد پرسکون بحالی پر مرکوز ہے۔', 'مضبوط نظام وہ ہے جو ہر سیکھنے والے کو اپنی حاصل شدہ پیش رفت محفوظ رکھنے دے۔', ['انجینئرنگ نظام', 'محفوظ پیش رفت', 'قابلِ اعتماد ترسیل']],
       ['Idrees Babar', 'شریک بانی · تحقیق', '/assets/team/idrees-babar-studio.webp', 'سرمئی اسٹوڈیو پس منظر میں Type2Learn کے تحقیقی سربراہ Idrees Babar', 'edited', 'ان کا کردار ثبوت کے جائزے، تحقیق کے ڈیزائن، پیمائش کے معیار اور دیانت دار عوامی دعووں کو مصنوعات کے فیصلوں سے جوڑتا ہے۔', 'ثبوت تب سب سے زیادہ اہم ہوتا ہے جب وہ ہمارے بنائے ہوئے کام اور دعووں کو بدلتا ہے۔', ['ثبوت کا جائزہ', 'آزمائش کا ڈیزائن', 'پیمائش کا معیار']],
       ['Muhammad Fahad Younus', 'شریک بانی · AI', '/assets/team/muhammad-fahad-younus-studio.webp', 'سرمئی اسٹوڈیو پس منظر میں Type2Learn کے AI سربراہ Muhammad Fahad Younus', 'edited', 'ان کا کردار ذمہ دار AI سمت، ماڈل کی جانچ، مؤثر انسانی نگرانی اور خودکار مدد کو تعلیمی مقصد کے مطابق رکھنے پر مرکوز ہے۔', 'ذہین مدد انسانی فیصلے کو مضبوط کرے، خاموشی سے اس کی جگہ نہ لے۔', ['ذمہ دار AI', 'ماڈل کی جانچ', 'انسانی نگرانی']],
-      ['Alizay Hassan', 'شریک بانی · مصنوعات', '/assets/team/alizay-hassan-figure.webp', 'Alizay Hassan کے پروفائل کی نمائندگی کرنے والی واضح طور پر غیر انسانی سرمئی 3D شکل', 'placeholder', 'ان کا کردار مصنوعات کی حکمتِ عملی، مشترکہ ڈیزائن، پروگرام کی وضاحت اور عمر کے احترام والی تجرباتی ترتیب کو ایک مربوط سفر میں لاتا ہے۔', 'واضح مصنوعات ہر سیکھنے والے کو آغاز، جاری رکھنے اور واپسی کا باوقار راستہ دیتی ہے۔', ['مصنوعات کی حکمتِ عملی', 'مشترکہ ڈیزائن', 'پروگرام کی وضاحت']]
+      ['Alizay Hassan', 'شریک بانی · مصنوعات', '/assets/team/alizay-hassan-figure.webp', 'Alizay Hassan کے پروفائل کی نمائندگی کرنے والی واضح طور پر غیر انسانی سرمئی 3D شکل', 'placeholder', 'ان کا کردار مصنوعات کی حکمتِ عملی، مشترکہ ڈیزائن، پروگرام کی وضاحت اور عمر کے احترام والی تجرباتی ترتیب کو ایک مربوط سفر میں لاتا ہے۔', 'واضح مصنوعات ہر سیکھنے والے کو آغاز، جاری رکھنے اور واپسی کا باوقار راستہ دیتی ہے۔', ['مصنوعات کی حکمتِ عملی', 'مشترکہ ڈیزائن', 'پروگرام کی وضاحت']],
+      ['Lameea Mubashir Khan', 'UI/UX ڈیزائن سربراہ', '/assets/team/lameea-mubashir-khan-figure.png', 'Lameea Mubashir Khan کے پروفائل کی نمائندگی کرنے والی واضح طور پر غیر انسانی سرمئی 3D شکل', 'placeholder', 'ان کا کردار معلوماتی ساخت، قابلِ رسائی تعامل، بصری تسلسل اور ایسے انٹرفیس کے فیصلوں کو جوڑتا ہے جو سیکھنے والے کے اگلے عمل کو واضح بنائیں۔', 'ایک اچھی اسکرین کو اگلا کام آسان بنانا چاہیے، مزید اندازے نہیں بڑھانے چاہیے۔', ['معلوماتی ساخت', 'قابلِ رسائی تعامل', 'بصری نظام']]
     ];
     const statusLabel = { supplied: 'فراہم کردہ تصویر', edited: 'فراہم کردہ تصویر سے تیار کردہ پورٹریٹ', placeholder: 'غیر انسانی متبادل تصویر' };
     const cards = members.map((member, index) => '<article class="team-profile-card' + (index === 0 ? ' is-active' : '') + ' has-' + member[4] + '" data-team-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><figure class="team-profile-portrait"><img src="' + member[2] + '" alt="' + member[3] + '" width="960" height="1200" loading="lazy" decoding="async"><figcaption class="portrait-status is-' + member[4] + '">' + statusLabel[member[4]] + '</figcaption></figure><div class="team-profile-copy"><p class="section-kicker">' + member[1] + '</p><h2 lang="en">' + member[0] + '</h2><p class="team-profile-statement">“' + member[6] + '”</p><p>' + member[5] + '</p><div class="team-profile-responsibilities">' + member[7].map((item) => '<span>' + item + '</span>').join('') + '</div></div></article>').join('');
@@ -294,9 +295,9 @@
     pageHero(
       'Co-design',
       'Neurodivergent voices should change the product—not decorate it.',
-      'Type2Learn is being designed to involve neurodivergent learners, educators, families, accessibility specialists, learning professionals, and researchers through structured, safeguarded participation.',
-      'Current status',
-      'The participation model is being prepared. Type2Learn does not yet claim completed external co-design findings or clinical validation.'
+      'Type2Learn publishes its early participation record while building a more formal, safeguarded co-design practice with neurodivergent learners, educators, families, accessibility specialists, learning professionals, and researchers.',
+      'Early record · ongoing practice',
+      'The public record documents early contributions that inform product decisions. It does not claim a completed formal co-design study, clinical validation, or endorsement.'
     ) +
     '<section class="page-section codesign-overview"><div class="content-wrap"><p class="section-kicker">Who the process is intended to involve</p><h2>Different experience. Shared authority over the decisions that matter.</h2><p>Participation should include people affected by the learning experience and people responsible for safe, accessible educational practice. A contributor is not described as a team member, advisor, or validator unless that relationship has been explicitly agreed.</p><div class="codesign-roster"><article><span>01</span><h3>Neurodivergent learners</h3><p>People with dyslexia, ADHD, autism, and other learning or access experiences, without requiring a diagnosis or public disclosure.</p></article><article><span>02</span><h3>Families and educators</h3><p>People who understand everyday learning routines, classroom constraints, transitions, support, and re-entry after interruption.</p></article><article><span>03</span><h3>Relevant professionals</h3><p>Accessibility specialists, special-education professionals, learning professionals, and learning-science researchers whose actual contribution is clearly described.</p></article></div></div></section>' +
     '<section class="page-section is-pale"><div class="content-wrap"><p class="section-kicker">What contributors are intended to influence</p><h2>Feedback belongs next to the product decision.</h2><div class="codesign-influence"><article><span>01</span><div><h3>Learning structure</h3><p>Objectives, step order, retrieval cues, correction, application, review, and what counts as meaningful completion.</p></div></article><article><span>02</span><div><h3>Access and sensory control</h3><p>Text, spacing, read-aloud, motion, sound, timing, literal instructions, alternative input, pause, and return.</p></div></article><article><span>03</span><div><h3>Language and feedback</h3><p>Whether instructions are understandable, feedback is respectful, and recovery offers a useful next action without shame.</p></div></article><article><span>04</span><div><h3>Navigation and pacing</h3><p>What stays predictable, what changes visibly, how progress is protected, and how a learner resumes after interruption.</p></div></article></div></div></section>' +
@@ -381,7 +382,7 @@
         kicker: 'گفتگو کا ریکارڈ', title: 'ایک وقت میں ایک گفتگو۔ ہر اندراج کے ساتھ واضح اگلا قدم۔', body: 'یہ عارضی ادارتی نوٹس ہیں، براہِ راست اقتباسات نہیں۔ منظور شدہ اقتباسات اور نقل موصول ہونے پر ان کی جگہ اصل الفاظ شامل کیے جائیں گے۔', record: 'عارضی ریکارڈ · براہِ راست اقتباس نہیں', prompt: 'جن نکات کو جانچا جا رہا ہے', professional: 'پیشہ ورانہ گفتگو', teachers: 'تدریسی گفتگو', open: 'مکمل گفتگو دیکھیں', transcript: 'اصل نقل دیکھیں', temporary: 'عارضی لنک · منظور شدہ ویڈیو شامل کریں', position: 'نفسیات کی معلمہ، محقق اور معالجہ'
       }
       : {
-        kicker: 'Conversation record', title: 'Interviews that changed the brief.', body: 'These are published, consent-aware summaries of the supplied interview records—not isolated quotations or diagnostic claims. The linked source gives each conversation its full context.', record: 'Published summary · distilled from the interview record', prompt: 'What this conversation helps us check', professional: 'Professional conversation', teachers: 'Professor conversation', open: 'Watch the full interview', transcript: 'Open source transcript', temporary: 'Open the interview archive', position: 'Psychology educator, researcher & therapist'
+        kicker: 'Conversation record', title: 'Interviews that changed the brief.', body: 'These are published, consent-aware summaries of the supplied interview records—not isolated quotations or diagnostic claims. The linked source gives each conversation its full context.', record: 'Published summary · distilled from the interview record', prompt: 'What this conversation helps us check', professional: 'Professional conversation', teachers: 'Teacher conversation', open: 'Watch the full interview', transcript: 'Open source transcript', temporary: 'Open the interview archive', position: 'Psychology educator, researcher & therapist'
       };
     const interviews = isUrdu ? [
       ['01', copy.professional, 'ڈاکٹر مائدہ', copy.position, 'dr-mayda-interview-spotlight.png', 'https://github.com/Type2Learn/Interviews/blob/main/Professionals/Pre-Product/Dr%20Mayda/readme.md', copy.transcript, ['نیورو ڈائیورسٹی کو کمی کے لیبل کے بجائے سیکھنے کے فرق کے طور پر سمجھنا۔', 'مدد سے کام تک رسائی آسان ہونی چاہیے، جواب کی قدر کم نہیں ہونی چاہیے۔', 'توجہ، حس اور ابلاغ کی ضرورت کے لیے پرسکون انتخاب اور واپسی کا راستہ درکار ہے۔', 'واضح زبان اور قابلِ پیش گوئی ترتیب سبق میں داخل ہونا آسان بناتی ہے۔', 'رفتار کا اسکور خود سیکھنے کی پوری وضاحت نہیں کرتا۔', 'پیشہ ورانہ تشریح اور حفاظت میں انسانی ذمہ داری باقی رہتی ہے۔', 'اجازت کی حد پہلے واضح ہو، پھر مواد یا میڈیا دکھایا جائے۔', 'Type2Learn کا اگلا قدم: کنٹرولز آزمائیں، تبدیلی درج کریں، اور حد عوامی کریں۔']],
@@ -448,7 +449,7 @@
   };
 
   const participationTrust = () => shell(
-    pageHero('Participation & trust', 'Participation should change the work. Trust should be visible.', 'This is the one public record for co-design, professional input, community participation, accessibility, privacy, security, and support boundaries. It replaces three overlapping sections with one accountable route.', 'Current status', 'The public record currently includes one professional, three professor interviews, five learner-contribution records, and 25 distinct product-review screenshots. It does not claim clinical validation or endorsement.') +
+    pageHero('Participation & trust', 'Participation should change the work. Trust should be visible.', 'This is the one public record for early participation, formal co-design status, accessibility, privacy, security, and support boundaries. It keeps evidence, inference, and planned work visibly distinct.', 'Early record · ongoing practice', 'The public record includes one professional, three teacher interviews, five learner-contribution records, and 25 distinct product-review screenshots. These early contributions inform product decisions; they are not presented as completed formal co-design, clinical validation, or endorsement.') +
     '<section class="page-section participation-record-section" id="participation-record"><div class="content-wrap"><div class="section-heading"><div class="section-heading-copy"><p class="section-kicker">Participation record</p><h2>Who is represented—and how their contribution is protected.</h2><p>Every public entry needs a clear permission level, source format, learning, and product decision. Counts are visible; personal identities and images are not.</p></div>' + status('Permission-aware', 'teal') + '</div><div class="participation-summary" aria-label="Participant count"><span><b>01</b>Professional</span><span><b>03</b>Teachers</span><span><b>05</b>Students</span></div><div class="participation-grid">' + participationCards() + '</div></div></section>' +
     '<section class="page-section is-pale evidence-placement-section" id="video-conversations"><div class="content-wrap"><div class="evidence-placement-grid"><div><p class="section-kicker">Evidence and video conversations</p><h2>Designed for permissioned proof, not decorative testimonials.</h2><p>The published conversation cards link to the public source records currently available. Text, audio, transcript, and approved-video records remain equal contributors; no participant image is required for a contribution to matter.</p><ol class="evidence-steps"><li><span>01</span>State the question and format.</li><li><span>02</span>Record the permission level and date.</li><li><span>03</span>Link the video, audio, or text record.</li><li><span>04</span>Publish what changed and what remains open.</li></ol></div><aside class="evidence-media-slot" data-evidence-media aria-label="Type2Learn public interview and review archive"><span>' + icon('message') + '</span><p>Public source archive</p><strong><a href="https://github.com/Type2Learn/Interviews" target="_blank" rel="noopener noreferrer">Open interviews &amp; reviews <span aria-hidden="true">↗</span></a></strong><small>Source records are published only where their relevant permission and review requirements have been met.</small></aside></div></div></section>' +
     '<section class="page-section trust-commitments" id="accessibility"><div class="content-wrap"><p class="section-kicker">Product commitments</p><h2>Four requirements that stay connected to participation.</h2><div class="trust-commitment-grid"><article class="trust-commitment reveal"><span>01</span><h3>Accessibility</h3><p>Keyboard operation, usable zoom and reflow, clear status, captions where needed, and a reduced-motion path are product requirements.</p></article><article class="trust-commitment reveal" data-delay="1"><span>02</span><h3>Privacy</h3><p>Minimise data, keep learner work private by default, use a defined purpose, and never sell learner data.</p></article><article class="trust-commitment reveal" data-delay="2" id="security"><span>03</span><h3>Security</h3><p>Least privilege, secure delivery, safe logging, reviewable operations, and transparent incident handling are requirements—not certification claims.</p></article><article class="trust-commitment reveal" data-delay="3" id="support"><span>04</span><h3>Support</h3><p>A support route needs accountable ownership, accessibility checks, privacy boundaries, response targets, and escalation handling before it is treated as live.</p></article></div><div class="trust-legal-links"><a href="/privacy/">Read the Privacy Policy</a><a href="/terms/">Read the Terms of Service</a><a href="https://github.com/Type2Learn" target="_blank" rel="noopener noreferrer">View Type2Learn on GitHub <span aria-hidden="true">↗</span></a><a href="https://www.linkedin.com/company/type2learn/" target="_blank" rel="noopener noreferrer">Follow Type2Learn on LinkedIn <span aria-hidden="true">↗</span></a></div></div></section>'
@@ -629,18 +630,279 @@
       ['Muhammad Hamiz Bin Kashif', 'Co-founder · Engineering lead', '/assets/team/muhammad-hamiz-bin-kashif-studio.webp', 'Muhammad Hamiz Bin Kashif, engineering lead at Type2Learn, against a grey studio background', 'edited', 'His role focuses on dependable engineering systems, protected progress, accessibility, secure delivery, and calm recovery when learning is interrupted.', 'The strongest system is the one that lets every learner keep what they have earned.', ['Engineering systems', 'Protected progress', 'Reliable delivery']],
       ['Idrees Babar', 'Co-founder · Research lead', '/assets/team/idrees-babar-studio.webp', 'Idrees Babar, research lead at Type2Learn, against a grey studio background', 'edited', 'His role connects evidence review, research design, measurement quality, and honest public claims to the decisions made in the learning experience.', 'Evidence matters most when it changes what we build and what we are willing to claim.', ['Evidence review', 'Pilot design', 'Measurement quality']],
       ['Muhammad Fahad Younus', 'Co-founder · AI lead', '/assets/team/muhammad-fahad-younus-studio.webp', 'Muhammad Fahad Younus, AI lead at Type2Learn, against a grey studio background', 'edited', 'His role focuses on responsible AI direction, model evaluation, useful human oversight, and keeping automated support aligned with the learning objective.', 'Intelligent support should strengthen human judgment, not quietly replace it.', ['Responsible AI', 'Model evaluation', 'Human oversight']],
-      ['Alizay Hassan', 'Co-founder · Product lead', '/assets/team/alizay-hassan-figure.webp', 'Clearly non-human grey 3D editorial figure representing the Alizay Hassan profile', 'placeholder', 'Her role brings product strategy, co-design, programme clarity, and age-respectful experience design into one coherent learner journey.', 'A clear product gives every learner a dignified way to begin, continue, and return.', ['Product strategy', 'Co-design', 'Programme clarity']]
+      ['Alizay Hassan', 'Co-founder · Product lead', '/assets/team/alizay-hassan-figure.webp', 'Clearly non-human grey 3D editorial figure representing the Alizay Hassan profile', 'placeholder', 'Her role brings product strategy, co-design, programme clarity, and age-respectful experience design into one coherent learner journey.', 'A clear product gives every learner a dignified way to begin, continue, and return.', ['Product strategy', 'Co-design', 'Programme clarity']],
+      ['Lameea Mubashir Khan', 'UI/UX Design Lead', '/assets/team/lameea-mubashir-khan-figure.png', 'Clearly non-human grey 3D editorial figure representing the Lameea Mubashir Khan profile', 'placeholder', 'Her role connects information architecture, accessible interaction, visual consistency, and interface decisions that make the learner’s next action clear.', 'A well-designed screen should make the next action easier—not ask the learner to guess more.', ['Information architecture', 'Accessible interaction', 'Visual systems']]
     ];
     const statusLabel = { supplied: 'Supplied portrait', edited: 'Portrait from supplied image', placeholder: 'Non-human placeholder' };
     const cards = members.map((member, index) => '<article class="team-profile-card' + (index === 0 ? ' is-active' : '') + ' has-' + member[4] + '" data-team-card="' + index + '" aria-hidden="' + (index === 0 ? 'false' : 'true') + '"><figure class="team-profile-portrait"><img src="' + member[2] + '" alt="' + member[3] + '" width="960" height="1200" loading="lazy" decoding="async"><figcaption class="portrait-status is-' + member[4] + '">' + statusLabel[member[4]] + '</figcaption></figure><div class="team-profile-copy"><p class="section-kicker">' + member[1] + '</p><h2>' + member[0] + '</h2><p class="team-profile-statement">“' + member[6] + '”</p><p>' + member[5] + '</p><div class="team-profile-responsibilities">' + member[7].map((item) => '<span>' + item + '</span>').join('') + '</div></div></article>').join('');
-    return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">The people building Type2Learn</p><h2 id="team-deck-title">Different disciplines. One accountable mission.</h2><p>The founder appears first, followed by the co-founders shaping engineering, research, AI, and product. Edited portraits are identified, and the non-human profile figure is clearly labelled.</p></div><div class="team-deck" data-team-deck data-scroll-stops="' + members.length + '"><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>Scroll or drag</span> to shuffle the team deck</p></div></div></section>';
+    return '<section class="page-section team-deck-section" aria-labelledby="team-deck-title"><div class="content-wrap"><div class="team-deck-intro"><p class="section-kicker">The people building Type2Learn</p><h2 id="team-deck-title">Different disciplines. One accountable mission.</h2><p>The founder appears first, followed by the co-founders shaping engineering, research, AI, and product, then the UI/UX Design Lead. Edited portraits are identified, and non-human profile figures are clearly labelled.</p></div><div class="team-deck" data-team-deck data-scroll-stops="' + members.length + '"><div class="team-deck-position" aria-live="polite"><span id="team-card-current">01</span><i></i><span>' + String(members.length).padStart(2, '0') + '</span></div><div class="team-card-stack">' + cards + '</div><p class="team-deck-instruction"><span>Scroll or drag</span> to shuffle the team deck</p></div></div></section>';
   };
 
   const identitySection = () => {
     if (isUrdu) {
-      return '<section class="section identity-section" aria-labelledby="type2learn-identity"><div class="content-wrap identity-layout"><div class="identity-copy"><p class="section-kicker"><span lang="en">Type2Learn Active Learning</span></p><h2 id="type2learn-identity">ٹائپنگ سیکھنے کا عمل ہے — آخری مقصد نہیں۔</h2><p class="identity-lead">Type2Learn ایک تعلیمی اقدام ہے جو غیر منافع بخش مقصد کے ساتھ تیار کیا جا رہا ہے۔ یہ ٹائپنگ کو محض رفتار کی مشق کے بجائے فعال سیکھنے کے طریقے کے طور پر استعمال کرتا ہے۔ سیکھنے والے تعلیمی خیالات کو یاد کرتے، اپنے الفاظ میں واضح کرتے، درست کرتے، استعمال کرتے اور بعد میں دوبارہ دہراتے ہیں۔</p></div><div class="identity-facts"><article><span>01</span><div><h3>بانی ٹیم</h3><p>بانی اور ترقیاتی سربراہ محمد طٰہٰ بن زعیم ہیں۔ بانی ٹیم میں <span lang="en">Muhammad Hamiz Bin Kashif</span>، <span lang="en">Idrees Babar</span>، <span lang="en">Muhammad Fahad Younus</span> اور <span lang="en">Alizay Hassan</span> شامل ہیں۔</p><a href="/ur/team/">بانی ٹیم کے پروفائلز دیکھیں</a></div></article><article><span>02</span><div><h3>مشترکہ ڈیزائن کی موجودہ حیثیت</h3><p>نیوروڈائیورجینٹ سیکھنے والوں—بشمول ڈسلیکسیا، ADHD اور آٹزم کے حامل افراد—اور متعلقہ پیشہ ور افراد کے ساتھ منظم مشترکہ ڈیزائن اور جانچ کی تیاری کی جا رہی ہے۔ مکمل بیرونی مشترکہ ڈیزائن کے نتائج کا ابھی دعویٰ نہیں کیا جا رہا۔</p><a href="/ur/participation-trust/#participation-record">شرکت اور مشترکہ ڈیزائن کا ریکارڈ پڑھیں</a></div></article><article><span>03</span><div><h3>تعلیمی، طبی نہیں</h3><p>Type2Learn کسی حالت کی تشخیص، علاج یا طبی جانچ نہیں کرتا۔ کچھ عوامی تجربات ابتدائی نمونے یا منصوبہ شدہ تصورات ہیں اور انہیں اسی طرح واضح کیا گیا ہے۔</p></div></article><article><span>04</span><div><h3>واضح شناخت</h3><p><span lang="en">Type2Learn Active Learning</span>، <span lang="en">Type to Learn</span> اور اسی نام والی براؤزر ایکسٹینشن سے آزاد اور غیر وابستہ ہے۔</p></div></article></div></div></section>';
+      return '<section class="section identity-section" aria-labelledby="type2learn-identity"><div class="content-wrap identity-layout"><div class="identity-copy"><p class="section-kicker"><span lang="en">Type2Learn Active Learning</span></p><h2 id="type2learn-identity">ٹائپنگ سیکھنے کا عمل ہے — آخری مقصد نہیں۔</h2><p class="identity-lead">Type2Learn ایک تعلیمی اقدام ہے جو غیر منافع بخش مقصد کے ساتھ تیار کیا جا رہا ہے۔ یہ ٹائپنگ کو محض رفتار کی مشق کے بجائے فعال سیکھنے کے طریقے کے طور پر استعمال کرتا ہے۔ سیکھنے والے تعلیمی خیالات کو یاد کرتے، اپنے الفاظ میں واضح کرتے، درست کرتے، استعمال کرتے اور بعد میں دوبارہ دہراتے ہیں۔</p></div><div class="identity-facts"><article><span>01</span><div><h3>ٹیم</h3><p>بانی اور ترقیاتی سربراہ محمد طٰہٰ بن زعیم ہیں۔ ٹیم میں <span lang="en">Muhammad Hamiz Bin Kashif</span>، <span lang="en">Idrees Babar</span>، <span lang="en">Muhammad Fahad Younus</span>، <span lang="en">Alizay Hassan</span> اور <span lang="en">Lameea Mubashir Khan</span> شامل ہیں۔</p><a href="/ur/team/">ٹیم کے پروفائلز دیکھیں</a></div></article><article><span>02</span><div><h3>ابتدائی شرکت کا ریکارڈ</h3><p>ایک پیشہ ور، تین اساتذہ، پانچ سیکھنے والوں کی شراکتیں اور 25 مصنوعات کے جائزے عوامی طور پر درج ہیں۔ یہ ابتدائی ریکارڈ فیصلوں کو سمت دیتا ہے؛ مکمل رسمی مشترکہ ڈیزائن، طبی توثیق یا حمایت کا دعویٰ نہیں۔</p><a href="/ur/participation-trust/#participation-record">شرکت اور اعتماد کا عوامی ریکارڈ پڑھیں</a></div></article><article><span>03</span><div><h3>تعلیمی، طبی نہیں</h3><p>Type2Learn کسی حالت کی تشخیص، علاج یا طبی جانچ نہیں کرتا۔ کچھ عوامی تجربات ابتدائی نمونے یا منصوبہ شدہ تصورات ہیں اور انہیں اسی طرح واضح کیا گیا ہے۔</p></div></article><article><span>04</span><div><h3>واضح شناخت</h3><p><span lang="en">Type2Learn Active Learning</span>، <span lang="en">Type to Learn</span> اور اسی نام والی براؤزر ایکسٹینشن سے آزاد اور غیر وابستہ ہے۔</p></div></article></div></div></section>';
     }
-    return '<section class="section identity-section" aria-labelledby="type2learn-identity"><div class="content-wrap identity-layout"><div class="identity-copy"><p class="section-kicker">Type2Learn Active Learning</p><h2 id="type2learn-identity">Typing is the learning action—not the finish line.</h2><p class="identity-lead">Type2Learn is an education initiative being developed with a nonprofit mission. It uses typing as an active-learning method—not merely as typing practice. Learners recall, explain, correct, apply, and revisit academic ideas to build durable understanding.</p></div><div class="identity-facts"><article><span>01</span><div><h3>Founding team</h3><p>Type2Learn was founded by Muhammad Taha Bin Zaeem, Founder and Development Lead. The founding team also includes Muhammad Hamiz Bin Kashif, Idrees Babar, Muhammad Fahad Younus, and Alizay Hassan.</p><a href="/team/">Meet the Type2Learn founding team</a></div></article><article><span>02</span><div><h3>Co-design, participation and trust</h3><p>Structured co-design and testing with neurodivergent learners—including people with dyslexia, ADHD, and autism—and relevant professionals are being prepared. Type2Learn does not yet claim completed external co-design findings.</p><a href="/participation-trust/#participation-record">Read the public participation record and safeguards</a></div></article><article><span>03</span><div><h3>Educational, not clinical</h3><p>Type2Learn does not diagnose, treat, or clinically assess any condition. Some public experiences are prototypes or planned concepts and are labelled accordingly.</p></div></article><article><span>04</span><div><h3>Independent identity</h3><p>Type2Learn Active Learning is independent and is not affiliated with Type to Learn or similarly named browser extensions.</p></div></article></div></div></section>';
+    return '<section class="section identity-section" aria-labelledby="type2learn-identity"><div class="content-wrap identity-layout"><div class="identity-copy"><p class="section-kicker">Type2Learn Active Learning</p><h2 id="type2learn-identity">Typing is the learning action—not the finish line.</h2><p class="identity-lead">Type2Learn is an education initiative being developed with a nonprofit mission. It uses typing as an active-learning method—not merely as typing practice. Learners recall, explain, correct, apply, and revisit academic ideas to build durable understanding.</p></div><div class="identity-facts"><article><span>01</span><div><h3>Team</h3><p>Type2Learn was founded by Muhammad Taha Bin Zaeem, Founder and Development Lead. The team includes Muhammad Hamiz Bin Kashif, Idrees Babar, Muhammad Fahad Younus, Alizay Hassan, and Lameea Mubashir Khan.</p><a href="/team/">Meet the Type2Learn team</a></div></article><article><span>02</span><div><h3>Early participation record</h3><p>One professional, three teachers, five learner contributions, and 25 product reviews are publicly documented. This early record informs product decisions; it is not presented as completed formal co-design, clinical validation, or endorsement.</p><a href="/participation-trust/#participation-record">Read the public participation and trust record</a></div></article><article><span>03</span><div><h3>Educational, not clinical</h3><p>Type2Learn does not diagnose, treat, or clinically assess any condition. Some public experiences are prototypes or planned concepts and are labelled accordingly.</p></div></article><article><span>04</span><div><h3>Independent identity</h3><p>Type2Learn Active Learning is independent and is not affiliated with Type to Learn or similarly named browser extensions.</p></div></article></div></div></section>';
+  };
+
+  // Public product narrative: concise, crawlable equivalents live in index.html and ur/index.html.
+  // This version keeps the interactive landing experience aligned with the released course engine.
+  const applyProductNarrative = () => {
+    if (!isHomeRoute) return;
+    const write = (selector, value) => {
+      const node = document.querySelector(selector);
+      if (node) node.textContent = value;
+    };
+    const updateCard = (card, title, body, bullets, label) => {
+      if (!card) return;
+      const chip = card.querySelector('.status-chip');
+      const heading = card.querySelector('h3');
+      const copy = card.querySelector('p');
+      const list = card.querySelector('ul');
+      if (chip && label) chip.textContent = label;
+      if (heading) heading.textContent = title;
+      if (copy) copy.textContent = body;
+      if (list) list.innerHTML = bullets.map((item) => '<li>' + item + '</li>').join('');
+    };
+
+    const heroCopy = document.querySelector('.hero-copy-block > .hero-copy');
+    const identityLead = document.querySelector('.identity-lead');
+    const identityFacts = document.querySelectorAll('.identity-facts article');
+    const moduleCards = document.querySelectorAll('.module-grid .module-card');
+    const audienceCards = document.querySelectorAll('.audience-grid .audience-card');
+    const evidenceCards = document.querySelectorAll('.evidence-grid .evidence-card');
+
+    if (isUrdu) {
+      if (heroCopy) heroCopy.textContent = 'مختصر سبق، اپنی زبان میں یادداشت، مخصوص رائے، استعمال اور بعد کی واپسی — Type2Learn سیکھنے کے ان اعمال کو ایک واضح راستے میں رکھتا ہے۔ کنٹرولز پیشکش بدلتے ہیں، مقصد نہیں۔';
+      if (identityLead) identityLead.textContent = 'Type2Learn فعال سیکھنے کا نظام ہے: سیکھنے والا ایک محدود خیال پڑھتا یا سنتا ہے، اسے اپنے الفاظ میں واپس لاتا ہے، مخصوص رائے کے ساتھ بہتر کرتا ہے، بامعنی مثال میں استعمال کرتا ہے اور بعد میں اس کی طرف واپس آتا ہے۔';
+      const urduFacts = [
+        ['ٹیم اور ذمہ داریاں', 'بانی اور ترقیاتی سربراہ محمد طٰہٰ بن زعیم ہیں۔ بنیادی ٹیم میں Muhammad Hamiz Bin Kashif، Idrees Babar، Muhammad Fahad Younus، Alizay Hassan اور UI/UX ڈیزائن سربراہ Lameea Mubashir Khan شامل ہیں۔', 'ٹیم کے پروفائلز دیکھیں'],
+        ['ابتدائی شرکت، واضح حدود', 'عوامی ریکارڈ میں 1 پیشہ ور، 3 اساتذہ، 5 سیکھنے والے اور 25 مصنوعات کے جائزے شامل ہیں۔ ان ابتدائی شراکتوں نے مصنوعات کے فیصلوں کو سمت دی ہے؛ یہ مکمل رسمی مشترکہ ڈیزائن مطالعہ یا طبی توثیق کا دعویٰ نہیں۔', 'شرکت اور مشترکہ ڈیزائن کا ریکارڈ پڑھیں'],
+        ['ماخذ سے تیار کورس تک', 'مواد ایک واضح کورس کے عمل سے گزرتا ہے: ماخذ، انسانی منتظم کا جائزہ، منظم نصابی ریکارڈ، قابلِ جانچ سبق کا پیک اور اشاعت۔ AI محدود، قابلِ جائزہ مدد ہے؛ انسان مواد کی ذمہ داری رکھتے ہیں۔', 'کورس بنانے کا طریقہ دیکھیں']
+      ];
+      identityFacts.forEach((article, index) => {
+        const fact = urduFacts[index];
+        if (!fact) return;
+        writeNode(article.querySelector('h3'), fact[0]);
+        writeNode(article.querySelector('p'), fact[1]);
+        writeNode(article.querySelector('a'), fact[2]);
+      });
+      updateCard(moduleCards[0], 'فعال کورس انجن', 'مختصر مطالعہ سے مکمل سیکشن ٹائپنگ، علم کی جانچ، استعمال اور واپسی تک ایک واضح تعلیمی چکر۔', ['پڑھیں یا سنیں', 'اپنے الفاظ میں یاد کریں', 'مخصوص رائے کے بعد استعمال کریں'], 'جاری');
+      updateCard(moduleCards[1], 'مقصد کے ساتھ مدد', 'لے آؤٹ، متن، وقفہ، پڑھ کر سنانا، پس منظر کی آواز اور “میں رکا ہوا ہوں” مدد سیکھنے والے کے اختیار میں رہتے ہیں۔', ['ایک وقت میں ایک قدم', 'بغیر رفتار درجہ بندی', 'موجودہ مقصد سے جڑی مدد'], 'سیکھنے والے کے اختیار میں');
+      updateCard(moduleCards[2], 'جائزہ شدہ کورس کی اشاعت', 'اساتذہ اور ادارے مواد جمع کراتے ہیں؛ منتظم اسے منظم، جائزہ شدہ کورس پیک میں تبدیل کر کے اشاعت سے پہلے چیک کرتے ہیں۔', ['ماخذ → منظم ریکارڈ', 'قابلِ جائزہ سرگرمیاں', 'انسانی منظوری کے بعد اشاعت'], 'انسانی جائزہ');
+      updateCard(audienceCards[0], 'سیکھنے کا راستہ', 'ہر سبق میں مقصد، اگلا عمل، جواب کا طریقہ، اصلاح اور واپسی واضح رہتے ہیں۔', ['مطالعہ، یادداشت، اظہار', 'مدد کے بعد دوبارہ کوشش', 'بعد میں واپسی'], null);
+      updateCard(audienceCards[1], 'ذہین مگر محدود مدد', 'AI صرف موجودہ مقصد پر مختصر مدد، آسان وضاحت یا مثال دے سکتا ہے؛ وہ تشخیص، خفیہ اسکور یا خودکار فیصلہ نہیں کرتا۔', ['“میں رکا ہوا ہوں” مدد', 'معیاری ساخت والا جواب', 'خرابی پر تیار شدہ متبادل'], null);
+      updateCard(audienceCards[2], 'کورس بنانے کا عمل', 'تعلیمی مواد ایک جائزہ شدہ، قابلِ ترمیم ریکارڈ سے ایسے کورس میں جاتا ہے جو اسی فعال سیکھنے کے انجن میں چلتا ہے۔', ['جمع کرائیں', 'منظم کریں اور جائزہ لیں', 'انسانی منظوری سے شائع کریں'], null);
+      updateCard(evidenceCards[2], 'ابتدائی شرکت کا ریکارڈ', '1 پیشہ ور، 3 اساتذہ، 5 سیکھنے والوں کے ریکارڈ اور 25 جائزوں سے حاصل ہونے والی باتیں مصنوعات کے فیصلوں کے ساتھ واضح کی جاتی ہیں۔', [], 'عوامی ریکارڈ');
+      updateCard(evidenceCards[3], 'رسمی مشترکہ ڈیزائن اور مطالعہ', 'منظم جانچ اور نتیجے کے دعوے الگ رضامندی، طریقۂ کار اور شائع شدہ حدوں کے بعد ہی کیے جائیں گے۔', [], 'اگلا مرحلہ');
+      return;
+    }
+
+    if (heroCopy) heroCopy.textContent = 'Short lessons become a clear learning loop: read or listen, retrieve in your own words, receive bounded feedback, apply the idea, and return later. Learner controls change the route—not the academic expectation.';
+    if (identityLead) identityLead.textContent = 'Type2Learn is an active-learning system. A learner meets one bounded idea, brings it back in their own words, improves it with specific feedback, uses it in a meaningful situation, and returns later. Typing makes thinking visible; it is never treated as a speed test.';
+    const englishFacts = [
+      ['Team and responsibility', 'Type2Learn was founded by Muhammad Taha Bin Zaeem, Founder and Development Lead. The core team includes Muhammad Hamiz Bin Kashif, Idrees Babar, Muhammad Fahad Younus, Alizay Hassan, and Lameea Mubashir Khan, UI/UX Design Lead.', 'Meet the Type2Learn team'],
+      ['Early participation, clear limits', 'The public record documents 1 professional, 3 teachers, 5 learner contributions, and 25 product reviews. Those early contributions have informed product decisions; they are not presented as a completed formal co-design study, clinical validation, or endorsement.', 'Read the co-design, participation & trust record'],
+      ['From source material to a course', 'Course content moves through a clear path: source material, human-admin review, structured curriculum record, testable lesson package, and publication. AI is bounded, reviewable support; people remain accountable for content.', 'See the course authoring path']
+    ];
+    identityFacts.forEach((article, index) => {
+      const fact = englishFacts[index];
+      if (!fact) return;
+      writeNode(article.querySelector('h3'), fact[0]);
+      writeNode(article.querySelector('p'), fact[1]);
+      writeNode(article.querySelector('a'), fact[2]);
+    });
+    updateCard(moduleCards[0], 'Active course engine', 'A clear learning loop from short reading to complete-section typing, knowledge checks, application, and later return.', ['Read or hear one bounded idea', 'Retrieve it in your own words', 'Correct, apply, and revisit'], 'Live engine');
+    updateCard(moduleCards[1], 'Support that stays with the objective', 'Layout, text, spacing, read-aloud, background noise, and “I’m stuck” support remain learner-controlled and tied to the current task.', ['One visible next step', 'No speed-first ranking', 'Bounded help, never diagnosis'], 'Learner-controlled');
+    updateCard(moduleCards[2], 'Reviewed course publishing', 'Teachers and institutes submit source material; an admin structures, reviews, and approves a course package before it reaches learners.', ['Source → structured record', 'Testable learning activities', 'Human approval before publish'], 'Human-reviewed');
+    updateCard(audienceCards[0], 'The learning path', 'Every lesson makes the objective, next action, response route, correction, and return visible.', ['Read, retrieve, express', 'Improve after support', 'Return without losing work'], null);
+    updateCard(audienceCards[1], 'Intelligent but bounded support', 'Course AI can offer a smaller explanation, hint, or example for the current objective. It does not diagnose, create a hidden score, or silently decide for a learner.', ['“I’m stuck” support', 'Structured, reviewable output', 'Authored fallback when AI is unavailable'], null);
+    updateCard(audienceCards[2], 'The course creation pipeline', 'Educational material becomes a course through an editable, reviewed source record and runs through the same active-learning engine.', ['Submit source material', 'Structure and review it', 'Publish after human approval'], null);
+    updateCard(evidenceCards[2], 'Early participation record', '1 professional, 3 teachers, 5 learner contributions, and 25 reviews are documented alongside the decisions they informed.', [], 'Public record');
+    updateCard(evidenceCards[3], 'Formal co-design and study', 'Structured co-design and outcome claims require their own consent, method, and published limitations before they are made.', [], 'Next stage');
+  };
+
+  const writeNode = (node, value) => {
+    if (node) node.textContent = value;
+  };
+
+  // Landing copy only: this deliberately changes no classes, structure, artwork, or interaction.
+  // It runs last in the home-page enhancement sequence so the public narrative is what visitors see.
+  const applyLandingSectionCopy = () => {
+    if (!isHomeRoute) return;
+    const write = (selector, value) => writeNode(document.querySelector(selector), value);
+    const updateHeading = (section, kicker, title, body) => {
+      const copy = section?.querySelector('.section-heading-copy');
+      writeNode(copy?.querySelector('.section-kicker'), kicker);
+      writeNode(copy?.querySelector('h2'), title);
+      if (body) writeNode(copy?.querySelector('p:not(.section-kicker)'), body);
+    };
+    const updateTask = (task, name, title, detail) => {
+      if (!task) return;
+      writeNode(task.querySelector('.state-name'), name);
+      writeNode(task.querySelector('strong'), title);
+      writeNode(task.querySelector('span:last-child'), detail);
+    };
+
+    const hero = document.querySelector('#main-content > .hero');
+    const demo = document.getElementById('demo');
+    const loopSection = document.querySelector('.learning-shuffle-section');
+    const moduleSection = document.querySelector('.module-grid')?.closest('section');
+    const supportPanel = document.querySelector('.support-panel');
+    const audienceSection = document.querySelector('.audience-grid')?.closest('section');
+    const evidenceSection = document.querySelector('.evidence-grid')?.closest('section');
+    const quote = document.querySelector('.quote-block');
+
+    if (isUrdu) {
+      writeNode(hero?.querySelector('.eyebrow')?.lastChild, 'قابلِ رسائی فعال سیکھنا');
+      write('.hero-copy-block > .hero-copy', 'Type2Learn سبق کو سمجھ کے ثبوت میں بدلتا ہے: پڑھیں یا سنیں، اپنے الفاظ میں سمجھائیں، ایک چھوٹی مفید مدد لیں، خیال کو استعمال کریں، پھر بعد میں اس کی طرف واپس آئیں۔ یہ رفتار کا امتحان نہیں۔');
+      const trust = hero?.querySelectorAll('.trust-inline > span') || [];
+      if (trust[0]) trust[0].lastChild.textContent = ' رفتار کی درجہ بندی نہیں';
+      if (trust[1]) trust[1].lastChild.textContent = ' سیکھنے والے کے اپنے کنٹرولز';
+      if (trust[2]) trust[2].lastChild.textContent = ' محدود، انسانی ذمہ داری والا AI';
+
+      write('.workspace-brand > span', 'Type2Learn سیکھنے کا چکر');
+      write('.workspace-controls .status-chip', 'ایک کام');
+      write('.workspace-heading h2', 'ایک خیال پڑھیں۔ اسے اپنے الفاظ میں واپس لائیں۔');
+      write('.workspace-heading p', 'مدد کام کے گرد راستہ بدلتی ہے — تعلیمی مقصد نہیں۔');
+      const tasks = hero?.querySelectorAll('.task-state') || [];
+      updateTask(tasks[0], 'اب', 'ایک خیال پڑھیں', 'مختصر، واضح اور قابلِ واپسی۔');
+      updateTask(tasks[1], 'اگلا', 'اپنے الفاظ میں سمجھائیں', 'جو سمجھا ہے اسے ظاہر کریں۔');
+      updateTask(tasks[2], 'پھر', 'خیال کو استعمال کریں', 'مثال میں آزمائیں اور واپس آئیں۔');
+      const progress = hero?.querySelectorAll('.workspace-progress > span') || [];
+      writeNode(progress[0], 'سیکھنے کا چکر');
+      writeNode(progress[1], '3 میں سے 1');
+
+      updateHeading(demo, 'حقیقی سیکھنے کا تعامل', 'جو سمجھا ہے وہ دکھائیں، صرف رفتار نہیں۔', 'یہ پیش منظر اسی چکر پر چلتا ہے: محدود خیال، آپ کا جواب، مخصوص رائے اور اگلا واضح عمل۔');
+      writeNode(demo?.querySelector('.section-heading > .status-chip'), 'اسی صفحے پر');
+      writeNode(demo?.querySelector('.card-label'), 'یاد کریں · اپنی سوچ ظاہر کریں');
+      writeNode(demo?.querySelector('.demo-top h2'), 'خیال کو اپنے الفاظ میں مکمل کریں۔');
+      writeNode(demo?.querySelector('.demo-prompt strong'), 'موجودہ خیال');
+      writeNode(demo?.querySelector('#demo-feedback'), 'آپ کا جواب اس براؤزر پیش منظر میں رہتا ہے۔');
+      writeNode(demo?.querySelector('.demo-footer > span'), 'کورس بامعنی الفاظ قبول کرتا ہے، پھر رائے کو سیکھنے کے مقصد پر مرکوز رکھتا ہے۔');
+      const demoControls = demo?.querySelectorAll('.control-preview') || [];
+      ['کم حرکت', 'پس منظر کی آواز اختیاری رہتی ہے', 'لفظی مدد دستیاب ہے', 'کی بورڈ اور آواز کے راستے'].forEach((label, index) => {
+        if (demoControls[index]) demoControls[index].lastChild.textContent = ' ' + label;
+      });
+
+      updateHeading(loopSection, 'بنیادی طریقۂ کار', 'سمجھ ایک قابلِ تکرار عمل سے بڑھتی ہے۔', 'ہر عمل قابلِ استعمال ثبوت بناتا ہے: سیکھنے والا کیا یاد کر، بیان، درست، استعمال اور بعد میں دوبارہ دیکھ سکتا ہے۔');
+      updateHeading(moduleSection, 'مصنوعات', 'ایک فعال سیکھنے کا انجن۔ اسے مفید بنانے کے تین طریقے۔', 'Type2Learn فعال یادداشت کو سیکھنے والے کے اپنے کنٹرولز، منظم مدد اور جائزہ شدہ کورس کی اشاعت کے راستے سے جوڑتا ہے۔');
+
+      writeNode(supportPanel?.querySelector('.section-kicker'), 'سیکھنے والے کے اپنے کنٹرولز');
+      writeNode(supportPanel?.querySelector(':scope > p:not(.section-kicker)'), 'صفحے کی ترتیب، رنگ، حرکت، حوصلہ افزائی، پس منظر کی آواز، بلند آواز سے پڑھنا اور ماسکوٹ کی موجودگی منتخب کریں۔ یہ کنٹرولز پیشکش اور مدد بدلتے ہیں — مقصد یا سیکھنے کا معیار نہیں۔');
+      const supportItems = [
+        ['حرکت اور آواز', 'حرکت کی سطح اور اختیاری پس منظر کی آواز آپ کے اختیار میں رہتی ہے۔'],
+        ['پڑھنا اور جواب دینا', 'متن، وقفہ، بلند آواز سے پڑھنا، ٹائپنگ اور آواز کے راستے منتخب کریں۔'],
+        ['رفتار اور اگلا قدم', 'ایک نمایاں کام، توقف اور واضح واپسی کے مقام کے ساتھ آگے بڑھیں۔'],
+        ['مدد اور وضاحت', 'وضاحت، مثال یا چھوٹا اگلا عمل مانگیں — بغیر چھپی درجہ بندی کے۔']
+      ];
+      supportPanel?.querySelectorAll('.support-item').forEach((item, index) => {
+        writeNode(item.querySelector('strong'), supportItems[index]?.[0]);
+        writeNode(item.querySelector('span'), supportItems[index]?.[1]);
+      });
+
+      updateHeading(audienceSection, 'یہ نظام کن لوگوں کے لیے ہے', 'ایک سیکھنے کا انجن، جس کے گرد واضح ذمہ داریاں ہیں۔');
+      const evidenceHeading = evidenceSection?.querySelector('.evidence-scene-heading');
+      writeNode(evidenceHeading?.querySelector('.section-kicker'), 'جو کچھ درج ہے');
+      writeNode(evidenceHeading?.querySelector('h2'), 'مصنوعات کے فیصلے، شرکت کے شواہد اور رسمی دعوے الگ رکھے جاتے ہیں۔');
+      writeNode(evidenceHeading?.querySelector('p:last-child'), 'عوامی ریکارڈ واضح کرتا ہے کہ ابتدائی شراکت نے کیا بتایا — اور کون سا دعویٰ رسمی طریقۂ کار سے پہلے نہیں کیا جا سکتا۔');
+      writeNode(quote?.querySelector('p'), 'سیکھنے کا نظام سیکھنے والے کو یہ دکھانے میں مدد دے کہ وہ کیا جانتا ہے۔');
+      writeNode(quote?.querySelector(':scope > span'), 'کورس، کنٹرولز، مواد سے کورس تک کا راستہ اور عوامی شرکت کا ریکارڈ دیکھیں۔');
+      return;
+    }
+
+    writeNode(hero?.querySelector('.eyebrow')?.lastChild, 'Accessible active learning');
+    write('.hero-copy-block > .hero-copy', 'Type2Learn turns a lesson into evidence of understanding: read or listen, explain in your own words, receive one useful support, apply the idea, and return later. It is not a speed test.');
+    const trust = hero?.querySelectorAll('.trust-inline > span') || [];
+    if (trust[0]) trust[0].lastChild.textContent = ' No speed scoring';
+    if (trust[1]) trust[1].lastChild.textContent = ' Learner-owned controls';
+    if (trust[2]) trust[2].lastChild.textContent = ' Bounded, human-accountable AI';
+
+    write('.workspace-brand > span', 'The Type2Learn learning loop');
+    write('.workspace-controls .status-chip', 'One task');
+    write('.workspace-heading h2', 'Read an idea. Bring it back in your own words.');
+    write('.workspace-heading p', 'Support changes the route around the task — not the academic goal.');
+    const tasks = hero?.querySelectorAll('.task-state') || [];
+    updateTask(tasks[0], 'Now', 'Read one idea', 'Short, clear, and ready to revisit.');
+    updateTask(tasks[1], 'Next', 'Explain it yourself', 'Make what you understand visible.');
+    updateTask(tasks[2], 'Then', 'Use the idea again', 'Apply it and return later.');
+    const progress = hero?.querySelectorAll('.workspace-progress > span') || [];
+    writeNode(progress[0], 'Learning loop');
+    writeNode(progress[1], '1 of 3');
+
+    updateHeading(demo, 'A real learning interaction', 'Show what you understand — not how fast you can type.', 'This preview follows the same loop as the course: a bounded idea, your response, specific feedback, and a clear next action.');
+    writeNode(demo?.querySelector('.section-heading > .status-chip'), 'Live on this page');
+    writeNode(demo?.querySelector('.card-label'), 'RETRIEVE · MAKE YOUR THINKING VISIBLE');
+    writeNode(demo?.querySelector('.demo-top h2'), 'Complete the idea in your own words.');
+    writeNode(demo?.querySelector('.demo-prompt strong'), 'Current idea');
+    writeNode(demo?.querySelector('#demo-feedback'), 'Your response stays in this browser preview.');
+    writeNode(demo?.querySelector('.demo-footer > span'), 'The course accepts meaningful wording, then focuses feedback on the learning objective.');
+    const demoControls = demo?.querySelectorAll('.control-preview') || [];
+    ['Reduced motion', 'Background sound stays optional', 'Literal help is available', 'Keyboard and speech routes'].forEach((label, index) => {
+      if (demoControls[index]) demoControls[index].lastChild.textContent = ' ' + label;
+    });
+
+    updateHeading(loopSection, 'The core workflow', 'Understanding grows through a repeatable set of actions.', 'Each action creates usable evidence: what the learner can recall, explain, revise, apply, and revisit.');
+    updateHeading(moduleSection, 'The product', 'One active-learning engine. Three ways it becomes useful.', 'Type2Learn pairs active recall with learner-owned presentation controls, structured support, and a reviewed course-publishing path.');
+
+    writeNode(supportPanel?.querySelector('.section-kicker'), 'Learner-owned controls');
+    writeNode(supportPanel?.querySelector(':scope > p:not(.section-kicker)'), 'Choose page layout, colour, motion, encouragement, background noise, text-to-speech, and mascot presence. These controls change presentation and support — not the objective or what counts as learning.');
+    const supportItems = [
+      ['Motion and sound', 'Choose the movement level and optional background sound that fit today.'],
+      ['Reading and response', 'Adjust text, spacing, read-aloud, typing, and speech routes.'],
+      ['Pacing and next action', 'Work with one visible task, a pause route, and a clear place to return.'],
+      ['Help and clarity', 'Ask for an explanation, example, or smaller next action — without a hidden score.']
+    ];
+    supportPanel?.querySelectorAll('.support-item').forEach((item, index) => {
+      writeNode(item.querySelector('strong'), supportItems[index]?.[0]);
+      writeNode(item.querySelector('span'), supportItems[index]?.[1]);
+    });
+
+    updateHeading(audienceSection, 'Who the system serves', 'The same learning engine, with clear responsibilities around it.');
+    const evidenceHeading = evidenceSection?.querySelector('.evidence-scene-heading');
+    writeNode(evidenceHeading?.querySelector('.section-kicker'), 'What is documented');
+    writeNode(evidenceHeading?.querySelector('h2'), 'Product decisions, participation evidence, and formal claims stay separate.');
+    writeNode(evidenceHeading?.querySelector('p:last-child'), 'The public record makes clear what early contributors informed — and what needs a formal method before Type2Learn makes a broader claim.');
+    writeNode(quote?.querySelector('p'), 'A learning system should help a learner show more of what they know.');
+    writeNode(quote?.querySelector(':scope > span'), 'Explore the course, the controls, the authoring route, and the public participation record.');
+  };
+
+  // Keeps the public co-design route precise: early evidence is visible; formal evidence is never implied.
+  const reconcileParticipationStatus = () => {
+    if (routeKey !== 'co-design') return;
+    const heroCopy = document.querySelector('.page-hero-copy > p:not(.eyebrow)');
+    const aside = document.querySelector('.page-hero-aside');
+    const ledger = document.querySelectorAll('.codesign-ledger > div');
+    const overview = document.querySelector('.codesign-overview > .content-wrap > p:not(.section-kicker)');
+    if (isUrdu) {
+      writeNode(heroCopy, 'Type2Learn کی ابتدائی شرکت کا عوامی ریکارڈ موجود ہے: ایک پیشہ ور، تین اساتذہ، پانچ سیکھنے والوں کی شراکتیں اور 25 مصنوعات کے جائزے۔ یہ ریکارڈ فیصلوں کو سمت دیتا ہے؛ رسمی مشترکہ ڈیزائن یا طبی توثیق کا بدل نہیں۔');
+      writeNode(aside?.querySelector('strong'), 'ابتدائی ریکارڈ · جاری عمل');
+      writeNode(aside?.querySelector('span:last-of-type'), 'ابتدائی شراکتیں واضح طور پر شائع ہیں۔ منظم مشترکہ ڈیزائن اور نتیجے کے دعوے الگ رضامندی اور طریقۂ کار کے بعد ہی کیے جائیں گے۔');
+      writeNode(overview, 'سیکھنے والے، اساتذہ، خاندان، رسائی کے ماہرین اور پیشہ ور افراد کی ابتدائی رائے نے قابلِ رسائی ترتیب، حسی کنٹرولز، واضح مراحل اور مدد کی زبان کے فیصلوں کو سمت دی ہے۔ کسی شراکت دار کو رسمی مشیر، توثیق کنندہ یا ٹیم رکن نہیں کہا جاتا جب تک یہ تعلق واضح طور پر طے نہ ہو۔');
+      const urduLedger = [
+        ['ابتدائی عوامی ریکارڈ', '1 پیشہ ور، 3 اساتذہ، 5 سیکھنے والوں کی شراکتیں اور 25 مصنوعات کے جائزے۔ یہ ریکارڈ بتاتا ہے کہ کیا سنا گیا اور کون سے فیصلے کھلے ہیں؛ یہ مکمل رسمی مطالعہ کا دعویٰ نہیں۔'],
+        ['زیرِ تشکیل رسمی عمل', 'شرکت کے معیار، رضامندی، حفاظت، قابلِ رسائی رائے کی صورتیں، فیصلوں کے ریکارڈ اور شراکت دار کی شناخت کے اصول کو باقاعدہ کیا جا رہا ہے۔'],
+        ['آگے کا کام', 'نتیجے کے دعووں سے پہلے نیوروڈائیورجینٹ سیکھنے والوں اور متعلقہ تعلیم و رسائی کے پیشہ ور افراد کے ساتھ منظم جائزہ اور عملی جانچ کی جائے گی۔']
+      ];
+      ledger.forEach((entry, index) => {
+        writeNode(entry.querySelector('dt'), urduLedger[index]?.[0]);
+        writeNode(entry.querySelector('dd'), urduLedger[index]?.[1]);
+      });
+      return;
+    }
+    writeNode(heroCopy, 'Type2Learn has a public early-participation record: one professional, three teachers, five learner contributions, and 25 product reviews. That record informs product decisions; it is not presented as a completed formal co-design study, clinical validation, or endorsement.');
+    writeNode(aside?.querySelector('strong'), 'Early record · ongoing practice');
+    writeNode(aside?.querySelector('span:last-of-type'), 'Early contributions are public. Formal co-design and outcome claims require their own consent, method, and published limitations.');
+    writeNode(overview, 'Early input from learners, teachers, and professionals has already informed decisions about accessible flow, sensory controls, clear steps, and support language. A contributor is never called an advisor, validator, or team member unless that relationship is explicitly agreed.');
+    const englishLedger = [
+      ['Early public record', '1 professional, 3 teachers, 5 learner contributions, and 25 product reviews. The record shows what was heard and which decisions remain open; it is not a claim of a completed formal study.'],
+      ['Formal process being established', 'Participation criteria, consent and safeguarding routes, accessible feedback formats, decision records, and contributor-recognition rules are being formalised.'],
+      ['Next', 'Structured review and task testing with neurodivergent learners and relevant education and accessibility professionals will precede outcome claims.']
+    ];
+    ledger.forEach((entry, index) => {
+      writeNode(entry.querySelector('dt'), englishLedger[index]?.[0]);
+      writeNode(entry.querySelector('dd'), englishLedger[index]?.[1]);
+    });
   };
 
   const applyUrduLandingCopy = () => {
@@ -946,23 +1208,23 @@
         const copy = teamHero.querySelector('.page-hero-copy > p:not(.eyebrow)');
         if (isUrdu) {
           if (eyebrow) eyebrow.innerHTML = '<span class="eyebrow-dot"></span>بانی ٹیم';
-          if (heading) heading.textContent = 'Type2Learn کی بانی ٹیم سے ملیں';
-          if (copy) copy.textContent = 'Type2Learn کے بانی محمد طٰہٰ بن زعیم ہیں۔ ایک کثیر شعبہ جاتی بانی ٹیم سیکھنے کے ڈیزائن، انجینئرنگ، مصنوعی ذہانت، تحقیق، مصنوعات، رسائی اور ذمہ دار تعلیمی ٹیکنالوجی پر کام کر رہی ہے۔';
+          if (heading) heading.textContent = 'Type2Learn کی ٹیم سے ملیں';
+          if (copy) copy.textContent = 'Type2Learn کے بانی محمد طٰہٰ بن زعیم ہیں۔ ٹیم سیکھنے کے ڈیزائن، انجینئرنگ، مصنوعی ذہانت، تحقیق، مصنوعات، رسائی، UI/UX اور ذمہ دار تعلیمی ٹیکنالوجی پر کام کر رہی ہے۔';
           if (teamIntro) {
             const introHeading = teamIntro.querySelector('h2');
             const introCopy = teamIntro.querySelector('p:last-child');
-            if (introHeading) introHeading.textContent = 'پانچ افراد پر مشتمل بانی ٹیم سے ملیں۔';
-            if (introCopy) introCopy.textContent = 'بانی پہلے ہیں، پھر انجینئرنگ، تحقیق، AI اور مصنوعات کی رہنمائی کرنے والے شریک بانی۔ ہر پروفائل اپنی موجودہ ذمہ داری واضح کرتا ہے۔';
+            if (introHeading) introHeading.textContent = 'Type2Learn کی چھ افراد پر مشتمل ٹیم سے ملیں۔';
+            if (introCopy) introCopy.textContent = 'بانی پہلے ہیں، پھر انجینئرنگ، تحقیق، AI اور مصنوعات کی رہنمائی کرنے والے شریک بانی، اور UI/UX ڈیزائن سربراہ۔ ہر پروفائل اپنی موجودہ ذمہ داری واضح کرتا ہے۔';
           }
         } else {
           if (eyebrow) eyebrow.innerHTML = '<span class="eyebrow-dot"></span>Founding team';
-          if (heading) heading.textContent = 'Meet the Type2Learn Founding Team';
-          if (copy) copy.textContent = 'Type2Learn was founded by Muhammad Taha Bin Zaeem and is being developed by a multidisciplinary founding team working across learning design, engineering, artificial intelligence, research, product development, accessibility, and responsible educational technology.';
+          if (heading) heading.textContent = 'Meet the Type2Learn Team';
+          if (copy) copy.textContent = 'Type2Learn was founded by Muhammad Taha Bin Zaeem and is being developed by a multidisciplinary team working across learning design, engineering, artificial intelligence, research, product development, accessibility, UI/UX design, and responsible educational technology.';
           if (teamIntro) {
             const introHeading = teamIntro.querySelector('h2');
             const introCopy = teamIntro.querySelector('p:last-child');
-            if (introHeading) introHeading.textContent = 'Meet the five-person founding team.';
-            if (introCopy) introCopy.textContent = 'The founder appears first, followed by the co-founders leading engineering, research, AI, and product. Each profile states its current responsibility clearly.';
+            if (introHeading) introHeading.textContent = 'Meet the six-person Type2Learn team.';
+            if (introCopy) introCopy.textContent = 'The founder appears first, followed by the co-founders leading engineering, research, AI, and product, then the UI/UX Design Lead. Each profile states its current responsibility clearly.';
           }
         }
       }
@@ -1009,28 +1271,28 @@
           if (professionalImage) professionalImage.alt = 'Dr. Mayda interview spotlight graphic';
           professionalSection.querySelector('.professional-interview-stage')?.append(professionalCard);
         }
-        const professorCards = Array.from(interviewRecord.querySelectorAll('.interview-card'));
-        professorCards.forEach((card, index) => {
+        const teacherCards = Array.from(interviewRecord.querySelectorAll('.interview-card'));
+        teacherCards.forEach((card, index) => {
           card.classList.add('professor-interview-card');
           card.querySelector('.interview-card-art')?.remove();
-          card.setAttribute('aria-label', (index + 1) + ' / ' + professorCards.length);
+          card.setAttribute('aria-label', (index + 1) + ' / ' + teacherCards.length);
         });
         const professorHeading = interviewRecord.querySelector('.section-heading-copy');
         if (professorHeading) {
           const kicker = professorHeading.querySelector('.section-kicker');
           const title = professorHeading.querySelector('h2');
           const body = professorHeading.querySelector('p:last-child');
-          if (kicker) kicker.textContent = isUrdu ? 'پروفیسر کی گفتگو' : 'Professor conversations';
-          if (title) title.textContent = isUrdu ? 'تین پروفیسر گفتگوئیں۔ ایک وقت میں ایک، بغیر تصاویر کے۔' : 'Three professor conversations. One at a time, with no portraits.';
+          if (kicker) kicker.textContent = isUrdu ? 'اساتذہ کی گفتگو' : 'Teacher conversations';
+          if (title) title.textContent = isUrdu ? 'تین اساتذہ کی گفتگوئیں۔ ایک وقت میں ایک، بغیر تصاویر کے۔' : 'Three teacher conversations. One at a time, with no portraits.';
           if (body) body.textContent = isUrdu ? 'ہر ریکارڈ میں اجازت کے مطابق خلاصہ، آٹھ قابلِ جانچ نکات، اور اصل گفتگو کا لنک شامل ہے۔' : 'Each record has a consent-aware summary, eight concrete learning implications, and a link to its source conversation.';
         }
         const professorControls = interviewRecord.querySelector('.interview-carousel-controls');
         const professorCount = professorControls?.querySelector('p');
         const professorPrevious = professorControls?.querySelector('[data-interview-previous]');
         const professorNext = professorControls?.querySelector('[data-interview-next]');
-        if (professorCount) professorCount.innerHTML = '<span data-interview-position>1</span> / ' + professorCards.length + (isUrdu ? ' · پروفیسر کے قابلِ جانچ نکات' : ' · Professor considerations');
-        if (professorPrevious) professorPrevious.setAttribute('aria-label', isUrdu ? 'پچھلی پروفیسر گفتگو' : 'Previous professor conversation');
-        if (professorNext) professorNext.setAttribute('aria-label', isUrdu ? 'اگلی پروفیسر گفتگو' : 'Next professor conversation');
+        if (professorCount) professorCount.innerHTML = '<span data-interview-position>1</span> / ' + teacherCards.length + (isUrdu ? ' · اساتذہ کے قابلِ جانچ نکات' : ' · Teacher considerations');
+        if (professorPrevious) professorPrevious.setAttribute('aria-label', isUrdu ? 'پچھلی استاد گفتگو' : 'Previous teacher conversation');
+        if (professorNext) professorNext.setAttribute('aria-label', isUrdu ? 'اگلی استاد گفتگو' : 'Next teacher conversation');
       }
       const commitmentsSection = document.querySelector('.trust-commitments');
       if (commitmentsSection && !document.getElementById('community-reviews')) {
@@ -1047,6 +1309,8 @@
         const identity = document.querySelector('.identity-section');
         if (identity) identity.insertAdjacentHTML('afterend', isUrdu ? urduScrollStory() : scrollStory());
       }
+
+      applyProductNarrative();
 
       const legacyLoop = document.querySelector('.learning-loop');
       const legacyLoopSection = legacyLoop && legacyLoop.closest('section');
@@ -1075,6 +1339,8 @@
         evidenceSection.classList.add('evidence-scene');
         evidenceWrap.insertAdjacentHTML('afterbegin', isUrdu ? '<div class="evidence-scene-heading"><div><p class="section-kicker">واضح حیثیت کے ساتھ بنیاد</p><h2>چار زاویے۔ ایک دیانت دار معیار۔</h2></div><p>تحقیق، مصنوعات کا ترجمہ، زندہ تجربہ اور منصوبہ شدہ پیمائش — ہر ایک کا الگ کردار ہے۔ کسی چیز کو اس سے زیادہ ثبوت نہیں کہا جاتا جو اس نے ابھی تک کمایا نہیں۔</p></div><div class="evidence-signal" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' : '<div class="evidence-scene-heading"><div><p class="section-kicker">Evidence with its status visible</p><h2>Four inputs. One honest standard.</h2></div><p>Research, product translation, lived experience, and planned measurement each have a distinct role. None is presented as proof it has not yet earned.</p></div><div class="evidence-signal" aria-hidden="true"><i></i><i></i><i></i><i></i></div>');
       }
+
+      applyLandingSectionCopy();
     }
 
     if (route === 'how-it-works') {
@@ -1088,7 +1354,16 @@
       const collaboratorsSection = document.querySelector('.collaborators-section');
       if (founderSection) founderSection.outerHTML = teamDeck();
       if (collaboratorsSection) collaboratorsSection.remove();
+      const teamIntro = document.querySelector('.team-deck-intro > p:last-child');
+      writeNode(teamIntro, 'The founder appears first, followed by the co-founders and design lead shaping engineering, research, AI, product, and interface design. Edited portraits are identified, and non-human profile figures are clearly labelled.');
     }
+
+    if (route === 'team-ur') {
+      const teamIntro = document.querySelector('.team-deck-intro > p:last-child');
+      writeNode(teamIntro, 'بانی پہلے ہیں، پھر انجینئرنگ، تحقیق، AI، مصنوعات اور انٹرفیس ڈیزائن کو تشکیل دینے والے شریک بانی اور ڈیزائن سربراہ۔ تیار کردہ تصاویر اور غیر انسانی پروفائل شکلیں واضح طور پر نشان زد ہیں۔');
+    }
+
+    reconcileParticipationStatus();
 
     const sections = Array.from(document.querySelectorAll('#main-content > section:not(.builder-credit)'));
     sections.forEach((section, index) => {
