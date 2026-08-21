@@ -3,7 +3,46 @@
  * action. Do not add `/api/`, Firebase tokens, teacher submissions, answer
  * keys, private course manifests, or user data to this list.
  */
-export const OFFLINE_CACHE_VERSION = 'type2learn-offline-v2';
+export const OFFLINE_CACHE_VERSION = 'type2learn-offline-v3';
+
+const COURSE_AUDIO_MODULE_KEYS = Object.freeze([
+  '01-adhd',
+  '02-dyslexia',
+  '03-autism-spectrum-disorder',
+  '04-dysgraphia',
+  '05-dyspraxia-developmental-coordination-disorder',
+  '06-dyscalculia',
+  '07-auditory-processing-disorder',
+  '08-visual-impairment-low-vision',
+  '09-intellectual-developmental-disabilities',
+  '10-physical-motor-disabilities',
+  '11-sensory-processing-sensitivities'
+]);
+
+// All local narration is deliberately part of the explicit offline download:
+// English reading and simple add-ons, plus every Urdu / Urdu-PK guided-typing
+// prompt. The current package is about 18 MB of MP3s. Nothing starts
+// downloading until a learner chooses "Download learning for offline use".
+const courseNarrationUrls = (key) => {
+  const root = `/course/audio/edge-ava/neurodivergent/${key}/`;
+  const guidedTyping = (locale) => [
+    `${root}${locale}/title-ava.mp3`,
+    ...Array.from({ length: 5 }, (_, index) => [
+      `${root}${locale}/section-${index + 1}-heading-ava.mp3`,
+      `${root}${locale}/section-${index + 1}-answer-ava.mp3`
+    ]).flat()
+  ];
+  return [
+    `${root}read-ava-timed.mp3`,
+    `${root}read.mp3`,
+    `${root}simple-addon-ava-timed.mp3`,
+    `${root}simple-addon.mp3`,
+    ...guidedTyping('urdu'),
+    ...guidedTyping('urdu-pk')
+  ];
+};
+
+export const COURSE_NARRATION_URLS = Object.freeze(COURSE_AUDIO_MODULE_KEYS.flatMap(courseNarrationUrls));
 
 export const CORE_SHELL_URLS = Object.freeze([
   '/', '/index.html', '/offline.html', '/site.webmanifest',
@@ -40,7 +79,8 @@ export const LEARNING_PACKAGE_URLS = Object.freeze([
   '/assets/audio/background-noise/brown-noise-loop.mp3',
   '/assets/2D%20Mascot/blinking.webp', '/assets/mascot/guest-profile-bunny.webp',
   '/assets/mascot/type2learn-companion.glb',
-  '/assets/rewards/type2learn-module-medal.webp', '/assets/rewards/type2learn-section-medal.webp'
+  '/assets/rewards/type2learn-module-medal.webp', '/assets/rewards/type2learn-section-medal.webp',
+  ...COURSE_NARRATION_URLS
 ]);
 
 export const allOfflineUrls = () => [...new Set([...CORE_SHELL_URLS, ...LEARNING_PACKAGE_URLS])];

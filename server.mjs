@@ -273,7 +273,8 @@ const handleApi = async (request, response, pathname, runtime) => {
       courseCatalogue: courseCatalog.status(),
       offlineLearning: {
         available: true,
-        package: 'public-course-and-learner-controls',
+        package: 'public-course-learner-controls-and-local-narration',
+        narration: 'english-and-urdu-local-mp3',
         excludes: ['api', 'private teacher courses', 'cloud sync']
       },
       signLanguage: {

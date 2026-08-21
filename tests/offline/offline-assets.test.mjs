@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { CORE_SHELL_URLS, LEARNING_PACKAGE_URLS, OFFLINE_CACHE_VERSION, allOfflineUrls } from '../../offline-assets.js';
+import { CORE_SHELL_URLS, COURSE_NARRATION_URLS, LEARNING_PACKAGE_URLS, OFFLINE_CACHE_VERSION, allOfflineUrls } from '../../offline-assets.js';
 
 test('offline cache has a versioned namespace', () => assert.match(OFFLINE_CACHE_VERSION, /^type2learn-offline-v\d+$/));
 test('offline asset list has no duplicate URLs', () => assert.equal(allOfflineUrls().length, new Set(allOfflineUrls()).size));
@@ -32,6 +32,12 @@ test('offline asset list includes both course language payloads', () => {
 });
 test('offline asset list includes all three background noise loops', () => {
   ['pink', 'white', 'brown'].forEach((type) => assert.ok(LEARNING_PACKAGE_URLS.includes(`/assets/audio/background-noise/${type}-noise-loop.mp3`)));
+});
+test('offline package includes every authored English and Urdu narration file', () => {
+  assert.equal(COURSE_NARRATION_URLS.length, 286);
+  assert.ok(COURSE_NARRATION_URLS.every((url) => LEARNING_PACKAGE_URLS.includes(url)));
+  assert.ok(COURSE_NARRATION_URLS.includes('/course/audio/edge-ava/neurodivergent/01-adhd/read-ava-timed.mp3'));
+  assert.ok(COURSE_NARRATION_URLS.includes('/course/audio/edge-ava/neurodivergent/11-sensory-processing-sensitivities/urdu-pk/section-5-answer-ava.mp3'));
 });
 test('offline asset list contains no API routes', () => assert.equal(allOfflineUrls().some((url) => url.startsWith('/api/')), false));
 test('offline asset list contains no private teacher or admin workspace', () => assert.equal(allOfflineUrls().some((url) => /(^|\/)admin|teacher|institute/.test(url)), false));
