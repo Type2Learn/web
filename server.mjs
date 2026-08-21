@@ -448,6 +448,7 @@ const handleApi = async (request, response, pathname, runtime) => {
       return sendJson(response, 200, await assessments.createDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'GET' && pathname === '/api/v1/assessment/drafts') {
+      const url = new URL(request.url || '/', 'http://localhost');
       return sendJson(response, 200, await assessments.getDraft({
         authorization: request.headers.authorization,
         query: {

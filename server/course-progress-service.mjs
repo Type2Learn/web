@@ -56,8 +56,11 @@ export const createCourseProgressService = ({ firebase, assertCourseAccess = nul
 
   const load = async ({ authorization, courseId }) => {
     if (!available()) throw apiError(503, 'COURSE_SYNC_NOT_CONFIGURED', 'Account saving is not connected yet. Your progress remains on this device.');
-    const safeCourseId = courseIdentifier(courseId);
+    // Authenticate before validating a caller-controlled course ID. This keeps
+    // every private progress path uniformly behind sign-in and avoids exposing
+    // validation detail to an unauthenticated request.
     const learner = await firebase.verifyBearer(authorization);
+    const safeCourseId = courseIdentifier(courseId);
     if (typeof assertCourseAccess === 'function') await assertCourseAccess({ authorization, courseKey: safeCourseId });
     let snapshot;
     try {
@@ -79,8 +82,9 @@ export const createCourseProgressService = ({ firebase, assertCourseAccess = nul
 
   const save = async ({ authorization, courseId, body }) => {
     if (!available()) throw apiError(503, 'COURSE_SYNC_NOT_CONFIGURED', 'Account saving is not connected yet. Your progress remains on this device.');
-    const safeCourseId = courseIdentifier(courseId);
+    // See load(): auth is intentionally the first private operation.
     const learner = await firebase.verifyBearer(authorization);
+    const safeCourseId = courseIdentifier(courseId);
     if (typeof assertCourseAccess === 'function') await assertCourseAccess({ authorization, courseKey: safeCourseId });
     const payload = cleanPayload(body);
     const updatedAtMs = Date.now();
