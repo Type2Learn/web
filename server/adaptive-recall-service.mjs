@@ -104,10 +104,13 @@ export const createAdaptiveRecallService = ({ config, firebase, ledger, provider
       ...body,
       page: { ...(body?.page || {}), phase: body?.page?.phase === 'type' ? 'read' : body?.page?.phase }
     };
-    const resolvedPageContext = contextResolver?.resolve
+    // Local guest preview is development-only and must stay on the bundled
+    // public course. Never invoke an authenticated reviewed-course resolver
+    // for a guest cookie, even during local integration testing.
+    const resolvedPageContext = !localGuest && contextResolver?.resolve
       ? await contextResolver.resolve({ authorization, body: recallBody })
       : null;
-    const context = adaptiveRecallContext(body, resolvedPageContext);
+    const context = adaptiveRecallContext(recallBody, resolvedPageContext);
     if (context.barrier && !BARRIERS.has(context.barrier)) throw apiError(400, 'INVALID_BARRIER', 'Choose one of the available support options.');
     if (hasPrivateData(context.response) || hasPrivateData(context.previousResponse)) throw apiError(400, 'PRIVATE_INFORMATION', 'Please remove private information before requesting learning support.');
     const instructions = instructionsFor(context);

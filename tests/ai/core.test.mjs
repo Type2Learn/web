@@ -267,6 +267,37 @@ test('signed-in Course AI uses the shared Gemini-first provider before an unavai
   assert.equal(settled[0].actual.usd, 0);
 });
 
+test('local guest AI preview uses only bundled public context and never requests a reviewed manifest', async () => {
+  const service = createAiService({
+    config: {
+      allowLocalGuestAi: true,
+      openAiApiKey: '', openAiResponsesUrl: '', openAiModel: APPROVED_OPENAI_MODEL,
+      openAiMaxOutputTokens: 120, openAiInputUsdPerMillion: .05, openAiOutputUsdPerMillion: .4,
+      openAiAppCapUsd: 14, openAiAppInputTokenCap: 11200000, openAiAppOutputTokenCap: 5600000,
+      openAiUserCapUsd: 2, openAiUserInputTokenCap: 1000000, openAiUserOutputTokenCap: 500000,
+      openAiRequestsPerMinute: 12
+    },
+    firebase: { available: true, verifyBearer: async () => assert.fail('local guest preview must not verify a bearer token') },
+    ledger: {
+      reserve: async () => ({ month: '2026-08', reservationId: 'local-guest-preview' }),
+      settle: async () => {}, release: async () => assert.fail('successful guest preview must settle')
+    },
+    provider: {
+      status: () => ({ available: true, primary: 'gemini', chatModel: 'gemini-3.5-flash-lite' }),
+      generate: async ({ instructions }) => {
+        assert.match(instructions, /Current module:/);
+        return { text: 'Start with one visible idea.', provider: 'gemini', usage: { inputTokens: 12, outputTokens: 7 } };
+      }
+    },
+    contextResolver: { resolve: async () => assert.fail('local guest preview must not load a private manifest') }
+  });
+  const result = await service.chat({
+    localGuest: { uid: 'guest-local-preview', isGuest: true },
+    body: { message: 'How can I begin?', history: [], courseId: COURSE_CONTENT.id, page: { moduleIndex: 0, phase: 'read' }, language: 'en' }
+  });
+  assert.equal(result.reply, 'Start with one visible idea.');
+});
+
 test('course context limits model facts to the current page and excludes assessment options', () => {
   const context = coursePageContext({
     courseId: COURSE_CONTENT.id,
@@ -403,6 +434,33 @@ test('adaptive recall keeps evidence scoped to the current module and returns st
   assert.equal(response.result.support_mode, 'hint');
   assert.deepEqual(response.result.evidence_found, ['mentions attention']);
   assert.equal(settled.length, 1);
+});
+
+test('local guest adaptive recall stays on public bundled context', async () => {
+  const service = createAdaptiveRecallService({
+    config: {
+      openAiInputUsdPerMillion: .05, openAiOutputUsdPerMillion: .4,
+      openAiAppCapUsd: 14, openAiAppInputTokenCap: 11200000, openAiAppOutputTokenCap: 5600000,
+      openAiUserCapUsd: 2, openAiUserInputTokenCap: 1000000, openAiUserOutputTokenCap: 500000,
+      openAiRequestsPerMinute: 12
+    },
+    firebase: { available: true, verifyBearer: async () => assert.fail('local guest preview must not verify a token') },
+    ledger: { reserve: async () => ({ month: '2026-08', reservationId: 'guest-adaptive' }), settle: async () => {}, release: async () => assert.fail('valid guest result must settle') },
+    provider: {
+      status: () => ({ available: true }),
+      generate: async () => ({
+        text: JSON.stringify({ evidence_found: ['mentions attention'], missing_concept: 'planning can also be affected', support_mode: 'hint', feedback: 'You named attention. Add one idea about planning.', next_prompt: 'How could planning affect the first step?', improvement: '' }),
+        usage: { inputTokens: 30, outputTokens: 20 }
+      })
+    },
+    contextResolver: { resolve: async () => assert.fail('local guest preview must not resolve a private manifest') }
+  });
+  const result = await service.analyse({
+    localGuest: { uid: 'guest-adaptive-preview', isGuest: true },
+    body: { courseId: COURSE_CONTENT.id, page: { moduleIndex: 0, phase: 'type' }, language: 'en', response: 'It can affect attention.' }
+  });
+  assert.equal(result.source, 'adaptive-recall');
+  assert.equal(result.result.support_mode, 'hint');
 });
 
 test('adaptive recall context has no assessment answers or exact typing target', () => {
