@@ -271,6 +271,16 @@ const handleApi = async (request, response, pathname, runtime) => {
       courseAuthoring: courseAuthoring.status(),
       courseBackups: courseBackups.status(),
       courseCatalogue: courseCatalog.status(),
+      offlineLearning: {
+        available: true,
+        package: 'public-course-and-learner-controls',
+        excludes: ['api', 'private teacher courses', 'cloud sync']
+      },
+      signLanguage: {
+        onDeviceLandmarks: true,
+        pslTemporalTranslation: false,
+        reason: 'A reviewed PSL temporal model has not yet passed the local model gate.'
+      },
       model: config.openAiModel
     });
   }

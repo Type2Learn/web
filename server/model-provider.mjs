@@ -1,7 +1,8 @@
 // Server-only model routing. Browser code never receives provider keys or a
-// provider URL. Gemini is first for ordinary learner chat. Bounded adaptive,
-// assessment, and JSON-repair tasks can deliberately prefer a named OpenAI
-// role, then fall back to the rotating Gemini pool if that role is unavailable.
+// provider URL. Gemini is always first. An optional single-flight Featherless
+// account is the bounded middle fallback, then a role-specific OpenAI model
+// supplies the final fallback. Every structured result is validated by the
+// calling service, regardless of which provider produced it.
 const outputText = (payload) => {
   if (typeof payload?.output_text === 'string' && payload.output_text.trim()) return payload.output_text.trim();
   return (Array.isArray(payload?.output) ? payload.output : [])
@@ -48,19 +49,11 @@ export const createModelProvider = (config) => {
   const keys = Array.isArray(config.geminiApiKeys) ? config.geminiApiKeys.slice() : [];
   let nextKey = 0;
   const cooldowns = new Map();
+  let featherlessInFlight = 0;
 
   const geminiReady = () => keys.some((key) => Number(cooldowns.get(key) || 0) <= Date.now());
+  const featherlessReady = () => Boolean(config.featherlessApiKey && config.featherlessChatCompletionsUrl && config.featherlessModel);
   const openAiReady = () => Boolean(config.openAiApiKey && config.openAiResponsesUrl);
-  const openAiPrimaryPurposes = new Set([
-    'adaptive-recall',
-    'assessment-evaluation',
-    'assessment-generation',
-    'final-assessment-generation',
-    'intent-generation',
-    'json-compilation',
-    'json-repair',
-    'component-planning'
-  ]);
   // Behavioural companion wording is intentionally Gemini-first. Nano is a
   // bounded repair/verification fallback only; this flow must never consume a
   // Mini or final-assessment model.
@@ -88,16 +81,22 @@ export const createModelProvider = (config) => {
     return config.openAiModel;
   };
   const status = () => ({
-    available: geminiReady() || openAiReady(),
-    primary: geminiReady() ? 'gemini' : openAiReady() ? 'openai' : 'offline',
-    fallback: openAiReady() ? 'openai' : null,
+    available: geminiReady() || featherlessReady() || openAiReady(),
+    primary: geminiReady() ? 'gemini' : featherlessReady() ? 'featherless' : openAiReady() ? 'openai' : 'offline',
+    fallback: featherlessReady() ? 'featherless' : openAiReady() ? 'openai' : null,
     fastModel: config.geminiFastModel || null,
     heavyModel: config.geminiHeavyModel || config.openAiMiniModel || config.openAiTestModel || null,
     chatModel: config.geminiFastModel || config.openAiModel || null,
     fallbackModel: config.openAiModel || null,
     nanoModel: config.openAiModel || null,
     miniModel: config.openAiMiniModel || null,
-    finalAssessmentModel: config.openAiTestModel || null
+    finalAssessmentModel: config.openAiTestModel || null,
+    featherless: {
+      available: featherlessReady(),
+      model: featherlessReady() ? config.featherlessModel : null,
+      maxConcurrentRequests: Number(config.featherlessMaxConcurrentRequests) || 1,
+      inFlight: featherlessInFlight
+    }
   });
 
   const nextAvailableKey = () => {
@@ -208,6 +207,59 @@ export const createModelProvider = (config) => {
     };
   };
 
+  const featherlessText = (payload) => {
+    const content = payload?.choices?.[0]?.message?.content;
+    if (typeof content === 'string') return content.trim();
+    if (Array.isArray(content)) return content.map((item) => item?.text || '').filter(Boolean).join('\n').trim();
+    return '';
+  };
+
+  const callFeatherless = async ({ instructions, input, maxOutputTokens }) => {
+    if (!featherlessReady()) throw new Error('Featherless is not configured.');
+    // Featherless accounts reserve a finite number of concurrent units. The
+    // Type2Learn fallback is intentionally one-at-a-time: when it is busy,
+    // the caller immediately continues to OpenAI rather than queuing a learner
+    // behind another learner’s interaction.
+    if (featherlessInFlight >= (Number(config.featherlessMaxConcurrentRequests) || 1)) {
+      throw new Error('Featherless capacity is busy.');
+    }
+    featherlessInFlight += 1;
+    try {
+      const response = await fetch(config.featherlessChatCompletionsUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${config.featherlessApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: config.featherlessModel,
+          temperature: 0.2,
+          max_tokens: Math.min(Number(maxOutputTokens) || 420, 420),
+          messages: [
+            { role: 'system', content: instructions },
+            { role: 'user', content: input }
+          ]
+        }),
+        signal: AbortSignal.timeout(35000)
+      });
+      if (!response.ok) throw new Error(await errorMessage(response));
+      const payload = await response.json().catch(() => ({}));
+      const text = featherlessText(payload);
+      if (!text) throw new Error('Featherless returned an empty result.');
+      return {
+        text,
+        provider: 'featherless',
+        model: config.featherlessModel,
+        usage: {
+          inputTokens: number(payload?.usage?.prompt_tokens, Math.ceil((instructions.length + input.length) / 3)),
+          outputTokens: number(payload?.usage?.completion_tokens, Math.ceil(text.length / 3))
+        }
+      };
+    } finally {
+      featherlessInFlight = Math.max(0, featherlessInFlight - 1);
+    }
+  };
+
   const generate = async (request) => {
     // ADAPTIVE LEARNING: one provider layer owns all model choices. A purpose
     // changes only model role/order, never the browser contract or safety
@@ -223,22 +275,21 @@ export const createModelProvider = (config) => {
       if (!openAiReady()) throw new Error('The Nano JSON-repair model is not available.');
       return callOpenAi(normalisedRequest);
     }
-    const preferOpenAi = openAiPrimaryPurposes.has(normalisedRequest.purpose)
-      && !geminiFirstNanoFallbackPurposes.has(normalisedRequest.purpose);
+    // Gemini remains the low-cost first provider for every learner request.
+    // Featherless is the explicitly bounded middle fallback, followed by the
+    // existing OpenAI role-specific provider. Every downstream service still
+    // validates structured output independently, so Featherless never widens
+    // the accepted response contract.
+    const candidates = [
+      [geminiReady(), callGemini],
+      [featherlessReady(), callFeatherless],
+      [openAiReady(), callOpenAi]
+    ];
     let firstError;
-    const first = preferOpenAi ? callOpenAi : callGemini;
-    const second = preferOpenAi ? callGemini : callOpenAi;
-    const firstReady = preferOpenAi ? openAiReady() : geminiReady();
-    const secondReady = preferOpenAi ? geminiReady() : openAiReady();
-    if (firstReady) {
-      try { return await first(normalisedRequest); } catch (error) { firstError = error; }
-    }
-    if (secondReady) {
-      try { return await second(normalisedRequest); } catch (error) {
-        const failure = new Error(firstError?.message || error?.message || 'No learning model is available.');
-        failure.cause = error;
-        throw failure;
-      }
+    for (const [ready, call] of candidates) {
+      if (!ready) continue;
+      try { return await call(normalisedRequest); }
+      catch (error) { firstError ||= error; }
     }
     throw firstError || new Error('No learning model is available.');
   };

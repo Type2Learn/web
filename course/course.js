@@ -12,7 +12,7 @@ import { visualExplanationMarkup } from './visual-explanations.js?v=20260809-ada
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
-import { downloadLearningForOffline, getOfflineStatus, registerOffline } from '/offline-client.js?v=20260821-offline1';
+import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestOfflinePersistence } from '/offline-client.js?v=20260821-offline2';
 
 (() => {
   'use strict';
@@ -7192,11 +7192,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline } from '/
     offlineLearning.status = 'Preparing the learning package for this browser…';
     render();
     try {
-      const result = await downloadLearningForOffline();
+      const [result, persistent] = await Promise.all([
+        downloadLearningForOffline(),
+        requestOfflinePersistence()
+      ]);
       offlineLearning.downloaded = true;
       offlineLearning.status = result.failures?.length
         ? 'Core learning is downloaded. A few optional files can refresh the next time you are online.'
-        : 'Learning is downloaded for offline use on this browser.';
+        : persistent
+          ? 'Learning is downloaded and this browser has been asked to keep it available offline.'
+          : 'Learning is downloaded for offline use on this browser.';
       announce('Learning package downloaded for offline use.');
     } catch (error) {
       offlineLearning.status = error?.message || 'The learning package could not be downloaded. Your current work is unchanged.';

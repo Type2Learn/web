@@ -21,6 +21,19 @@ test('Render runs the full release verifier before deployment', async () => {
   assert.match(render, /buildCommand: npm ci && npm run verify/);
 });
 
+test('Render enables consent-gated learning features without exposing private publishing', async () => {
+  const render = await read('render.yaml');
+  for (const key of [
+    'ADAPTIVE_LEARNING_ENABLED',
+    'BEHAVIOUR_CONTEXT_ENABLED',
+    'MASCOT_PARTNER_AI_ENABLED',
+    'AI_ASSESSMENTS_ENABLED',
+    'AI_VISUALS_ENABLED'
+  ]) assert.match(render, new RegExp(`key: ${key}\\n\\s+value: ["']?true["']?`));
+  assert.doesNotMatch(render, /key: COURSE_PUBLISHING_ENABLED/);
+  assert.doesNotMatch(render, /key: EDUCATOR_WORKSPACE_ENABLED/);
+});
+
 test('the versioned pre-push hook invokes the same release verifier and is executable', async () => {
   const [hook, details] = await Promise.all([
     read('.githooks/pre-push'),

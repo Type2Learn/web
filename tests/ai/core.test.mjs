@@ -193,12 +193,15 @@ test('Azure Responses calls use api-key, the exact approved model, and parse Azu
   }
 });
 
-test('structured adaptive work uses mini and final-bank work uses the reserved 5.1 model', { concurrency: false }, async () => {
+test('structured adaptive work uses its OpenAI role only after Gemini is unavailable, and final-bank work keeps the reserved 5.1 model', { concurrency: false }, async () => {
   const previousFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options) => {
     calls.push({ url: String(url), options });
-    if (!String(url).startsWith('https://api.openai.com/')) throw new Error('The OpenAI primary should be attempted before Gemini for this purpose.');
+    if (String(url).startsWith('https://generativelanguage.googleapis.com/')) {
+      return new Response(JSON.stringify({ error: { message: 'temporary Gemini quota' } }), { status: 429, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (!String(url).startsWith('https://api.openai.com/')) throw new Error('Only the configured Gemini and OpenAI endpoints may be contacted.');
     return new Response(JSON.stringify({
       output: [{ type: 'message', content: [{ type: 'output_text', text: '{"ok":true}' }] }],
       usage: { input_tokens: 10, output_tokens: 5 }
@@ -212,8 +215,9 @@ test('structured adaptive work uses mini and final-bank work uses the reserved 5
     });
     await provider.generate({ purpose: 'adaptive-recall', instructions: 'Return JSON.', input: '{}', maxOutputTokens: 50, jsonSchema: { type: 'object' } });
     await provider.generate({ purpose: 'final-assessment-generation', instructions: 'Return JSON.', input: '{}', maxOutputTokens: 50, jsonSchema: { type: 'object' } });
-    assert.equal(JSON.parse(calls[0].options.body).model, APPROVED_OPENAI_MINI_MODEL);
-    assert.equal(JSON.parse(calls[1].options.body).model, RESERVED_TEST_GENERATION_MODEL);
+    const openAiCalls = calls.filter((call) => call.url.startsWith('https://api.openai.com/'));
+    assert.equal(JSON.parse(openAiCalls[0].options.body).model, APPROVED_OPENAI_MINI_MODEL);
+    assert.equal(JSON.parse(openAiCalls[1].options.body).model, RESERVED_TEST_GENERATION_MODEL);
   } finally {
     globalThis.fetch = previousFetch;
   }

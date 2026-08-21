@@ -42,7 +42,7 @@ site architecture, start with the [main README](README.md).
 | [Behavioural data scope](#4-behavioural-data-scope) | The minimal aggregate signals the product may use after consent |
 | [Adaptive support engine](#6-adaptive-support-engine) | How policy, provider output, validation, and the learner proposal fit together |
 | [AI assessment design](#9-ai-assessment-design) | The authored fallback bank, item limits, review path, and no-score rule |
-| [Model routing and budget](#8-model-routing-and-budget) | Gemini-first rotation, constrained OpenAI fallback, and caps |
+| [Model routing and budget](#8-model-routing-and-budget) | Gemini-first rotation, single-flight Featherless middle fallback, constrained OpenAI fallback, and caps |
 | [Delivery phases](#14-delivery-phases) | Remaining governance and rollout work |
 
 > **Important:** the “proposed” and “future” parts of this specification are
@@ -54,7 +54,7 @@ site architecture, start with the [main README](README.md).
 
 | Area | Current status | Where it is implemented |
 | --- | --- | --- |
-| Gemini-first model routing | **Live when Gemini keys are configured.** Numbered Gemini keys rotate before the OpenAI fallback. | `server/model-provider.mjs`, `server/ai-service.mjs` |
+| Gemini-first model routing | **Live when Gemini keys are configured.** Numbered Gemini keys rotate first; an explicitly configured single-flight Featherless unit is the middle fallback, then the approved OpenAI role. | `server/model-provider.mjs`, `server/ai-service.mjs` |
 | Course AI / “Talk to Course AI” | **Live for signed-in learners; local guest preview only behind `AI_ALLOW_GUESTS`.** It is bounded to the current course step. | `course/course.js`, `server/ai-service.mjs` |
 | Adaptive Recall / barrier support | **Live when the adaptive recall endpoint is configured.** The “I’m stuck” choices include a direct Course AI route. | `server/adaptive-recall-service.mjs`, `course/course.js` |
 | Consent-gated learning summaries | **Implemented, off by default.** Only compact aggregate metrics are uploaded after a learner opts in. | `course/learning-telemetry.js`, `server/learning-analytics-service.mjs` |
@@ -466,15 +466,18 @@ the current task and returns to saved choices.
 
 ## 8. Model routing and budget
 
-The provider policy is Gemini-first for ordinary learner chat, with a
-purpose-bound OpenAI specialist tier for structured work:
+The provider policy is **Gemini-first for every ordinary learner request**.
+When Gemini is unavailable or returns an unusable response, an explicitly
+configured **single-flight Featherless** account is tried next; the matching
+OpenAI role is the final fallback. Every provider result is independently
+validated by the deterministic service that requested it.
 
 | Job | Model | Boundary |
 | --- | --- | --- |
 | Existing Course AI chat | Gemini 3.5 Flash-Lite | Current page only, concise, signed-in; rotate eligible Gemini chat keys before the GPT-5.4 Nano fallback |
 | Prompt checks / compact JSON verification | GPT-5.4 Nano | Strict schema, bounded input and output; rotating Gemini pool is the outage fallback |
-| Adaptive recall, support wording, response classification, module-bank generation | GPT-5.4 Mini | Purpose-bound structured output, deterministic validator, and rotating Gemini fallback; never used as unrestricted chat |
-| Final assessment-bank generation | GPT-5.1 | Reviewer-triggered only, once per course version/language window; Gemini 3.6 Flash is the outage fallback |
+| Adaptive recall, support wording, response classification, module-bank generation | Gemini Flash-Lite → Featherless → GPT-5.4 Mini | Purpose-bound structured output, deterministic validator; never used as unrestricted chat |
+| Final assessment-bank generation | Gemini Flash-Lite → Featherless → GPT-5.1 | Reviewer-triggered only, once per course version/language window; all outputs remain reviewer-gated |
 | Image generation | Disabled pending approval | Separate provider/model/moderation/object-store/shared-cost design |
 
 Use the provider-specific API, structured JSON when required, bounded inputs,
@@ -485,9 +488,13 @@ instruction/command, provider key, or upstream error body.
 Gemini key rotation is server-only. Deployment may use comma-separated
 `GEMINI_CHAT_API_KEYS` / `GEMINI_TEST_API_KEYS` or numbered key variables.
 Each request begins at the next healthy key. Auth, model, quota and temporary
-upstream failures cool that key down before the next rotation. Specialist
-OpenAI work falls back to the matching Gemini pool on provider or quota failure;
-ordinary learner chat keeps Gemini as its first choice.
+upstream failures cool that key down before the next rotation. If the Gemini
+pool is unavailable, the optional Featherless unit accepts at most one request
+at a time; a second learner immediately proceeds to the final OpenAI fallback
+instead of waiting behind another learner. Role-specific OpenAI work is only
+reached after those earlier providers fail or are not configured. The sole
+exception is a bounded Nano JSON-repair call for malformed behavioural-partner
+wording; it cannot produce curriculum decisions or learner feedback on its own.
 
 ### 8.1 Shared budget
 
@@ -499,8 +506,8 @@ model call will occur.
 | Reserve | Monthly application cap | Use |
 | --- | ---: | --- |
 | Live text Course AI chat | Configured shared OpenAI cap | Gemini-first; OpenAI Nano fallback only; per-user ceiling applies |
-| Adaptive support | USD 2 default app cap | Mini-first structured wording with rotating Gemini fallback; per-user ceiling applies |
-| Assessment bank/evaluation | USD 3 default app cap | Mini for module work; GPT-5.1 only for reviewer-triggered final-bank generation; cache by curriculum version/language |
+| Adaptive support | USD 2 default app cap | Gemini-first, optional single-flight Featherless, then Nano/Mini fallback; per-user ceiling applies |
+| Assessment bank/evaluation | USD 3 default app cap | Gemini-first, optional Featherless, then Mini for module work; GPT-5.1 only for reviewer-triggered final-bank generation; cache by curriculum version/language |
 | Total | Explicitly deployment-configured | Every request reserves a bounded maximum before provider access and settles actual usage |
 
 Image generation cannot begin without explicitly reallocating this table or
@@ -726,10 +733,16 @@ adaptive: {
 Full summaries stay server-side. Browser state holds no credential, raw event
 stream, permanent answer key or model instruction.
 
-New Render/local variables use disabled/restrictive defaults:
+Local defaults remain disabled/restrictive. The production runtime and the
+committed Render Blueprint enable the learner-facing, consent-gated feature
+flags below unless Render explicitly sets one to `false`; private educator
+publishing remains disabled until its individual encrypted credentials are
+configured.
 
 ~~~text
 ADAPTIVE_LEARNING_ENABLED=false
+BEHAVIOUR_CONTEXT_ENABLED=false
+MASCOT_PARTNER_AI_ENABLED=false
 AI_ASSESSMENTS_ENABLED=false
 AI_VISUALS_ENABLED=false
 # Model roles are pinned in server/config.mjs; this is documentation only.
@@ -748,6 +761,13 @@ ASSESSMENT_REVIEWER_UIDS=<comma-separated Firebase reviewer UIDs>
 LEARNING_ANALYTICS_RETENTION_DAYS=<approved value>
 FIREBASE_STORAGE_BUCKET=<approved bucket when visuals ship>
 ~~~
+
+The production Blueprint enables the first five flags only. It intentionally
+does **not** enable `EDUCATOR_WORKSPACE_ENABLED` or
+`COURSE_PUBLISHING_ENABLED`: those services fail closed until Render holds all
+of `ADMIN_BOOTSTRAP_CODE_SHA256`, `ROLE_CODE_PEPPER`, private Firebase Storage,
+and the private GitHub/Supabase backup credentials. A boolean cannot safely
+replace those secrets.
 
 Secrets remain in Render encrypted variables and local ignored "security/api.env";
 they never go to Git. "server/config.mjs" must enforce hard maximums. Disabled

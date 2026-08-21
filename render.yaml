@@ -9,3 +9,18 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # These flags are safe to keep in the public Blueprint: personalisation
+      # still requires a signed-in learner, explicit adaptive consent, Firebase
+      # and strict server-side validation before any compact summary is stored.
+      - key: ADAPTIVE_LEARNING_ENABLED
+        value: "true"
+      - key: BEHAVIOUR_CONTEXT_ENABLED
+        value: "true"
+      - key: MASCOT_PARTNER_AI_ENABLED
+        value: "true"
+      - key: AI_ASSESSMENTS_ENABLED
+        value: "true"
+      # This enables the learner-controlled authored visual rail. Generative
+      # images remain unavailable until a separately reviewed provider is added.
+      - key: AI_VISUALS_ENABLED
+        value: "true"

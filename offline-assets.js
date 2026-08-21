@@ -3,7 +3,7 @@
  * action. Do not add `/api/`, Firebase tokens, teacher submissions, answer
  * keys, private course manifests, or user data to this list.
  */
-export const OFFLINE_CACHE_VERSION = 'type2learn-offline-v1';
+export const OFFLINE_CACHE_VERSION = 'type2learn-offline-v2';
 
 export const CORE_SHELL_URLS = Object.freeze([
   '/', '/index.html', '/offline.html', '/site.webmanifest',
@@ -22,6 +22,8 @@ export const CORE_SHELL_URLS = Object.freeze([
 ]);
 
 export const LEARNING_PACKAGE_URLS = Object.freeze([
+  // Course shell and every first-party module required by the public course.
+  // Query-string versioning is intentionally ignored by the service worker.
   '/course/', '/course/index.html', '/course/course.css', '/course/course-router.js',
   '/course/course.js', '/course/course-content.js', '/course/course-urdu.js',
   '/course/course-audio-manifest.js', '/course/course-audio-cues.js', '/course/narration.js',
@@ -29,6 +31,8 @@ export const LEARNING_PACKAGE_URLS = Object.freeze([
   '/course/behaviour-context.js', '/course/learning-partner.js', '/course/adaptive-support.js',
   '/course/visual-explanations.js', '/course/voice-text.js', '/course/learner-settings.js',
   '/course/mascot-2d.js', '/course/mascot-3d.js', '/course/dynamic-course.js', '/course/dynamic-course.css',
+  '/color-mode.js', '/website-scheme.js', '/website-scheme.css', '/mascot.css',
+  '/vendor/three.module.min.js', '/vendor/GLTFLoader.js',
   '/learn/', '/learn/index.html', '/learn/learn.js', '/learn/learn.css',
   '/afterlogin/', '/afterlogin/index.html', '/mascot.css', '/mascot.js',
   '/assets/audio/background-noise/pink-noise-loop.mp3',

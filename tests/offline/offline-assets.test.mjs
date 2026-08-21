@@ -12,6 +12,20 @@ test('offline asset list includes the public participation and co-design record'
   assert.ok(CORE_SHELL_URLS.includes('/ur/co-design/'));
 });
 test('offline asset list includes the current course entry', () => assert.ok(LEARNING_PACKAGE_URLS.includes('/course/')));
+test('offline package includes the Mascot, learner partner, behaviour context, and deterministic course renderer', () => {
+  [
+    '/course/behaviour-context.js',
+    '/course/learning-partner.js',
+    '/course/mascot-2d.js',
+    '/course/mascot-3d.js',
+    '/course/dynamic-course.js'
+  ].forEach((asset) => assert.ok(LEARNING_PACKAGE_URLS.includes(asset), asset));
+});
+test('offline package includes the optional desktop mascot renderer without adding private model responses', () => {
+  assert.ok(LEARNING_PACKAGE_URLS.includes('/vendor/three.module.min.js'));
+  assert.ok(LEARNING_PACKAGE_URLS.includes('/vendor/GLTFLoader.js'));
+  assert.ok(LEARNING_PACKAGE_URLS.includes('/assets/mascot/type2learn-companion.glb'));
+});
 test('offline asset list includes both course language payloads', () => {
   assert.ok(LEARNING_PACKAGE_URLS.includes('/course/course-content.js'));
   assert.ok(LEARNING_PACKAGE_URLS.includes('/course/course-urdu.js'));
@@ -41,4 +55,12 @@ test('offline client has no automatic download action', async () => {
 test('offline client requires a user-facing download request message', async () => {
   const client = await readFile(new URL('../../offline-client.js', import.meta.url), 'utf8');
   assert.match(client, /DOWNLOAD_LEARNING_PACKAGE/);
+});
+test('offline persistence is requested only after the learner starts an explicit download', async () => {
+  const [client, course] = await Promise.all([
+    readFile(new URL('../../offline-client.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../course/course.js', import.meta.url), 'utf8')
+  ]);
+  assert.match(client, /navigator\.storage\?\.persist/);
+  assert.match(course, /requestOfflinePersistence\(\)/);
 });

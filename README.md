@@ -86,9 +86,11 @@ unrestricted chatbot as a substitute for curriculum or learner judgement.
 | **Understanding checks** | Delivers one question at a time from a reviewed or authored reserve. A deterministic objective-evidence monitor guides a precise review route; Mini may recognise a safe paraphrase, but never decides alone. | Expose correct answers, visible percentages, speed scores, raw answers, or a learner profile. |
 | **Visual explanations** | Provides authored, accessible concept maps in the visual/mascot rail. | Generate stereotyped learner images or make visuals the only way to learn. |
 
-AI is **Gemini-first for ordinary course chat**, with bounded key rotation and
-server-only specialist OpenAI roles: **GPT-5.4 Nano** for prompt/JSON checks,
-**GPT-5.4 Mini** for bounded adaptive intent and assessment work, and
+AI is **Gemini-first**, with bounded key rotation. When configured, one
+capacity-limited **Featherless** request may run as the middle fallback; the
+server immediately continues to OpenAI when that single unit is busy. The
+server-only specialist OpenAI roles remain **GPT-5.4 Nano** for prompt/JSON
+checks, **GPT-5.4 Mini** for bounded adaptive intent and assessment work, and
 **GPT-5.1** only for reviewer-triggered final assessment-bank generation.
 The Behavioural Learning Partner is more constrained: its deterministic policy
 chooses the role, trigger and permitted action; **Gemini Flash-Lite** can only
@@ -119,7 +121,7 @@ feature flags, safeguards, and rollout requirements in
 | Objective-evidence monitor and targeted review | Implemented | Assessment runs store only question/objective IDs and bounded outcome categories; never an answer, option choice, score, or model rationale |
 | AI-generated visual assets | Intentionally disabled | Requires separate moderation, storage, retention, and curriculum-review work |
 | Structured and direct-reviewed theory-course authoring | Implemented behind private server configuration | Admins may use the bilingual form or import reviewed Markdown directly; Firebase, human review, narration/TTS choice, and all four backup receipts remain required before publication |
-| Offline public learning package | Implemented | A learner explicitly downloads the shipped public course, local controls, offline-capable audio, mascot assets, and public site shell to one browser. AI, authentication, cloud sync, private teacher content, and unpublished/reviewed answer material stay online-only. |
+| Offline public learning package | Implemented | A learner explicitly downloads the shipped public course, local controls, optional 2D/3D mascot renderer, offline-capable audio, and public site shell to one browser. The browser is then asked to retain the package. AI, authentication, cloud sync, private teacher content, and unpublished/reviewed answer material stay online-only. |
 | PSL-ready on-device sign input foundation | Implemented, intentionally not surfaced in the learner UI yet | Browser-local MediaPipe landmark extraction is tested with a real hand image. It makes **no** sign or translation claim until an evaluated Pakistani Sign Language temporal model is approved and installed. |
 
 ## Private by design: offline learning and sign input
@@ -184,7 +186,7 @@ The reusable player is `/course/?courseId=<course-id>&version=<version>`. It use
 ├── server.mjs                         # HTTP server, security headers, API routing
 ├── server/
 │   ├── config.mjs                     # Environment parsing and safe runtime limits
-│   ├── model-provider.mjs             # Gemini rotation + OpenAI fallback
+│   ├── model-provider.mjs             # Gemini rotation + single-flight Featherless + OpenAI fallback
 │   ├── ai-service.mjs                 # Bounded Course AI
 │   ├── adaptive-recall-service.mjs    # Structured recall feedback / barrier support
 │   ├── adaptive-support-service.mjs   # Consent-gated proposals and copy

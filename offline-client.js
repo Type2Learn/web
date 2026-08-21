@@ -37,6 +37,15 @@ const askWorker = async (type) => {
 
 export const downloadLearningForOffline = () => askWorker('DOWNLOAD_LEARNING_PACKAGE');
 
+// Request persistent browser storage only after the learner explicitly asks
+// for an offline package. Browsers may decline; the package still works in the
+// regular cache and no permission prompt is shown before this deliberate act.
+export const requestOfflinePersistence = async () => {
+  if (!navigator.storage?.persist) return false;
+  try { return Boolean(await navigator.storage.persist()); }
+  catch { return false; }
+};
+
 export const getOfflineStatus = async () => {
   if (!canUseServiceWorker()) return { supported: false, installed: false, downloaded: false };
   const registration = await registerOffline();

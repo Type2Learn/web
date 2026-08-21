@@ -102,6 +102,24 @@ const openAiEndpoint = (value) => {
   }
 };
 
+// Featherless exposes an OpenAI-compatible Chat Completions endpoint. Keep the
+// target intentionally allow-listed: model credentials must never turn an
+// arbitrary environment URL into a server-side request primitive.
+const featherlessEndpoint = (value) => {
+  const fallback = 'https://api.featherless.ai/v1/chat/completions';
+  const configured = value || fallback;
+  try {
+    const parsed = new URL(configured);
+    if (parsed.protocol !== 'https:' || parsed.hostname.toLowerCase() !== 'api.featherless.ai') return '';
+    if (!/\/v1\/chat\/completions\/?$/.test(parsed.pathname)) {
+      parsed.pathname = parsed.pathname.replace(/\/$/, '') + '/v1/chat/completions';
+    }
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+};
+
 export const loadRuntimeConfig = async ({ environment = process.env, root = repositoryRoot } = {}) => {
   const production = String(environment.NODE_ENV || '').toLowerCase() === 'production';
   // The local file is intentionally never read by a production process. Render
@@ -133,6 +151,7 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
   const configuredOrigins = splitOrigins(value('AI_ALLOWED_ORIGINS'));
 
   const configuredOpenAiEndpoint = openAiEndpoint(value('OPENAI_RESPONSES_URL', 'OPENAI_API_BASE_URL', 'OPENAI_BASE_URL', 'url'));
+  const configuredFeatherlessEndpoint = featherlessEndpoint(value('FEATHERLESS_CHAT_COMPLETIONS_URL', 'FEATHERLESS_API_BASE_URL'));
   const geminiApiKeys = Array.from(new Set([
     ...values('GEMINI_API_KEYS', 'GEMINI_API_KEY').flatMap(splitKeys),
     ...values('gemchat', 'gemtext', 'gemtest').flatMap(splitKeys),
@@ -149,19 +168,20 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // Firebase account. It is hard-disabled in production even when an
     // environment variable is accidentally supplied there.
     allowLocalGuestAi: !production && booleanFrom(value('AI_ALLOW_GUESTS')),
-    // ADAPTIVE LEARNING: every data-collecting or generative feature remains
-    // off by default. These flags must block server routes as well as UI, so a
-    // hidden button cannot create learner data or provider spend.
-    adaptiveLearningEnabled: booleanFrom(value('ADAPTIVE_LEARNING_ENABLED')),
-    // BEHAVIOURAL LEARNING PARTNER: this deliberately sits behind its own
-    // rollout flags. Behaviour support can provide local authored help without
-    // this flag, but no server-side directive or consented behaviour summary
-    // is available until it is explicitly enabled.
-    behaviourContextEnabled: booleanFrom(value('BEHAVIOUR_CONTEXT_ENABLED')),
-    mascotPartnerAiEnabled: booleanFrom(value('MASCOT_PARTNER_AI_ENABLED')),
+    // ADAPTIVE LEARNING: the production deployment deliberately enables these
+    // consent-gated learner features. A deployment may set any flag false to
+    // turn the capability off; all routes still require sign-in, explicit
+    // adaptive consent, Firebase and strict server-side validation before a
+    // compact summary is stored or a provider call is made.
+    adaptiveLearningEnabled: booleanFrom(value('ADAPTIVE_LEARNING_ENABLED') || (production ? 'true' : 'false')),
+    // BEHAVIOURAL LEARNING PARTNER: authored local support is still available
+    // without upload. Server-side wording and 90-day summaries only activate
+    // after the learner opts in, even though the production feature flag is on.
+    behaviourContextEnabled: booleanFrom(value('BEHAVIOUR_CONTEXT_ENABLED') || (production ? 'true' : 'false')),
+    mascotPartnerAiEnabled: booleanFrom(value('MASCOT_PARTNER_AI_ENABLED') || (production ? 'true' : 'false')),
     adaptiveRetentionDays: numberFrom(value('ADAPTIVE_RETENTION_DAYS'), 90, { min: 1, max: 365 }),
-    aiAssessmentsEnabled: booleanFrom(value('AI_ASSESSMENTS_ENABLED')),
-    aiVisualsEnabled: booleanFrom(value('AI_VISUALS_ENABLED')),
+    aiAssessmentsEnabled: booleanFrom(value('AI_ASSESSMENTS_ENABLED') || (production ? 'true' : 'false')),
+    aiVisualsEnabled: booleanFrom(value('AI_VISUALS_ENABLED') || (production ? 'true' : 'false')),
     firebaseProjectId: value('FIREBASE_PROJECT_ID') || 'type2learn-defcc',
     firebaseServiceAccountJson: value('FIREBASE_SERVICE_ACCOUNT_JSON'),
     firebaseStorageBucket: value('FIREBASE_STORAGE_BUCKET') || '',
@@ -181,6 +201,13 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     openAiApiKey: value('OPENAI_API_KEY', 'openai', 'key'),
     openAiResponsesUrl: configuredOpenAiEndpoint.url,
     openAiProvider: configuredOpenAiEndpoint.provider,
+    // Featherless is an optional capacity-constrained middle fallback. It is
+    // never called without both an explicit key and an explicitly selected
+    // account-available model. Requests are single-flight by design.
+    featherlessApiKey: value('FEATHERLESS_API_KEY'),
+    featherlessChatCompletionsUrl: configuredFeatherlessEndpoint,
+    featherlessModel: value('FEATHERLESS_MODEL'),
+    featherlessMaxConcurrentRequests: numberFrom(value('FEATHERLESS_MAX_CONCURRENT_REQUESTS'), 1, { min: 1, max: 1 }),
     // `speech` is supported only for the existing local api.env file. The
     // deployment variable is always the explicit SPEECHMATICS_API_KEY name.
     speechmaticsApiKey: value('SPEECHMATICS_API_KEY', 'speech'),
