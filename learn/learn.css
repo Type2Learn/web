@@ -499,6 +499,70 @@ body[data-setup-layout="open"] .learn-main--open .noise-preview-status {
   font-size: 13px;
 }
 
+/* FIRST-RUN READING PREVIEW
+   The reading controls are not deferred labels. They alter this real lesson
+   sample immediately, using the same values saved into the course player. */
+.learning-reading-preview {
+  grid-column: 1 / -1;
+  width: min(100%, var(--learning-preview-width, 720px));
+  margin: 4px 0 8px;
+  border: 1px solid var(--learn-line-strong);
+  border-radius: 14px;
+  padding: 18px 20px;
+  color: var(--learn-ink);
+  background: var(--learn-paper);
+  font-size: var(--learning-preview-font-size, 16px);
+  line-height: var(--learning-preview-line-height, 1.62);
+  box-shadow: 0 8px 24px rgb(28 73 114 / .06);
+}
+
+.learning-reading-preview strong { display: block; font-size: .78em; letter-spacing: .12em; text-transform: uppercase; }
+.learning-reading-preview p { max-width: 100%; margin: var(--learning-preview-paragraph-gap, 10px) 0 0; }
+
+.learning-tts-preview {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.learning-tts-preview button {
+  min-height: 40px;
+  border: 1px solid var(--learn-blue);
+  border-radius: 999px;
+  padding: 0 15px;
+  color: var(--learn-ink);
+  background: var(--learn-paper);
+  font-weight: 850;
+}
+
+.learning-tts-preview small { color: var(--learn-soft); font-size: 12px; line-height: 1.45; }
+
+body[data-setup-text-size="large"] { --learning-preview-font-size: 18px; }
+body[data-setup-text-size="extra-large"] { --learning-preview-font-size: 20px; }
+body[data-setup-spacing="relaxed"] { --learning-preview-line-height: 1.9; --learning-preview-paragraph-gap: 18px; }
+body[data-setup-reading-width="narrow"] { --learning-preview-width: 560px; }
+body[data-setup-reading-width="comfortable"] { --learning-preview-width: 720px; }
+body[data-setup-reading-width="wide"] { --learning-preview-width: 940px; }
+
+body[data-setup-reading-surface="soft-blue"] .learning-reading-preview {
+  border-color: #b8d9f1;
+  background: #eef8ff;
+}
+
+body[data-setup-reading-surface="warm-cream"] .learning-reading-preview {
+  border-color: #e7d5b5;
+  background: #fff8e9;
+}
+
+body[data-setup-reading-contrast="on"] .learning-reading-preview {
+  border-color: #111;
+  color: #000;
+  background: #fff;
+  box-shadow: none;
+}
+
 .learning-settings--open {
   width: 100%;
   max-width: none;

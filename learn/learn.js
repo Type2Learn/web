@@ -39,6 +39,7 @@ let mascotLanguageExplicitlyChosen = false;
 let layoutBeforeFocused = 'balanced';
 let setupFeedbackTimer = 0;
 let setupMotionSequence = 0;
+let setupPreviewUtterance = null;
 const mascotScreenIsSupported = () => window.matchMedia?.('(min-width: 1181px)').matches;
 
 const preferenceControls = [
@@ -331,6 +332,67 @@ const backgroundNoiseMarkup = (choices) => {
 
 const controlById = (id) => preferenceControls.find((control) => control.id === id);
 
+const readingPreferenceIds = new Set([
+  'reading-text-size',
+  'reading-spacing',
+  'reading-width',
+  'reading-contrast',
+  'reading-surface'
+]);
+
+// This is deliberately a real, short piece of lesson-like content rather
+// than a decorative mock-up. The five reading controls change this preview
+// immediately, before a learner commits their course settings.
+const readingPreviewMarkup = (choices) => {
+  const urdu = setupLanguage(choices) === 'urdu';
+  const labels = urdu
+    ? ['پڑھنے کا پیش نظارہ', 'یہ مختصر متن آپ کے منتخب کردہ سائز، فاصلے، چوڑائی، تضاد اور سطح کے ساتھ فوراً بدلتا ہے۔']
+    : ['Reading preview', 'This short lesson sample updates immediately with your chosen text size, rhythm, width, contrast, and surface.'];
+  return '<aside class="learning-reading-preview" data-learning-reading-preview lang="' + (urdu ? 'ur' : 'en') + '" dir="' + (urdu ? 'rtl' : 'ltr') + '"><strong>' + labels[0] + '</strong><p>' + labels[1] + '</p></aside>';
+};
+
+const textToSpeechPreviewMarkup = (choices) => {
+  if (choices['text-to-speech'] !== 'on') return '';
+  const urdu = setupLanguage(choices) === 'urdu';
+  const label = urdu ? 'پڑھنے کا مختصر نمونہ سنیں' : 'Listen to a short reading preview';
+  const note = urdu
+    ? 'آواز صرف آپ کے اس بٹن دبانے کے بعد چلتی ہے۔'
+    : 'Audio starts only after you choose this button.';
+  return '<div class="learning-tts-preview"><button type="button" data-setup-tts-preview>' + label + '</button><small data-setup-tts-status>' + note + '</small></div>';
+};
+
+const setupPreviewText = (choices) => setupLanguage(choices) === 'urdu'
+  ? 'یہ پڑھنے کا مختصر نمونہ ہے۔ آپ اپنی رفتار سے ایک واضح خیال پر توجہ دے سکتے ہیں۔'
+  : 'This is a short reading preview. You can focus on one clear idea at your own pace.';
+
+const playSetupTextToSpeechPreview = (choices) => {
+  const status = document.querySelector('[data-setup-tts-status]');
+  if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance !== 'function') {
+    if (status) status.textContent = setupLanguage(choices) === 'urdu'
+      ? 'اس براؤزر میں آواز کا پیش نظارہ دستیاب نہیں ہے۔'
+      : 'This browser does not provide a speech preview.';
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(setupPreviewText(choices));
+  utterance.lang = setupLanguage(choices) === 'urdu' ? 'ur-PK' : 'en-US';
+  utterance.rate = 0.94;
+  utterance.volume = 0.72;
+  setupPreviewUtterance = utterance;
+  utterance.onstart = () => {
+    if (status) status.textContent = setupLanguage(choices) === 'urdu' ? 'پیش نظارہ چل رہا ہے۔' : 'Reading preview is playing.';
+  };
+  utterance.onend = () => {
+    if (setupPreviewUtterance !== utterance) return;
+    if (status) status.textContent = setupLanguage(choices) === 'urdu' ? 'پیش نظارہ مکمل ہوا۔' : 'Reading preview finished.';
+  };
+  utterance.onerror = () => {
+    if (setupPreviewUtterance !== utterance) return;
+    if (status) status.textContent = setupLanguage(choices) === 'urdu' ? 'پیش نظارہ نہیں چل سکا۔ آپ کورس میں دوبارہ کوشش کر سکتے ہیں۔' : 'The preview could not play. You can try again in the course.';
+  };
+  window.speechSynthesis.speak(utterance);
+};
+
 const mascotDialogue = (choices) => {
   const language = choices['mascot-language'] || setupLanguage(choices);
   return language === 'urdu'
@@ -421,7 +483,10 @@ const focusedStepContent = (step, choices) => {
   if (step.id === 'mascot-language') return mascotLanguageControl(choices);
   if (step.id === 'mascot-voice') return mascotSpeechControl(choices);
   if (step.id === 'mascot-voice-language') return mascotVoiceControl(choices);
-  return controlMarkup(controlById(step.id), choices[step.id], setupLanguage(choices));
+  const control = controlMarkup(controlById(step.id), choices[step.id], setupLanguage(choices));
+  const readingPreview = readingPreferenceIds.has(step.id) ? readingPreviewMarkup(choices) : '';
+  const ttsPreview = step.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '';
+  return control + readingPreview + ttsPreview;
 };
 
 const focusedStageMarkup = (choices) => {
@@ -463,7 +528,7 @@ const balancedStageMarkup = (choices) => {
   '<small class="learning-settings-later">' + copy.laterSettings + '</small>',
   '</header>',
   '<div class="learning-control-list" aria-label="' + copy.preferences + '">',
-  preferenceControls.map((control) => controlMarkup(control, choices[control.id], setupLanguage(choices)) + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '') + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')).join(''),
+  preferenceControls.map((control) => controlMarkup(control, choices[control.id], setupLanguage(choices)) + (control.id === 'reading-surface' ? readingPreviewMarkup(choices) : '') + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '') + (control.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '') + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')).join(''),
   '</div>',
   '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="scheme">' + (setupLanguage(choices) === 'urdu' ? 'ویب سائٹ کی پیشکش پر واپس' : 'Back to website scheme') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
   '</section>',
@@ -474,7 +539,9 @@ const balancedStageMarkup = (choices) => {
 
 const openControlRowMarkup = (control, choices) => '<article class="learning-open-row">'
   + controlMarkup(control, choices[control.id], setupLanguage(choices))
+  + (control.id === 'reading-surface' ? readingPreviewMarkup(choices) : '')
   + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '')
+  + (control.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '')
   + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')
   + '</article>';
 
@@ -557,6 +624,20 @@ const applySetupPresentation = (choices) => {
   document.body.dataset.setupLayout = ['focused', 'balanced', 'open'].includes(choices.layout)
     ? choices.layout
     : 'balanced';
+  // These attributes make the first-run controls an actual live preview of
+  // the same persisted presentation settings used by the course player.
+  // They are intentionally independent of layout, colour, and encouragement.
+  document.body.dataset.setupTextSize = ['standard', 'large', 'extra-large'].includes(choices['reading-text-size'])
+    ? choices['reading-text-size']
+    : 'standard';
+  document.body.dataset.setupSpacing = choices['reading-spacing'] === 'relaxed' ? 'relaxed' : 'standard';
+  document.body.dataset.setupReadingWidth = ['narrow', 'comfortable', 'wide'].includes(choices['reading-width'])
+    ? choices['reading-width']
+    : 'comfortable';
+  document.body.dataset.setupReadingContrast = choices['reading-contrast'] === 'on' ? 'on' : 'off';
+  document.body.dataset.setupReadingSurface = ['paper', 'soft-blue', 'warm-cream'].includes(choices['reading-surface'])
+    ? choices['reading-surface']
+    : 'paper';
 };
 
 const launchSetupControlMotion = (control, event, choices, routeChange = false) => {
@@ -776,6 +857,13 @@ const boot = async () => {
         if (preference === 'animations') showSetupFeedback('animations', choices);
         return;
       }
+      // Reading controls update the real preview card and the surrounding
+      // setup presentation immediately. Re-render rather than only toggling
+      // aria-pressed so the learner can verify the change before continuing.
+      if (readingPreferenceIds.has(preference) || preference === 'text-to-speech') {
+        render(choices);
+        return;
+      }
       updateChoiceUi(preference, value);
       if (preference === 'encouragement' || preference === 'animations') showSetupFeedback(preference, choices);
       return;
@@ -788,6 +876,11 @@ const boot = async () => {
         button.setAttribute('aria-pressed', String(button === noiseTypeButton));
       });
       if (choices['background-noise'] === 'on') startBackgroundNoisePreview(choices);
+      return;
+    }
+
+    if (event.target.closest('[data-setup-tts-preview]')) {
+      playSetupTextToSpeechPreview(choices);
       return;
     }
 
