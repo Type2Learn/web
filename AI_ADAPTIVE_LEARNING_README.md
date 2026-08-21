@@ -762,8 +762,9 @@ LEARNING_ANALYTICS_RETENTION_DAYS=<approved value>
 FIREBASE_STORAGE_BUCKET=<approved bucket when visuals ship>
 ~~~
 
-The production Blueprint enables the first five flags only. It intentionally
-does **not** enable `EDUCATOR_WORKSPACE_ENABLED` or
+The production Blueprint enables the first five flags and the public Firebase
+Storage bucket identifier only. It intentionally does **not** enable
+`EDUCATOR_WORKSPACE_ENABLED` or
 `COURSE_PUBLISHING_ENABLED`: those services fail closed until Render holds all
 of `ADMIN_BOOTSTRAP_CODE_SHA256`, `ROLE_CODE_PEPPER`, private Firebase Storage,
 and the private GitHub/Supabase backup credentials. A boolean cannot safely

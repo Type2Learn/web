@@ -30,6 +30,7 @@ test('Render enables consent-gated learning features without exposing private pu
     'AI_ASSESSMENTS_ENABLED',
     'AI_VISUALS_ENABLED'
   ]) assert.match(render, new RegExp(`key: ${key}\\n\\s+value: ["']?true["']?`));
+  assert.match(render, /key: FIREBASE_STORAGE_BUCKET\n\s+value: type2learn-defcc\.firebasestorage\.app/);
   assert.doesNotMatch(render, /key: COURSE_PUBLISHING_ENABLED/);
   assert.doesNotMatch(render, /key: EDUCATOR_WORKSPACE_ENABLED/);
 });

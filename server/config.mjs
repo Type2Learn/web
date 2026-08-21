@@ -184,7 +184,10 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     aiVisualsEnabled: booleanFrom(value('AI_VISUALS_ENABLED') || (production ? 'true' : 'false')),
     firebaseProjectId: value('FIREBASE_PROJECT_ID') || 'type2learn-defcc',
     firebaseServiceAccountJson: value('FIREBASE_SERVICE_ACCOUNT_JSON'),
-    firebaseStorageBucket: value('FIREBASE_STORAGE_BUCKET') || '',
+    // This is public Firebase project metadata supplied by the application's
+    // client configuration. Credentials remain exclusively in the Render
+    // Firebase Admin service-account secret.
+    firebaseStorageBucket: value('FIREBASE_STORAGE_BUCKET') || 'type2learn-defcc.firebasestorage.app',
     // Private educator workspace. The first administrator proves possession of
     // the one-time setup code; only its SHA-256 digest is stored in deployment
     // configuration. Role/invite codes are HMAC hashed with a separate pepper.
