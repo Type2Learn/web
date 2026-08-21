@@ -83,7 +83,14 @@
 
   const icon = (name, small) => '<svg aria-hidden="true" class="icon' + (small ? ' icon-sm' : '') + '" viewBox="0 0 24 24">' + (iconPaths[name] || iconPaths.spark) + '</svg>';
   const status = (text, kind) => '<span class="status-chip chip-' + (kind || 'blue') + '">' + text + '</span>';
-  const button = (label, href, kind) => '<a class="button button-' + (kind || 'secondary') + '" href="/login/">' + label + icon('arrow', true) + '</a>';
+  // Public CTAs must preserve their stated destination. Only an explicit
+  // “Get started” control in the header should lead to sign-in.
+  const button = (label, href, kind) => {
+    let destination = typeof href === 'string' && (/^\/(?!\/)/.test(href) || href.startsWith('#')) ? href : '/';
+    // One legacy Urdu learner CTA used a sign-in URL while promising a preview.
+    if (destination === '/login/' && label === 'اب آزمائیں') destination = '/ur/#demo';
+    return '<a class="button button-' + (kind || 'secondary') + '" href="' + destination + '">' + label + icon('arrow', true) + '</a>';
+  };
 
   const brand = () => '<a class="brand" href="' + (isUrdu ? "/ur/" : "/") + '" aria-label="' + (isUrdu ? "Type2Learn — فعال سیکھیں — مرکزی صفحہ" : "Type2Learn — Learn actively — home") + '"><img class="brand-mark" src="/assets/type2learn-logo-nav.webp" width="160" height="141" alt=""><span class="brand-copy"><span class="brand-name">TYPE2LEARN</span><span class="brand-tagline">' + (isUrdu ? "فعال سیکھیں" : "Learn actively") + '</span></span></a>';
 
@@ -130,7 +137,7 @@
     trust: ['Keep the standard visible', 'Read how access, privacy, security, and terms connect.', 'Use one accountable trust center to understand the safeguards around learning and participation.', 'Explore the method', '/how-it-works/', 'Community & help', '/community/']
   };
   const urduCtaDefinitions = {
-    "how-it-works": ['طریقے کو عمل میں لائیں', 'واضح عمل سے پائیدار واپسی تک جائیں۔', 'یادداشت، مفید رائے، استعمال اور پرسکون واپسی کے گرد بنایا گیا راستہ منتخب کریں۔', 'راستے دریافت کریں', '/ur/pathways/', 'اب آزمائیں', '/login/'],
+    "how-it-works": ['طریقے کو عمل میں لائیں', 'واضح عمل سے پائیدار واپسی تک جائیں۔', 'یادداشت، مفید رائے، استعمال اور پرسکون واپسی کے گرد بنایا گیا راستہ منتخب کریں۔', 'راستے دریافت کریں', '/ur/pathways/', 'یہ پیش منظر آزمائیں', '/ur/#demo'],
     "learning-together": ['سیکھنے والے کو مرکز میں رکھیں', 'ہر معاون کردار واضح بنائیں۔', 'ذمہ داریوں کا مشترکہ معیار دیکھیں جس سے خاندان، اساتذہ اور اسکول سیکھنے کو نگرانی بنائے بغیر مدد دے سکیں۔', 'شرکت اور اعتماد دیکھیں', '/ur/participation-trust/', 'طریقہ پڑھیں', '/ur/how-it-works/'],
     "participation-trust": ['ریکارڈ کو جواب دہ رکھیں', 'ہر شراکت اور حد کو واضح بنائیں۔', 'تعلیمی طریقہ دیکھیں، پھر شرکت کے شواہد اور مدد کی حکمرانی بڑھنے پر یہاں واپس آئیں۔', 'طریقہ دیکھیں', '/ur/how-it-works/', 'ٹیم سے ملیں', '/ur/team/'],
     pathways: ['اپنا راستہ منتخب کریں', 'وہاں سے آغاز کریں جہاں سیکھنے والے کو کام کرنا ہے۔', 'تین راستوں کا موازنہ کریں اور وہ راستہ چنیں جو مقصد اور اگلا قدم واضح رکھے۔', 'سیکھنے والوں کے لیے', '/ur/learners/', 'اسکولوں کے لیے', '/ur/schools/'],
@@ -164,7 +171,7 @@
 
   const siteCta = () => {
     if (isUrdu && isHomeRoute) {
-      return '<section class="site-cta site-cta-home" data-cta-route="home" aria-labelledby="site-cta-title"><div class="content-wrap"><div class="site-cta-panel reveal"><div class="cta-orbit" aria-hidden="true"><i></i><i></i><i></i></div><div class="site-cta-copy"><p class="section-kicker">ایک واضح اگلے قدم سے آغاز کریں</p><h2 id="site-cta-title">دیکھیں کہ فعال سیکھنا عمل میں کیسا محسوس ہوتا ہے۔</h2><p>سیکھنے کے راستے دریافت کریں یا ایک واضح اگلے قدم کے گرد بنائی گئی رہنمائی والی یادداشت کی سرگرمی سے آغاز کریں۔</p></div><div class="site-cta-actions">' + button('اب آزمائیں', '#demo', 'primary') + button('راستے دریافت کریں', '#pathways', 'light') + '</div></div></div></section>';
+      return '<section class="site-cta site-cta-home" data-cta-route="home" aria-labelledby="site-cta-title"><div class="content-wrap"><div class="site-cta-panel reveal"><div class="cta-orbit" aria-hidden="true"><i></i><i></i><i></i></div><div class="site-cta-copy"><p class="section-kicker">ایک واضح اگلے قدم سے آغاز کریں</p><h2 id="site-cta-title">دیکھیں کہ فعال سیکھنا عمل میں کیسا محسوس ہوتا ہے۔</h2><p>سیکھنے کے راستے دریافت کریں یا ایک واضح اگلے قدم کے گرد بنائی گئی رہنمائی والی یادداشت کی سرگرمی سے آغاز کریں۔</p></div><div class="site-cta-actions">' + button('یہ پیش منظر آزمائیں', '#demo', 'primary') + button('راستے دریافت کریں', '/ur/pathways/', 'light') + '</div></div></div></section>';
     }
     const item = (isUrdu ? urduCtaDefinitions : ctaDefinitions)[ctaRoute] || ctaDefinitions.home;
     const isHome = ctaRoute === 'home';
@@ -520,6 +527,24 @@
   } else {
     root.innerHTML = (pageMap[route] || landing)();
   }
+  // Legacy public CTAs are normalised after rendering. They deliberately
+  // retain public destinations; the header is the only sign-in call to action.
+  const previewDestination = isUrdu ? '/ur/#demo' : '/#demo';
+  root.querySelectorAll('.story-action[href="/login/"]').forEach((link) => {
+    link.href = previewDestination;
+    link.innerHTML = (isUrdu ? 'سیکھنے کا پیش منظر آزمائیں' : 'Try the learning preview') + icon('arrow', true);
+  });
+  root.querySelectorAll('a.button[href="/ur/#demo"]').forEach((link) => {
+    if (link.textContent.trim() === 'اب آزمائیں') {
+      link.innerHTML = 'یہ پیش منظر آزمائیں' + icon('arrow', true);
+    }
+  });
+  root.querySelectorAll('a.button[href="/login/"]').forEach((link) => {
+    if (/^get support$/i.test(link.textContent.trim())) {
+      link.href = isUrdu ? '/ur/community/#support' : '/community/#support';
+      link.innerHTML = (isUrdu ? 'مدد کے اختیارات دیکھیں' : 'Find support options') + icon('arrow', true);
+    }
+  });
   root.querySelectorAll('img[src="/assets/type2learn-logo.png"]').forEach((image) => {
     image.src = '/assets/type2learn-logo-nav.webp';
     image.width = 160;
@@ -928,7 +953,7 @@
       }
       write(copy, 'Type2Learn ایک تعلیمی اقدام ہے جو غیر منافع بخش مقصد کے ساتھ تیار کیا جا رہا ہے۔ یہ ٹائپنگ کے ذریعے فعال سیکھنے کو یادداشت، درستگی، استعمال اور پائیدار پیش رفت سے جوڑتا ہے۔');
       const actions = homeHero.querySelectorAll('.hero-actions .button');
-      replaceButton(actions[0], 'اب آزمائیں');
+      replaceButton(actions[0], 'یہ پیش منظر آزمائیں');
       replaceButton(actions[1], 'راستے دریافت کریں');
       const trustItems = homeHero.querySelectorAll('.trust-inline > span');
       if (trustItems[0]) trustItems[0].innerHTML = icon('check', true) + 'رفتار کی بنیاد پر درجہ بندی نہیں';
