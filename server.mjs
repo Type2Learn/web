@@ -258,6 +258,15 @@ const handleApi = async (request, response, pathname, runtime) => {
   }
   if (request.method === 'GET' && pathname === '/api/v1/health') {
     return sendJson(response, 200, {
+      // Render provides this at runtime for Git-backed deploys. Publishing the
+      // short revision makes support checks deterministic without exposing any
+      // configuration or credentials: a learner or maintainer can verify that
+      // a reported issue is occurring on the intended release.
+      release: {
+        environment: process.env.RENDER === 'true' ? 'render' : 'local',
+        branch: String(process.env.RENDER_GIT_BRANCH || '').slice(0, 120) || null,
+        commit: String(process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || '').slice(0, 12) || null
+      },
       ai: ai.status(),
       adaptiveRecall: { ...adaptiveRecall.status(), localGuestPreview: config.allowLocalGuestAi },
       adaptiveLearning: learningAnalytics.status(),

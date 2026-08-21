@@ -109,6 +109,9 @@ test('a failed Gemini attempt uses Featherless before OpenAI', { concurrency: fa
 
 test('feature health advertises the exact offline and PSL capability boundary', async () => {
   const source = await readFile(new URL('../../server.mjs', import.meta.url), 'utf8');
+  assert.match(source, /release:\s*\{/);
+  assert.match(source, /RENDER_GIT_COMMIT/);
+  assert.match(source, /RENDER_GIT_BRANCH/);
   assert.match(source, /offlineLearning:/);
   assert.match(source, /public-course-learner-controls-and-local-narration/);
   assert.match(source, /english-and-urdu-local-mp3/);
