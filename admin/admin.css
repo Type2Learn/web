@@ -1,0 +1,373 @@
+body[data-workspace="admin"] {
+  --admin-ink: #173b6c;
+  --admin-heading: #0b2855;
+  --admin-muted: #4f6f98;
+  --admin-line: #cbdcf0;
+  --admin-surface: #ffffff;
+  --admin-surface-soft: #f6faff;
+  --admin-accent: #1769ff;
+  overflow-x: hidden;
+  color: var(--admin-ink);
+}
+
+body[data-workspace="admin"] .workspace-shell,
+body[data-workspace="admin"] .workspace-main,
+body[data-workspace="admin"] .workspace-layout,
+body[data-workspace="admin"] .workspace-content,
+body[data-workspace="admin"] [data-panel],
+body[data-workspace="admin"] .workspace-panel,
+body[data-workspace="admin"] .authoring-builder,
+body[data-workspace="admin"] .authoring-module,
+body[data-workspace="admin"] .authoring-final-question,
+body[data-workspace="admin"] .workspace-grid,
+body[data-workspace="admin"] .workspace-row,
+body[data-workspace="admin"] .workspace-field,
+body[data-workspace="admin"] .workspace-note {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body[data-workspace="admin"] .workspace-header {
+  padding-inline: clamp(18px, 2.8vw, 48px);
+  gap: 16px;
+}
+
+body[data-workspace="admin"] .workspace-brand {
+  min-width: 0;
+  color: var(--admin-heading);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+body[data-workspace="admin"] .workspace-brand-logo {
+  display: block;
+  width: auto;
+  height: 34px;
+  max-width: min(190px, 42vw);
+  object-fit: contain;
+}
+
+body[data-workspace="admin"] .workspace-header-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+body[data-workspace="admin"] .workspace-main {
+  width: min(1820px, calc(100% - clamp(24px, 3.2vw, 64px)));
+  padding-top: clamp(26px, 3vw, 42px);
+}
+
+body[data-workspace="admin"] .workspace-title {
+  max-width: 980px;
+  color: var(--admin-heading);
+  font-weight: 650;
+}
+
+body[data-workspace="admin"] .workspace-intro {
+  max-width: 1040px;
+  color: var(--admin-muted);
+}
+
+body[data-workspace="admin"] .workspace-layout {
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
+  gap: clamp(18px, 2vw, 28px);
+  margin-top: 30px;
+}
+
+body[data-workspace="admin"] .workspace-nav {
+  width: 100%;
+  border-color: var(--admin-line);
+}
+
+body[data-workspace="admin"] .workspace-nav p,
+body[data-workspace="admin"] .workspace-eyebrow {
+  font-weight: 650;
+}
+
+body[data-workspace="admin"] .workspace-nav button {
+  min-width: 0;
+  color: var(--admin-ink);
+  font-weight: 550;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+body[data-workspace="admin"] .workspace-nav button:hover,
+body[data-workspace="admin"] .workspace-nav button[aria-current="page"] {
+  color: #0a58c7;
+}
+
+body[data-workspace="admin"] .workspace-content {
+  width: 100%;
+}
+
+body[data-workspace="admin"] .workspace-panel {
+  width: 100%;
+  margin-bottom: 18px;
+  padding: clamp(20px, 2.3vw, 34px);
+  border-color: var(--admin-line);
+}
+
+body[data-workspace="admin"] .workspace-panel h2 {
+  color: var(--admin-heading);
+  font-weight: 620;
+}
+
+body[data-workspace="admin"] .workspace-panel h3,
+body[data-workspace="admin"] .workspace-card h3,
+body[data-workspace="admin"] .authoring-language h4,
+body[data-workspace="admin"] .authoring-question h5,
+body[data-workspace="admin"] strong {
+  color: var(--admin-heading);
+  font-weight: 600;
+}
+
+body[data-workspace="admin"] .workspace-panel p,
+body[data-workspace="admin"] .workspace-card p,
+body[data-workspace="admin"] .workspace-field span,
+body[data-workspace="admin"] .workspace-list small,
+body[data-workspace="admin"] .workspace-input-help {
+  color: var(--admin-muted);
+}
+
+body[data-workspace="admin"] .workspace-field {
+  color: var(--admin-ink);
+  font-weight: 560;
+}
+
+body[data-workspace="admin"] .workspace-field input,
+body[data-workspace="admin"] .workspace-field textarea,
+body[data-workspace="admin"] .workspace-field select {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--admin-ink);
+  font-weight: 450;
+}
+
+body[data-workspace="admin"] .workspace-button {
+  max-width: 100%;
+  font-weight: 560;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+body[data-workspace="admin"] .workspace-tag {
+  max-width: 100%;
+  font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+body[data-workspace="admin"] .workspace-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+body[data-workspace="admin"] .workspace-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body[data-workspace="admin"] .workspace-row {
+  align-items: flex-end;
+}
+
+body[data-workspace="admin"] .workspace-row > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body[data-workspace="admin"] .workspace-list > li {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+body[data-workspace="admin"] .workspace-list > li > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body[data-workspace="admin"] .workspace-note,
+body[data-workspace="admin"] .workspace-code,
+body[data-workspace="admin"] .workspace-status,
+body[data-workspace="admin"] .workspace-preview-content,
+body[data-workspace="admin"] .workspace-preview-bar {
+  overflow-wrap: anywhere;
+}
+
+body[data-workspace="admin"] .admin-review-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px 28px;
+  align-items: center;
+  width: 100%;
+  margin: 0 0 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--admin-line);
+  border-radius: 14px;
+  background: var(--admin-surface);
+}
+
+body[data-workspace="admin"] .admin-review-actions-copy {
+  min-width: 0;
+}
+
+body[data-workspace="admin"] .admin-review-actions-copy strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+body[data-workspace="admin"] .admin-review-actions-copy p {
+  margin: 0;
+  color: var(--admin-muted);
+  line-height: 1.45;
+}
+
+body[data-workspace="admin"] .admin-review-actions .workspace-row {
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+body[data-workspace="admin"] .admin-review-actions .workspace-button {
+  min-height: 40px;
+}
+
+body[data-workspace="admin"] .admin-authoring-panel > .workspace-field:first-of-type {
+  margin-top: 22px;
+}
+
+body[data-workspace="admin"] .admin-authoring-panel [data-markdown-form] {
+  width: 100%;
+}
+
+body[data-workspace="admin"] .authoring-builder {
+  width: 100%;
+}
+
+body[data-workspace="admin"] .authoring-builder-heading,
+body[data-workspace="admin"] .authoring-module-heading {
+  flex-wrap: wrap;
+}
+
+body[data-workspace="admin"] .authoring-builder-heading > div,
+body[data-workspace="admin"] .authoring-module-heading > div {
+  min-width: 0;
+  flex: 1 1 360px;
+}
+
+body[data-workspace="admin"] .workspace-preview-bar {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1180px) {
+  body[data-workspace="admin"] .workspace-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-workspace="admin"] .workspace-nav {
+    position: static;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 8px;
+    scrollbar-width: thin;
+  }
+
+  body[data-workspace="admin"] .workspace-nav p {
+    display: none;
+  }
+
+  body[data-workspace="admin"] .workspace-nav button {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 980px) {
+  body[data-workspace="admin"] .workspace-grid--three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body[data-workspace="admin"] .admin-review-actions {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-workspace="admin"] .admin-review-actions .workspace-row {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  body[data-workspace="admin"] .workspace-main {
+    width: min(100% - 20px, 1820px);
+  }
+
+  body[data-workspace="admin"] .workspace-grid,
+  body[data-workspace="admin"] .workspace-grid--three {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-workspace="admin"] .workspace-panel {
+    padding: 18px;
+  }
+
+  body[data-workspace="admin"] .workspace-header {
+    position: static;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body[data-workspace="admin"] .workspace-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  body[data-workspace="admin"] .workspace-header-actions .workspace-button {
+    flex: 1 1 150px;
+  }
+
+  body[data-workspace="admin"] .workspace-list > li {
+    flex-direction: column;
+  }
+
+  body[data-workspace="admin"] .authoring-builder-heading,
+  body[data-workspace="admin"] .authoring-module-heading {
+    flex-direction: column;
+  }
+
+  body[data-workspace="admin"] .admin-review-actions .workspace-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  body[data-workspace="admin"] .admin-review-actions .workspace-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 460px) {
+  body[data-workspace="admin"] .workspace-main {
+    width: calc(100% - 14px);
+  }
+
+  body[data-workspace="admin"] .workspace-panel,
+  body[data-workspace="admin"] .admin-review-actions,
+  body[data-workspace="admin"] .authoring-builder,
+  body[data-workspace="admin"] .authoring-module,
+  body[data-workspace="admin"] .authoring-final-question {
+    border-radius: 12px;
+  }
+
+  body[data-workspace="admin"] .workspace-header-actions > * {
+    flex: 1 1 100%;
+  }
+
+  body[data-workspace="admin"] .workspace-tag {
+    justify-content: center;
+  }
+}
