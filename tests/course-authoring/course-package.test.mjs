@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-import { backupsComplete } from '../../server/course-backup-service.mjs';
+import { backupsComplete, writeGithubBackupSet } from '../../server/course-backup-service.mjs';
 import { createCoursePackage } from '../../server/course-package.mjs';
 
 const entries = [
@@ -39,4 +39,29 @@ test('strict Firebase policy remains available once the private bucket is provis
   const acknowledgedZip = { verified: true, downloadedAt: '2026-08-13T00:00:00.000Z' };
   assert.equal(backupsComplete({ firebase: { verified: false }, github: verified, supabase: verified, zip: acknowledgedZip }, { firebaseRequired: true }), false);
   assert.equal(backupsComplete({ firebase: verified, github: verified, supabase: verified, zip: acknowledgedZip }, { firebaseRequired: true }), true);
+});
+
+test('GitHub release receipts are written serially to avoid same-branch Contents API conflicts', async () => {
+  let active = 0;
+  let highestActive = 0;
+  const calls = [];
+  const request = async ({ path }) => {
+    active += 1;
+    highestActive = Math.max(highestActive, active);
+    calls.push(path);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    active -= 1;
+    return { path, sha: 'test', checksum: 'test' };
+  };
+  const result = await writeGithubBackupSet({
+    config: {}, prefix: 'courses/demo/1.0.0/hash', courseId: 'demo', version: '1.0.0',
+    markdown: Buffer.from('course'), learner: Buffer.from('{}'), privateManifest: Buffer.from('{}'), request
+  });
+  assert.equal(highestActive, 1);
+  assert.deepEqual(calls, [
+    'courses/demo/1.0.0/hash/course.md',
+    'courses/demo/1.0.0/hash/learner-manifest.json',
+    'courses/demo/1.0.0/hash/private-authoring-manifest.json'
+  ]);
+  assert.equal(result.length, 3);
 });

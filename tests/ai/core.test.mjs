@@ -75,6 +75,13 @@ test('zero-valued AI allowance variables fall back to the bounded working defaul
   assert.equal(config.openAiUserOutputTokenCap, 500000);
 });
 
+test('Supabase backup origin accepts one accidental dashboard equals sign but rejects non-HTTPS input', async () => {
+  const repaired = await loadRuntimeConfig({ environment: { NODE_ENV: 'production', SUPABASE_BACKUP_URL: '=https://private.example.co/path' } });
+  const rejected = await loadRuntimeConfig({ environment: { NODE_ENV: 'production', SUPABASE_BACKUP_URL: 'http://not-private.example.co' } });
+  assert.equal(repaired.supabaseBackupUrl, 'https://private.example.co');
+  assert.equal(rejected.supabaseBackupUrl, '');
+});
+
 test('Gemini aliases and numbered keys are all retained for server-side rotation', async () => {
   const config = await loadRuntimeConfig({
     environment: {

@@ -52,6 +52,18 @@ const githubRequest = async ({ config, path, content, message }) => {
   return { path, sha: String(payload?.content?.sha || ''), checksum: checksum(content) };
 };
 
+// GitHub's Contents API may reject concurrent writes to the same branch even
+// when every file path is different. Course receipts are therefore committed
+// in deterministic order; this is an immutable release gate, not a latency-
+// sensitive learner request. The request parameter keeps the ordering testable
+// without a real GitHub token.
+export const writeGithubBackupSet = async ({ config, prefix, courseId, version, markdown, learner, privateManifest, request = githubRequest }) => {
+  const course = await request({ config, path: `${prefix}/course.md`, content: markdown, message: `backup(course): ${courseId}@${version} Markdown` });
+  const learnerManifest = await request({ config, path: `${prefix}/learner-manifest.json`, content: learner, message: `backup(course): ${courseId}@${version} learner manifest` });
+  const authoringManifest = await request({ config, path: `${prefix}/private-authoring-manifest.json`, content: privateManifest, message: `backup(course): ${courseId}@${version} private authoring manifest` });
+  return [course, learnerManifest, authoringManifest];
+};
+
 const supabaseRequest = async ({ config, path, content, contentType }) => {
   if (!config.supabaseBackupUrl || !config.supabaseBackupServiceKey || !config.supabaseBackupBucket) throw apiError(503, 'SUPABASE_BACKUP_NOT_CONFIGURED', 'Supabase backup is not configured.');
   const base = config.supabaseBackupUrl.replace(/\/$/, '');
@@ -116,12 +128,16 @@ export const createCourseBackupService = ({ firebase, config, access }) => {
         }
       }
       const githubPrefix = `${basePath}/${packageData.sha256}`;
-      const [githubMarkdown, githubLearner, githubPrivate, supabase] = await Promise.all([
-        githubRequest({ config, path: `${githubPrefix}/course.md`, content: markdown, message: `backup(course): ${record.courseId}@${record.version} Markdown` }),
-        githubRequest({ config, path: `${githubPrefix}/learner-manifest.json`, content: learner, message: `backup(course): ${record.courseId}@${record.version} learner manifest` }),
-        githubRequest({ config, path: `${githubPrefix}/private-authoring-manifest.json`, content: privateManifest, message: `backup(course): ${record.courseId}@${record.version} private authoring manifest` }),
-        supabaseRequest({ config, path: `${basePath}/course-package-${packageData.sha256}.zip`, content: packageData.archive, contentType: 'application/zip' })
-      ]);
+      const [githubMarkdown, githubLearner, githubPrivate] = await writeGithubBackupSet({
+        config,
+        prefix: githubPrefix,
+        courseId: record.courseId,
+        version: record.version,
+        markdown,
+        learner,
+        privateManifest
+      });
+      const supabase = await supabaseRequest({ config, path: `${basePath}/course-package-${packageData.sha256}.zip`, content: packageData.archive, contentType: 'application/zip' });
       if (config.courseBackupFirebaseRequired && !firebaseReceipt.verified) {
         throw apiError(503, 'FIREBASE_BACKUP_REQUIRED', 'Firebase backup is required by this deployment but the private bucket is unavailable.');
       }

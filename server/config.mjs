@@ -120,6 +120,20 @@ const featherlessEndpoint = (value) => {
   }
 };
 
+// Dashboard copy/paste can accidentally leave `URL==https://…`. Recover that
+// harmless leading delimiter only for the bounded Supabase origin; malformed
+// or non-HTTPS values are rejected rather than becoming a server-side target.
+const supabaseOrigin = (value) => {
+  const candidate = String(value || '').trim().replace(/^=+/, '');
+  if (!candidate) return '';
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === 'https:' ? parsed.origin : '';
+  } catch {
+    return '';
+  }
+};
+
 export const loadRuntimeConfig = async ({ environment = process.env, root = repositoryRoot } = {}) => {
   const production = String(environment.NODE_ENV || '').toLowerCase() === 'production';
   // The local file is intentionally never read by a production process. Render
@@ -203,7 +217,7 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // is using Firebase's no-billing configuration. Set true to restore a
     // strict three-remote-backup requirement later.
     courseBackupFirebaseRequired: booleanFrom(value('COURSE_BACKUP_FIREBASE_REQUIRED')),
-    supabaseBackupUrl: value('SUPABASE_BACKUP_URL'),
+    supabaseBackupUrl: supabaseOrigin(value('SUPABASE_BACKUP_URL')),
     supabaseBackupServiceKey: value('SUPABASE_BACKUP_SERVICE_ROLE_KEY'),
     supabaseBackupBucket: value('SUPABASE_BACKUP_BUCKET'),
     openAiApiKey: value('OPENAI_API_KEY', 'openai', 'key'),
