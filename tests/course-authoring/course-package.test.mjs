@@ -25,10 +25,18 @@ test('course package rejects unsafe, empty, or duplicate entries', () => {
   assert.throws(() => createCoursePackage([{ name: 'a.txt', content: 'one' }, { name: 'a.txt', content: 'two' }]));
 });
 
-test('publication backup gate requires all services and an acknowledged ZIP download', () => {
+test('publication gate accepts verified GitHub and Supabase receipts with an acknowledged ZIP while Firebase is optional', () => {
   const verified = { verified: true };
-  assert.equal(backupsComplete({ firebase: verified, github: verified, supabase: verified, zip: { verified: true, downloadedAt: '2026-08-13T00:00:00.000Z' } }), true);
+  const acknowledgedZip = { verified: true, downloadedAt: '2026-08-13T00:00:00.000Z' };
+  assert.equal(backupsComplete({ firebase: { verified: false, optional: true }, github: verified, supabase: verified, zip: acknowledgedZip }), true);
   assert.equal(backupsComplete({ firebase: verified, github: verified, supabase: verified, zip: { verified: true, downloadedAt: '' } }), false);
   assert.equal(backupsComplete({ firebase: verified, github: verified, supabase: { verified: false }, zip: { verified: true, downloadedAt: 'now' } }), false);
   assert.equal(backupsComplete({ firebase: verified, github: {}, supabase: verified, zip: { verified: true, downloadedAt: 'now' } }), false);
+});
+
+test('strict Firebase policy remains available once the private bucket is provisioned', () => {
+  const verified = { verified: true };
+  const acknowledgedZip = { verified: true, downloadedAt: '2026-08-13T00:00:00.000Z' };
+  assert.equal(backupsComplete({ firebase: { verified: false }, github: verified, supabase: verified, zip: acknowledgedZip }, { firebaseRequired: true }), false);
+  assert.equal(backupsComplete({ firebase: verified, github: verified, supabase: verified, zip: acknowledgedZip }, { firebaseRequired: true }), true);
 });

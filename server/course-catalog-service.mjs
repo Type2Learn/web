@@ -1,6 +1,7 @@
 import { apiError } from './errors.mjs';
 import { migratedLegacyTheoryCourse } from './legacy-neurodivergent-migration.mjs';
 import { randomUUID } from 'node:crypto';
+import { privateStorageStatus, signedPrivateObjectUrl } from './private-object-storage.mjs';
 
 const ROOT = 'type2learnCourseAuthoring';
 const legacyCompiled = migratedLegacyTheoryCourse();
@@ -139,7 +140,8 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       };
     },
 
-    // Human narration stays in private Firebase Storage. A learner who can
+    // Human narration stays in private Firebase Storage when it is available,
+    // otherwise in the verified Supabase private store. A learner who can
     // already open the reviewed manifest may request one short-lived URL for
     // the current module; object paths and storage credentials never enter
     // the course manifest or learner-facing API JSON.
@@ -147,7 +149,7 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       const account = await accountFor(authorization);
       const { record } = await load(courseId, version);
       assertVisible(record, account);
-      if (!firebase.storage) throw apiError(503, 'NARRATION_STORAGE_NOT_CONFIGURED', 'Human narration is not connected yet. Device text-to-speech remains available.');
+      if (!privateStorageStatus({ firebase, config }).available) throw apiError(503, 'NARRATION_STORAGE_NOT_CONFIGURED', 'Human narration is not connected yet. Device text-to-speech remains available.');
       const sectionId = clean(moduleId, 80);
       const locale = language === 'ur' ? 'ur' : 'en';
       if (!sectionId) throw apiError(400, 'NARRATION_SECTION_REQUIRED', 'Choose a course module before requesting narration.');
@@ -160,7 +162,7 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       const expiresAt = new Date(Date.now() + (5 * 60 * 1000));
       purgeNarrationLeases();
       const token = randomUUID().replace(/-/g, '');
-      narrationLeases.set(token, { objectPath: asset.objectPath, expiresAtMs: expiresAt.getTime() });
+      narrationLeases.set(token, { objectPath: asset.objectPath, provider: asset.provider || 'firebase', expiresAtMs: expiresAt.getTime() });
       await audit(firebase.firestore, { actorUid: account.uid, action: 'learner-course-narration-opened', courseId: record.courseId, version: record.version, detail: `${locale}:${sectionId}` });
       return { source: 'human-narration', url: `/api/v1/course-narration-stream?token=${token}`, expiresAt: expiresAt.toISOString(), locale, sectionId };
     },
@@ -172,7 +174,7 @@ export const createCourseCatalogService = ({ firebase, config, access }) => {
       // A lease is single-purpose but reusable for its brief lifetime so native
       // media range/retry requests can still work without a second API call.
       try {
-        const [url] = await firebase.storage.file(lease.objectPath).getSignedUrl({ action: 'read', expires: new Date(lease.expiresAtMs) });
+        const url = await signedPrivateObjectUrl({ firebase, config, provider: lease.provider || 'firebase', objectPath: lease.objectPath, expiresAt: new Date(lease.expiresAtMs) });
         return { url, expiresAt: new Date(lease.expiresAtMs).toISOString() };
       } catch {
         narrationLeases.delete(String(token || ''));

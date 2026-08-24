@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { apiError } from './errors.mjs';
 import { createCoursePackage } from './course-package.mjs';
+import { downloadPrivateObject, firebaseStorageReady } from './private-object-storage.mjs';
 
 const ROOT = 'type2learnCourseAuthoring';
 const nowIso = () => new Date().toISOString();
@@ -12,7 +13,7 @@ const checksum = (content) => createHash('sha256').update(content).digest('hex')
 
 const requirePublishing = ({ firebase, config }) => {
   if (!config?.educatorWorkspaceEnabled || !config?.coursePublishingEnabled) throw apiError(503, 'COURSE_PUBLISHING_DISABLED', 'Course publishing is not enabled yet.');
-  if (!firebase?.available || !firebase.firestore || !firebase.storage) throw apiError(503, 'COURSE_BACKUP_STORAGE_NOT_CONFIGURED', 'Firebase Firestore and private Storage are required before publication.');
+  if (!firebase?.available || !firebase.firestore) throw apiError(503, 'COURSE_BACKUP_WORKSPACE_NOT_CONFIGURED', 'Firebase Firestore is required before publication.');
 };
 
 const backupShape = (value = {}) => ({
@@ -21,7 +22,16 @@ const backupShape = (value = {}) => ({
   supabase: value.supabase || { verified: false },
   zip: value.zip || { verified: false, downloadedAt: '' }
 });
-export const backupsComplete = (backups) => Boolean(backups.firebase?.verified && backups.github?.verified && backups.supabase?.verified && backups.zip?.verified && backups.zip?.downloadedAt);
+// Firebase is a third optional receipt until its private bucket is provisioned.
+// The release gate still requires two independent remote stores (private
+// GitHub and Supabase) and administrator acknowledgement of the ZIP export.
+export const backupsComplete = (backups, { firebaseRequired = false } = {}) => Boolean(
+  (!firebaseRequired || backups.firebase?.verified)
+  && backups.github?.verified
+  && backups.supabase?.verified
+  && backups.zip?.verified
+  && backups.zip?.downloadedAt
+);
 
 const githubRequest = async ({ config, path, content, message }) => {
   if (!config.courseBackupGithubRepository || !config.courseBackupGithubToken) throw apiError(503, 'GITHUB_BACKUP_NOT_CONFIGURED', 'Private GitHub backup is not configured.');
@@ -77,7 +87,8 @@ export const createCourseBackupService = ({ firebase, config, access }) => {
   return {
     status: () => ({
       enabled: Boolean(config?.educatorWorkspaceEnabled && config?.coursePublishingEnabled),
-      firebase: Boolean(firebase?.available && firebase.firestore && firebase.storage),
+      firebase: firebaseStorageReady(firebase),
+      firebaseRequired: Boolean(config?.courseBackupFirebaseRequired),
       github: Boolean(config?.courseBackupGithubRepository && config?.courseBackupGithubToken),
       supabase: Boolean(config?.supabaseBackupUrl && config?.supabaseBackupServiceKey && config?.supabaseBackupBucket)
     }),
@@ -93,7 +104,17 @@ export const createCourseBackupService = ({ firebase, config, access }) => {
       const learner = Buffer.from(JSON.stringify(record.learnerManifest, null, 2), 'utf8');
       const privateManifest = Buffer.from(JSON.stringify(record.privateManifest, null, 2), 'utf8');
       const firebasePath = `private-course-exports/${record.courseId}/${record.version}/course-package-${packageData.sha256}.zip`;
-      await firebase.storage.file(firebasePath).save(packageData.archive, { resumable: false, contentType: 'application/zip', metadata: { metadata: { courseId: record.courseId, version: record.version, sha256: packageData.sha256, immutable: 'true' } } });
+      let firebaseReceipt = { verified: false, optional: !config.courseBackupFirebaseRequired, state: 'not-configured', checkedAt: nowIso() };
+      if (firebaseStorageReady(firebase)) {
+        try {
+          await firebase.storage.file(firebasePath).save(packageData.archive, { resumable: false, contentType: 'application/zip', metadata: { metadata: { courseId: record.courseId, version: record.version, sha256: packageData.sha256, immutable: 'true' } } });
+          firebaseReceipt = { verified: true, optional: !config.courseBackupFirebaseRequired, objectPath: firebasePath, sha256: packageData.sha256, verifiedAt: nowIso() };
+        } catch {
+          // Storage may be configured but not provisioned. The two independent
+          // required stores below still protect the release in that case.
+          firebaseReceipt = { verified: false, optional: !config.courseBackupFirebaseRequired, state: 'unavailable', checkedAt: nowIso() };
+        }
+      }
       const githubPrefix = `${basePath}/${packageData.sha256}`;
       const [githubMarkdown, githubLearner, githubPrivate, supabase] = await Promise.all([
         githubRequest({ config, path: `${githubPrefix}/course.md`, content: markdown, message: `backup(course): ${record.courseId}@${record.version} Markdown` }),
@@ -101,11 +122,14 @@ export const createCourseBackupService = ({ firebase, config, access }) => {
         githubRequest({ config, path: `${githubPrefix}/private-authoring-manifest.json`, content: privateManifest, message: `backup(course): ${record.courseId}@${record.version} private authoring manifest` }),
         supabaseRequest({ config, path: `${basePath}/course-package-${packageData.sha256}.zip`, content: packageData.archive, contentType: 'application/zip' })
       ]);
+      if (config.courseBackupFirebaseRequired && !firebaseReceipt.verified) {
+        throw apiError(503, 'FIREBASE_BACKUP_REQUIRED', 'Firebase backup is required by this deployment but the private bucket is unavailable.');
+      }
       const backups = {
-        firebase: { verified: true, objectPath: firebasePath, sha256: packageData.sha256, verifiedAt: nowIso() },
+        firebase: firebaseReceipt,
         github: { verified: true, files: [githubMarkdown, githubLearner, githubPrivate], verifiedAt: nowIso() },
         supabase: { verified: true, ...supabase, verifiedAt: nowIso() },
-        zip: { verified: true, objectPath: firebasePath, sha256: packageData.sha256, checksums: packageData.checksums, downloadedAt: '' }
+        zip: { verified: true, provider: 'supabase', objectPath: supabase.path, sha256: packageData.sha256, checksums: packageData.checksums, downloadedAt: '' }
       };
       await reference.set({ backups, status: 'backups-verified', updatedAt: nowIso(), updatedBy: admin.uid }, { merge: true });
       await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-backups-verified', courseId: record.courseId, version: record.version, archiveSha256: packageData.sha256 });
@@ -117,7 +141,7 @@ export const createCourseBackupService = ({ firebase, config, access }) => {
       const { reference, record } = await loadCourse(courseId, version);
       const backups = backupShape(record.backups);
       if (!backups.zip?.verified || !backups.zip?.objectPath) throw apiError(409, 'EXPORT_NOT_READY', 'Verify backups before downloading the immutable course export.');
-      const [archive] = await firebase.storage.file(backups.zip.objectPath).download();
+      const archive = await downloadPrivateObject({ firebase, config, provider: backups.zip.provider || 'firebase', objectPath: backups.zip.objectPath });
       backups.zip.downloadedAt = nowIso();
       backups.zip.downloadedBy = admin.uid;
       await reference.set({ backups, updatedAt: nowIso(), updatedBy: admin.uid }, { merge: true });
@@ -131,7 +155,9 @@ export const createCourseBackupService = ({ firebase, config, access }) => {
       const audience = body?.audience === 'platform' ? 'platform' : 'organisation';
       if (audience === 'organisation' && !record.ownerOrganisationId) throw apiError(400, 'ORGANISATION_REQUIRED', 'Organisation publication requires an owning organisation.');
       const backups = backupShape(record.backups);
-      if (!backupsComplete(backups)) throw apiError(409, 'BACKUPS_NOT_COMPLETE', 'Firebase, private GitHub, Supabase, and a downloaded ZIP export must all verify before publication.');
+      if (!backupsComplete(backups, { firebaseRequired: Boolean(config.courseBackupFirebaseRequired) })) throw apiError(409, 'BACKUPS_NOT_COMPLETE', config.courseBackupFirebaseRequired
+        ? 'Firebase, private GitHub, Supabase, and a downloaded ZIP export must all verify before publication.'
+        : 'Private GitHub, Supabase, and a downloaded ZIP export must all verify before publication.');
       if (!record.validation?.valid || !record.learnerManifest || !record.privateManifest) throw apiError(409, 'COURSE_NOT_APPROVED', 'A validated bilingual course is required before publication.');
       if (record.status !== 'approved') throw apiError(409, 'ADMIN_APPROVAL_REQUIRED', 'An administrator must explicitly approve this reviewed course after backups verify before it can publish.');
       await reference.set({ status: 'published', requestedAudience: audience, publishedAt: nowIso(), publishedBy: admin.uid, updatedAt: nowIso(), updatedBy: admin.uid }, { merge: true });

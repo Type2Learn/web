@@ -198,6 +198,11 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     courseBackupGithubRepository: value('COURSE_BACKUP_GITHUB_REPOSITORY'),
     courseBackupGithubToken: value('COURSE_BACKUP_GITHUB_TOKEN'),
     courseBackupGithubBranch: value('COURSE_BACKUP_GITHUB_BRANCH') || 'main',
+    // Firebase Storage is a useful third immutable backup when provisioned,
+    // but GitHub plus Supabase remain the minimum release gate while a project
+    // is using Firebase's no-billing configuration. Set true to restore a
+    // strict three-remote-backup requirement later.
+    courseBackupFirebaseRequired: booleanFrom(value('COURSE_BACKUP_FIREBASE_REQUIRED')),
     supabaseBackupUrl: value('SUPABASE_BACKUP_URL'),
     supabaseBackupServiceKey: value('SUPABASE_BACKUP_SERVICE_ROLE_KEY'),
     supabaseBackupBucket: value('SUPABASE_BACKUP_BUCKET'),

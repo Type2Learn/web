@@ -3,6 +3,7 @@ import { apiError } from './errors.mjs';
 import { isTheoryCourseType } from './access-policy.mjs';
 import { compileTheoryCourse, fallbackMcqDraft, parseTheoryMarkdown, validateTheoryCourse } from './theory-course-markdown.mjs';
 import { canTransitionCourseWorkflow, isWorkflowState } from './course-workflow.mjs';
+import { downloadPrivateObject, privateStorageStatus, uploadPrivateObject } from './private-object-storage.mjs';
 
 const ROOT = 'type2learnCourseAuthoring';
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
@@ -156,7 +157,8 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
     status: () => ({
       enabled: Boolean(config?.educatorWorkspaceEnabled),
       firebase: Boolean(firebase?.available && firebase.firestore),
-      privateSourceStorage: Boolean(firebase?.storage),
+      privateSourceStorage: privateStorageStatus({ firebase, config }).available,
+      privateStorageProviders: privateStorageStatus({ firebase, config }),
       theoryOnly: true,
       aiDrafting: Boolean(provider?.status?.().available),
       maxSourceBytes: MAX_SOURCE_BYTES
@@ -165,7 +167,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
     async submitSource({ authorization, form }) {
       const account = await accountFor(authorization);
       if (!canSubmit(account)) throw apiError(403, 'COURSE_SUBMISSION_DENIED', 'A teacher, institute owner, or administrator account is required to submit a course.');
-      if (!firebase.storage) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private course-source storage is not configured yet.');
+      if (!privateStorageStatus({ firebase, config }).available) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private course-source storage is not configured yet.');
       const type = String(form?.get('courseType') || '');
       if (!isTheoryCourseType(type)) throw apiError(400, 'COURSE_TYPE_LOCKED', 'Only theory courses are supported at this time.');
       const organisationId = workspaceIdentifier(form?.get('organisationId')) || account.organisations.find((entry) => entry.active !== false)?.organisationId || '';
@@ -174,10 +176,13 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const source = await sourceFileInfo(form?.get('sourceFile'));
       const submissionId = `sub_${randomUUID().replace(/-/g, '')}`;
       const objectPath = `private-course-sources/${organisationId}/${submissionId}/${source.sha256}.${source.extension || 'bin'}`;
-      await firebase.storage.file(objectPath).save(source.buffer, {
-        resumable: false,
+      const privateObject = await uploadPrivateObject({
+        firebase,
+        config,
+        objectPath,
+        content: source.buffer,
         contentType: source.contentType,
-        metadata: { metadata: { submissionId, sha256: source.sha256, originalName: source.originalName } }
+        metadata: { submissionId, sha256: source.sha256, originalName: source.originalName }
       });
       const record = {
         submissionId,
@@ -193,7 +198,8 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
           contentType: source.contentType,
           bytes: source.buffer.length,
           sha256: source.sha256,
-          objectPath,
+          objectPath: privateObject.objectPath,
+          provider: privateObject.provider,
           extraction: source.extraction,
           extractedText: source.text
         }
@@ -228,7 +234,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         submission: publicSubmission({ ...record, status: record.status === 'submitted' ? 'source-reviewed' : record.status }),
         extractedText: record.source?.extraction === 'safe-text-extracted' ? String(record.source?.extractedText || '') : '',
         requiresAdminTranscription: record.source?.extraction !== 'safe-text-extracted',
-        downloadAvailable: Boolean(firebase.storage && record.source?.objectPath)
+        downloadAvailable: Boolean(record.source?.objectPath && privateStorageStatus({ firebase, config }).available)
       };
     },
 
@@ -238,7 +244,6 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
     // learner manifest after publication.
     async downloadSource({ authorization, submissionId }) {
       const admin = await requireAdmin(authorization);
-      if (!firebase.storage) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private course-source storage is not configured yet.');
       const id = workspaceIdentifier(submissionId);
       const snapshot = await sourceCollection(firebase.firestore, 'submissions').doc(id).get();
       if (!snapshot.exists) throw apiError(404, 'SUBMISSION_NOT_FOUND', 'This course submission was not found.');
@@ -246,7 +251,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const objectPath = String(record.source?.objectPath || '');
       if (!objectPath) throw apiError(409, 'SOURCE_FILE_UNAVAILABLE', 'This source submission has no private file to download.');
       let buffer;
-      try { [buffer] = await firebase.storage.file(objectPath).download(); } catch {
+      try { buffer = await downloadPrivateObject({ firebase, config, provider: record.source?.provider || 'firebase', objectPath }); } catch {
         throw apiError(503, 'SOURCE_FILE_UNAVAILABLE', 'The private source file could not be opened right now.');
       }
       await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-source-downloaded-for-review', submissionId: id, organisationId: record.ownerOrganisationId });
@@ -418,7 +423,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
 
     async uploadNarration({ authorization, form }) {
       const admin = await requireAdmin(authorization);
-      if (!firebase.storage) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private narration storage is not configured yet.');
+      if (!privateStorageStatus({ firebase, config }).available) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private narration storage is not configured yet.');
       const { reference, record } = await courseFor(form?.get('courseId'), form?.get('version'));
       const file = await sourceFileInfo(form?.get('audioFile'));
       if (!supportedAudioExtensions.has(file.extension) || !/^audio\//i.test(file.contentType)) throw apiError(400, 'AUDIO_FILE_NOT_SUPPORTED', 'Upload an MP3, M4A, WAV, OGG, or WebM audio file.');
@@ -429,8 +434,15 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         && record.learnerManifest.modules.some((module) => slug(module?.id) === sectionId);
       if (!knownModule) throw apiError(400, 'NARRATION_SECTION_UNKNOWN', 'Use the exact reviewed module ID shown in the validated course before uploading narration.');
       const objectPath = `private-course-audio/${record.courseId}/${record.version}/${locale}/${sectionId}/${file.sha256}.${file.extension}`;
-      await firebase.storage.file(objectPath).save(file.buffer, { resumable: false, contentType: file.contentType, metadata: { metadata: { courseId: record.courseId, version: record.version, locale, sectionId, sha256: file.sha256 } } });
-      const assets = [...(record.narrationAssets || []), { locale, sectionId, objectPath, sha256: file.sha256, bytes: file.buffer.length, uploadedAt: nowIso(), uploadedBy: admin.uid }];
+      const privateObject = await uploadPrivateObject({
+        firebase,
+        config,
+        objectPath,
+        content: file.buffer,
+        contentType: file.contentType,
+        metadata: { courseId: record.courseId, version: record.version, locale, sectionId, sha256: file.sha256 }
+      });
+      const assets = [...(record.narrationAssets || []), { locale, sectionId, objectPath: privateObject.objectPath, provider: privateObject.provider, sha256: file.sha256, bytes: file.buffer.length, uploadedAt: nowIso(), uploadedBy: admin.uid }];
       const narration = { humanAudioCount: assets.length, fallback: 'device-text-to-speech' };
       await reference.set({ narrationAssets: assets, narration, status: record.status === 'admin-review' ? 'audio-ready' : record.status, updatedAt: nowIso(), updatedBy: admin.uid }, { merge: true });
       await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-narration-uploaded', courseId: record.courseId, version: record.version, locale, sectionId });
