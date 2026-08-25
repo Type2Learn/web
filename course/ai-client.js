@@ -108,6 +108,11 @@ export const loadReviewedCourseManifest = async ({ user, courseId, version, sign
   return authenticatedRequest(user, '/api/v1/course-manifest?' + query.toString(), { signal });
 };
 
+// The learner catalogue is a deliberately small projection of approved
+// courses the current account may open. It never includes source uploads,
+// answer keys, rosters, or other authoring-only data.
+export const loadPublishedCourseCatalogue = async ({ user, signal }) => authenticatedRequest(user, '/api/v1/courses', { signal });
+
 // Published human narration is retrieved only for the visible module. The
 // endpoint returns a short-lived signed URL, never a private Storage path.
 export const loadReviewedCourseNarration = async ({ user, courseId, version, moduleId, language, signal }) => {

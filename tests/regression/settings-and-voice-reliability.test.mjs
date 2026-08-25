@@ -24,6 +24,51 @@ test('profile settings use a modal with explicit categories and a backdrop close
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.course-settings-backdrop \{ align-items: center; padding: 10px; \}/);
 });
 
+test('profile settings dialog is portalled outside the blurred sticky header so viewport centering is real', () => {
+  const topbarStart = course.indexOf('const courseTopbar = () =>');
+  const shellStart = course.indexOf('const renderShell = (content) =>');
+  assert.ok(topbarStart >= 0 && shellStart > topbarStart, 'course shell declarations are present');
+  const topbar = course.slice(topbarStart, shellStart);
+  assert.doesNotMatch(topbar, /courseSettingsMenu\(\)/, 'the dialog must not be a descendant of the top bar backdrop-filter context');
+  const shell = course.slice(shellStart, shellStart + 900);
+  assert.match(shell, /course-page-content[\s\S]*courseSettingsMenu\(\)/, 'the dialog is rendered after page content as an app-shell sibling');
+  assert.match(shell, /truly centered against the browser viewport/);
+});
+
+test('mascot dialogue Listen uses authenticated audio first and a browser-speech fallback with visible state', () => {
+  assert.match(course, /const mascotSpeech = \{ controller: null, element: null, url: '', loading: false, text: '' \}/);
+  assert.match(course, /const speakMascotDialogue = async/);
+  assert.match(course, /synthesiseCourseAiReply\(\{/);
+  assert.match(course, /const speakMascotWithBrowser/);
+  assert.match(course, /mascotSpeech\.loading \? courseUi\('Loading audio…'/);
+  assert.match(course, /mascotSpeech\.text === dialogue \? courseUi\('Stop audio'/);
+  assert.match(course, /stopMascotSpeech\(\);/);
+  assert.match(course, /const SILENT_AUDIO_UNLOCK_WAV/);
+  assert.match(course, /const unlockMascotAudioFromClick/);
+  assert.match(course, /mascotSpeech\.element = unlockMascotAudioFromClick\(\)/);
+  assert.match(course, /const audio = mascotSpeech\.element \|\| new Audio\(\)/);
+});
+
+test('approved published courses load into the normal learner course selection and preserve course-specific setup', () => {
+  assert.match(course, /loadPublishedCourseCatalogue/);
+  assert.match(course, /const reviewedCourseCatalogue = \{ status: 'idle'/);
+  assert.match(course, /const refreshReviewedCourseCatalogue = async/);
+  assert.match(course, /data-action="open-reviewed-course"/);
+  assert.match(course, /const openReviewedCoursePreferences/);
+  assert.match(course, /destination\.searchParams\.set\('version', version\)/);
+  assert.match(course, /if \(!usesReviewedManifest\(\)\) void refreshReviewedCourseCatalogue\(\)/);
+});
+
+test('course entry points share the current cache-busted catalogue and mascot player', async () => {
+  const [router, courseHtml] = await Promise.all([
+    read('../../course/course-router.js'),
+    read('../../course/index.html')
+  ]);
+  assert.match(router, /course\.js\?v=20260825-catalogue-and-mascot-speech1/);
+  assert.match(courseHtml, /course-router\.js\?v=20260825-catalogue-and-mascot-speech1/);
+  assert.match(courseHtml, /course\.css\?v=20260825-catalogue-and-mascot-speech1/);
+});
+
 test('starting preferences explicitly include privacy-aware support and partner behaviour controls', () => {
   assert.match(setup, /id: 'adaptive-learning'/);
   assert.match(setup, /id: 'learning-partner'/);

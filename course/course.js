@@ -2,7 +2,7 @@ import { COURSE_CONTENT as DEFAULT_COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU as DEFAULT_COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260813-rich-manifest2';
+import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260825-catalogue-and-mascot-speech1';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
 import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
 import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
@@ -27,6 +27,9 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   // Compatibility route: query-selected reviewed courses retain this mature
   // UI, but their content comes only from a learner-safe published manifest.
   let reviewedCourseContext = null;
+  // Approved additional courses are fetched for the normal selection screen;
+  // the query-route loader below still fetches the selected learner manifest.
+  const reviewedCourseCatalogue = { status: 'idle', courses: [], error: '', request: null };
   // Reviewed course narration is fetched only for the visible module. It uses
   // a short-lived URL and falls back to device TTS if no human clip exists.
   const reviewedNarration = { readyKey: '', missingKey: '', loadingKey: '', url: '', expiresAt: 0, request: null };
@@ -156,6 +159,14 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   let courseMascot = null;
   let mascotControllerLoad = null;
   let mascotPresentation = { enabled: false, encouragement: 'balanced', language: 'english', voice: 'text', behaviour: 'calm' };
+  // Dialogue playback stays independent from the Course AI message player so
+  // a learner can stop/retry the mascot without changing their chat history.
+  const mascotSpeech = { controller: null, element: null, url: '', loading: false, text: '' };
+  // A tiny silent WAV is played only to retain the explicit click's media
+  // permission while the authenticated TTS request is in flight. It contains
+  // silence, is never audible, and lets the real spoken clip start reliably
+  // after a network response in browsers that otherwise drop user activation.
+  const SILENT_AUDIO_UNLOCK_WAV = 'data:audio/wav;base64,UklGRkQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
   let lastMascotScene = '';
   let lastMascotSupportEventId = 0;
   const mascotViewportQuery = window.matchMedia?.('(min-width: 1181px)');
@@ -1971,36 +1982,141 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     return messages[moment.kind] || '';
   };
 
-  const mascotSpeechCanPlay = () => Boolean(
+  const mascotVoiceEnabled = () => Boolean(
     mascotPresentation.enabled
     && (mascotPresentation.voice === 'speech' || mascotPresentation.voice === 'both' || learningChoices()['text-to-speech'] === 'on')
-    && typeof window.SpeechSynthesisUtterance === 'function'
-    && window.speechSynthesis
   );
 
-  // Mascot speech is always initiated by the learner through the visible
-  // Listen control. It never autoplays merely because a preference is on.
-  const speakMascotDialogue = () => {
+  const browserMascotSpeechAvailable = () => Boolean(
+    typeof window.SpeechSynthesisUtterance === 'function' && window.speechSynthesis
+  );
+
+  const mascotSpeechCanPlay = () => mascotVoiceEnabled() && Boolean(
+    signedInLearner() || browserMascotSpeechAvailable()
+  );
+
+  const stopMascotSpeech = () => {
+    mascotSpeech.controller?.abort?.();
+    mascotSpeech.controller = null;
+    if (mascotSpeech.element) {
+      mascotSpeech.element.pause();
+      mascotSpeech.element.src = '';
+    }
+    mascotSpeech.element = null;
+    if (mascotSpeech.url) URL.revokeObjectURL(mascotSpeech.url);
+    mascotSpeech.url = '';
+    mascotSpeech.loading = false;
+    mascotSpeech.text = '';
+    try { window.speechSynthesis?.cancel?.(); } catch (_) { /* Browser speech is best effort. */ }
+  };
+
+  const unlockMascotAudioFromClick = () => {
+    try {
+      const audio = new Audio(SILENT_AUDIO_UNLOCK_WAV);
+      audio.muted = true;
+      // This happens synchronously inside the learner's Listen click. The
+      // later network response reuses this exact element for the real voice.
+      void audio.play().catch(() => {});
+      return audio;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const refreshMascotSpeechControl = () => {
+    if (app.querySelector('[data-course-mascot]')) render();
+  };
+
+  const speakMascotWithBrowser = (dialogue) => {
+    if (!browserMascotSpeechAvailable()) {
+      announce(courseUi('Mascot speech is not available right now. You can still read its message.', 'ماسکٹ کی آواز ابھی دستیاب نہیں۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
+      refreshMascotSpeechControl();
+      return;
+    }
+    try {
+      const utterance = new SpeechSynthesisUtterance(dialogue);
+      utterance.lang = mascotPresentation.language === 'urdu' ? 'ur-PK' : 'en-US';
+      utterance.rate = 0.92;
+      utterance.volume = Math.min(1, Math.max(0.1, Number(state.preferences.narrationVolume) || 0.72));
+      mascotSpeech.text = dialogue;
+      utterance.onstart = () => announce(courseUi('Mascot speech has started.', 'ماسکٹ کی آواز شروع ہو گئی ہے۔'));
+      utterance.onend = () => {
+        mascotSpeech.text = '';
+        refreshMascotSpeechControl();
+      };
+      utterance.onerror = () => {
+        mascotSpeech.text = '';
+        announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
+        refreshMascotSpeechControl();
+      };
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume?.();
+      window.speechSynthesis.speak(utterance);
+      // Chromium may preserve a paused queue after a tab return. A second
+      // resume is safe and keeps this explicit user action reliable.
+      window.setTimeout(() => window.speechSynthesis?.resume?.(), 80);
+      refreshMascotSpeechControl();
+    } catch (_) {
+      mascotSpeech.text = '';
+      announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
+      refreshMascotSpeechControl();
+    }
+  };
+
+  // Mascot speech is learner initiated. It prefers the authenticated TTS
+  // route so it works even when the browser has no usable system voices, then
+  // falls back to the device reader if the network voice is unavailable.
+  const speakMascotDialogue = async () => {
     const dialogue = mascotDialogue();
     if (!dialogue || !mascotSpeechCanPlay()) {
       announce(courseUi('Mascot speech is not available in this browser yet.', 'اس براؤزر میں ماسکٹ کی آواز ابھی دستیاب نہیں۔'));
       return;
     }
+    if (mascotSpeech.loading || mascotSpeech.text === dialogue) {
+      stopMascotSpeech();
+      refreshMascotSpeechControl();
+      return;
+    }
+    stopMascotSpeech();
+    if (!signedInLearner() || !aiChat.connection.aiAudio) {
+      speakMascotWithBrowser(dialogue);
+      return;
+    }
+    const controller = new AbortController();
+    mascotSpeech.controller = controller;
+    mascotSpeech.element = unlockMascotAudioFromClick();
+    mascotSpeech.loading = true;
+    mascotSpeech.text = dialogue;
+    refreshMascotSpeechControl();
     try {
-      window.speechSynthesis.cancel();
-      // Chromium can leave a paused speech queue after a background tab or a
-      // previous utterance. Resume before creating the explicit utterance.
-      window.speechSynthesis.resume?.();
-      const utterance = new SpeechSynthesisUtterance(dialogue);
-      utterance.lang = mascotPresentation.language === 'urdu' ? 'ur-PK' : 'en-US';
-      utterance.rate = 0.92;
-      utterance.volume = Math.min(1, Math.max(0.1, Number(state.preferences.narrationVolume) || 0.72));
-      utterance.onerror = () => announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
-      window.speechSynthesis.speak(utterance);
-      window.setTimeout(() => window.speechSynthesis?.resume?.(), 80);
+      const blob = await synthesiseCourseAiReply({
+        user: authenticatedUser,
+        text: dialogue,
+        language: mascotPresentation.language === 'urdu' ? 'ur' : 'en',
+        signal: controller.signal
+      });
+      if (controller.signal.aborted) return;
+      const url = URL.createObjectURL(blob);
+      const audio = mascotSpeech.element || new Audio();
+      audio.pause();
+      audio.src = url;
+      audio.muted = false;
+      mascotSpeech.controller = null;
+      mascotSpeech.element = audio;
+      mascotSpeech.url = url;
+      mascotSpeech.loading = false;
+      audio.addEventListener('ended', () => {
+        if (mascotSpeech.element !== audio) return;
+        stopMascotSpeech();
+        refreshMascotSpeechControl();
+      }, { once: true });
+      await audio.play();
       announce(courseUi('Mascot speech has started.', 'ماسکٹ کی آواز شروع ہو گئی ہے۔'));
+      refreshMascotSpeechControl();
     } catch (_) {
-      announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
+      if (controller.signal.aborted) return;
+      stopMascotSpeech();
+      speakMascotWithBrowser(dialogue);
     }
   };
 
@@ -2024,7 +2140,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       ? companionBubbleMarkup({ directive: companion, language: mascotLanguage, escapeHtml, focused: focusedPartner })
       : '';
     const dialogueMarkup = !showAiPanel && dialogue && !companion
-      ? '<div class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '"><p>' + escapeHtml(dialogue) + '</p>' + (mascotSpeechCanPlay() ? '<button class="course-mascot-listen" type="button" data-action="mascot-speak">' + escapeHtml(courseUi('Listen', 'سنیں')) + '</button>' : '') + '</div>'
+      ? '<div class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '"><p>' + escapeHtml(dialogue) + '</p>' + (mascotSpeechCanPlay() ? '<button class="course-mascot-listen" type="button" data-action="mascot-speak">' + escapeHtml(mascotSpeech.loading ? courseUi('Loading audio…', 'آڈیو لوڈ ہو رہی ہے…') : mascotSpeech.text === dialogue ? courseUi('Stop audio', 'آڈیو روکیں') : courseUi('Listen', 'سنیں')) + '</button>' : '') + '</div>'
       : '';
     const dockMarkup = !showAiPanel && location === 'lesson' && companion && !focusedPartner
       ? companionDockMarkup({ language: mascotLanguage, escapeHtml, draft: behaviourPartner.draft, canSpeak: browserSpeechRecognitionAvailable(), channel: partnerControls().channel, listening: behaviourPartner.listening })
@@ -2050,7 +2166,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       '<div class="course-topbar-profile">',
       '<button class="course-pause-button" type="button" data-action="pause" aria-label="Pause and save"><span aria-hidden="true">Ⅱ</span><span>Pause &amp; save</span></button>',
       '<button class="course-profile-button" type="button" data-action="toggle-settings-menu" aria-expanded="' + String(Boolean(state.settingsMenu)) + '" aria-controls="course-settings-menu" aria-label="Open learning settings">' + profileAvatar() + '</button>',
-      courseSettingsMenu(),
       '</div>',
       '</div>',
       '</header>'
@@ -2058,7 +2173,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   };
 
   const renderShell = (content) => authenticatedUser
-    ? '<div class="course-app-shell">' + courseTopbar() + '<div class="course-page-content">' + content + '</div></div>'
+    // A fixed child of the blurred sticky header is positioned against that
+    // header in Chromium. Keep the dialog as an app-shell sibling so it is
+    // truly centered against the browser viewport.
+    ? '<div class="course-app-shell">' + courseTopbar() + '<div class="course-page-content">' + content + '</div>' + courseSettingsMenu() + '</div>'
     : content;
 
   const announce = (message) => {
@@ -2066,6 +2184,33 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   };
 
   const signedInLearner = () => Boolean(authenticatedUser && !authenticatedUser.isGuest && typeof authenticatedUser.getIdToken === 'function');
+
+  const isLegacyCatalogueCourse = (course) => String(course?.courseId || '') === DEFAULT_COURSE_CONTENT.id
+    && String(course?.version || '') === String(DEFAULT_COURSE_CONTENT.version || '');
+
+  const refreshReviewedCourseCatalogue = async () => {
+    if (!signedInLearner() || reviewedCourseCatalogue.status === 'loading' || reviewedCourseCatalogue.status === 'loaded') return;
+    const controller = new AbortController();
+    reviewedCourseCatalogue.status = 'loading';
+    reviewedCourseCatalogue.error = '';
+    reviewedCourseCatalogue.request = controller;
+    try {
+      const response = await loadPublishedCourseCatalogue({ user: authenticatedUser, signal: controller.signal });
+      if (reviewedCourseCatalogue.request !== controller) return;
+      reviewedCourseCatalogue.courses = (Array.isArray(response?.courses) ? response.courses : [])
+        .filter((course) => course && !isLegacyCatalogueCourse(course))
+        .filter((course) => String(course.courseId || '').trim() && String(course.version || '').trim());
+      reviewedCourseCatalogue.status = 'loaded';
+    } catch (error) {
+      if (reviewedCourseCatalogue.request !== controller) return;
+      reviewedCourseCatalogue.courses = [];
+      reviewedCourseCatalogue.status = 'error';
+      reviewedCourseCatalogue.error = error?.message || 'Reviewed courses could not load right now.';
+    } finally {
+      if (reviewedCourseCatalogue.request === controller) reviewedCourseCatalogue.request = null;
+      if (state.view === 'dashboard' || state.view === 'browse') render();
+    }
+  };
 
   const adaptiveLearningIsActive = () => Boolean(
     signedInLearner()
@@ -3220,7 +3365,24 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     return '<article class="course-catalogue-card course-catalogue-card--locked" aria-label="' + escapeHtml(courseUi(course.title + ' is planned and not available yet.', course.urduTitle + ' منصوبہ بند ہے اور ابھی دستیاب نہیں ہے۔')) + '"><div class="course-catalogue-card-copy"><p class="course-eyebrow">' + courseUi('Planned course', 'منصوبہ بند کورس') + '</p><h2>' + escapeHtml(title) + '</h2><p class="course-catalogue-description">' + escapeHtml(description) + '</p>' + (course.urduMode ? '<p class="course-catalogue-language">' + courseUi('Urdu mode planned', 'اردو موڈ منصوبہ بند ہے') + '</p>' : '') + '</div><div class="course-catalogue-lock" aria-hidden="true"><span>' + courseUi('Not available yet', 'ابھی دستیاب نہیں') + '</span></div><span class="course-visually-hidden">' + courseUi('This planned course is not available yet.', 'یہ منصوبہ بند کورس ابھی دستیاب نہیں ہے۔') + '</span></article>';
   };
 
-  const courseCatalogue = () => '<section class="course-catalogue" aria-label="' + courseUi('Course selection', 'کورس کا انتخاب') + '">' + availableCourseCard() + '<div class="course-catalogue-grid">' + PLANNED_COURSES.map(lockedCourseCard).join('') + '</div></section>';
+  const reviewedCourseCard = (course, index) => {
+    const englishTitle = String(course?.title?.en || course?.courseId || '').trim();
+    const urduTitle = String(course?.title?.ur || englishTitle).trim();
+    const title = courseUi(englishTitle, urduTitle);
+    const englishLabel = String(course?.label?.en || 'Educational course').trim();
+    const urduLabel = String(course?.label?.ur || 'تعلیمی کورس').trim();
+    const modules = Math.max(0, Number(course?.modules) || 0);
+    const headingId = 'reviewed-course-title-' + index;
+    return '<article class="course-catalogue-card course-catalogue-card--available course-catalogue-card--published" aria-labelledby="' + headingId + '"><div><p class="course-eyebrow">' + escapeHtml(courseUi('New reviewed course', 'نیا جائزہ شدہ کورس')) + '</p><h2 id="' + headingId + '">' + escapeHtml(title) + '</h2><p class="course-catalogue-setup">' + escapeHtml(courseUi(englishLabel, urduLabel)) + (modules ? ' · ' + escapeHtml(courseUi(modules + ' modules', modules + ' ماڈیولز')) : '') + '</p><p class="course-catalogue-description">' + escapeHtml(courseUi('This approved course is ready in the same accessible Type2Learn learning flow.', 'یہ منظور شدہ کورس اسی قابلِ رسائی Type2Learn سیکھنے کے طریقے میں تیار ہے۔')) + '</p><p class="course-catalogue-language">' + escapeHtml(courseUi('English and Urdu learning choices available', 'انگریزی اور اردو سیکھنے کے انتخاب دستیاب ہیں')) + '</p></div><button class="course-primary-button" type="button" data-action="open-reviewed-course" data-course-id="' + escapeHtml(String(course.courseId)) + '" data-course-version="' + escapeHtml(String(course.version)) + '">' + escapeHtml(courseUi('Choose this course', 'یہ کورس منتخب کریں')) + ' <span aria-hidden="true">' + escapeHtml(courseUi('→', '←')) + '</span></button></article>';
+  };
+
+  const reviewedCourseCardsMarkup = () => {
+    if (reviewedCourseCatalogue.status === 'loading') return '<p class="course-catalogue-loading" role="status">' + escapeHtml(courseUi('Checking for approved courses…', 'منظور شدہ کورسز دیکھے جا رہے ہیں…')) + '</p>';
+    if (reviewedCourseCatalogue.status === 'error') return '<p class="course-catalogue-loading" role="status">' + escapeHtml(courseUi('Approved additional courses could not load right now. Your available course remains ready.', 'منظور شدہ اضافی کورسز ابھی لوڈ نہیں ہو سکے۔ آپ کا دستیاب کورس تیار ہے۔')) + '</p>';
+    return reviewedCourseCatalogue.courses.map(reviewedCourseCard).join('');
+  };
+
+  const courseCatalogue = () => '<section class="course-catalogue" aria-label="' + courseUi('Course selection', 'کورس کا انتخاب') + '">' + availableCourseCard() + reviewedCourseCardsMarkup() + '<div class="course-catalogue-grid">' + PLANNED_COURSES.map(lockedCourseCard).join('') + '</div></section>';
 
   const renderDashboard = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<header class="course-dashboard-header"><p class="course-eyebrow">' + courseUi('Your learning space', 'آپ کی سیکھنے کی جگہ') + '</p><h1>' + courseUi('One small step at a time.', 'ایک وقت میں ایک مختصر مرحلہ') + '</h1><p>' + courseUi('Choose one course to begin. You can set up the learning options for that course before you start.', 'شروع کرنے کے لیے ایک کورس منتخب کریں۔ اس کورس کے سیکھنے کے اختیارات شروع کرنے سے پہلے ترتیب دیے جا سکتے ہیں۔') + '</p></header>' + courseCatalogue(), 'dashboard') + '</main>';
 
@@ -7208,6 +7370,19 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     window.location.assign(destination.pathname + destination.search);
   };
 
+  const openReviewedCoursePreferences = (element) => {
+    const courseId = String(element?.dataset?.courseId || '').trim();
+    const version = String(element?.dataset?.courseVersion || '').trim();
+    if (!/^[a-z0-9][a-z0-9-]{2,79}$/i.test(courseId) || !/^\d+\.\d+(?:\.\d+)?$/.test(version)) {
+      announce(courseUi('This course link is not ready. Please choose it again from the course list.', 'اس کورس کا لنک تیار نہیں۔ براہِ کرم کورس فہرست سے دوبارہ منتخب کریں۔'));
+      return;
+    }
+    const destination = new URL('/afterlogin/', window.location.origin);
+    destination.searchParams.set('course', courseId);
+    destination.searchParams.set('version', version);
+    window.location.assign(destination.pathname + destination.search);
+  };
+
   const refreshOfflineLearningStatus = async () => {
     offlineLearning.checking = true;
     try {
@@ -7315,6 +7490,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         if (coursePreferencesAreSaved()) goTo('course', 'Your course choices are ready.');
         else openCoursePreferences();
         break;
+      case 'open-reviewed-course': openReviewedCoursePreferences(element); break;
       case 'continue-course':
         state.coursePaused = false;
         goTo('course', 'You are back at your saved small step.');
@@ -8061,6 +8237,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     });
     if (upgradeLegacyNarrationVoice()) save();
     render();
+    // Published platform/assigned courses belong in this same selection
+    // screen. Fetching happens after the normal render so catalogue trouble
+    // can never delay the existing course or the learner's saved progress.
+    if (!usesReviewedManifest()) void refreshReviewedCourseCatalogue();
     // Adaptive support is loaded after the normal course renders. A failed or
     // disabled optional feature must never delay the learner's first task.
     void hydrateAdaptiveLearning();
@@ -8093,6 +8273,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     narration.service?.destroy();
     stopVoiceInput();
     resetAiChat();
+    stopMascotSpeech();
     pauseBackgroundNoise();
     courseMascot?.destroy();
   });
