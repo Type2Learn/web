@@ -521,10 +521,11 @@ body[data-setup-layout="open"] .learn-main--open .noise-preview-status {
 
 .learning-tts-preview {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  gap: 7px;
   margin-top: 14px;
+  max-width: 100%;
 }
 
 .learning-tts-preview button {
@@ -537,7 +538,7 @@ body[data-setup-layout="open"] .learn-main--open .noise-preview-status {
   font-weight: 850;
 }
 
-.learning-tts-preview small { color: var(--learn-soft); font-size: 12px; line-height: 1.45; }
+.learning-tts-preview small { display: block; max-width: 42ch; color: var(--learn-soft); font-size: 12px; line-height: 1.45; }
 
 body[data-setup-text-size="large"] { --learning-preview-font-size: 18px; }
 body[data-setup-text-size="extra-large"] { --learning-preview-font-size: 20px; }

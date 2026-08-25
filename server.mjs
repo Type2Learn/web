@@ -491,7 +491,12 @@ const handleApi = async (request, response, pathname, runtime) => {
       return sendJson(response, 200, await speech.transcribe({ authorization: request.headers.authorization, form: await readForm(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/speech/synthesise') {
-      const result = await speech.synthesise({ authorization: request.headers.authorization, body: await readJson(request) });
+      const result = await speech.synthesise({
+        authorization: request.headers.authorization,
+        body: await readJson(request),
+        localGuest: localGuestFromRequest(request, config),
+        clientAddress: request.socket?.remoteAddress || ''
+      });
       return send(response, 200, result.audio, {
         ...securityHeaders('/api', { api: true }),
         'Content-Type': result.contentType,

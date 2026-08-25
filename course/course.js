@@ -2,11 +2,11 @@ import { COURSE_CONTENT as DEFAULT_COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU as DEFAULT_COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260825-mascot-dock-and-speech2';
+import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260825-mascot-companion-route3';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
 import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
 import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
-import { companionBubbleMarkup, companionDockMarkup, localCompanionDirective } from './learning-partner.js?v=20260814-course-bound-partner1';
+import { companionBubbleMarkup, companionDockMarkup, localCompanionDirective } from './learning-partner.js?v=20260825-mascot-companion2';
 import { adaptiveProposalMarkup, taskInitiationMarkup } from './adaptive-support.js?v=20260809-adaptive-learning1';
 import { visualExplanationMarkup } from './visual-explanations.js?v=20260809-adaptive-learning1';
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
@@ -81,6 +81,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     requesting: false,
     dataMessage: '',
     draft: '',
+    status: '',
     recognition: null,
     listening: false,
     focusedOpen: false,
@@ -448,7 +449,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     'mascot-role': 'calm-guide',
     'mascot-presence': 'available',
     'mascot-proactive': 'on',
-    'mascot-voice': 'text',
     'adaptive-learning': 'off',
     'urdu-mode': 'off'
   });
@@ -467,6 +467,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       'mascot-language': _legacyMascotLanguage,
       'mascot-language-explicit': _legacyMascotLanguageExplicit,
       'mascot-voice-language': _legacyMascotVoiceLanguage,
+      'mascot-voice': _legacyMascotVoice,
       ...supportedSaved
     } = saved;
     const savedWebsiteScheme = normaliseWebsiteScheme(supportedSaved['website-scheme']);
@@ -478,12 +479,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         : supportedSaved['urdu-mode'] === 'off'
         ? 'off'
         : 'off';
-    return {
+    const resolved = {
       ...defaultLearningChoices(),
       ...supportedSaved,
       'website-scheme': savedWebsiteScheme || 'calm',
       'urdu-mode': urduMode
     };
+    // Migrate the legacy hidden companion flag into the single visible mascot
+    // choice on read, before any UI or behavioural policy observes it.
+    resolved['learning-partner'] = resolved.mascot === 'on' ? 'on' : 'off';
+    return resolved;
   };
 
   const coursePreferencesAreSaved = () => {
@@ -534,9 +539,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       // The bunny and learning partner follow the course language. There is
       // intentionally no separate partner-language preference.
       language: supportLanguage(),
-      voice: ['text', 'speech', 'both'].includes(choices['mascot-voice'])
-        ? choices['mascot-voice']
-        : 'text',
+      // Input mode used to be an independent mascot setting. The mascot is
+      // now the Course AI surface when it is present, so text and optional
+      // dictation are both available without a second, contradictory toggle.
+      voice: 'both',
       // The retained 3D rollback renderer still accepts this presentation
       // value, although the current 2D companion does not expose it as a UI
       // preference.
@@ -565,7 +571,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
 
   const refreshMascotRolePreview = () => {
     const choices = learningChoices();
-    behaviourPartner.rolePreview = (choices.mascot === 'on' || choices['learning-partner'] === 'on')
+    behaviourPartner.rolePreview = choices.mascot === 'on'
       ? mascotRolePreviewCopy()
       : '';
   };
@@ -1354,8 +1360,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const noiseType = ['pink', 'white', 'brown'].includes(choices['background-noise-type']) ? choices['background-noise-type'] : 'pink';
     const requestedNoiseVolume = Number(choices['background-noise-volume']);
     const noiseVolume = Math.min(BACKGROUND_NOISE_MAX_VOLUME * 100, Math.max(0, Number.isFinite(requestedNoiseVolume) ? requestedNoiseVolume : 0));
-    const partnerOn = choices['learning-partner'] === 'on';
     const mascotOn = choices.mascot === 'on';
+    // The mascot and learning partner are one visible companion.  Retain the
+    // historical `learning-partner` value for existing records only; it no
+    // longer creates a second on/off control that can contradict Mascot.
+    const partnerOn = mascotOn;
     const tabButton = (id, label, icon) => '<button type="button" data-settings-tab="' + id + '" aria-current="' + String(tab === id) + '"><span aria-hidden="true">' + icon + '</span>' + label + '</button>';
     const panel = (title, intro, body) => '<section class="course-settings-panel" data-settings-panel="' + tab + '"><h2>' + escapeHtml(title) + '</h2><p class="course-settings-panel-intro">' + escapeHtml(intro) + '</p><div class="course-settings-menu-controls">' + body + '</div></section>';
     let content = '';
@@ -1383,14 +1392,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       );
     } else if (tab === 'partner') {
       const unavailable = !mascotViewportQuery?.matches;
-      content = panel('Learning partner', 'A fictional, task-bound companion. You stay in control of its role and presence.',
+      content = panel('Learning partner', 'A fictional, task-bound companion. You stay in control of its personality, presence, and offers.',
         settingsSwitch('mascot', 'Mascot', unavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', mascotOn, unavailable)
-        + settingsSwitch('learning-partner', 'Learning partner', 'Use optional task-bound partner support. With the mascot hidden, it opens in Course AI instead.', partnerOn)
-        + (partnerOn ? settingsChoiceGroup('mascot-role', 'Partner role', 'Choose the kind of support you want.', [['calm-guide', 'Calm Guide'], ['learning-partner', 'Learning Partner'], ['self-challenge', 'Self-Challenge Coach'], ['visual-co-explorer', 'Visual Co-Explorer']], choices['mascot-role'])
-          + settingsChoiceGroup('mascot-presence', 'Partner presence', 'Choose how visibly your partner appears.', [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']], choices['mascot-presence'])
-          + settingsSwitch('mascot-proactive', 'Proactive offers', 'Offer one optional support after matched task signals. You can dismiss it for this task.', choices['mascot-proactive'] !== 'off')
+        + (partnerOn ? settingsChoiceGroup('mascot-role', 'Mascot personality', 'Choose the kind of task-bound support you want.', [['calm-guide', 'Calm Guide'], ['learning-partner', 'Learning Partner'], ['self-challenge', 'Self-Challenge Coach'], ['visual-co-explorer', 'Visual Co-Explorer']], choices['mascot-role'])
+          + settingsChoiceGroup('mascot-presence', 'Mascot presence', 'Choose how visibly your mascot appears.', [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']], choices['mascot-presence'])
+          + settingsSwitch('mascot-proactive', 'Mascot offer', 'Offer one optional support after matched task signals. You can dismiss it for this task.', choices['mascot-proactive'] !== 'off')
           + '<details class="course-adaptive-settings-explainer"><summary>Why did this appear?</summary><p>Type2Learn waits for at least two neutral task signals, such as returning after a pause and rereading. It does not diagnose you or change settings automatically.</p></details>' : '')
-        + ((mascotOn || partnerOn) ? settingsChoiceGroup('mascot-voice', partnerOn ? 'Partner response' : 'Mascot response', 'Choose text, voice input, or both. Voice words are always shown before sending. The bunny follows your course language.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '')
       );
     } else {
       const dataStatus = signedInLearner() && adaptiveLearning.available
@@ -1502,7 +1509,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const aiChatIsVisible = () => aiChat.open || state.modal === 'ai-chat';
 
   const aiReplyCanSpeak = () => Boolean(
-    signedInLearner()
+    courseAiAccessAllowed()
     && aiLanguage() === 'en'
     && state.preferences.readAloud
     && aiChat.connection.aiAudio
@@ -1996,18 +2003,19 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     return messages[moment.kind] || '';
   };
 
+  // MASCOT NARRATION: the visible Listen control means the configured online
+  // narration voice, not whichever robotic browser voice happens to exist.
+  // Turning text-to-speech off hides this optional control everywhere.
   const mascotVoiceEnabled = () => Boolean(
-    mascotPresentation.enabled
-    && (mascotPresentation.voice === 'speech' || mascotPresentation.voice === 'both' || learningChoices()['text-to-speech'] === 'on')
+    mascotPresentation.enabled && learningChoices()['text-to-speech'] === 'on'
   );
 
-  const browserMascotSpeechAvailable = () => Boolean(
-    typeof window.SpeechSynthesisUtterance === 'function' && window.speechSynthesis
-  );
-
-  const mascotSpeechCanPlay = () => mascotVoiceEnabled() && Boolean(
-    signedInLearner() || browserMascotSpeechAvailable()
-  );
+  // The configured response narrator currently supplies English audio only.
+  // Do not render a clickable Listen button for an Urdu reply that the
+  // service cannot produce; the written reply remains fully available.
+  const mascotSpeechCanPlay = () => mascotVoiceEnabled()
+    && mascotPresentation.language !== 'urdu'
+    && Boolean(aiChat.connection.aiAudio);
 
   // The Listen control must always speak the exact sentence currently visible
   // beside the bunny. A direct Course AI reply therefore takes priority over
@@ -2030,7 +2038,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     mascotSpeech.url = '';
     mascotSpeech.loading = false;
     mascotSpeech.text = '';
-    try { window.speechSynthesis?.cancel?.(); } catch (_) { /* Browser speech is best effort. */ }
   };
 
   const unlockMascotAudioFromClick = () => {
@@ -2050,49 +2057,13 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (app.querySelector('[data-course-mascot]')) render();
   };
 
-  const speakMascotWithBrowser = (dialogue) => {
-    if (!browserMascotSpeechAvailable()) {
-      announce(courseUi('Mascot speech is not available right now. You can still read its message.', 'ماسکٹ کی آواز ابھی دستیاب نہیں۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
-      refreshMascotSpeechControl();
-      return;
-    }
-    try {
-      const utterance = new SpeechSynthesisUtterance(dialogue);
-      utterance.lang = mascotPresentation.language === 'urdu' ? 'ur-PK' : 'en-US';
-      utterance.rate = 0.92;
-      utterance.volume = Math.min(1, Math.max(0.1, Number(state.preferences.narrationVolume) || 0.72));
-      mascotSpeech.text = dialogue;
-      utterance.onstart = () => announce(courseUi('Mascot speech has started.', 'ماسکٹ کی آواز شروع ہو گئی ہے۔'));
-      utterance.onend = () => {
-        mascotSpeech.text = '';
-        refreshMascotSpeechControl();
-      };
-      utterance.onerror = () => {
-        mascotSpeech.text = '';
-        announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
-        refreshMascotSpeechControl();
-      };
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.resume?.();
-      window.speechSynthesis.speak(utterance);
-      // Chromium may preserve a paused queue after a tab return. A second
-      // resume is safe and keeps this explicit user action reliable.
-      window.setTimeout(() => window.speechSynthesis?.resume?.(), 80);
-      refreshMascotSpeechControl();
-    } catch (_) {
-      mascotSpeech.text = '';
-      announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
-      refreshMascotSpeechControl();
-    }
-  };
-
-  // Mascot speech is learner initiated. It prefers the authenticated TTS
-  // route so it works even when the browser has no usable system voices, then
-  // falls back to the device reader if the network voice is unavailable.
+  // Mascot speech is learner initiated and uses the configured course narration
+  // service. We intentionally do not fall back to a browser system voice.
   const speakMascotDialogue = async () => {
     const dialogue = currentMascotSpeechText();
+    if (!aiChat.connection.checked) await refreshAiConnection();
     if (!dialogue || !mascotSpeechCanPlay()) {
-      announce(courseUi('Mascot speech is not available in this browser yet.', 'اس براؤزر میں ماسکٹ کی آواز ابھی دستیاب نہیں۔'));
+      announce(courseUi('The selected narration voice is not available right now. You can still read the mascot message.', 'منتخب آواز ابھی دستیاب نہیں۔ آپ ماسکٹ کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
       return;
     }
     if (mascotSpeech.loading || mascotSpeech.text === dialogue) {
@@ -2101,13 +2072,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       return;
     }
     stopMascotSpeech();
-    // The server narration endpoint currently offers English audio. For an
-    // Urdu course, use the device voice immediately from the learner's click
-    // instead of waiting for a request that the server must reject.
-    if (!signedInLearner() || !aiChat.connection.aiAudio || mascotPresentation.language === 'urdu') {
-      speakMascotWithBrowser(dialogue);
-      return;
-    }
+    if (!aiChat.connection.aiAudio) return;
     const controller = new AbortController();
     mascotSpeech.controller = controller;
     mascotSpeech.element = unlockMascotAudioFromClick();
@@ -2142,7 +2107,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     } catch (_) {
       if (controller.signal.aborted) return;
       stopMascotSpeech();
-      speakMascotWithBrowser(dialogue);
+      announce(courseUi('The selected narration voice could not start. You can still read the mascot message.', 'منتخب آواز شروع نہیں ہو سکی۔ آپ ماسکٹ کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
     }
   };
 
@@ -2184,7 +2149,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // suggestion. It stays directly beneath its feet in the same rail and
     // can send a learner-initiated message at any time.
     const dockMarkup = !showAiPanel && location === 'lesson'
-      ? companionDockMarkup({ language: mascotLanguage, escapeHtml, draft: behaviourPartner.draft, canSpeak: browserSpeechRecognitionAvailable(), channel: partnerControls().channel, listening: behaviourPartner.listening })
+      ? companionDockMarkup({ language: mascotLanguage, escapeHtml, draft: behaviourPartner.draft, canSpeak: browserSpeechRecognitionAvailable(), channel: partnerControls().channel, listening: behaviourPartner.listening, sending: behaviourPartner.requesting, status: behaviourPartner.status })
       : '';
     if (showAiPanel) {
       // The assistant owns this rail while it is open: the animated mascot is
@@ -2865,11 +2830,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const partnerControls = () => {
     const choices = learningChoices();
     return normalisePartnerControls({
-      enabled: choices['learning-partner'] === 'on',
+      // The visible mascot switch is the partner switch.  This makes its
+      // behavioural effects predictable and stops hidden partner offers.
+      enabled: choices.mascot === 'on',
       role: choices['mascot-role'],
       presence: choices['mascot-presence'],
       proactive: choices['mascot-proactive'] !== 'off',
-      channel: choices['mascot-voice']
+      // The dock uses the exact Course AI conversation workflow. Text is
+      // always available; the browser enables Speak only when it supports
+      // transcription, so there is no separate mascot-voice setting.
+      channel: 'both'
     });
   };
 
@@ -3028,10 +2998,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // public-course workflow without a silent redirect.
     if (!aiChat.connection.checked) await refreshAiConnection();
     if (!courseAiAccessAllowed() || !aiChat.connection.ai) {
-      openCourseAi(app.querySelector('[data-action="companion-send"]'));
+      behaviourPartner.status = courseUi('Your learning partner is not connected right now. You can keep learning and try again shortly.', 'آپ کا سیکھنے والا ساتھی ابھی منسلک نہیں ہے۔ آپ سیکھتے رہیں اور کچھ دیر بعد دوبارہ کوشش کریں۔');
+      render();
       return;
     }
     behaviourPartner.requesting = true;
+    behaviourPartner.status = courseUi('Your learning partner is thinking…', 'آپ کا سیکھنے والا ساتھی سوچ رہا ہے…');
     aiChat.error = '';
     aiChat.status = 'sending';
     const history = courseAiHistory();
@@ -3040,6 +3012,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const contextKey = aiChat.contextKey;
     const controller = new AbortController();
     aiChat.requestController = controller;
+    render();
     try {
       const reply = await askCourseAi({ user: authenticatedUser, message, history, companionRole: partnerControls().role, ...aiPageRequestContext(), signal: controller.signal });
       if (contextKey !== aiChat.contextKey || controller.signal.aborted) return;
@@ -3047,12 +3020,14 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       aiChat.messages.push({ role: 'assistant', content: response, companion: true });
       behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'teach-partner', surface: 'bubble', message: response, reasonCategory: 'using-support', source: 'companion-chat', taskKey: displayedModuleIndex() + ':' + state.progress.phase };
       behaviourPartner.draft = '';
+      behaviourPartner.status = '';
       behaviourPartner.focusedOpen = true;
       behaviourPartner.context.accept('teach-partner');
     } catch (error) {
       if (controller.signal.aborted || contextKey !== aiChat.contextKey) return;
       aiChat.error = error?.message || courseUi('Your learning partner could not reply right now. Please try again later.', 'آپ کا سیکھنے والا ساتھی ابھی جواب نہیں دے سکا۔ براہ کرم بعد میں دوبارہ کوشش کریں۔');
       behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'return-to-task', surface: 'bubble', message: courseUi('Your partner could not reply right now. Your task is still here, and you can continue when you are ready.', 'آپ کا ساتھی ابھی جواب نہیں دے سکا۔ آپ کا کام محفوظ ہے، اور آپ جب چاہیں جاری رکھ سکتے ہیں۔'), reasonCategory: 'system-error', source: 'companion-chat', taskKey: displayedModuleIndex() + ':' + state.progress.phase };
+      behaviourPartner.status = aiChat.error;
       behaviourPartner.focusedOpen = true;
     } finally {
       if (aiChat.requestController === controller) aiChat.requestController = null;
@@ -4388,49 +4363,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     syncTaskNarrationControl();
     return;
 
-    /* Legacy browser-speech prelude retained as a rollback reference.
-    const session = ++taskNarration.session;
-    let lessonStarted = false;
-    const beginLesson = () => {
-      if (lessonStarted || session !== taskNarration.session) return;
-      lessonStarted = true;
-      clearTaskNarrationPrelude();
-      service.start(0);
-      syncTaskNarrationControl();
-    };
-    taskNarration.preludeContinue = beginLesson;
-    const canSkipTask = canSkipCurrentTask();
-    const prelude = courseUi(
-      COURSE.title + (canSkipTask ? '. You can skip this step.' : '.'),
-      COURSE_URDU.title + (canSkipTask ? '۔ آپ اس مرحلے کو چھوڑ سکتے ہیں۔' : '۔')
-    );
-    const canSpeakPrelude = typeof window.SpeechSynthesisUtterance === 'function' && window.speechSynthesis;
-    if (!canSpeakPrelude) {
-      beginLesson();
-      return;
-    }
-    clearTaskNarrationPrelude();
-    taskNarration.preludeActive = true;
-    taskNarration.preludePaused = false;
-    const utterance = new SpeechSynthesisUtterance(prelude);
-    utterance.rate = 0.9;
-    utterance.volume = Number(state.preferences.narrationVolume);
-    utterance.lang = courseUsesUrdu() ? 'ur' : 'en';
-    const preludeVoice = service.voices.find((voice) => String(voice.lang || '').toLowerCase().startsWith(utterance.lang));
-    if (preludeVoice) utterance.voice = preludeVoice;
-    utterance.onend = beginLesson;
-    utterance.onerror = beginLesson;
-    // Some browser engines never resolve a speech cue. The real course audio
-    // must still begin rather than leaving the learner on a paused-looking UI.
-    taskNarration.preludeTimer = window.setTimeout(beginLesson, 6500);
-    try {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    } catch (_) {
-      beginLesson();
-    }
-    syncTaskNarrationControl();
-    */
   };
 
   const narrationVoiceOptions = () => hasLocalAvaNarration()
@@ -7402,19 +7334,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }, delay);
   };
 
-  const speakCurrentTask = () => {
-    const speechText = [currentStep().title, ...currentStep().read, state.showSimple ? currentStep().simple : ''].filter(Boolean).join(' ');
-    if (!('speechSynthesis' in window)) {
-      announce('Read-aloud is not available in this browser. You can use your device’s usual assistive reading tool.');
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(speechText);
-    utterance.rate = 0.92;
-    window.speechSynthesis.speak(utterance);
-    announce('Read-aloud has started.');
-  };
-
   const narrateCurrentTask = () => startNarration();
 
   const signOut = async (button) => {
@@ -7500,6 +7419,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // to resume an earlier loudness. Start it at zero and let the learner
     // raise the slider only if they want to hear it.
     if (key === 'background-noise' && value === 'on') choices['background-noise-volume'] = '0';
+    if (key === 'mascot') choices['learning-partner'] = value === 'on' ? 'on' : 'off';
     saveLearningChoices(choices);
 
     if (key === 'colours' && colorModes.includes(value)) window.Type2LearnColorMode?.set(value, false);
@@ -7521,7 +7441,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // recent learning acknowledgement.
     if (activeSupportMoment) lastMascotSupportEventId = activeSupportMoment.id;
     syncMascotPreferences();
-    if (['mascot-role', 'mascot-presence', 'learning-partner', 'mascot'].includes(key)) {
+    if (['mascot-role', 'mascot-presence', 'mascot-proactive', 'learning-partner', 'mascot'].includes(key)) {
       // Make the companion choice observable immediately rather than waiting
       // for a later behavioural trigger. This is a preference preview, not an
       // AI inference and it never changes the learner's saved role by itself.

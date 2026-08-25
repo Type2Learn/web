@@ -6101,7 +6101,7 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
        centre is therefore 42.8% of the rail; anchoring the dock at 57.2%
        from the right makes both visual midpoints coincide. */
     right: 57.2%; bottom: clamp(14px, 3.4vh, 34px); left: auto;
-    width: min(460px, calc(100% - 24px));
+    width: min(560px, calc(100% - 12px));
     transform: translateX(50%);
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -6119,6 +6119,7 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
   .course-companion-dock .course-secondary-button,
   .course-companion-dock .course-primary-button { min-height: 30px; padding: 6px 8px; font-size: 10px; white-space: nowrap; }
   .course-companion-dock .course-text-button { grid-column: 1 / -1; justify-self: start; padding: 0; color: var(--course-link); font-size: 10px; font-weight: 800; }
+  .course-companion-dock-status { grid-column: 1 / -1; margin: -1px 1px 0; color: var(--course-muted); font-size: 10px; font-weight: 700; line-height: 1.35; }
   .course-companion-quiet-trigger { position: absolute; z-index: 5; top: 14%; right: 7%; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--course-line-strong); border-radius: 999px; padding: 8px 10px; color: var(--course-ink); background: var(--course-paper); font: inherit; font-size: 11px; font-weight: 800; box-shadow: 0 8px 20px rgba(18, 52, 83, .09); pointer-events: auto; cursor: pointer; }
   html[dir="rtl"] .course-companion-bubble,
   body[data-course-direction="rtl"] .course-companion-bubble { right: auto; left: 72%; text-align: right; }

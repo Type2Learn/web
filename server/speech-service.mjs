@@ -45,10 +45,23 @@ export const validateCourseAudio = (form) => {
 
 export const createSpeechService = ({ config, firebase, ledger }) => {
   const available = () => Boolean(config.speechmaticsApiKey && firebase.available && ledger);
-  const ttsAvailable = () => Boolean(config.speechmaticsApiKey && firebase.available);
+  // Read-aloud has no learner-uploaded audio and only accepts a bounded piece
+  // of already-visible course text. It can therefore remain available to the
+  // explicit public guest course when AI_ALLOW_GUESTS is enabled, while STT
+  // and every stored learner feature remain Firebase-authenticated.
+  const ttsAvailable = () => Boolean(config.speechmaticsApiKey && (firebase.available || config.allowGuestAi));
+  const guestTtsAvailable = () => Boolean(config.allowGuestAi && config.speechmaticsApiKey);
   const ttsCache = new Map();
   const ttsRecentRequests = new Map();
-  const status = () => ({ available: available(), requiresSignIn: true, purposes: ['chat', 'typing'], textToSpeech: { available: ttsAvailable(), language: 'en', voice: TTS_VOICE_ID } });
+  const status = () => ({
+    available: available(),
+    requiresSignIn: true,
+    purposes: ['chat', 'typing'],
+    textToSpeech: {
+      available: ttsAvailable(), language: 'en', voice: TTS_VOICE_ID,
+      guestAccess: guestTtsAvailable(), requiresSignIn: !guestTtsAvailable()
+    }
+  });
 
   const pruneTtsCache = (now) => {
     for (const [key, item] of ttsCache.entries()) if (item.expiresAt <= now) ttsCache.delete(key);
@@ -62,14 +75,17 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     ttsRecentRequests.set(userHash, recent);
   };
 
-  const synthesise = async ({ authorization, body }) => {
-    if (!config.speechmaticsApiKey || !firebase.available) throw apiError(503, 'AI_AUDIO_NOT_CONFIGURED', 'Audio for AI replies is not connected yet.');
+  const synthesise = async ({ authorization, body, localGuest = null, clientAddress = '' }) => {
+    if (!config.speechmaticsApiKey || (!firebase.available && !localGuest)) throw apiError(503, 'AI_AUDIO_NOT_CONFIGURED', 'Audio for AI replies is not connected yet.');
     if (body?.language !== 'en') throw apiError(400, 'AI_AUDIO_LANGUAGE_UNSUPPORTED', 'Audio for AI replies is currently available in English only.');
     const text = bounded(body?.text, MAX_TTS_CHARACTERS);
     if (!text) throw apiError(400, 'EMPTY_AI_AUDIO', 'There is no AI reply to read aloud.');
-    const learner = await firebase.verifyBearer(authorization);
+    if (localGuest && !config.allowGuestAi) throw apiError(401, 'SIGN_IN_REQUIRED', 'Please sign in to listen to this reply.');
+    const learner = localGuest ? null : await firebase.verifyBearer(authorization);
     const now = Date.now();
-    const userHash = identifierHash(learner.uid);
+    // A guest gets a small per-address rate bucket. This is only a safety
+    // limit for public narrated text; no address is stored in Firestore.
+    const userHash = identifierHash(learner?.uid || ('guest-tts:' + String(clientAddress || 'anonymous')));
     checkTtsRate(userHash, now);
     const key = createHash('sha256').update(TTS_VOICE_ID + '\n' + text).digest('hex');
     pruneTtsCache(now);

@@ -38,7 +38,11 @@ let focusedStepIndex = 0;
 let layoutBeforeFocused = 'balanced';
 let setupFeedbackTimer = 0;
 let setupMotionSequence = 0;
-let setupPreviewUtterance = null;
+// The preference preview deliberately uses the same configured narration
+// service as the course—not an arbitrary browser/system voice.  It remains
+// silent until the learner presses its button, and the request is bounded to
+// a tiny authored sample.
+let setupPreviewAudio = null;
 const mascotScreenIsSupported = () => window.matchMedia?.('(min-width: 1181px)').matches;
 
 const preferenceControls = [
@@ -57,7 +61,6 @@ const preferenceControls = [
   { id: 'background-noise', label: 'Background noise', description: 'Optional looping sound, always off to start.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'text-to-speech', label: 'Text to speech', description: 'Optional read-aloud support.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'adaptive-learning', label: 'Behaviour-aware support', description: 'Choose whether compact learning signals may be saved to suggest optional support. Your words, recordings, chats, and scores are never saved as behaviour data.', choices: [['off', 'Keep it on this device'], ['on', 'Use optional adaptive support']] },
-  { id: 'learning-partner', label: 'Learning partner', description: 'Choose whether your fictional learning partner can offer task-bound support.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'urdu-mode', label: 'Urdu mode', description: 'Show the course and Course AI in Urdu. The typing target stays in English.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'mascot', label: 'Mascot', description: 'A learning companion when you want one.', choices: [['off', 'Off'], ['on', 'On']] }
 ];
@@ -66,7 +69,6 @@ const defaultChoices = {
   ...Object.fromEntries(preferenceControls.map(({ id, choices }) => [id, id === 'colours' || id === 'layout' ? 'balanced' : id === 'animations' ? 'gentle' : choices[0][0]])),
   'website-scheme': 'calm',
   'urdu-mode': 'off',
-  'mascot-voice': 'text',
   'adaptive-learning': 'off',
   'learning-partner': 'off',
   'mascot-role': 'calm-guide',
@@ -206,7 +208,6 @@ const localizedControls = {
     'text-to-speech': { label: 'متن سے آواز', description: 'اختیاری پڑھ کر سنانے کی مدد۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     'urdu-mode': { label: 'اردو موڈ', description: 'کورس اور کورس کی مصنوعی ذہانت اردو میں دکھائیں۔ ٹائپنگ کا متن انگریزی میں رہتا ہے۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     mascot: { label: 'میسکاٹ', description: 'جب آپ چاہیں ایک سیکھنے والا ساتھی۔', choices: [['off', 'بند'], ['on', 'چالو']] },
-    'mascot-voice': { label: 'میسکاٹ کی گفتگو', description: 'منتخب کریں کہ میسکاٹ آپ سے کیسے بات کرے گا۔', choices: [['text', 'متن'], ['speech', 'آواز'], ['both', 'دونوں']] },
   }
 };
 
@@ -362,36 +363,46 @@ const textToSpeechPreviewMarkup = (choices) => {
   return '<div class="learning-tts-preview"><button type="button" data-setup-tts-preview>' + label + '</button><small data-setup-tts-status>' + note + '</small></div>';
 };
 
-const setupPreviewText = (choices) => setupLanguage(choices) === 'urdu'
-  ? 'یہ پڑھنے کا مختصر نمونہ ہے۔ آپ اپنی رفتار سے ایک واضح خیال پر توجہ دے سکتے ہیں۔'
-  : 'This is a short reading preview. You can focus on one clear idea at your own pace.';
+// SETUP NARRATION: the preferences page previews the same bundled Ava
+// narration family used in the lesson itself.  It never falls back to the
+// browser's system speech synthesiser, which can sound robotic and varies
+// between browsers.  These small, pre-compressed excerpts also work offline.
+const setupPreviewAudioSource = (choices) => setupLanguage(choices) === 'urdu'
+  ? '/course/audio/edge-ava/neurodivergent/01-adhd/urdu-pk/section-1-answer-ava.mp3'
+  : '/course/audio/edge-ava/neurodivergent/01-adhd/simple-addon-ava-timed.mp3';
 
 const playSetupTextToSpeechPreview = (choices) => {
   const status = document.querySelector('[data-setup-tts-status]');
-  if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance !== 'function') {
-    if (status) status.textContent = setupLanguage(choices) === 'urdu'
-      ? 'اس براؤزر میں آواز کا پیش نظارہ دستیاب نہیں ہے۔'
-      : 'This browser does not provide a speech preview.';
+  const language = setupLanguage(choices) === 'urdu' ? 'ur' : 'en';
+  if (setupPreviewAudio && !setupPreviewAudio.paused) {
+    setupPreviewAudio.pause();
+    setupPreviewAudio.currentTime = 0;
+    if (status) status.textContent = language === 'ur' ? 'پیش نظارہ روک دیا گیا۔' : 'Reading preview stopped.';
     return;
   }
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(setupPreviewText(choices));
-  utterance.lang = setupLanguage(choices) === 'urdu' ? 'ur-PK' : 'en-US';
-  utterance.rate = 0.94;
-  utterance.volume = 0.72;
-  setupPreviewUtterance = utterance;
-  utterance.onstart = () => {
-    if (status) status.textContent = setupLanguage(choices) === 'urdu' ? 'پیش نظارہ چل رہا ہے۔' : 'Reading preview is playing.';
+  if (status) status.textContent = language === 'ur' ? 'پیش نظارہ تیار ہو رہا ہے…' : 'Preparing the reading preview…';
+  const audio = setupPreviewAudio || new Audio();
+  audio.pause();
+  audio.src = setupPreviewAudioSource(choices);
+  audio.preload = 'auto';
+  audio.currentTime = 0;
+  audio.volume = 0.78;
+  setupPreviewAudio = audio;
+  audio.onended = () => {
+    if (status) status.textContent = language === 'ur' ? 'پیش نظارہ مکمل ہوا۔' : 'Reading preview finished.';
   };
-  utterance.onend = () => {
-    if (setupPreviewUtterance !== utterance) return;
-    if (status) status.textContent = setupLanguage(choices) === 'urdu' ? 'پیش نظارہ مکمل ہوا۔' : 'Reading preview finished.';
+  audio.onerror = () => {
+    if (status) status.textContent = language === 'ur'
+      ? 'کورس کی منتخب آواز ابھی دستیاب نہیں۔ آپ پڑھنا جاری رکھ سکتے ہیں۔'
+      : 'The selected course reading voice is unavailable right now. You can still continue reading.';
   };
-  utterance.onerror = () => {
-    if (setupPreviewUtterance !== utterance) return;
-    if (status) status.textContent = setupLanguage(choices) === 'urdu' ? 'پیش نظارہ نہیں چل سکا۔ آپ کورس میں دوبارہ کوشش کر سکتے ہیں۔' : 'The preview could not play. You can try again in the course.';
-  };
-  window.speechSynthesis.speak(utterance);
+  void audio.play().then(() => {
+    if (status) status.textContent = language === 'ur' ? 'پیش نظارہ چل رہا ہے۔' : 'Reading preview is playing.';
+  }).catch(() => {
+    if (status) status.textContent = language === 'ur'
+      ? 'پیش نظارے کی آواز شروع نہیں ہو سکی۔ آپ پڑھنا جاری رکھ سکتے ہیں۔'
+      : 'The course reading voice could not start. You can still continue reading.';
+  });
 };
 
 const mascotDialogue = (choices) => {
@@ -408,44 +419,30 @@ const mascotRailMarkup = (choices) => {
   return '<aside class="learning-setup-mascot-rail" data-learning-mascot><div class="learning-mascot-stage" data-learning-mascot-stage aria-hidden="true"></div><p class="learning-mascot-dialogue" lang="' + (language === 'urdu' ? 'ur' : 'en') + '" dir="' + (language === 'urdu' ? 'rtl' : 'ltr') + '">' + mascotDialogue(choices) + '</p></aside>';
 };
 
-const mascotSpeechControl = (choices) => controlMarkup({
-  id: 'mascot-voice',
-  label: 'Mascot Speech',
-  description: 'Choose how your mascot will communicate with you.',
-  choices: [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']]
-}, choices['mascot-voice'], setupLanguage(choices));
-
 const mascotDetailsMarkup = (choices) => choices.mascot === 'on'
-  ? '<div class="learning-mascot-details">' + mascotSpeechControl(choices) + '</div>'
+  ? '<div class="learning-mascot-details">' + partnerRoleControl(choices) + partnerPresenceControl(choices) + partnerProactiveControl(choices) + '</div>'
   : '';
 
 const partnerRoleControl = (choices) => controlMarkup({
   id: 'mascot-role',
-  label: 'Partner role',
+  label: 'Mascot personality',
   description: 'Choose the kind of task-bound support that feels useful. You can change it later.',
   choices: [['calm-guide', 'Calm Guide'], ['learning-partner', 'Learning Partner'], ['self-challenge', 'Self-Challenge Coach'], ['visual-co-explorer', 'Visual Co-Explorer']]
 }, choices['mascot-role'], setupLanguage(choices));
 
 const partnerPresenceControl = (choices) => controlMarkup({
   id: 'mascot-presence',
-  label: 'Partner presence',
-  description: 'Choose how visibly your partner stays with you.',
+  label: 'Mascot presence',
+  description: 'Choose how visibly your mascot stays with you.',
   choices: [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']]
 }, choices['mascot-presence'], setupLanguage(choices));
 
 const partnerProactiveControl = (choices) => controlMarkup({
   id: 'mascot-proactive',
-  label: 'Partner offers',
-  description: 'Choose whether your partner can offer one optional support after matched task signals.',
+  label: 'Mascot offer',
+  description: 'Choose whether your mascot can offer one optional support after matched task signals.',
   choices: [['on', 'Offer support'], ['off', 'Wait for me to ask']]
 }, choices['mascot-proactive'], setupLanguage(choices));
-
-// A learner chooses their role and presence during initial setup as well as in
-// course settings. These choices remain dormant when Learning partner is Off;
-// this avoids hiding a meaningful control behind an earlier on/off decision.
-const learningPartnerDetailsMarkup = (choices) => '<div class="learning-mascot-details">'
-  + (choices['learning-partner'] === 'on' ? '' : '<p class="learning-partner-choice-note">Choose a role now if you may turn on the partner later. It will stay off until you enable it.</p>')
-  + partnerRoleControl(choices) + partnerPresenceControl(choices) + partnerProactiveControl(choices) + '</div>';
 
 const setupLanguageAttributes = (choices) => setupLanguage(choices) === 'urdu' ? ' lang="ur" dir="rtl"' : '';
 const mascotMainClass = (choices) => choices.mascot === 'on' && mascotScreenIsSupported() ? ' learn-main--with-mascot' : '';
@@ -488,14 +485,13 @@ const focusedSteps = (choices) => {
     { id: 'background-noise' }
   ];
   if (choices['background-noise'] === 'on') steps.push({ id: 'noise-details' });
-  steps.push({ id: 'text-to-speech' }, { id: 'adaptive-learning' }, { id: 'learning-partner' }, { id: 'mascot-role' }, { id: 'mascot-presence' }, { id: 'mascot-proactive' }, { id: 'urdu-mode' }, { id: 'mascot' });
-  if (choices.mascot === 'on') steps.push({ id: 'mascot-voice' });
+  steps.push({ id: 'text-to-speech' }, { id: 'adaptive-learning' }, { id: 'urdu-mode' }, { id: 'mascot' });
+  if (choices.mascot === 'on') steps.push({ id: 'mascot-role' }, { id: 'mascot-presence' }, { id: 'mascot-proactive' });
   return steps;
 };
 
 const focusedStepContent = (step, choices) => {
   if (step.id === 'noise-details') return backgroundNoiseMarkup(choices);
-  if (step.id === 'mascot-voice') return mascotSpeechControl(choices);
   if (step.id === 'mascot-role') return partnerRoleControl(choices);
   if (step.id === 'mascot-presence') return partnerPresenceControl(choices);
   if (step.id === 'mascot-proactive') return partnerProactiveControl(choices);
@@ -544,7 +540,7 @@ const balancedStageMarkup = (choices) => {
   '<small class="learning-settings-later">' + copy.laterSettings + '</small>',
   '</header>',
   '<div class="learning-control-list" aria-label="' + copy.preferences + '">',
-  preferenceControls.map((control) => controlMarkup(control, choices[control.id], setupLanguage(choices)) + (control.id === 'reading-surface' ? readingPreviewMarkup(choices) : '') + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '') + (control.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '') + (control.id === 'learning-partner' ? learningPartnerDetailsMarkup(choices) : '') + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')).join(''),
+  preferenceControls.map((control) => controlMarkup(control, choices[control.id], setupLanguage(choices)) + (control.id === 'reading-surface' ? readingPreviewMarkup(choices) : '') + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '') + (control.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '') + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')).join(''),
   '</div>',
   '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="scheme">' + (setupLanguage(choices) === 'urdu' ? 'ویب سائٹ کی پیشکش پر واپس' : 'Back to website scheme') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
   '</section>',
@@ -558,7 +554,6 @@ const openControlRowMarkup = (control, choices) => '<article class="learning-ope
   + (control.id === 'reading-surface' ? readingPreviewMarkup(choices) : '')
   + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '')
   + (control.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '')
-  + (control.id === 'learning-partner' ? learningPartnerDetailsMarkup(choices) : '')
   + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')
   + '</article>';
 
@@ -795,6 +790,11 @@ const boot = async () => {
     'urdu-mode': migratedUrduMode,
     'website-scheme': savedScheme
   };
+  // One visible companion switch avoids the old confusing state where a
+  // hidden partner could be enabled before the mascot itself.  Keep the
+  // legacy value synchronised for the course player, but never expose it as
+  // a second learner-facing setting.
+  choices['learning-partner'] = choices.mascot === 'on' ? 'on' : 'off';
   // Do not keep or prefetch the optional 3D companion on a small screen.
   if (!mascotScreenIsSupported()) choices.mascot = 'off';
   window.Type2LearnColorMode?.set(choices.colours, false);
@@ -818,6 +818,7 @@ const boot = async () => {
       const { preference, value } = preferenceButton.dataset;
       const previousValue = choices[preference];
       choices[preference] = value;
+      if (preference === 'mascot') choices['learning-partner'] = value === 'on' ? 'on' : 'off';
       applySetupPresentation(choices);
       if (preference === 'colours') window.Type2LearnColorMode?.set(value);
       if (preference === 'website-scheme') window.Type2LearnWebsiteScheme?.set(value);

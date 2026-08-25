@@ -5,4 +5,4 @@
 // Keep the learner shell and the catalogue/voice fixes on the same immutable
 // module URL. This matters for a returning learner with an older offline or
 // browser cache: the new route must request the current course player.
-await import('./course.js?v=20260825-mascot-dock-and-speech2');
+await import('./course.js?v=20260825-mascot-companion-route3');

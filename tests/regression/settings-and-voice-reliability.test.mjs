@@ -35,13 +35,12 @@ test('profile settings dialog is portalled outside the blurred sticky header so 
   assert.match(shell, /truly centered against the browser viewport/);
 });
 
-test('mascot dialogue Listen uses authenticated audio first and a browser-speech fallback with visible state', () => {
+test('mascot dialogue Listen uses only the configured course voice for guests and signed learners', () => {
   assert.match(course, /const mascotSpeech = \{ controller: null, element: null, url: '', loading: false, text: '' \}/);
   assert.match(course, /const currentMascotSpeechText = \(\)/);
   assert.match(course, /const dialogue = currentMascotSpeechText\(\);/);
   assert.match(course, /const speakMascotDialogue = async/);
   assert.match(course, /synthesiseCourseAiReply\(\{/);
-  assert.match(course, /const speakMascotWithBrowser/);
   assert.match(course, /mascotSpeech\.loading \? courseUi\('Loading audio…'/);
   assert.match(course, /mascotSpeech\.text === dialogue \? courseUi\('Stop audio'/);
   assert.match(course, /stopMascotSpeech\(\);/);
@@ -51,7 +50,12 @@ test('mascot dialogue Listen uses authenticated audio first and a browser-speech
   assert.match(course, /const audio = mascotSpeech\.element \|\| new Audio\(\)/);
   assert.match(css, /\.course-mascot-dialogue[\s\S]*pointer-events: auto/);
   assert.match(css, /\.course-mascot-listen[\s\S]*touch-action: manipulation/);
-  assert.match(course, /mascotPresentation\.language === 'urdu'/);
+  assert.match(course, /Turning text-to-speech off hides this optional control everywhere/);
+  assert.doesNotMatch(course, /const speakMascotWithBrowser/);
+  const mascotSpeechStart = course.indexOf('const speakMascotDialogue = async');
+  const mascotSpeechEnd = course.indexOf('const mascotSpeechButtonMarkup');
+  const mascotSpeech = course.slice(mascotSpeechStart, mascotSpeechEnd);
+  assert.doesNotMatch(mascotSpeech, /SpeechSynthesisUtterance|speechSynthesis\\.speak/);
 });
 
 test('mascot is one language-following partner with a direct dock centred under its visual rail', () => {
@@ -64,7 +68,7 @@ test('mascot is one language-following partner with a direct dock centred under 
   assert.match(course, /companionRole: partnerControls\(\)\.role/);
   assert.match(course, /behaviourPartner\.focusedOpen = true/);
   assert.match(css, /\.course-companion-dock[\s\S]*right: 57\.2%; bottom: clamp\(14px, 3\.4vh, 34px\)/);
-  assert.match(css, /\.course-companion-dock[\s\S]*width: min\(460px, calc\(100% - 24px\)\)/);
+  assert.match(css, /\.course-companion-dock[\s\S]*width: min\(560px, calc\(100% - 12px\)\)/);
   assert.match(css, /\.course-companion-dock[\s\S]*pointer-events: auto/);
   assert.match(course, /mascotSpeechButtonMarkup\(dialogue\)/);
 });
@@ -84,18 +88,21 @@ test('course entry points share the current cache-busted catalogue and mascot pl
     read('../../course/course-router.js'),
     read('../../course/index.html')
   ]);
-  assert.match(router, /course\.js\?v=20260825-mascot-dock-and-speech2/);
-  assert.match(courseHtml, /course-router\.js\?v=20260825-mascot-dock-and-speech2/);
-  assert.match(courseHtml, /course\.css\?v=20260825-mascot-dock-and-speech2/);
+  assert.match(router, /course\.js\?v=20260825-mascot-companion-route3/);
+  assert.match(courseHtml, /course-router\.js\?v=20260825-mascot-companion-route3/);
+  assert.match(courseHtml, /course\.css\?v=20260825-mascot-companion-route3/);
 });
 
-test('starting preferences explicitly include privacy-aware support and partner behaviour controls', () => {
+test('starting preferences show privacy-aware support and reveal mascot controls only after Mascot is enabled', () => {
   assert.match(setup, /id: 'adaptive-learning'/);
-  assert.match(setup, /id: 'learning-partner'/);
+  assert.doesNotMatch(setup, /id: 'learning-partner'/);
   assert.match(setup, /const partnerRoleControl/);
   assert.match(setup, /const partnerPresenceControl/);
   assert.match(setup, /const partnerProactiveControl/);
-  assert.match(setup, /\{ id: 'learning-partner' \}, \{ id: 'mascot-role' \}, \{ id: 'mascot-presence' \}, \{ id: 'mascot-proactive' \}/);
+  assert.match(setup, /if \(choices\.mascot === 'on'\) steps\.push\(\{ id: 'mascot-role' \}, \{ id: 'mascot-presence' \}, \{ id: 'mascot-proactive' \}\)/);
+  assert.match(setup, /const mascotDetailsMarkup = \(choices\) => choices\.mascot === 'on'/);
+  assert.match(setup, /label: 'Mascot personality'/);
+  assert.match(setup, /label: 'Mascot offer'/);
 });
 
 test('mascot role selection changes its immediate visual state and written dialogue', () => {

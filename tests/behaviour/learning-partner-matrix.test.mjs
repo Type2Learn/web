@@ -116,7 +116,7 @@ for (const language of ['en', 'ur']) {
 
 test('Learning Partner dock requires review before any voluntary voice submission', () => {
   const markup = companionDockMarkup({ language: 'en', escapeHtml, draft: 'I think support helps.', canSpeak: true, channel: 'both' });
-  assert.match(markup, /Say something, then review it before sending/);
+  assert.match(markup, /Speak or write, then review before sending/);
   assert.match(markup, /data-companion-input/);
   assert.match(markup, /data-action="companion-send"/);
   assert.equal(/Open full chat/.test(markup), false);
@@ -126,5 +126,5 @@ test('Learning Partner dock requires review before any voluntary voice submissio
 test('Learning Partner text-only dock never requests microphone input', () => {
   const markup = companionDockMarkup({ language: 'en', escapeHtml, canSpeak: true, channel: 'text' });
   assert.equal(/companion-dictation/.test(markup), false);
-  assert.match(markup, /Message your learning partner/);
+  assert.match(markup, /Message your mascot/);
 });

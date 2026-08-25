@@ -42,7 +42,9 @@ test('each reading preview data state has a matching visible CSS treatment', () 
 test('text-to-speech preview is explicitly user-triggered and never auto-plays', () => {
   assert.match(source, /data-setup-tts-preview/);
   assert.match(source, /playSetupTextToSpeechPreview\(choices\)/);
-  assert.match(source, /window\.speechSynthesis\.speak\(utterance\)/);
+  assert.match(source, /const setupPreviewAudioSource/);
+  assert.match(source, /edge-ava\/neurodivergent\/01-adhd/);
+  assert.match(source, /new Audio\(\)/);
   assert.match(source, /Audio starts only after you choose this button/);
-  assert.doesNotMatch(source, /render\(choices\)[\s\S]{0,180}speechSynthesis\.speak/);
+  assert.doesNotMatch(source, /SpeechSynthesisUtterance|speechSynthesis\.speak/);
 });

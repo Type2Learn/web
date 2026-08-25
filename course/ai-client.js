@@ -224,16 +224,26 @@ export const acknowledgeUnderstandingReview = async ({ user, runId, signal }) =>
 });
 
 export const synthesiseCourseAiReply = async ({ user, text, language, signal }) => {
-  const token = await requireToken(user);
+  const options = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, language }),
+    signal,
+    cache: 'no-store'
+  };
   let response;
   try {
-    response = await fetch(apiBase() + '/api/v1/speech/synthesise', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, language }),
-      signal,
-      cache: 'no-store'
-    });
+    // Guest narration is an intentionally bounded public read-aloud route.
+    // It uses the same provider voice as the signed-in course, while private
+    // speech-to-text and learner data remain authenticated-only.
+    if (user?.isGuest) response = await fetch(apiBase() + '/api/v1/speech/synthesise', options);
+    else {
+      const token = await requireToken(user);
+      response = await fetch(apiBase() + '/api/v1/speech/synthesise', {
+        ...options,
+        headers: { Authorization: `Bearer ${token}`, ...options.headers }
+      });
+    }
   } catch {
     throw new CourseAiError('Audio for this AI reply is not connected right now.', 'AI_AUDIO_OFFLINE');
   }
