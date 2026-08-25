@@ -45,12 +45,20 @@ try {
       value: { version: 1, courseId, complete: true, choices: choices(view.layout) }
     });
     await page.goto(`${baseUrl}/course/?course=${courseId}&start=course`, { waitUntil: 'networkidle' });
-    const callAi = page.locator('[data-action="call-ai"]');
-    await callAi.waitFor({ state: 'visible', timeout: 15000 });
-    assert.equal(await callAi.isDisabled(), true, `${view.name}: Call AI must be disabled for a guest`);
+    // Course AI is intentionally reached from the current-step support sheet
+    // rather than adding an unrelated chat control to the preview. Guests can
+    // discover that path, but it must end in a clear sign-in gate—not a chat.
+    const stuck = page.locator('[data-action="stuck"]');
+    await stuck.waitFor({ state: 'visible', timeout: 15000 });
+    await stuck.click();
+    const talkToAi = page.locator('[data-action="help-open-ai"]');
+    await talkToAi.waitFor({ state: 'visible', timeout: 15000 });
+    await talkToAi.click();
+    await page.locator('#guest-ai-title').waitFor({ state: 'visible', timeout: 15000 });
+    assert.match(await page.locator('#guest-ai-title').innerText(), /Sign in to use Course AI/, `${view.name}: guest AI must explain that sign-in is required`);
     assert.equal(await page.locator('[data-course-ai-chat]').count(), 0, `${view.name}: a guest must not open the chat`);
-    const tooltip = await page.locator('.course-ai-login-gate').evaluate((node) => getComputedStyle(node, '::after').content);
-    assert.match(tooltip, /Log in required/, `${view.name}: guest AI control needs a login explanation`);
+    assert.match(await page.locator('.course-modal').innerText(), /Guest learning stays private to this browser/, `${view.name}: guest AI gate must explain the privacy boundary`);
+    await page.locator('.course-modal-close[data-action="close-modal"]').click();
     assert.equal(await page.locator('[data-action="start-voice-input"]').count(), 0, `${view.name}: guest typing voice input must not be exposed`);
     assert.equal(await page.locator('[data-action="skip-course"]').count(), 0, `${view.name}: course pausing must not be offered as module navigation`);
     const skipModule = page.locator('[data-action="guest-skip-module"]');
