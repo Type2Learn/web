@@ -2486,6 +2486,31 @@ body.course-stable-layout *::after { transition-duration: .01ms; }
   body.course-focus-mode .course-now-panel { grid-template-columns: 1fr; }
 }
 
+/* LEARNING-PARTNER ROLE FEEDBACK: role selection changes the companion
+   immediately, without pretending that it is a different person or loading
+   another asset. The contained halo remains static when motion is reduced. */
+@media (min-width: 1181px) {
+  .course-mascot-stage[data-mascot-role] { isolation: isolate; }
+  .course-mascot-stage[data-mascot-role]::before {
+    position: absolute;
+    z-index: 0;
+    width: min(68%, 360px);
+    aspect-ratio: 1;
+    border: 1px solid color-mix(in srgb, var(--course-blue) 26%, transparent);
+    border-radius: 50%;
+    content: '';
+    opacity: .56;
+    transform: translateX(-10%);
+  }
+  .course-mascot-stage[data-mascot-role] .course-mascot-image { position: relative; z-index: 1; }
+  .course-mascot-stage[data-mascot-role="calm-guide"]::before { border-color: color-mix(in srgb, var(--course-teal) 38%, transparent); background: radial-gradient(circle, color-mix(in srgb, var(--course-teal-pale) 40%, transparent), transparent 68%); }
+  .course-mascot-stage[data-mascot-role="learning-partner"]::before { border-style: dashed; border-color: color-mix(in srgb, var(--course-blue) 38%, transparent); background: radial-gradient(circle, color-mix(in srgb, var(--course-blue-pale) 38%, transparent), transparent 68%); }
+  .course-mascot-stage[data-mascot-role="self-challenge"]::before { border-width: 2px; border-color: color-mix(in srgb, var(--course-green) 40%, transparent); background: radial-gradient(circle, color-mix(in srgb, var(--course-green-pale) 44%, transparent), transparent 68%); }
+  .course-mascot-stage[data-mascot-role="visual-co-explorer"]::before { border-radius: 34% 66% 59% 41% / 44% 41% 59% 56%; border-color: color-mix(in srgb, var(--course-purple, #6d60d7) 40%, transparent); background: radial-gradient(circle, color-mix(in srgb, var(--course-blue-pale) 30%, transparent), transparent 68%); }
+  .course-mascot-stage[data-mascot-presence="quiet"] .course-mascot-image { opacity: .82; filter: saturate(.76); }
+  .course-mascot-stage[data-mascot-presence="involved"] .course-mascot-image { filter: saturate(1.08) contrast(1.02); }
+}
+
 @media (max-width: 420px) {
   .course-setup-card,
   .course-task-card,
@@ -6147,4 +6172,102 @@ html[dir="rtl"] .course-visual-explanation { text-align: right; }
   .course-visual-map { grid-template-columns: 1fr; }
   .course-visual-map::before { inset: 20% 45%; }
   .course-visual-node { min-height: 0; }
+}
+
+/* PROFILE SETTINGS DIALOG: a real settings surface rather than a long
+   top-bar popover. It deliberately reuses every accessible existing control.
+   The backdrop also makes an outside click an explicit, predictable close. */
+.course-settings-backdrop {
+  position: fixed;
+  z-index: 160;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 22, 48, .42);
+  backdrop-filter: blur(3px);
+}
+
+.course-settings-backdrop .course-settings-menu,
+html[dir="rtl"] .course-settings-backdrop .course-settings-menu,
+body[data-course-direction="rtl"] .course-settings-backdrop .course-settings-menu {
+  position: relative;
+  inset: auto;
+  width: min(980px, 100%);
+  max-height: min(720px, calc(100dvh - 48px));
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 0;
+  background: var(--course-paper);
+  box-shadow: 0 26px 70px rgba(3, 13, 32, .34);
+}
+
+.course-settings-backdrop .course-settings-menu > header,
+.course-settings-backdrop .course-settings-menu > footer { padding: 16px 20px; }
+.course-settings-backdrop .course-settings-menu > header { border-bottom: 1px solid var(--course-line); }
+.course-settings-backdrop .course-settings-menu > footer { margin: 0; border-top: 1px solid var(--course-line); padding-top: 13px; }
+
+.course-settings-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 500px;
+  max-height: min(582px, calc(100dvh - 166px));
+}
+
+.course-settings-tabs {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  border-right: 1px solid var(--course-line);
+  padding: 16px 12px;
+  background: color-mix(in srgb, var(--course-cloud) 62%, var(--course-paper));
+}
+
+html[dir="rtl"] .course-settings-tabs,
+body[data-course-direction="rtl"] .course-settings-tabs { border-right: 0; border-left: 1px solid var(--course-line); }
+
+.course-settings-tabs button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 10px;
+  color: var(--course-ink-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.course-settings-tabs button span { width: 18px; text-align: center; color: var(--course-blue); }
+.course-settings-tabs button:hover { color: var(--course-ink); background: var(--course-paper); }
+.course-settings-tabs button[aria-current="true"] { border-color: color-mix(in srgb, var(--course-green) 34%, var(--course-line)); color: var(--course-ink); background: var(--course-paper); box-shadow: inset 3px 0 0 var(--course-green); }
+
+.course-settings-panel { min-width: 0; overflow: auto; padding: 22px 28px 26px; }
+.course-settings-panel h2 { margin: 0; color: var(--course-ink); font-family: var(--course-sans); font-size: clamp(22px, 2.3vw, 29px); line-height: 1.12; }
+.course-settings-panel-intro { max-width: 66ch; margin: 6px 0 3px; color: var(--course-muted); font-size: 12px; line-height: 1.5; }
+.course-settings-panel .course-settings-menu-controls { margin-top: 18px; gap: 18px; }
+.course-settings-panel .course-learning-partner-settings { margin-top: 0; }
+.course-settings-panel .course-partner-data-actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 12px 0; }
+
+body[data-course-animations="gentle"] .course-settings-backdrop { animation: course-backdrop-in 180ms ease-out both; }
+body[data-course-animations="lively"] .course-settings-backdrop { animation: course-backdrop-in 220ms ease-out both; }
+body[data-course-animations="still"] .course-settings-backdrop { backdrop-filter: none; }
+
+@media (max-width: 760px) {
+  .course-settings-backdrop { align-items: end; padding: 10px; }
+  .course-settings-backdrop .course-settings-menu { width: 100%; max-height: calc(100dvh - 20px); border-radius: 15px; }
+  .course-settings-layout { grid-template-columns: 1fr; max-height: calc(100dvh - 136px); }
+  .course-settings-tabs { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--course-line); padding: 9px; }
+  html[dir="rtl"] .course-settings-tabs,
+  body[data-course-direction="rtl"] .course-settings-tabs { border-left: 0; border-bottom: 1px solid var(--course-line); }
+  .course-settings-tabs button { width: auto; white-space: nowrap; }
+  .course-settings-tabs button[aria-current="true"] { box-shadow: inset 0 -3px 0 var(--course-green); }
+  .course-settings-panel { padding: 18px 16px 22px; }
+  .course-settings-backdrop .course-settings-menu > header,
+  .course-settings-backdrop .course-settings-menu > footer { padding-left: 16px; padding-right: 16px; }
 }

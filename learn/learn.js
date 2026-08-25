@@ -57,6 +57,8 @@ const preferenceControls = [
   { id: 'reading-surface', label: 'Reading surface', description: 'Choose a low-glare surface for lesson text. It does not change the lesson wording.', choices: [['paper', 'Paper'], ['soft-blue', 'Soft blue'], ['warm-cream', 'Warm cream']] },
   { id: 'background-noise', label: 'Background noise', description: 'Optional looping sound, always off to start.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'text-to-speech', label: 'Text to speech', description: 'Optional read-aloud support.', choices: [['off', 'Off'], ['on', 'On']] },
+  { id: 'adaptive-learning', label: 'Behaviour-aware support', description: 'Choose whether compact learning signals may be saved to suggest optional support. Your words, recordings, chats, and scores are never saved as behaviour data.', choices: [['off', 'Keep it on this device'], ['on', 'Use optional adaptive support']] },
+  { id: 'learning-partner', label: 'Learning partner', description: 'Choose whether your fictional learning partner can offer task-bound support.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'urdu-mode', label: 'Urdu mode', description: 'Show the course and Course AI in Urdu. The typing target stays in English.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'mascot', label: 'Mascot', description: 'A learning companion when you want one.', choices: [['off', 'Off'], ['on', 'On']] }
 ];
@@ -69,6 +71,11 @@ const defaultChoices = {
   'mascot-language-explicit': false,
   'mascot-voice': 'text',
   'mascot-voice-language': 'english',
+  'adaptive-learning': 'off',
+  'learning-partner': 'off',
+  'mascot-role': 'calm-guide',
+  'mascot-presence': 'available',
+  'mascot-proactive': 'on',
   'reading-text-size': 'standard',
   'reading-spacing': 'standard',
   'reading-width': 'comfortable',
@@ -432,6 +439,34 @@ const mascotDetailsMarkup = (choices) => choices.mascot === 'on'
   ? '<div class="learning-mascot-details">' + mascotLanguageControl(choices) + mascotSpeechControl(choices) + mascotVoiceControl(choices) + '</div>'
   : '';
 
+const partnerRoleControl = (choices) => controlMarkup({
+  id: 'mascot-role',
+  label: 'Partner role',
+  description: 'Choose the kind of task-bound support that feels useful. You can change it later.',
+  choices: [['calm-guide', 'Calm Guide'], ['learning-partner', 'Learning Partner'], ['self-challenge', 'Self-Challenge Coach'], ['visual-co-explorer', 'Visual Co-Explorer']]
+}, choices['mascot-role'], setupLanguage(choices));
+
+const partnerPresenceControl = (choices) => controlMarkup({
+  id: 'mascot-presence',
+  label: 'Partner presence',
+  description: 'Choose how visibly your partner stays with you.',
+  choices: [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']]
+}, choices['mascot-presence'], setupLanguage(choices));
+
+const partnerProactiveControl = (choices) => controlMarkup({
+  id: 'mascot-proactive',
+  label: 'Partner offers',
+  description: 'Choose whether your partner can offer one optional support after matched task signals.',
+  choices: [['on', 'Offer support'], ['off', 'Wait for me to ask']]
+}, choices['mascot-proactive'], setupLanguage(choices));
+
+// A learner chooses their role and presence during initial setup as well as in
+// course settings. These choices remain dormant when Learning partner is Off;
+// this avoids hiding a meaningful control behind an earlier on/off decision.
+const learningPartnerDetailsMarkup = (choices) => '<div class="learning-mascot-details">'
+  + (choices['learning-partner'] === 'on' ? '' : '<p class="learning-partner-choice-note">Choose a role now if you may turn on the partner later. It will stay off until you enable it.</p>')
+  + partnerRoleControl(choices) + partnerPresenceControl(choices) + partnerProactiveControl(choices) + '</div>';
+
 const setupLanguageAttributes = (choices) => setupLanguage(choices) === 'urdu' ? ' lang="ur" dir="rtl"' : '';
 const mascotMainClass = (choices) => choices.mascot === 'on' && mascotScreenIsSupported() ? ' learn-main--with-mascot' : '';
 
@@ -473,7 +508,7 @@ const focusedSteps = (choices) => {
     { id: 'background-noise' }
   ];
   if (choices['background-noise'] === 'on') steps.push({ id: 'noise-details' });
-  steps.push({ id: 'text-to-speech' }, { id: 'urdu-mode' }, { id: 'mascot' });
+  steps.push({ id: 'text-to-speech' }, { id: 'adaptive-learning' }, { id: 'learning-partner' }, { id: 'mascot-role' }, { id: 'mascot-presence' }, { id: 'mascot-proactive' }, { id: 'urdu-mode' }, { id: 'mascot' });
   if (choices.mascot === 'on') steps.push({ id: 'mascot-language' }, { id: 'mascot-voice' }, { id: 'mascot-voice-language' });
   return steps;
 };
@@ -483,6 +518,9 @@ const focusedStepContent = (step, choices) => {
   if (step.id === 'mascot-language') return mascotLanguageControl(choices);
   if (step.id === 'mascot-voice') return mascotSpeechControl(choices);
   if (step.id === 'mascot-voice-language') return mascotVoiceControl(choices);
+  if (step.id === 'mascot-role') return partnerRoleControl(choices);
+  if (step.id === 'mascot-presence') return partnerPresenceControl(choices);
+  if (step.id === 'mascot-proactive') return partnerProactiveControl(choices);
   const control = controlMarkup(controlById(step.id), choices[step.id], setupLanguage(choices));
   const readingPreview = readingPreferenceIds.has(step.id) ? readingPreviewMarkup(choices) : '';
   const ttsPreview = step.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '';
@@ -528,7 +566,7 @@ const balancedStageMarkup = (choices) => {
   '<small class="learning-settings-later">' + copy.laterSettings + '</small>',
   '</header>',
   '<div class="learning-control-list" aria-label="' + copy.preferences + '">',
-  preferenceControls.map((control) => controlMarkup(control, choices[control.id], setupLanguage(choices)) + (control.id === 'reading-surface' ? readingPreviewMarkup(choices) : '') + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '') + (control.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '') + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')).join(''),
+  preferenceControls.map((control) => controlMarkup(control, choices[control.id], setupLanguage(choices)) + (control.id === 'reading-surface' ? readingPreviewMarkup(choices) : '') + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '') + (control.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '') + (control.id === 'learning-partner' ? learningPartnerDetailsMarkup(choices) : '') + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')).join(''),
   '</div>',
   '<div class="learning-settings-action learning-settings-action--split"><button class="learning-back" type="button" data-go-back="scheme">' + (setupLanguage(choices) === 'urdu' ? 'ویب سائٹ کی پیشکش پر واپس' : 'Back to website scheme') + '</button><button class="learning-continue" type="button" data-save-preferences>' + copy.continue + ' <span aria-hidden="true">→</span></button></div>',
   '</section>',
@@ -542,6 +580,7 @@ const openControlRowMarkup = (control, choices) => '<article class="learning-ope
   + (control.id === 'reading-surface' ? readingPreviewMarkup(choices) : '')
   + (control.id === 'background-noise' ? backgroundNoiseMarkup(choices) : '')
   + (control.id === 'text-to-speech' ? textToSpeechPreviewMarkup(choices) : '')
+  + (control.id === 'learning-partner' ? learningPartnerDetailsMarkup(choices) : '')
   + (control.id === 'mascot' ? mascotDetailsMarkup(choices) : '')
   + '</article>';
 

@@ -32,6 +32,12 @@ export const createCourseMascot = () => {
       image.setAttribute('aria-hidden', 'true');
       image.decoding = 'async';
     }
+    // The supplied WebP is intentionally the same trusted character asset,
+    // but each chosen learning-partner role is exposed on the rendering stage
+    // immediately. Course CSS gives every role a distinct, calm visual state
+    // without restarting the animation or implying a different real person.
+    target.dataset.mascotRole = presentation.behaviour || 'calm-guide';
+    target.dataset.mascotPresence = presentation.presence || 'available';
     setAnimation(currentAnimation);
     if (image.parentElement !== target) target.replaceChildren(image);
   };
@@ -63,6 +69,10 @@ export const createCourseMascot = () => {
       showBlinking();
     },
     unmount() {
+      if (target?.dataset) {
+        delete target.dataset.mascotRole;
+        delete target.dataset.mascotPresence;
+      }
       target = null;
     },
     destroy() {

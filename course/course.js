@@ -81,7 +81,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     recognition: null,
     listening: false,
     focusedOpen: false,
-    lastOfferKey: ''
+    lastOfferKey: '',
+    // A role choice is a learner-controlled interaction, not a behavioural
+    // inference. Keep a short visible preview so changing roles immediately
+    // changes what the companion says and how it is presented.
+    rolePreview: ''
   };
   // ADAPTIVE LEARNING: assessment answers are held only while the learner is
   // actively answering. The regular course save gets an opaque run id, never
@@ -437,6 +441,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     'mascot-language-explicit': false,
     'mascot-voice': 'text',
     'mascot-voice-language': 'english',
+    'adaptive-learning': 'off',
     'urdu-mode': 'off'
   });
 
@@ -520,6 +525,30 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       presence: choices['mascot-presence'] || 'available',
       proactive: choices['mascot-proactive'] !== 'off'
     };
+  };
+
+  const mascotRolePreviewCopy = () => {
+    const role = learningChoices()['mascot-role'] || 'calm-guide';
+    const urdu = mascotPresentation.language === 'urdu';
+    const copy = urdu ? {
+      'calm-guide': 'میں آپ کے لیے صرف اگلا واضح قدم نمایاں رکھوں گا۔',
+      'learning-partner': 'میں آپ کے ساتھ سیکھ رہا ہوں۔ آپ مجھے ایک خیال اپنے الفاظ میں سمجھا سکتے ہیں۔',
+      'self-challenge': 'جب آپ چاہیں، میں ایک مختصر اختیاری مشن پیش کروں گا۔',
+      'visual-co-explorer': 'میں ایک وقت میں ایک تعلق دکھانے کے لیے سادہ بصری نقشہ پیش کر سکتا ہوں۔'
+    } : {
+      'calm-guide': 'I will keep just one clear next step in view.',
+      'learning-partner': 'I am learning alongside you. You can teach me one idea in your own words.',
+      'self-challenge': 'When you want one, I will offer a small optional mission.',
+      'visual-co-explorer': 'I can offer a simple visual map that shows one connection at a time.'
+    };
+    return copy[role] || copy['calm-guide'];
+  };
+
+  const refreshMascotRolePreview = () => {
+    const choices = learningChoices();
+    behaviourPartner.rolePreview = (choices.mascot === 'on' || choices['learning-partner'] === 'on')
+      ? mascotRolePreviewCopy()
+      : '';
   };
 
   const cancelBackgroundNoiseFade = () => {
@@ -681,6 +710,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     readingSectionIndex: 0,
     reviewModuleIndex: null,
     settingsMenu: false,
+    settingsTab: 'general',
     storageAvailable: true
     ,
     coursePaused: false,
@@ -1299,59 +1329,64 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
 
   const courseSettingsMenu = () => {
     if (!state.settingsMenu) return '';
-    const preferencesSaved = coursePreferencesAreSaved();
     const choices = learningChoices();
+    const tab = ['general', 'reading', 'partner', 'privacy'].includes(state.settingsTab) ? state.settingsTab : 'general';
+    const preferencesSaved = coursePreferencesAreSaved();
     const noiseType = ['pink', 'white', 'brown'].includes(choices['background-noise-type']) ? choices['background-noise-type'] : 'pink';
     const requestedNoiseVolume = Number(choices['background-noise-volume']);
     const noiseVolume = Math.min(BACKGROUND_NOISE_MAX_VOLUME * 100, Math.max(0, Number.isFinite(requestedNoiseVolume) ? requestedNoiseVolume : 0));
-    const mascotUnavailable = !mascotViewportQuery?.matches;
-    // BEHAVIOURAL LEARNING PARTNER: privacy controls stay available even
-    // after the learner hides the partner, so consent can always be reviewed,
-    // exported, deleted, or turned off from this one profile menu.
-    const partnerDataPanel = signedInLearner() && adaptiveLearning.available
-      ? '<section class="course-learning-partner-settings course-learning-partner-data"><p class="course-eyebrow">DATA &amp; PRIVACY</p><details class="course-adaptive-settings-explainer"><summary>What Type2Learn notices</summary><p>In this browser session it keeps only task and support categories: active or idle time, returns and rereads, optional read-aloud or visual use, aggregate typing pace and corrections, and partner offers you accept or dismiss. It never includes your typed words, individual keys, recordings, transcripts, chat messages, answer text, scores, IP address, or a profile of you.</p></details><p>With Adaptive learning support on, a compact module summary is saved to your account for up to ' + escapeHtml(String(adaptiveLearning.retentionDays || 90)) + ' days. You can delete it at any time.</p><div class="course-partner-data-actions"><button class="course-text-button" type="button" data-action="export-behaviour-data">Download my adaptive data</button><button class="course-text-button" type="button" data-action="delete-behaviour-data">Delete adaptive data</button></div>' + (behaviourPartner.dataMessage ? '<p class="course-partner-data-status" role="status">' + escapeHtml(behaviourPartner.dataMessage) + '</p>' : '') + '</section>'
-      : '<section class="course-learning-partner-settings course-learning-partner-data"><p class="course-eyebrow">DATA &amp; PRIVACY</p><p>Learning partner support stays in this browser session until you choose Adaptive learning support. It never saves typed words, recordings, chats, answer text, scores, or a personal profile.</p></section>';
-    const controls = preferencesSaved ? [
-      '<div class="course-settings-menu-controls">',
-      settingsChoiceGroup('website-scheme', 'Website scheme', 'Choose the overall presentation for your learning space. Calm keeps the current look; Playful is bright, colourful, and kid-friendly.', [['calm', 'Calm'], ['playful', 'Playful']], choices['website-scheme']),
-      settingsChoiceGroup('colours', 'Color style', 'Choose how much color appears around the task.', [['flat', 'Flat'], ['balanced', 'Balanced'], ['vivid', 'Vivid']], choices.colours),
-      settingsChoiceGroup('layout', 'Page layout', 'Choose how much space sits around one task.', [['focused', 'Focused'], ['balanced', 'Balanced'], ['open', 'Open']], choices.layout),
-      settingsChoiceGroup('encouragement', 'Encouragement', 'Choose how visible supportive moments feel.', [['subtle', 'Subtle'], ['balanced', 'Balanced'], ['expressive', 'Expressive']], choices.encouragement),
-      settingsChoiceGroup('animations', 'Animations', 'Choose how much supportive movement you would like to see.', [['still', 'Still'], ['gentle', 'Gentle'], ['lively', 'Lively']], choices.animations),
-      signedInLearner() && adaptiveLearning.available
-        ? settingsSwitch('adaptive-learning', 'Adaptive learning support', 'Use compact course summaries to offer one optional setting change and objective-based understanding checks. It never saves raw typing, recordings, or chats.', adaptiveLearning.consented, adaptiveLearning.updatingConsent)
-          + '<details class="course-adaptive-settings-explainer"><summary>' + escapeHtml(courseUi('How this support works', 'یہ مدد کیسے کام کرتی ہے')) + '</summary><p>' + escapeHtml(courseUi('After a module, Type2Learn may offer one reversible presentation change. Understanding checks use approved course objectives and can return you to one related idea. You choose every change, and no score is shown.', 'ہر ماڈیول کے بعد Type2Learn ایک قابلِ واپسی پیشکش کر سکتا ہے۔ سمجھ جانچ منظور شدہ کورس کے مقاصد استعمال کرتی ہے اور آپ کو ایک متعلقہ خیال کی طرف واپس لے جا سکتی ہے۔ ہر تبدیلی آپ منتخب کرتے ہیں اور کوئی اسکور نہیں دکھایا جاتا۔')) + '</p></details>'
-        : signedInLearner() && adaptiveLearning.consentKnown
-          ? '<p class="course-settings-menu-gate">Adaptive learning support is not available right now.</p>'
-          : '',
-      settingsChoiceGroup('reading-text-size', 'Reading text size', 'Change text size immediately for this course.', [['standard', 'Standard'], ['large', 'Larger'], ['extra-large', 'Extra large']], state.preferences.textSize),
-      settingsChoiceGroup('reading-spacing', 'Reading rhythm', 'Choose standard or roomier line and paragraph spacing for lesson text.', [['standard', 'Standard'], ['relaxed', 'More room']], state.preferences.spacing),
-      settingsChoiceGroup('reading-width', 'Reading width', 'Choose shorter or wider reading lines.', [['narrow', 'Short lines'], ['comfortable', 'Comfortable'], ['wide', 'Wide lines']], state.preferences.readingWidth),
-      settingsChoiceGroup('reading-contrast', 'Reading contrast', 'Use a higher-contrast reading surface when that feels clearer.', [['off', 'Standard'], ['on', 'Higher contrast']], state.preferences.highContrast ? 'on' : 'off'),
-      settingsChoiceGroup('reading-surface', 'Reading surface', 'Choose a low-glare surface for lesson text. It does not change the lesson wording.', [['paper', 'Paper'], ['soft-blue', 'Soft blue'], ['warm-cream', 'Warm cream']], ['paper', 'soft-blue', 'warm-cream'].includes(choices['reading-surface']) ? choices['reading-surface'] : 'paper'),
-      settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It starts muted; you choose the volume.', choices['background-noise'] === 'on'),
-      choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="' + (BACKGROUND_NOISE_MAX_VOLUME * 100) + '" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '',
-      offlineLearningMarkup(),
-      settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud support available. It will not play by itself.', choices['text-to-speech'] === 'on'),
-      settingsSwitch('mascot', 'Mascot', mascotUnavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', choices.mascot === 'on', mascotUnavailable),
-      // BEHAVIOURAL LEARNING PARTNER: this is independent from the visual
-      // mascot switch. A learner can keep the mascot hidden and receive the
-      // same optional support through the accessible Course AI sheet.
-      settingsSwitch('learning-partner', 'Learning partner', 'Use a fictional, task-bound partner. With the mascot hidden, support opens in Course AI instead.', choices['learning-partner'] === 'on'),
-      choices['learning-partner'] === 'on' ? '<section class="course-learning-partner-settings"><p class="course-eyebrow">LEARNING PARTNER</p><p>Your partner is fictional and task-bound. You choose its role, how often it offers support, and what data stays optional.</p>'
-        + settingsChoiceGroup('mascot-role', 'Partner role', 'Choose the kind of support you want. Type2Learn can suggest a role, but never changes it for you.', [['calm-guide', 'Calm Guide'], ['learning-partner', 'Learning Partner'], ['self-challenge', 'Self-Challenge Coach'], ['visual-co-explorer', 'Visual Co-Explorer']], choices['mascot-role'])
-        + settingsChoiceGroup('mascot-presence', 'Partner presence', 'Choose how visibly your partner appears during a task.', [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']], choices['mascot-presence'])
-        + settingsSwitch('mascot-proactive', 'Proactive offers', 'Offer one optional support only after matched task signals. You can dismiss it for the current task.', choices['mascot-proactive'] !== 'off')
-        + '<details class="course-adaptive-settings-explainer"><summary>Why did this appear?</summary><p>Type2Learn looks for at least two neutral task signals, such as returning after a pause and rereading. It does not diagnose you, rank you, or change your settings automatically.</p></details>'
-        + '</section>' : '',
-      partnerDataPanel,
-      (choices.mascot === 'on' || choices['learning-partner'] === 'on') ? settingsChoiceGroup('mascot-language', choices['learning-partner'] === 'on' ? 'Partner language' : 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || supportLanguage()) : '',
-      (choices.mascot === 'on' || choices['learning-partner'] === 'on') ? settingsChoiceGroup('mascot-voice', choices['learning-partner'] === 'on' ? 'Partner response' : 'Mascot Speech', 'Choose text, voice input, or both. Voice words are always shown for review before sending.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '',
-      choices.mascot === 'on' ? settingsChoiceGroup('mascot-voice-language', 'Mascot voice', 'Choose the language your mascot will speak.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-voice-language']) : '',
-      settingsSwitch('urdu-mode', 'Urdu mode', 'Show the course and Course AI in Urdu. The typing target stays in English.', choices['urdu-mode'] === 'on'),
-      '</div>'
-    ].join('') : '<p class="course-settings-menu-gate">Choose the available course first. Its personal learning settings will appear here after setup.</p>';
-    return '<section class="course-settings-menu" id="course-settings-menu" role="dialog" aria-label="Learning settings"><header><span class="course-settings-profile">' + profileAvatar() + '<strong>' + escapeHtml(profileName()) + '</strong></span><button class="course-settings-close" type="button" data-action="close-settings-menu" aria-label="Close settings">×</button></header>' + controls + '<footer><button class="course-settings-signout" type="button" data-action="signout">Sign out</button></footer></section>';
+    const partnerOn = choices['learning-partner'] === 'on';
+    const mascotOn = choices.mascot === 'on';
+    const tabButton = (id, label, icon) => '<button type="button" data-settings-tab="' + id + '" aria-current="' + String(tab === id) + '"><span aria-hidden="true">' + icon + '</span>' + label + '</button>';
+    const panel = (title, intro, body) => '<section class="course-settings-panel" data-settings-panel="' + tab + '"><h2>' + escapeHtml(title) + '</h2><p class="course-settings-panel-intro">' + escapeHtml(intro) + '</p><div class="course-settings-menu-controls">' + body + '</div></section>';
+    let content = '';
+    if (!preferencesSaved) {
+      content = panel('Course settings', 'Choose a course first. Its personal controls will appear here after setup.', '<p class="course-settings-menu-gate">Your choices are course-specific, so they stay connected to the course you select.</p>');
+    } else if (tab === 'general') {
+      content = panel('General', 'Choose the overall presentation of this learning space.',
+        settingsChoiceGroup('website-scheme', 'Website scheme', 'Calm keeps the current look; Playful is bright and colourful.', [['calm', 'Calm'], ['playful', 'Playful']], choices['website-scheme'])
+        + settingsChoiceGroup('colours', 'Color style', 'Choose how much color appears around the task.', [['flat', 'Flat'], ['balanced', 'Balanced'], ['vivid', 'Vivid']], choices.colours)
+        + settingsChoiceGroup('layout', 'Page layout', 'Choose how much space sits around one task.', [['focused', 'Focused'], ['balanced', 'Balanced'], ['open', 'Open']], choices.layout)
+        + settingsChoiceGroup('encouragement', 'Encouragement', 'Choose how visible supportive moments feel.', [['subtle', 'Subtle'], ['balanced', 'Balanced'], ['expressive', 'Expressive']], choices.encouragement)
+        + settingsChoiceGroup('animations', 'Animations', 'Choose how much supportive movement you would like to see.', [['still', 'Still'], ['gentle', 'Gentle'], ['lively', 'Lively']], choices.animations)
+        + settingsSwitch('urdu-mode', 'Urdu mode', 'Show the course and Course AI in Urdu. Typing targets stay in English.', choices['urdu-mode'] === 'on')
+      );
+    } else if (tab === 'reading') {
+      content = panel('Reading & input', 'Adjust the reading surface and optional audio tools without changing the lesson.',
+        settingsChoiceGroup('reading-text-size', 'Reading text size', 'Change text size immediately for this course.', [['standard', 'Standard'], ['large', 'Larger'], ['extra-large', 'Extra large']], state.preferences.textSize)
+        + settingsChoiceGroup('reading-spacing', 'Reading rhythm', 'Choose standard or roomier line and paragraph spacing.', [['standard', 'Standard'], ['relaxed', 'More room']], state.preferences.spacing)
+        + settingsChoiceGroup('reading-width', 'Reading width', 'Choose shorter or wider reading lines.', [['narrow', 'Short lines'], ['comfortable', 'Comfortable'], ['wide', 'Wide lines']], state.preferences.readingWidth)
+        + settingsChoiceGroup('reading-contrast', 'Reading contrast', 'Use a stronger reading surface when it feels clearer.', [['off', 'Standard'], ['on', 'Higher contrast']], state.preferences.highContrast ? 'on' : 'off')
+        + settingsChoiceGroup('reading-surface', 'Reading surface', 'Choose a low-glare surface for lesson text. It does not change lesson wording.', [['paper', 'Paper'], ['soft-blue', 'Soft blue'], ['warm-cream', 'Warm cream']], ['paper', 'soft-blue', 'warm-cream'].includes(choices['reading-surface']) ? choices['reading-surface'] : 'paper')
+        + settingsSwitch('text-to-speech', 'Text to speech', 'Keep optional read-aloud available. It will not play by itself.', choices['text-to-speech'] === 'on')
+        + settingsSwitch('background-noise', 'Background noise', 'Optional looping sound. It starts muted; you choose the volume.', choices['background-noise'] === 'on')
+        + (choices['background-noise'] === 'on' ? '<div class="course-settings-noise"><label>Noise type<select data-settings-noise-type><option value="pink"' + (noiseType === 'pink' ? ' selected' : '') + '>Pink</option><option value="white"' + (noiseType === 'white' ? ' selected' : '') + '>White</option><option value="brown"' + (noiseType === 'brown' ? ' selected' : '') + '>Brown</option></select></label><label>Volume <output data-settings-noise-volume-output>' + noiseVolume + '%</output><input type="range" min="0" max="' + (BACKGROUND_NOISE_MAX_VOLUME * 100) + '" step="1" value="' + noiseVolume + '" data-settings-noise-volume></label></div>' : '')
+      );
+    } else if (tab === 'partner') {
+      const unavailable = !mascotViewportQuery?.matches;
+      content = panel('Learning partner', 'A fictional, task-bound companion. You stay in control of its role and presence.',
+        settingsSwitch('mascot', 'Mascot', unavailable ? 'Available on larger screens. This screen is too small.' : 'Show your learning companion during this course.', mascotOn, unavailable)
+        + settingsSwitch('learning-partner', 'Learning partner', 'Use optional task-bound partner support. With the mascot hidden, it opens in Course AI instead.', partnerOn)
+        + (partnerOn ? settingsChoiceGroup('mascot-role', 'Partner role', 'Choose the kind of support you want.', [['calm-guide', 'Calm Guide'], ['learning-partner', 'Learning Partner'], ['self-challenge', 'Self-Challenge Coach'], ['visual-co-explorer', 'Visual Co-Explorer']], choices['mascot-role'])
+          + settingsChoiceGroup('mascot-presence', 'Partner presence', 'Choose how visibly your partner appears.', [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']], choices['mascot-presence'])
+          + settingsSwitch('mascot-proactive', 'Proactive offers', 'Offer one optional support after matched task signals. You can dismiss it for this task.', choices['mascot-proactive'] !== 'off')
+          + '<details class="course-adaptive-settings-explainer"><summary>Why did this appear?</summary><p>Type2Learn waits for at least two neutral task signals, such as returning after a pause and rereading. It does not diagnose you or change settings automatically.</p></details>' : '')
+        + ((mascotOn || partnerOn) ? settingsChoiceGroup('mascot-language', partnerOn ? 'Partner language' : 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || supportLanguage())
+          + settingsChoiceGroup('mascot-voice', partnerOn ? 'Partner response' : 'Mascot response', 'Choose text, voice input, or both. Voice words are always shown before sending.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice'])
+          + (mascotOn ? settingsChoiceGroup('mascot-voice-language', 'Mascot voice language', 'Choose the language your mascot will speak.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-voice-language']) : '') : '')
+      );
+    } else {
+      const dataStatus = signedInLearner() && adaptiveLearning.available
+        ? '<p>With adaptive learning enabled, a compact module summary is saved to your account for up to ' + escapeHtml(String(adaptiveLearning.retentionDays || 90)) + ' days. It excludes typed words, recordings, chats, answer text, scores, IP addresses, and personal profiles.</p><div class="course-partner-data-actions"><button class="course-text-button" type="button" data-action="export-behaviour-data">Download my adaptive data</button><button class="course-text-button" type="button" data-action="delete-behaviour-data">Delete adaptive data</button></div>'
+        : '<p>Adaptive support is kept in this browser session unless you explicitly turn on compact course summaries. Guest learners never send course AI or adaptive data.</p>';
+      content = panel('Data & privacy', 'See what learning support notices, change consent, or prepare this course for offline learning.',
+        settingsSwitch('adaptive-learning', 'Adaptive learning support', 'Use compact course summaries to offer one optional setting suggestion. Raw typing, recordings, and chats are never saved.', choices['adaptive-learning'] === 'on', !signedInLearner())
+        + '<details class="course-adaptive-settings-explainer"><summary>What Type2Learn notices</summary><p>Task and support categories only: active or idle time, returns and rereads, optional read-aloud or visual use, aggregate typing pace and corrections, and accepted or dismissed partner offers. It never stores your individual keys or words.</p></details>'
+        + dataStatus
+        + offlineLearningMarkup()
+      );
+    }
+    return '<div class="course-settings-backdrop" data-action="close-settings-menu"><section class="course-settings-menu" id="course-settings-menu" role="dialog" aria-modal="true" aria-label="Learning settings"><header><span class="course-settings-profile">' + profileAvatar() + '<strong>' + escapeHtml(profileName()) + '</strong></span><button class="course-settings-close" type="button" data-action="close-settings-menu" aria-label="Close settings">×</button></header><div class="course-settings-layout"><nav class="course-settings-tabs" aria-label="Settings categories">' + tabButton('general', 'General', '⚙') + tabButton('reading', 'Reading & input', 'Aa') + tabButton('partner', 'Learning partner', '♥') + tabButton('privacy', 'Data & privacy', '⌁') + '</nav>' + content + '</div><footer><button class="course-settings-signout" type="button" data-action="signout">Sign out</button></footer></section></div>';
   };
 
   const mascotCanAppear = () => Boolean(
@@ -1689,9 +1724,9 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     aiChat.draft = [initialDraft, cleanTranscript].filter(Boolean).join(initialDraft && cleanTranscript ? ' ' : '');
   };
 
-  // The browser recogniser cannot transcribe a recording that has already
-  // finished, so a failed Speechmatics request switches straight into a fresh
-  // live browser session and clearly asks the learner to repeat the question.
+  // Browser recognition is a one-shot fallback for browsers that cannot use
+  // the authenticated recorder. It never reconnects itself: browser speech
+  // services can loop indefinitely after a quota or network failure.
   const startBrowserAiDictation = ({ fallback = false } = {}) => {
     if (!aiChatIsVisible()) return false;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1813,7 +1848,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       appendAiDictationTranscript(transcript);
     } catch (error) {
       if (session !== dictation.session) return;
-      if (browserSpeechRecognitionAvailable() && startBrowserAiDictation({ fallback: true })) return;
       aiChat.error = aiLanguage() === 'ur'
         ? 'آواز کے ذریعے اِن پٹ جاری نہیں رہ سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔'
         : (error?.message || 'Voice input could not continue. You can type your question instead.');
@@ -1895,6 +1929,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const mascotDialogue = () => {
     const companion = behaviourPartner.directive;
     if (companion?.message && mascotPresentation.enabled && !aiChat.open) return companion.message;
+    if (behaviourPartner.rolePreview && mascotPresentation.enabled && !aiChat.open) return behaviourPartner.rolePreview;
     const moment = activeSupportMoment;
     const urdu = mascotPresentation.language === 'urdu';
     if ((state.modal === 'help' || state.modal === 'explain') && mascotPresentation.enabled) {
@@ -1953,11 +1988,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
     try {
       window.speechSynthesis.cancel();
+      // Chromium can leave a paused speech queue after a background tab or a
+      // previous utterance. Resume before creating the explicit utterance.
+      window.speechSynthesis.resume?.();
       const utterance = new SpeechSynthesisUtterance(dialogue);
       utterance.lang = mascotPresentation.language === 'urdu' ? 'ur-PK' : 'en-US';
       utterance.rate = 0.92;
       utterance.volume = Math.min(1, Math.max(0.1, Number(state.preferences.narrationVolume) || 0.72));
+      utterance.onerror = () => announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
       window.speechSynthesis.speak(utterance);
+      window.setTimeout(() => window.speechSynthesis?.resume?.(), 80);
       announce(courseUi('Mascot speech has started.', 'ماسکٹ کی آواز شروع ہو گئی ہے۔'));
     } catch (_) {
       announce(courseUi('Mascot speech could not start. You can still read its message.', 'ماسکٹ کی آواز شروع نہیں ہو سکی۔ آپ اس کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
@@ -2151,6 +2191,17 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       const consent = await getAdaptiveLearningConsent({ user: authenticatedUser, signal: requestTimeoutSignal(10000) });
       adaptiveLearning.consented = consent?.enabled === true;
       adaptiveLearning.consentKnown = true;
+      // The first-run preferences page asks this question plainly. Honour an
+      // explicit answer once the protected consent endpoint is reachable, but
+      // never infer an answer from an older preference record that lacks it.
+      const savedChoices = readLearningChoices();
+      if (Object.prototype.hasOwnProperty.call(savedChoices, 'adaptive-learning')) {
+        const requested = savedChoices['adaptive-learning'] === 'on';
+        if (requested !== adaptiveLearning.consented) {
+          void updateAdaptiveLearningConsent(requested);
+          return;
+        }
+      }
       syncAdaptiveLearningTelemetry();
     } catch (_) {
       adaptiveLearning.available = false;
@@ -2170,6 +2221,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       const result = await setAdaptiveLearningConsent({ user: authenticatedUser, enabled, signal: requestTimeoutSignal(10000) });
       adaptiveLearning.consented = result?.enabled === true;
       adaptiveLearning.consentKnown = true;
+      const choices = learningChoices();
+      if (choices['adaptive-learning'] !== (adaptiveLearning.consented ? 'on' : 'off')) {
+        choices['adaptive-learning'] = adaptiveLearning.consented ? 'on' : 'off';
+        saveLearningChoices(choices);
+      }
       if (!adaptiveLearning.consented) stopAdaptiveLearningTelemetry();
       else syncAdaptiveLearningTelemetry();
       announce(adaptiveLearning.consented
@@ -4993,21 +5049,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     renderVoiceInputState(nextStatus, message);
   };
 
-  const scheduleVoiceRecognitionRestart = (sessionId, message, delay = 350) => {
-    if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
-    if (voiceInput.restartTimer) window.clearTimeout(voiceInput.restartTimer);
-    if (voiceInput.restartCount >= 10) {
-      stopVoiceInput('Speech recognition could not stay connected. Your response is still here; type or choose Try again.', 'error');
-      return;
-    }
-    voiceInput.restartCount += 1;
-    renderVoiceInputState('listening', message);
-    voiceInput.restartTimer = window.setTimeout(() => {
-      voiceInput.restartTimer = null;
-      beginVoiceRecognitionCycle(sessionId);
-    }, delay);
-  };
-
   const pauseVoiceInput = () => {
     if (voiceInput.recorder?.state === 'recording') {
       // Unlike browser recognition, the Speechmatics compatibility path sends
@@ -5091,7 +5132,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     try {
       recognition = new Recognition();
     } catch (_) {
-      scheduleVoiceRecognitionRestart(sessionId, 'The microphone is reconnecting. You can keep your place and try speaking again.', 500);
+      stopVoiceInput('Live browser recognition could not start. Try Speak again, or type your response instead.', 'error');
       return;
     }
     voiceInput.recognition = recognition;
@@ -5142,9 +5183,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       const errorCode = String(event?.error || 'unknown');
       voiceInput.lastError = errorCode;
       if (errorCode === 'no-speech' || errorCode === 'aborted' || errorCode === 'network') {
-        renderVoiceInputState('listening', errorCode === 'network'
-          ? 'Speech recognition briefly lost its connection and is reconnecting. Typing stays available.'
-          : 'No speech was heard yet. The microphone is staying ready, and typing stays available.');
+        // Never retry a browser recogniser without a new learner action.
+        // Chromium can otherwise report `network` indefinitely while showing
+        // a misleading listening control and never placing a transcript.
+        stopVoiceInput(errorCode === 'network'
+          ? 'Live browser recognition lost its connection. Try Speak again, or type your response instead.'
+          : 'No speech was heard. Try Speak again when you are ready, or type your response instead.', 'error');
         return;
       }
       const permissionDenied = errorCode === 'not-allowed' || errorCode === 'service-not-allowed';
@@ -5161,20 +5205,13 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     recognition.onend = () => {
       if (sessionId !== voiceInput.sessionId || voiceInput.recognition !== recognition || voiceInput.stopRequested) return;
       voiceInput.recognition = null;
-      const networkDelay = voiceInput.lastError === 'network' ? 800 : 350;
-      scheduleVoiceRecognitionRestart(
-        sessionId,
-        voiceInput.lastError === 'network'
-          ? 'Speech recognition briefly lost its connection. The microphone is reconnecting.'
-          : 'The microphone paused briefly. It is still listening for your response.',
-        networkDelay
-      );
+      stopVoiceInput('Live browser recognition stopped. Your response is still here; choose Speak again only if you want another attempt.', 'stopped');
     };
     try {
       recognition.start();
     } catch (_) {
       if (voiceInput.recognition === recognition) voiceInput.recognition = null;
-      scheduleVoiceRecognitionRestart(sessionId, 'The microphone is starting again. Your response is still here.', 500);
+      stopVoiceInput('Live browser recognition could not start. Try Speak again, or type your response instead.', 'error');
     }
   };
 
@@ -5273,10 +5310,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       recordUnifiedBehaviourAction('speech-complete');
     } catch (error) {
       if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
-      if (voiceRecognitionConstructor()) {
-        startBrowserVoiceInput('Speechmatics could not transcribe that recording. Browser speech recognition is ready; please repeat your response.');
-        return;
-      }
       renderVoiceInputState('error', error?.message || 'Voice input could not continue. Your response is still here, and typing stays available.');
     }
   };
@@ -5337,19 +5370,18 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         : 'Log in required to use Speechmatics voice input.');
       return;
     }
-    if (voiceRecognitionConstructor()) {
-      // Browser recognition is intentionally preferred for typing: it emits
-      // interim words, allowing the visible authored text to turn green while
-      // the learner speaks. Speechmatics receives a completed recording and
-      // therefore cannot offer that immediate feedback.
-      startBrowserVoiceInput();
-      return;
-    }
+    // For signed-in learners use the explicit recording route first. It works
+    // consistently across Firefox and Chromium and never leaves Brave in a
+    // reconnecting state that appears active without adding text.
     if (await speechmaticsTypingIsReady()) {
       await startSpeechmaticsTypingInput();
       return;
     }
-    renderVoiceInputState('error', 'Live speech recognition is unavailable in this browser and the Speechmatics fallback is not ready. You can type your response instead.');
+    if (voiceRecognitionConstructor()) {
+      startBrowserVoiceInput('Live browser recognition is a fallback. It will listen once and never reconnect repeatedly.');
+      return;
+    }
+    renderVoiceInputState('error', 'Voice input is not connected in this browser right now. You can type your response instead.');
   };
 
   const addTypingSupportControls = () => {
@@ -5965,7 +5997,9 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // the task. Keeping it in the reading flow gives the celebration a home
     // without covering the course heading or the learner's next control.
     const isPlayfulScheme = learningChoices()['website-scheme'] === 'playful';
-    const isPopup = moment.encouragementLevel !== 'subtle' && !isPlayfulScheme;
+    // A visible mascot already gives encouragement a stable surface. Keep the
+    // written moment inside the task instead of layering a popup over it.
+    const isPopup = moment.encouragementLevel !== 'subtle' && !isPlayfulScheme && !mascotCanAppear();
     const isOpenPopup = isPopup && layout === 'open';
     const isFocusedPopup = isPopup && layout === 'focused';
     const isBalancedPopup = isPopup && layout === 'balanced';
@@ -6058,7 +6092,8 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // The colourful Playful scheme deliberately uses the inline treatment:
     // an acknowledgement should decorate the task, never float over it.
     const popupPresentation = moment.encouragementLevel !== 'subtle'
-      && learningChoices()['website-scheme'] !== 'playful';
+      && learningChoices()['website-scheme'] !== 'playful'
+      && !mascotCanAppear();
     if (markup && (!popupPresentation || isNew)) {
       // The central support moment replaces older one-off feedback strings for
       // the action that just occurred. Saved feedback still appears after a
@@ -6388,7 +6423,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       //     return courseMascot;
       //   })
       //   .catch(() => null);
-      mascotControllerLoad = import('./mascot-2d.js?v=20260804-blink1')
+      mascotControllerLoad = import('./mascot-2d.js?v=20260825-role-states1')
         .then(({ createCourseMascot }) => {
           courseMascot = createCourseMascot();
           return courseMascot;
@@ -7244,6 +7279,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // recent learning acknowledgement.
     if (activeSupportMoment) lastMascotSupportEventId = activeSupportMoment.id;
     syncMascotPreferences();
+    if (['mascot-role', 'mascot-presence', 'learning-partner', 'mascot'].includes(key)) {
+      // Make the companion choice observable immediately rather than waiting
+      // for a later behavioural trigger. This is a preference preview, not an
+      // AI inference and it never changes the learner's saved role by itself.
+      refreshMascotRolePreview();
+      behaviourPartner.directive = null;
+      behaviourPartner.focusedOpen = false;
+      lastMascotScene = '';
+    }
+    if (key === 'adaptive-learning') void updateAdaptiveLearningConsent(value === 'on');
     if (key === 'background-noise' || key === 'background-noise-type') {
       if (backgroundNoise.enabled) playBackgroundNoise({ announceChange: false });
       else pauseBackgroundNoise();
@@ -7537,9 +7582,8 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const settingsMenuToggle = event.target.closest('[data-action="toggle-settings-menu"]');
     const clickedInsideSettings = Boolean(event.target.closest('.course-settings-menu'));
     if (state.settingsMenu && !clickedInsideSettings && !settingsMenuToggle) {
-      // Settings are a compact popover: an outside click should always put the
-      // learner back on the page, while still allowing that same click to use
-      // another control such as Pause & save.
+      // The settings dialog always closes when its backdrop is chosen, while
+      // still allowing that same click to use another page control.
       state.settingsMenu = false;
       if (!event.target.closest('[data-action]')) {
         render();
@@ -7547,6 +7591,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       }
     }
 
+    const settingsTab = event.target.closest('[data-settings-tab]');
+    if (settingsTab) {
+      state.settingsTab = settingsTab.dataset.settingsTab || 'general';
+      render();
+      return;
+    }
     const settingsChoice = event.target.closest('[data-settings-choice]');
     if (settingsChoice) {
       saveCourseLearningChoice(settingsChoice.dataset.settingsChoice, settingsChoice.dataset.value);
@@ -7555,10 +7605,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const settingsToggle = event.target.closest('[data-settings-toggle]');
     if (settingsToggle && !settingsToggle.disabled) {
       const key = settingsToggle.dataset.settingsToggle;
-      if (key === 'adaptive-learning') {
-        void updateAdaptiveLearningConsent(!adaptiveLearning.consented);
-        return;
-      }
       const current = learningChoices()[key] === 'on';
       saveCourseLearningChoice(key, current ? 'off' : 'on');
       return;

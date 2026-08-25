@@ -14,6 +14,15 @@ const jobIdFrom = (payload) => payload?.id || payload?.job?.id || payload?.jobs?
 const jobStatusFrom = (payload) => String(payload?.status || payload?.job?.status || payload?.jobs?.[0]?.status || '').toLowerCase();
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+// Provider quota and billing responses should be clear to the learner without
+// exposing provider payloads, account data, or implementation details.
+export const upstreamSpeechFailure = (response, fallback) => {
+  if ([402, 403, 429].includes(Number(response?.status))) {
+    return apiError(503, 'SPEECH_PROVIDER_LIMIT', 'Voice transcription is temporarily unavailable because its provider limit has been reached. You can type your response instead.');
+  }
+  return apiError(502, 'SPEECH_UPSTREAM_ERROR', fallback);
+};
+
 // MediaRecorder correctly reports its codec with the MIME type (for example
 // `audio/webm;codecs=opus`).  The codec parameter is not a different file
 // format, so compare the media type itself rather than rejecting it.
@@ -77,7 +86,7 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     } catch {
       throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not start.');
     }
-    if (!response.ok) throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not be created.');
+    if (!response.ok) throw upstreamSpeechFailure(response, 'Audio for this AI reply could not be created.');
     const audio = Buffer.from(await response.arrayBuffer());
     if (!audio.length || audio.length > 3 * 1024 * 1024) throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not be created.');
     const result = { audio, contentType: response.headers.get('content-type') || 'audio/wav' };
@@ -127,7 +136,7 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
         throw apiError(502, 'SPEECH_UPSTREAM_ERROR', 'Voice input could not start. You can type instead.');
       }
       const createdBody = await created.json().catch(() => ({}));
-      if (!created.ok) throw apiError(502, 'SPEECH_UPSTREAM_ERROR', 'Voice input could not start. You can type instead.');
+      if (!created.ok) throw upstreamSpeechFailure(created, 'Voice input could not start. You can type instead.');
       jobId = jobIdFrom(createdBody);
       if (!jobId) throw apiError(502, 'SPEECH_JOB_ERROR', 'Voice input did not return a transcription job.');
 
@@ -138,6 +147,7 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
           headers: { Authorization: `Bearer ${config.speechmaticsApiKey}` },
           signal: AbortSignal.timeout(10000)
         });
+        if (!statusResponse.ok) throw upstreamSpeechFailure(statusResponse, 'Voice input could not continue. You can type instead.');
         const status = jobStatusFrom(await statusResponse.json().catch(() => ({})));
         if (status === 'done' || status === 'completed') { complete = true; break; }
         if (['rejected', 'failed', 'error'].includes(status)) throw apiError(502, 'SPEECH_JOB_ERROR', 'Voice input could not understand that recording. Try a shorter recording or type instead.');
@@ -148,7 +158,8 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
         signal: AbortSignal.timeout(15000)
       });
       const transcript = bounded(await transcriptResponse.text().catch(() => ''), MAX_TRANSCRIPT_CHARACTERS);
-      if (!transcriptResponse.ok || !transcript) throw apiError(502, 'SPEECH_TRANSCRIPT_ERROR', 'Voice input could not return text for that recording.');
+      if (!transcriptResponse.ok) throw upstreamSpeechFailure(transcriptResponse, 'Voice input could not return text for that recording.');
+      if (!transcript) throw apiError(502, 'SPEECH_TRANSCRIPT_ERROR', 'Voice input could not return text for that recording.');
       await ledger.settle({ ...reservation, actual: { usd: 0, inputTokens: 0, outputTokens: 0, credits: estimatedCredits } });
       settled = true;
       return { transcript };

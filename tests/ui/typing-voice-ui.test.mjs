@@ -10,11 +10,13 @@ test('typing voice UI keeps one external Speak control and an in-field pause/res
   assert.match(source, /voiceIsActive = voiceInput\.listening/);
 });
 
-test('typing selects browser live recognition before batch Speechmatics transcription', async () => {
+test('typing selects the authenticated recorder before one-shot browser fallback', async () => {
   const source = await readFile(new URL('../../course/course.js', import.meta.url), 'utf8');
-  const browserFirst = source.indexOf('if (voiceRecognitionConstructor())', source.indexOf('const startVoiceInput'));
-  const speechmaticsSecond = source.indexOf('if (await speechmaticsTypingIsReady())', source.indexOf('const startVoiceInput'));
-  assert.ok(browserFirst >= 0 && speechmaticsSecond > browserFirst);
+  const speechmaticsFirst = source.indexOf('if (await speechmaticsTypingIsReady())', source.indexOf('const startVoiceInput'));
+  const browserSecond = source.indexOf('if (voiceRecognitionConstructor())', source.indexOf('const startVoiceInput'));
+  assert.ok(speechmaticsFirst >= 0 && browserSecond > speechmaticsFirst);
+  assert.match(source, /Never retry a browser recogniser without a new learner action/);
+  assert.doesNotMatch(source, /scheduleVoiceRecognitionRestart/);
 });
 
 test('Speechmatics compatibility recording has a visible Finish control instead of making learners wait for a timeout', async () => {
