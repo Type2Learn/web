@@ -69,8 +69,8 @@ for (const role of roles) {
         } else {
           const markup = companionBubbleMarkup({ directive, language: 'en', escapeHtml });
           assert.match(markup, /course-companion-bubble/);
-          assert.match(markup, /Why did this appear\?/);
-          assert.match(markup, /Not now/);
+          assert.match(markup, /data-action="companion-use"/);
+          assert.equal(/Why did this appear\?|Not now/.test(markup), false);
         }
       });
     }

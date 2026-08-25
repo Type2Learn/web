@@ -13,6 +13,7 @@
     "verify": "node scripts/verify-release.mjs",
     "test:ui": "node tests/ui/ai-chat-visual.mjs",
     "test:ui:guest-companion": "node tests/ui/guest-companion-ai-flow.mjs",
+    "test:ui:mascot-guidance": "node tests/ui/mascot-contextual-guidance.mjs",
     "test:offline": "node tests/ui/offline-learning-package.mjs",
     "test:sign-image": "node tests/ui/sign-language-image-probe.mjs"
   },

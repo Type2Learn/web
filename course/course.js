@@ -1397,7 +1397,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         + (partnerOn ? settingsChoiceGroup('mascot-role', 'Mascot personality', 'Choose the kind of task-bound support you want.', [['calm-guide', 'Calm Guide'], ['learning-partner', 'Learning Partner'], ['self-challenge', 'Self-Challenge Coach'], ['visual-co-explorer', 'Visual Co-Explorer']], choices['mascot-role'])
           + settingsChoiceGroup('mascot-presence', 'Mascot presence', 'Choose how visibly your mascot appears.', [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']], choices['mascot-presence'])
           + settingsSwitch('mascot-proactive', 'Mascot offer', 'Offer one optional support after matched task signals. You can dismiss it for this task.', choices['mascot-proactive'] !== 'off')
-          + '<details class="course-adaptive-settings-explainer"><summary>Why did this appear?</summary><p>Type2Learn waits for at least two neutral task signals, such as returning after a pause and rereading. It does not diagnose you or change settings automatically.</p></details>' : '')
+          + '<details class="course-adaptive-settings-explainer"><summary>How optional offers work</summary><p>Type2Learn waits for at least two neutral task signals, such as returning after a pause and rereading. It does not diagnose you or change settings automatically.</p></details>' : '')
       );
     } else {
       const dataStatus = signedInLearner() && adaptiveLearning.available
@@ -2931,6 +2931,20 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     return text.split(/(?<=[.!?؟])\s+/).slice(0, 2).join(' ').slice(0, 300);
   };
 
+  // MASCOT GUIDANCE REQUEST: both “Help with this step” and “I’m stuck →
+  // Talk to Course AI” use this exact compact Course AI request whenever the
+  // mascot is visible. The message contains no learner answer and tells the
+  // server to provide choices before any explanatory content.
+  const companionGuidancePrompt = () => courseUi(
+    'I need guidance with this current page. Do not answer the task. Please ask whether I would like you to rephrase it, make the first part smaller, explain it in short chunks, or show one brief example.',
+    'مجھے اس موجودہ صفحے میں رہنمائی چاہیے۔ کام کا جواب نہ دیں۔ براہ کرم پوچھیں کہ کیا میں ہدایت کو دوبارہ الفاظ میں، پہلے حصے کو چھوٹا کر کے، مختصر حصوں میں، یا ایک مختصر مثال سے سمجھنا چاہوں گا/گی۔'
+  );
+
+  const companionGuidanceFallback = () => courseUi(
+    'Would you like me to rephrase this step, make the first part smaller, explain it in short chunks, or show one brief example? Tell me which feels most useful.',
+    'کیا آپ چاہیں گے کہ میں اس مرحلے کو دوبارہ الفاظ میں بیان کروں، پہلا حصہ چھوٹا کروں، مختصر حصوں میں سمجھاؤں، یا ایک مختصر مثال دوں؟ بتائیں کون سا طریقہ زیادہ مددگار ہوگا۔'
+  );
+
   // Learning-partner voice uses the browser recogniser only after the learner
   // presses Speak. It writes into the visible draft field first; nothing is
   // sent to an AI service until the learner reviews and chooses Send.
@@ -3016,7 +3030,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     try {
       const reply = await askCourseAi({ user: authenticatedUser, message, history, companionRole: partnerControls().role, ...aiPageRequestContext(), signal: controller.signal });
       if (contextKey !== aiChat.contextKey || controller.signal.aborted) return;
-      const response = companionMessage(reply?.reply) || courseUi('I could not make that clear yet. Try sharing one smaller part of the idea.', 'میں اسے ابھی واضح نہیں بنا سکا۔ خیال کا ایک چھوٹا حصہ بتانے کی کوشش کریں۔');
+      const response = companionMessage(reply?.reply) || companionGuidanceFallback();
       aiChat.messages.push({ role: 'assistant', content: response, companion: true });
       behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'teach-partner', surface: 'bubble', message: response, reasonCategory: 'using-support', source: 'companion-chat', taskKey: displayedModuleIndex() + ':' + state.progress.phase };
       behaviourPartner.draft = '';
@@ -3025,8 +3039,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       behaviourPartner.context.accept('teach-partner');
     } catch (error) {
       if (controller.signal.aborted || contextKey !== aiChat.contextKey) return;
-      aiChat.error = error?.message || courseUi('Your learning partner could not reply right now. Please try again later.', 'آپ کا سیکھنے والا ساتھی ابھی جواب نہیں دے سکا۔ براہ کرم بعد میں دوبارہ کوشش کریں۔');
-      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'return-to-task', surface: 'bubble', message: courseUi('Your partner could not reply right now. Your task is still here, and you can continue when you are ready.', 'آپ کا ساتھی ابھی جواب نہیں دے سکا۔ آپ کا کام محفوظ ہے، اور آپ جب چاہیں جاری رکھ سکتے ہیں۔'), reasonCategory: 'system-error', source: 'companion-chat', taskKey: displayedModuleIndex() + ':' + state.progress.phase };
+      aiChat.error = error?.message || courseUi('Your learning partner could not connect right now. You can still choose a smaller kind of help.', 'آپ کا سیکھنے والا ساتھی ابھی منسلک نہیں ہو سکا۔ آپ پھر بھی مدد کی ایک چھوٹی قسم منتخب کر سکتے ہیں۔');
+      // A provider failure must never strand the learner with a generic error.
+      // Keep the same useful, authored choices visible so the task can continue.
+      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'teach-partner', surface: 'bubble', message: companionGuidanceFallback(), reasonCategory: 'system-error', source: 'companion-chat', taskKey: displayedModuleIndex() + ':' + state.progress.phase };
       behaviourPartner.status = aiChat.error;
       behaviourPartner.focusedOpen = true;
     } finally {
@@ -3035,6 +3051,19 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       behaviourPartner.requesting = false;
       render();
     }
+  };
+
+  const requestCompanionGuidance = async () => {
+    // This function intentionally uses the dock's existing sender. It keeps
+    // message history, guest access, rate protection, personality prompting,
+    // and the visible bunny speech bubble on one shared Course AI workflow.
+    if (!mascotCanAppear() || !partnerControls().enabled || behaviourPartner.requesting) return false;
+    syncAiChatContext();
+    state.modal = '';
+    behaviourPartner.focusedOpen = true;
+    behaviourPartner.draft = companionGuidancePrompt();
+    await sendCompanionMessage();
+    return true;
   };
 
   const openCompanionChat = (element) => {
@@ -7531,16 +7560,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         behaviourPartner.focusedOpen = true;
         render();
         break;
-      case 'companion-dismiss':
-        if (behaviourPartner.directive?.trigger) behaviourPartner.context.dismiss(behaviourPartner.directive.trigger);
-        behaviourPartner.directive = null;
-        behaviourPartner.focusedOpen = false;
-        render();
-        announce(courseUi('Learning partner support is quiet for this task.', 'سیکھنے کے ساتھی کی مدد اس مرحلے کے لیے خاموش ہے۔'));
-        break;
-      case 'companion-why':
-        announce(courseUi('This appeared after at least two neutral task signals, such as returning, rereading, or taking a longer pause. It is not a diagnosis or a score.', 'یہ کم از کم دو غیر جانبدار تعلیمی اشاروں کے بعد ظاہر ہوا، جیسے واپس آنا، دوبارہ پڑھنا یا طویل وقفہ۔ یہ تشخیص یا اسکور نہیں ہے۔'));
-        break;
       case 'companion-use': {
         const partnerAction = String(element.dataset.companionAction || '');
         behaviourPartner.context.accept(partnerAction);
@@ -7554,9 +7573,8 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
           behaviourPartner.directive = null;
           recordSupportMoment('task-entry', { result: 'simple-reading' });
         } else if (partnerAction === 'teach-partner') {
-          const input = app.querySelector('[data-companion-input]');
-          if (input) input.focus();
-          else openCourseAi(element);
+          void requestCompanionGuidance();
+          break;
         } else if (partnerAction === 'process-support') {
           behaviourPartner.context.action('assessment-help');
           openCourseModal('help', element, '[data-action="stuck"]');
@@ -7590,7 +7608,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         });
         break;
       case 'help-open-ai':
-        openCourseAi(element);
+        // With a visible mascot, the task-bound companion is the Course AI
+        // surface. The help sheet closes and the bunny sends one guarded
+        // current-page guidance request; without a mascot, preserve normal
+        // full Course AI behaviour.
+        if (mascotCanAppear() && partnerControls().enabled) void requestCompanionGuidance();
+        else openCourseAi(element);
         break;
       case 'accept-adaptive-proposal':
         void decideAdaptiveLearningProposal(true);

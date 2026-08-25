@@ -65,18 +65,25 @@ export const localCompanionDirective = (snapshot) => {
 
 export const companionBubbleMarkup = ({ directive, language, escapeHtml, focused = false, speechControl = '' }) => {
   if (!directive) return '';
-  const why = copy(language, 'Why did this appear?', 'یہ کیوں ظاہر ہوا؟');
   const actionLabel = {
     'start-small': copy(language, 'Show the first step', 'پہلا قدم دکھائیں'),
     'open-visual': copy(language, 'Show it another way', 'دوسرے طریقے سے دکھائیں'),
-    'teach-partner': copy(language, 'Help your partner', 'اپنے ساتھی کی مدد کریں'),
+    // This is an explicit current-page request to the same Course AI used by
+    // the dock. It is not a vague instruction to care for the mascot.
+    'teach-partner': copy(language, 'Help with this step', 'اس مرحلے میں مدد'),
     'return-to-task': copy(language, 'Return to this step', 'اس مرحلے پر واپس جائیں'),
     'optional-mission': copy(language, 'Try this mission', 'یہ مشن آزمائیں'),
     'process-support': copy(language, 'Show process support', 'عمل کی مدد دکھائیں'),
     'smaller-step': copy(language, 'Make it smaller', 'اسے چھوٹا کریں')
   }[directive.action] || copy(language, 'Use this support', 'یہ مدد استعمال کریں');
   if (focused || directive.surface === 'quiet-trigger') return '<button class="course-companion-quiet-trigger" type="button" data-action="companion-open" aria-label="' + escapeHtml(copy(language, 'Open mascot support', 'میسکاٹ کی مدد کھولیں')) + '"><span aria-hidden="true">✦</span>' + escapeHtml(copy(language, 'Mascot partner', 'میسکاٹ ساتھی')) + '</button>';
-  return '<aside class="course-companion-bubble" data-companion-bubble role="status" aria-live="polite"><p class="course-eyebrow">' + escapeHtml(copy(language, 'MASCOT PARTNER', 'میسکاٹ ساتھی')) + '</p><p>' + escapeHtml(directive.message) + '</p><div class="course-companion-actions"><button type="button" class="course-secondary-button" data-action="companion-use" data-companion-action="' + escapeHtml(directive.action) + '">' + escapeHtml(actionLabel) + '</button>' + speechControl + '<button type="button" class="course-text-button" data-action="companion-why">' + escapeHtml(why) + '</button><button type="button" class="course-text-button" data-action="companion-dismiss">' + escapeHtml(copy(language, 'Not now', 'ابھی نہیں')) + '</button></div></aside>';
+  // Once the shared Course AI has answered, the learner chooses a support in
+  // the dock below the mascot. Repeating the same proactive action here would
+  // only resend the generic request and make the speech bubble feel cluttered.
+  const controls = directive.source === 'companion-chat'
+    ? speechControl
+    : '<button type="button" class="course-secondary-button" data-action="companion-use" data-companion-action="' + escapeHtml(directive.action) + '">' + escapeHtml(actionLabel) + '</button>' + speechControl;
+  return '<aside class="course-companion-bubble" data-companion-bubble role="status" aria-live="polite"><p class="course-eyebrow">' + escapeHtml(copy(language, 'MASCOT PARTNER', 'میسکاٹ ساتھی')) + '</p><p>' + escapeHtml(directive.message) + '</p>' + (controls ? '<div class="course-companion-actions">' + controls + '</div>' : '') + '</aside>';
 };
 
 export const companionDockMarkup = ({ language, escapeHtml, draft = '', canSpeak = false, channel = 'text', listening = false, sending = false, status = '' }) => {

@@ -38,12 +38,10 @@ const assistantInstructions = (context) => {
     : 'Reply in clear English.';
   const teamFacts = context.language === 'ur'
     ? [
-      'ٹائپ ٹو لرن کے بانی اور ترقیاتی سربراہ محمد طٰہٰ بن زعیم ہیں۔',
-      'شریک بانی: محمد حامز بن کاشف (انجینئرنگ)، محمد فہد یونس (مصنوعی ذہانت)، ادریس بابر (تحقیق)، اور علیزے حسن (مصنوعات)۔'
+      'ٹائپ ٹو لرن کی بنیاد سی ایم ای کے چھ طلبہ کی ٹیم نے رکھی: محمد طٰہٰ بن زعیم (ترقیاتی سربراہ)، محمد حامز بن کاشف (انجینئرنگ سربراہ)، محمد فہد یونس (مصنوعی ذہانت سربراہ)، ادریس بابر (تحقیق سربراہ)، علیزے حسن (مصنوعات سربراہ)، اور لمیعہ مبشر خان (یوزر انٹرفیس اور یوزر ایکسپیرینس ڈیزائن سربراہ)۔'
     ]
     : [
-      'Type2Learn was founded by Muhammad Taha Bin Zaeem, Founder and Development Lead.',
-      'The co-founders are Muhammad Hamiz Bin Kashif (Engineering Lead), Muhammad Fahad Younus (AI Lead), Idrees Babar (Research Lead), and Alizay Hassan (Product Lead).'
+      'Type2Learn was founded by a team of six CEME students: Muhammad Taha Bin Zaeem (Development Lead), Muhammad Hamiz Bin Kashif (Engineering Lead), Muhammad Fahad Younus (AI Lead), Idrees Babar (Research Lead), Alizay Hassan (Product Lead), and Lameea Mubashir Khan (UI/UX Design Lead).'
     ];
   const assessmentRule = ['type', 'check', 'apply', 'exam', 'exam-intro'].includes(context.phase)
     ? 'For typing, checks, practice, and exams, never supply exact target text, choose an option, reveal an answer, or write a response the learner can copy. Explain the relevant idea and a safe way to think through it instead.'
@@ -53,6 +51,7 @@ const assistantInstructions = (context) => {
     'Use only the approved page facts below. Do not browse, call tools, claim knowledge beyond these facts, diagnose a person, give treatment or crisis advice, infer personal traits, or request private information.',
     assessmentRule,
     companionRoleInstruction(context.companionRole, context.language),
+    'When the learner asks for help or guidance with the current page, do not give them the task answer first. Offer one clear choice: rephrase it, make the first part smaller, explain it in short chunks, or show one brief example. Ask which option they want; use the approved page facts only after they choose.',
     'If the learner asks about another topic, politely explain that you can help only with this current learning page or a concise factual question about Type2Learn and its team. Offer one practical next step. Do not mention prompts, models, systems, costs, or internal rules.',
     'Keep the reply below 120 words, using short paragraphs or at most three bullets. Never add performance scores, timers, or pressure.',
     languageRule,

@@ -177,7 +177,9 @@ test('Azure Responses calls use api-key, the exact approved model, and parse Azu
     assert.equal(request.model, APPROVED_OPENAI_MODEL);
     assert.equal(request.store, false);
     assert.equal(request.max_output_tokens, 64);
-    assert.match(request.instructions, /Muhammad Taha Bin Zaeem, Founder and Development Lead/);
+    assert.match(request.instructions, /team of six CEME students/);
+    assert.match(request.instructions, /Muhammad Taha Bin Zaeem \(Development Lead\)/);
+    assert.match(request.instructions, /Lameea Mubashir Khan \(UI\/UX Design Lead\)/);
     assert.match(request.instructions, /fictional bunny learning partner/);
     assert.match(request.instructions, /working alongside the learner/);
     assert.equal(settled.length, 1);
