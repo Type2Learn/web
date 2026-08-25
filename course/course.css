@@ -6193,8 +6193,12 @@ html[dir="rtl"] .course-settings-backdrop .course-settings-menu,
 body[data-course-direction="rtl"] .course-settings-backdrop .course-settings-menu {
   position: relative;
   inset: auto;
+  display: flex;
+  flex-direction: column;
   width: min(980px, 100%);
+  height: min(720px, calc(100dvh - 48px));
   max-height: min(720px, calc(100dvh - 48px));
+  min-height: 0;
   overflow: hidden;
   border-radius: 18px;
   padding: 0;
@@ -6210,8 +6214,9 @@ body[data-course-direction="rtl"] .course-settings-backdrop .course-settings-men
 .course-settings-layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  min-height: 500px;
-  max-height: min(582px, calc(100dvh - 166px));
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .course-settings-tabs {
@@ -6259,9 +6264,9 @@ body[data-course-animations="lively"] .course-settings-backdrop { animation: cou
 body[data-course-animations="still"] .course-settings-backdrop { backdrop-filter: none; }
 
 @media (max-width: 760px) {
-  .course-settings-backdrop { align-items: end; padding: 10px; }
-  .course-settings-backdrop .course-settings-menu { width: 100%; max-height: calc(100dvh - 20px); border-radius: 15px; }
-  .course-settings-layout { grid-template-columns: 1fr; max-height: calc(100dvh - 136px); }
+  .course-settings-backdrop { align-items: center; padding: 10px; }
+  .course-settings-backdrop .course-settings-menu { width: 100%; height: calc(100dvh - 20px); max-height: calc(100dvh - 20px); border-radius: 15px; }
+  .course-settings-layout { grid-template-columns: 1fr; }
   .course-settings-tabs { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--course-line); padding: 9px; }
   html[dir="rtl"] .course-settings-tabs,
   body[data-course-direction="rtl"] .course-settings-tabs { border-left: 0; border-bottom: 1px solid var(--course-line); }

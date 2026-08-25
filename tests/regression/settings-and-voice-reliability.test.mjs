@@ -19,6 +19,9 @@ test('profile settings use a modal with explicit categories and a backdrop close
   assert.match(course, /const settingsTab = event\.target\.closest\('\[data-settings-tab\]'/);
   assert.match(css, /\.course-settings-layout\s*\{/);
   assert.match(css, /grid-template-columns: 220px minmax\(0, 1fr\)/);
+  assert.match(css, /\.course-settings-backdrop \.course-settings-menu[\s\S]*display: flex;[\s\S]*height: min\(720px, calc\(100dvh - 48px\)\)/);
+  assert.match(css, /\.course-settings-layout[\s\S]*min-height: 0;[\s\S]*flex: 1 1 auto;[\s\S]*overflow: hidden/);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.course-settings-backdrop \{ align-items: center; padding: 10px; \}/);
 });
 
 test('starting preferences explicitly include privacy-aware support and partner behaviour controls', () => {
