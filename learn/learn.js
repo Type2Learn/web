@@ -35,7 +35,6 @@ let mascotPreview = null;
 let mascotPreviewLoad = null;
 let setupStage = 'scheme';
 let focusedStepIndex = 0;
-let mascotLanguageExplicitlyChosen = false;
 let layoutBeforeFocused = 'balanced';
 let setupFeedbackTimer = 0;
 let setupMotionSequence = 0;
@@ -67,10 +66,7 @@ const defaultChoices = {
   ...Object.fromEntries(preferenceControls.map(({ id, choices }) => [id, id === 'colours' || id === 'layout' ? 'balanced' : id === 'animations' ? 'gentle' : choices[0][0]])),
   'website-scheme': 'calm',
   'urdu-mode': 'off',
-  'mascot-language': 'english',
-  'mascot-language-explicit': false,
   'mascot-voice': 'text',
-  'mascot-voice-language': 'english',
   'adaptive-learning': 'off',
   'learning-partner': 'off',
   'mascot-role': 'calm-guide',
@@ -210,9 +206,7 @@ const localizedControls = {
     'text-to-speech': { label: 'متن سے آواز', description: 'اختیاری پڑھ کر سنانے کی مدد۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     'urdu-mode': { label: 'اردو موڈ', description: 'کورس اور کورس کی مصنوعی ذہانت اردو میں دکھائیں۔ ٹائپنگ کا متن انگریزی میں رہتا ہے۔', choices: [['off', 'بند'], ['on', 'چالو']] },
     mascot: { label: 'میسکاٹ', description: 'جب آپ چاہیں ایک سیکھنے والا ساتھی۔', choices: [['off', 'بند'], ['on', 'چالو']] },
-    'mascot-language': { label: 'میسکاٹ کی زبان', description: 'یہ آپ کی ابتدائی زبان کے ساتھ شروع ہوتی ہے۔ آپ میسکاٹ کے لیے الگ زبان منتخب کر سکتے ہیں۔', choices: [['english', 'انگریزی'], ['urdu', 'اردو']] },
     'mascot-voice': { label: 'میسکاٹ کی گفتگو', description: 'منتخب کریں کہ میسکاٹ آپ سے کیسے بات کرے گا۔', choices: [['text', 'متن'], ['speech', 'آواز'], ['both', 'دونوں']] },
-    'mascot-voice-language': { label: 'میسکاٹ کی آواز', description: 'منتخب کریں کہ میسکاٹ کس زبان میں بولے گا۔', choices: [['english', 'انگریزی'], ['urdu', 'اردو']] }
   }
 };
 
@@ -401,7 +395,7 @@ const playSetupTextToSpeechPreview = (choices) => {
 };
 
 const mascotDialogue = (choices) => {
-  const language = choices['mascot-language'] || setupLanguage(choices);
+  const language = setupLanguage(choices);
   return language === 'urdu'
     ? 'السلام علیکم! میں آپ کے ساتھ ایک وقت میں ایک انتخاب پر رہوں گا۔'
     : 'Hi! I can stay with you while you choose one setting at a time.';
@@ -410,16 +404,9 @@ const mascotDialogue = (choices) => {
 const mascotRailMarkup = (choices) => {
   if (choices.mascot !== 'on') return '';
   if (!mascotScreenIsSupported()) return '';
-  const language = choices['mascot-language'] || setupLanguage(choices);
+  const language = setupLanguage(choices);
   return '<aside class="learning-setup-mascot-rail" data-learning-mascot><div class="learning-mascot-stage" data-learning-mascot-stage aria-hidden="true"></div><p class="learning-mascot-dialogue" lang="' + (language === 'urdu' ? 'ur' : 'en') + '" dir="' + (language === 'urdu' ? 'rtl' : 'ltr') + '">' + mascotDialogue(choices) + '</p></aside>';
 };
-
-const mascotLanguageControl = (choices) => controlMarkup({
-  id: 'mascot-language',
-  label: 'Mascot language',
-  description: 'This starts with your learning language. You can choose a different one for the mascot.',
-  choices: [['english', 'English'], ['urdu', 'اردو']]
-}, choices['mascot-language'] || setupLanguage(choices), setupLanguage(choices));
 
 const mascotSpeechControl = (choices) => controlMarkup({
   id: 'mascot-voice',
@@ -428,15 +415,8 @@ const mascotSpeechControl = (choices) => controlMarkup({
   choices: [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']]
 }, choices['mascot-voice'], setupLanguage(choices));
 
-const mascotVoiceControl = (choices) => controlMarkup({
-  id: 'mascot-voice-language',
-  label: 'Mascot voice',
-  description: 'Choose the language your mascot will speak.',
-  choices: [['english', 'English'], ['urdu', 'اردو']]
-}, choices['mascot-voice-language'], setupLanguage(choices));
-
 const mascotDetailsMarkup = (choices) => choices.mascot === 'on'
-  ? '<div class="learning-mascot-details">' + mascotLanguageControl(choices) + mascotSpeechControl(choices) + mascotVoiceControl(choices) + '</div>'
+  ? '<div class="learning-mascot-details">' + mascotSpeechControl(choices) + '</div>'
   : '';
 
 const partnerRoleControl = (choices) => controlMarkup({
@@ -509,15 +489,13 @@ const focusedSteps = (choices) => {
   ];
   if (choices['background-noise'] === 'on') steps.push({ id: 'noise-details' });
   steps.push({ id: 'text-to-speech' }, { id: 'adaptive-learning' }, { id: 'learning-partner' }, { id: 'mascot-role' }, { id: 'mascot-presence' }, { id: 'mascot-proactive' }, { id: 'urdu-mode' }, { id: 'mascot' });
-  if (choices.mascot === 'on') steps.push({ id: 'mascot-language' }, { id: 'mascot-voice' }, { id: 'mascot-voice-language' });
+  if (choices.mascot === 'on') steps.push({ id: 'mascot-voice' });
   return steps;
 };
 
 const focusedStepContent = (step, choices) => {
   if (step.id === 'noise-details') return backgroundNoiseMarkup(choices);
-  if (step.id === 'mascot-language') return mascotLanguageControl(choices);
   if (step.id === 'mascot-voice') return mascotSpeechControl(choices);
-  if (step.id === 'mascot-voice-language') return mascotVoiceControl(choices);
   if (step.id === 'mascot-role') return partnerRoleControl(choices);
   if (step.id === 'mascot-presence') return partnerPresenceControl(choices);
   if (step.id === 'mascot-proactive') return partnerProactiveControl(choices);
@@ -841,11 +819,6 @@ const boot = async () => {
       const previousValue = choices[preference];
       choices[preference] = value;
       applySetupPresentation(choices);
-      if (preference === 'urdu-mode' && !mascotLanguageExplicitlyChosen) choices['mascot-language'] = value === 'on' ? 'urdu' : 'english';
-      if (preference === 'mascot-language') {
-        mascotLanguageExplicitlyChosen = true;
-        choices['mascot-language-explicit'] = true;
-      }
       if (preference === 'colours') window.Type2LearnColorMode?.set(value);
       if (preference === 'website-scheme') window.Type2LearnWebsiteScheme?.set(value);
       if (preference === 'urdu-mode') {
@@ -891,7 +864,7 @@ const boot = async () => {
         render(choices);
         return;
       }
-      if (preference === 'mascot' || (preference === 'animations' && choices.mascot === 'on') || (preference === 'mascot-language' && choices.mascot === 'on')) {
+      if (preference === 'mascot' || (preference === 'animations' && choices.mascot === 'on')) {
         render(choices);
         if (preference === 'animations') showSetupFeedback('animations', choices);
         return;

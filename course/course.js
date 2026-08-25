@@ -2,7 +2,7 @@ import { COURSE_CONTENT as DEFAULT_COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU as DEFAULT_COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260825-catalogue-and-mascot-speech1';
+import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260825-mascot-dock-and-speech2';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
 import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
 import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
@@ -448,10 +448,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     'mascot-role': 'calm-guide',
     'mascot-presence': 'available',
     'mascot-proactive': 'on',
-    'mascot-language': 'english',
-    'mascot-language-explicit': false,
     'mascot-voice': 'text',
-    'mascot-voice-language': 'english',
     'adaptive-learning': 'off',
     'urdu-mode': 'off'
   });
@@ -462,18 +459,28 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     : websiteSchemes.includes(value) ? value : '';
   const learningChoices = () => {
     const saved = readLearningChoices();
-    const savedWebsiteScheme = normaliseWebsiteScheme(saved['website-scheme']);
+    // Retire the historical independent mascot-language choices. The bunny
+    // now always follows the course language so it is one partner, not a
+    // second localization system. Ignoring them also cleans old local data on
+    // the next normal preference save.
+    const {
+      'mascot-language': _legacyMascotLanguage,
+      'mascot-language-explicit': _legacyMascotLanguageExplicit,
+      'mascot-voice-language': _legacyMascotVoiceLanguage,
+      ...supportedSaved
+    } = saved;
+    const savedWebsiteScheme = normaliseWebsiteScheme(supportedSaved['website-scheme']);
     const isLegacyLanguagePreference = !savedWebsiteScheme;
-    const urduMode = isLegacyLanguagePreference && saved['learning-language'] === 'urdu'
+    const urduMode = isLegacyLanguagePreference && supportedSaved['learning-language'] === 'urdu'
       ? 'on'
-      : saved['urdu-mode'] === 'on'
-      ? 'on'
-      : saved['urdu-mode'] === 'off'
+      : supportedSaved['urdu-mode'] === 'on'
+        ? 'on'
+        : supportedSaved['urdu-mode'] === 'off'
         ? 'off'
         : 'off';
     return {
       ...defaultLearningChoices(),
-      ...saved,
+      ...supportedSaved,
       'website-scheme': savedWebsiteScheme || 'calm',
       'urdu-mode': urduMode
     };
@@ -524,11 +531,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         ? choices.encouragement
         : 'subtle',
       animations: effectiveAnimationLevel(),
-      language: choices['mascot-language'] === 'urdu' ? 'urdu' : supportLanguage(),
+      // The bunny and learning partner follow the course language. There is
+      // intentionally no separate partner-language preference.
+      language: supportLanguage(),
       voice: ['text', 'speech', 'both'].includes(choices['mascot-voice'])
         ? choices['mascot-voice']
         : 'text',
-      voiceLanguage: choices['mascot-voice-language'] === 'urdu' ? 'urdu' : 'english',
       // The retained 3D rollback renderer still accepts this presentation
       // value, although the current 2D companion does not expose it as a UI
       // preference.
@@ -1382,9 +1390,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
           + settingsChoiceGroup('mascot-presence', 'Partner presence', 'Choose how visibly your partner appears.', [['quiet', 'Quiet'], ['available', 'Available'], ['involved', 'Involved']], choices['mascot-presence'])
           + settingsSwitch('mascot-proactive', 'Proactive offers', 'Offer one optional support after matched task signals. You can dismiss it for this task.', choices['mascot-proactive'] !== 'off')
           + '<details class="course-adaptive-settings-explainer"><summary>Why did this appear?</summary><p>Type2Learn waits for at least two neutral task signals, such as returning after a pause and rereading. It does not diagnose you or change settings automatically.</p></details>' : '')
-        + ((mascotOn || partnerOn) ? settingsChoiceGroup('mascot-language', partnerOn ? 'Partner language' : 'Mascot language', 'This can match or differ from your learning language.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-language'] || supportLanguage())
-          + settingsChoiceGroup('mascot-voice', partnerOn ? 'Partner response' : 'Mascot response', 'Choose text, voice input, or both. Voice words are always shown before sending.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice'])
-          + (mascotOn ? settingsChoiceGroup('mascot-voice-language', 'Mascot voice language', 'Choose the language your mascot will speak.', [['english', 'English'], ['urdu', 'اردو']], choices['mascot-voice-language']) : '') : '')
+        + ((mascotOn || partnerOn) ? settingsChoiceGroup('mascot-voice', partnerOn ? 'Partner response' : 'Mascot response', 'Choose text, voice input, or both. Voice words are always shown before sending. The bunny follows your course language.', [['text', 'Text'], ['speech', 'Speech'], ['both', 'Both']], choices['mascot-voice']) : '')
       );
     } else {
       const dataStatus = signedInLearner() && adaptiveLearning.available
@@ -2078,7 +2084,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       return;
     }
     stopMascotSpeech();
-    if (!signedInLearner() || !aiChat.connection.aiAudio) {
+    // The server narration endpoint currently offers English audio. For an
+    // Urdu course, use the device voice immediately from the learner's click
+    // instead of waiting for a request that the server must reject.
+    if (!signedInLearner() || !aiChat.connection.aiAudio || mascotPresentation.language === 'urdu') {
       speakMascotWithBrowser(dialogue);
       return;
     }
@@ -2120,6 +2129,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
   };
 
+  const mascotSpeechButtonMarkup = (dialogue) => mascotSpeechCanPlay()
+    ? '<button class="course-mascot-listen" type="button" data-action="mascot-speak">'
+      + escapeHtml(mascotSpeech.loading ? courseUi('Loading audio…', 'آڈیو لوڈ ہو رہی ہے…') : mascotSpeech.text === dialogue ? courseUi('Stop audio', 'آڈیو روکیں') : courseUi('Listen', 'سنیں'))
+      + '</button>'
+    : '';
+
   const courseMascotMarkup = (location) => {
     // ADAPTIVE LEARNING: an opted-in learner can request a reviewed visual
     // explanation. It uses the companion rail when present, rather than
@@ -2135,14 +2150,22 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const dialogue = mascotDialogue();
     const companion = location === 'lesson' ? behaviourPartner.directive : null;
     const showAiPanel = location === 'lesson' && aiChat.open && canUseMascotAiPanel();
-    const focusedPartner = selectedCourseLayout() === 'focused' && !behaviourPartner.focusedOpen;
+    // A direct learner message must always receive a visible speech bubble,
+    // including in Focused layout. The quiet trigger is only for unsolicited
+    // proactive offers.
+    const focusedPartner = selectedCourseLayout() === 'focused'
+      && !behaviourPartner.focusedOpen
+      && companion?.trigger !== 'using-support';
     const companionMarkup = !showAiPanel && companion
-      ? companionBubbleMarkup({ directive: companion, language: mascotLanguage, escapeHtml, focused: focusedPartner })
+      ? companionBubbleMarkup({ directive: companion, language: mascotLanguage, escapeHtml, focused: focusedPartner, speechControl: mascotSpeechButtonMarkup(dialogue) })
       : '';
     const dialogueMarkup = !showAiPanel && dialogue && !companion
-      ? '<div class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '"><p>' + escapeHtml(dialogue) + '</p>' + (mascotSpeechCanPlay() ? '<button class="course-mascot-listen" type="button" data-action="mascot-speak">' + escapeHtml(mascotSpeech.loading ? courseUi('Loading audio…', 'آڈیو لوڈ ہو رہی ہے…') : mascotSpeech.text === dialogue ? courseUi('Stop audio', 'آڈیو روکیں') : courseUi('Listen', 'سنیں')) + '</button>' : '') + '</div>'
+      ? '<div class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '"><p>' + escapeHtml(dialogue) + '</p>' + mascotSpeechButtonMarkup(dialogue) + '</div>'
       : '';
-    const dockMarkup = !showAiPanel && location === 'lesson' && companion && !focusedPartner
+    // The compact dock belongs to the bunny, not to a particular proactive
+    // suggestion. It stays directly beneath its feet in the same rail and
+    // can send a learner-initiated message at any time.
+    const dockMarkup = !showAiPanel && location === 'lesson'
       ? companionDockMarkup({ language: mascotLanguage, escapeHtml, draft: behaviourPartner.draft, canSpeak: browserSpeechRecognitionAvailable(), channel: partnerControls().channel, listening: behaviourPartner.listening })
       : '';
     if (showAiPanel) {
@@ -2974,17 +2997,25 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
 
   const sendCompanionMessage = async () => {
     const message = behaviourPartner.draft.trim();
-    if (!message || !courseAiAccessAllowed() || behaviourPartner.requesting) return;
+    if (!message || behaviourPartner.requesting) return;
+    if (!courseAiAccessAllowed()) {
+      // Guest learning remains private and authored-only. Show the same clear
+      // explanation used by Course AI rather than leaving this dock silent.
+      openCourseAi(app.querySelector('[data-action="companion-send"]'));
+      return;
+    }
     behaviourPartner.requesting = true;
     recordUnifiedBehaviourAction('ai-request');
     try {
-      const reply = await askCourseAi({ user: authenticatedUser, message, history: [], ...aiPageRequestContext(), signal: requestTimeoutSignal(20000) });
+      const reply = await askCourseAi({ user: authenticatedUser, message, history: [], companionRole: partnerControls().role, ...aiPageRequestContext(), signal: requestTimeoutSignal(20000) });
       const response = companionMessage(reply?.reply) || courseUi('I could not make that clear yet. Try sharing one smaller part of the idea.', 'میں اسے ابھی واضح نہیں بنا سکا۔ خیال کا ایک چھوٹا حصہ بتانے کی کوشش کریں۔');
       behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'teach-partner', surface: 'bubble', message: response, reasonCategory: 'using-support' };
       behaviourPartner.draft = '';
+      behaviourPartner.focusedOpen = true;
       behaviourPartner.context.accept('teach-partner');
     } catch (error) {
-      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'return-to-task', surface: 'bubble', message: courseUi('Your partner could not reply right now. Your task is still here, and you can continue or open full chat later.', 'آپ کا ساتھی ابھی جواب نہیں دے سکا۔ آپ کا کام محفوظ ہے، اور آپ جاری رکھ سکتے ہیں یا بعد میں مکمل چیٹ کھول سکتے ہیں۔'), reasonCategory: 'system-error' };
+      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'return-to-task', surface: 'bubble', message: courseUi('Your partner could not reply right now. Your task is still here, and you can continue when you are ready.', 'آپ کا ساتھی ابھی جواب نہیں دے سکا۔ آپ کا کام محفوظ ہے، اور آپ جب چاہیں جاری رکھ سکتے ہیں۔'), reasonCategory: 'system-error' };
+      behaviourPartner.focusedOpen = true;
     } finally {
       behaviourPartner.requesting = false;
       render();
@@ -7429,10 +7460,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // to resume an earlier loudness. Start it at zero and let the learner
     // raise the slider only if they want to hear it.
     if (key === 'background-noise' && value === 'on') choices['background-noise-volume'] = '0';
-    // The companion follows Urdu mode until the learner explicitly gives it a
-    // different language in the same menu.
-    if (key === 'urdu-mode' && !choices['mascot-language-explicit']) choices['mascot-language'] = value === 'on' ? 'urdu' : 'english';
-    if (key === 'mascot-language') choices['mascot-language-explicit'] = true;
     saveLearningChoices(choices);
 
     if (key === 'colours' && colorModes.includes(value)) window.Type2LearnColorMode?.set(value, false);

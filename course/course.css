@@ -1446,6 +1446,7 @@ body[data-course-direction="rtl"] .course-catalogue-lock {
     place-items: center;
     overflow: hidden;
     background: transparent;
+    pointer-events: none;
   }
 
   .course-mascot-rail--dashboard .course-mascot-stage,
@@ -1493,6 +1494,9 @@ body[data-course-direction="rtl"] .course-catalogue-lock {
     font-size: 13px;
     font-weight: 700;
     line-height: 1.45;
+    /* The lesson rail itself passes clicks through to the course route. The
+       speech bubble is an intentional, interactive exception. */
+    pointer-events: auto;
   }
 
   .course-mascot-dialogue p { margin: 0; }
@@ -1510,6 +1514,7 @@ body[data-course-direction="rtl"] .course-catalogue-lock {
     font-size: 12px;
     font-weight: 800;
     cursor: pointer;
+    touch-action: manipulation;
   }
 
   .course-mascot-dialogue::after {
@@ -6089,7 +6094,12 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
   .course-companion-dock {
     position: absolute;
     z-index: 5;
-    right: 3%; bottom: 2%; left: 3%;
+    /* This is anchored to the mascot rail's lower stage, rather than the
+       changing course content. It therefore stays under the bunny's feet as
+       a layout expands, collapses, or mirrors in Urdu. */
+    right: 50%; bottom: clamp(14px, 3.4vh, 34px); left: auto;
+    width: min(330px, calc(100% - 24px));
+    transform: translateX(50%);
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 7px 9px;
@@ -6101,7 +6111,7 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
     pointer-events: auto;
   }
   .course-companion-dock label { min-width: 0; }
-  .course-companion-dock textarea { width: 100%; min-height: 48px; resize: vertical; border: 1px solid var(--course-line-strong); border-radius: 8px; padding: 7px 8px; color: var(--course-ink); background: var(--course-paper); font: inherit; font-size: 12px; line-height: 1.35; }
+  .course-companion-dock textarea { width: 100%; min-height: 38px; max-height: 88px; resize: vertical; border: 1px solid var(--course-line-strong); border-radius: 8px; padding: 7px 8px; color: var(--course-ink); background: var(--course-paper); font: inherit; font-size: 12px; line-height: 1.35; }
   .course-companion-dock > div { display: grid; align-content: start; gap: 6px; }
   .course-companion-dock .course-secondary-button,
   .course-companion-dock .course-primary-button { min-height: 30px; padding: 6px 8px; font-size: 10px; white-space: nowrap; }
@@ -6113,6 +6123,8 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
   body[data-course-direction="rtl"] .course-companion-bubble::after { right: auto; left: -8px; border-top: 0; border-right: 0; border-bottom: 1px solid var(--course-line-strong); border-left: 1px solid var(--course-line-strong); }
   html[dir="rtl"] .course-companion-quiet-trigger,
   body[data-course-direction="rtl"] .course-companion-quiet-trigger { right: auto; left: 7%; }
+  html[dir="rtl"] .course-companion-dock,
+  body[data-course-direction="rtl"] .course-companion-dock { right: 50%; left: auto; transform: translateX(50%); }
 }
 
 @media (min-width: 1181px) and (max-width: 1500px) {

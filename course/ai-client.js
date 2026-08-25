@@ -44,11 +44,14 @@ const authenticatedRequest = async (user, path, options = {}) => {
 
 export const getCourseAiStatus = () => request('/api/v1/health');
 
-export const askCourseAi = async ({ user, message, history, courseId, courseVersion, page, language, signal }) => {
+export const askCourseAi = async ({ user, message, history, courseId, courseVersion, page, language, companionRole = '', signal }) => {
   const requestOptions = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, history, courseId, courseVersion, page, language }),
+    // `companionRole` is an allow-listed presentation hint. The server owns
+    // the whitelist and the learning safeguards; it never changes course
+    // facts or gives the model an unrestricted persona instruction.
+    body: JSON.stringify({ message, history, courseId, courseVersion, page, language, companionRole }),
     signal
   };
   // Local guest chat is a development-only preview. The server accepts it

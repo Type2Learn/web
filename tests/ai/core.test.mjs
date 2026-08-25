@@ -162,6 +162,7 @@ test('Azure Responses calls use api-key, the exact approved model, and parse Azu
       body: {
         message: 'What does this page introduce?',
         history: [],
+        companionRole: 'learning-partner',
         courseId: COURSE_CONTENT.id,
         page: { moduleIndex: 0, phase: 'read' },
         language: 'en'
@@ -176,6 +177,8 @@ test('Azure Responses calls use api-key, the exact approved model, and parse Azu
     assert.equal(request.store, false);
     assert.equal(request.max_output_tokens, 64);
     assert.match(request.instructions, /Muhammad Taha Bin Zaeem, Founder and Development Lead/);
+    assert.match(request.instructions, /fictional bunny learning partner/);
+    assert.match(request.instructions, /working alongside the learner/);
     assert.equal(settled.length, 1);
     assert.equal(settled[0].actual.inputTokens, 31);
     assert.equal(settled[0].actual.outputTokens, 7);

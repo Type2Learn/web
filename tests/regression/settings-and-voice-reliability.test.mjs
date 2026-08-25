@@ -47,6 +47,23 @@ test('mascot dialogue Listen uses authenticated audio first and a browser-speech
   assert.match(course, /const unlockMascotAudioFromClick/);
   assert.match(course, /mascotSpeech\.element = unlockMascotAudioFromClick\(\)/);
   assert.match(course, /const audio = mascotSpeech\.element \|\| new Audio\(\)/);
+  assert.match(css, /\.course-mascot-dialogue[\s\S]*pointer-events: auto/);
+  assert.match(css, /\.course-mascot-listen[\s\S]*touch-action: manipulation/);
+  assert.match(course, /mascotPresentation\.language === 'urdu'/);
+});
+
+test('mascot is one language-following partner with a direct dock below its rail', () => {
+  assert.doesNotMatch(course, /settingsChoiceGroup\('mascot-language'/);
+  assert.doesNotMatch(course, /settingsChoiceGroup\('mascot-voice-language'/);
+  assert.doesNotMatch(setup, /id: 'mascot-language'/);
+  assert.doesNotMatch(setup, /id: 'mascot-voice-language'/);
+  assert.match(course, /language: supportLanguage\(\)/);
+  assert.match(course, /const dockMarkup = !showAiPanel && location === 'lesson'/);
+  assert.match(course, /companionRole: partnerControls\(\)\.role/);
+  assert.match(course, /behaviourPartner\.focusedOpen = true/);
+  assert.match(css, /\.course-companion-dock[\s\S]*right: 50%; bottom: clamp\(14px, 3\.4vh, 34px\)/);
+  assert.match(css, /\.course-companion-dock[\s\S]*pointer-events: auto/);
+  assert.match(course, /mascotSpeechButtonMarkup\(dialogue\)/);
 });
 
 test('approved published courses load into the normal learner course selection and preserve course-specific setup', () => {
@@ -64,9 +81,9 @@ test('course entry points share the current cache-busted catalogue and mascot pl
     read('../../course/course-router.js'),
     read('../../course/index.html')
   ]);
-  assert.match(router, /course\.js\?v=20260825-catalogue-and-mascot-speech1/);
-  assert.match(courseHtml, /course-router\.js\?v=20260825-catalogue-and-mascot-speech1/);
-  assert.match(courseHtml, /course\.css\?v=20260825-catalogue-and-mascot-speech1/);
+  assert.match(router, /course\.js\?v=20260825-mascot-dock-and-speech2/);
+  assert.match(courseHtml, /course-router\.js\?v=20260825-mascot-dock-and-speech2/);
+  assert.match(courseHtml, /course\.css\?v=20260825-mascot-dock-and-speech2/);
 });
 
 test('starting preferences explicitly include privacy-aware support and partner behaviour controls', () => {
