@@ -49,10 +49,12 @@ test('B-02: enabling the mascot keeps preference controls inside a usable rail l
   assert.match(learnCss, /max-width: 1550px[\s\S]*learning-control-list \{ grid-template-columns: repeat\(2/);
 });
 
-test('B-03: Course AI is not available to guest learners', () => {
-  assert.match(courseJs, /const courseAiAccessAllowed = \(\) => signedInLearner\(\);/);
-  assert.match(courseJs, /if \(authenticatedUser\?\.isGuest\) \{\s*openCourseModal\('guest-ai'/);
-  assert.match(courseJs, /Sign in to use Course AI/);
+test('B-03: guest learners can use the server-approved bounded public Course AI workflow', () => {
+  assert.match(courseJs, /const courseAiAccessAllowed = \(\) => signedInLearner\(\)\s*\|\| Boolean\(authenticatedUser\?\.isGuest && aiChat\.connection\.guestAccess\)/);
+  assert.match(courseJs, /authenticatedUser\?\.isGuest && aiChat\.connection\.checked && !courseAiAccessAllowed\(\)/);
+  assert.match(courseJs, /guestAccess = Boolean\(status\?\.ai\?\.guestAccess \?\? status\?\.ai\?\.localGuestPreview\)/);
+  assert.match(courseJs, /const courseAiHistory = \(\)/);
+  assert.match(courseJs, /history, companionRole: partnerControls\(\)\.role/);
   assert.match(courseJs, /const canRequestAdaptiveRecall = \(\) => signedInLearner\(\);/);
 });
 
@@ -97,4 +99,3 @@ test('B-07: deterministic support varies with an entered response and a revision
   assert.match(courseJs, /You changed your response\. Now connect it to the current idea\./);
   assert.match(courseJs, /const fallback = adaptiveFallback\(barrier, safeResponse, previousResponse\);/);
 });
-

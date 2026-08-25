@@ -114,7 +114,7 @@ const sendJson = (response, status, payload) => send(response, status, JSON.stri
 
 const asOrigin = (request) => String(request.headers.origin || '').replace(/\/$/, '');
 const localGuestFromRequest = (request, config) => {
-  if (!config.allowLocalGuestAi) return null;
+  if (!(config.allowGuestAi ?? config.allowLocalGuestAi)) return null;
   const cookie = String(request.headers.cookie || '');
   const match = cookie.match(/(?:^|;\s*)type2learn_guest_id=([A-Za-z0-9_-]{20,96})(?:;|$)/);
   if (!match) return null;
@@ -268,7 +268,7 @@ const handleApi = async (request, response, pathname, runtime) => {
         commit: String(process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || '').slice(0, 12) || null
       },
       ai: ai.status(),
-      adaptiveRecall: { ...adaptiveRecall.status(), localGuestPreview: config.allowLocalGuestAi },
+      adaptiveRecall: { ...adaptiveRecall.status(), guestAccess: Boolean(config.allowGuestAi ?? config.allowLocalGuestAi), localGuestPreview: Boolean(config.allowGuestAi ?? config.allowLocalGuestAi) },
       adaptiveLearning: learningAnalytics.status(),
       adaptiveSupport: adaptiveSupport.status(),
       behaviouralPartner: behaviouralPartner.status(),

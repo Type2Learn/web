@@ -46,6 +46,7 @@ test('production runtime never loads the local secret file and caps cannot be ra
     assert.equal(production.openAiAppCapUsd, 14);
     assert.equal(production.openAiModel, 'gpt-5.4-nano');
     assert.equal(production.openAiMiniModel, 'gpt-5.4-mini');
+    assert.equal(production.allowGuestAi, true, 'the public course demo keeps its bounded guest helper enabled');
 
     const development = await loadRuntimeConfig({ root, environment: { NODE_ENV: 'development' } });
     assert.equal(development.openAiApiKey, 'local-only-value');
@@ -277,17 +278,17 @@ test('signed-in Course AI uses the shared Gemini-first provider before an unavai
   assert.equal(settled[0].actual.usd, 0);
 });
 
-test('local guest AI preview uses only bundled public context and never requests a reviewed manifest', async () => {
+test('guest Course AI uses only bundled public context and never requests a reviewed manifest', async () => {
   const service = createAiService({
     config: {
-      allowLocalGuestAi: true,
+      allowGuestAi: true,
       openAiApiKey: '', openAiResponsesUrl: '', openAiModel: APPROVED_OPENAI_MODEL,
       openAiMaxOutputTokens: 120, openAiInputUsdPerMillion: .05, openAiOutputUsdPerMillion: .4,
       openAiAppCapUsd: 14, openAiAppInputTokenCap: 11200000, openAiAppOutputTokenCap: 5600000,
       openAiUserCapUsd: 2, openAiUserInputTokenCap: 1000000, openAiUserOutputTokenCap: 500000,
       openAiRequestsPerMinute: 12
     },
-    firebase: { available: true, verifyBearer: async () => assert.fail('local guest preview must not verify a bearer token') },
+    firebase: { available: true, verifyBearer: async () => assert.fail('guest Course AI must not verify a bearer token') },
     ledger: {
       reserve: async () => ({ month: '2026-08', reservationId: 'local-guest-preview' }),
       settle: async () => {}, release: async () => assert.fail('successful guest preview must settle')
@@ -299,13 +300,15 @@ test('local guest AI preview uses only bundled public context and never requests
         return { text: 'Start with one visible idea.', provider: 'gemini', usage: { inputTokens: 12, outputTokens: 7 } };
       }
     },
-    contextResolver: { resolve: async () => assert.fail('local guest preview must not load a private manifest') }
+    contextResolver: { resolve: async () => assert.fail('guest Course AI must not load a private manifest') }
   });
   const result = await service.chat({
     localGuest: { uid: 'guest-local-preview', isGuest: true },
     body: { message: 'How can I begin?', history: [], courseId: COURSE_CONTENT.id, page: { moduleIndex: 0, phase: 'read' }, language: 'en' }
   });
   assert.equal(result.reply, 'Start with one visible idea.');
+  assert.equal(service.status().guestAccess, true);
+  assert.equal(service.status().requiresSignIn, false);
 });
 
 test('course context limits model facts to the current page and excludes assessment options', () => {

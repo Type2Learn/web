@@ -214,7 +214,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     draft: '',
     status: 'idle',
     error: '',
-    connection: { checked: false, checking: false, ai: false, localGuestPreview: false, speech: false, aiAudio: false },
+    connection: { checked: false, checking: false, ai: false, guestAccess: false, localGuestPreview: false, speech: false, aiAudio: false },
     requestController: null,
     dictation: {
       recorder: null,
@@ -1523,10 +1523,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }).join('');
   };
 
-  // Guest learning deliberately keeps authored help available, but never
-  // sends a guest's text to Course AI. This is enforced in the UI as well as
-  // on the API boundary so a local-preview flag cannot accidentally expose it.
-  const courseAiAccessAllowed = () => signedInLearner();
+  // COURSE AI + LEARNING PARTNER: guests may use the same bounded public
+  // course conversation only when the server explicitly advertises guest
+  // access. Private/assigned manifests still require signed-in resolution.
+  const courseAiAccessAllowed = () => signedInLearner()
+    || Boolean(authenticatedUser?.isGuest && aiChat.connection.guestAccess);
 
   const syncAiComposerState = () => {
     const busy = ['checking', 'sending', 'recording', 'transcribing'].includes(aiChat.status);
@@ -1582,12 +1583,14 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     try {
       const status = await getCourseAiStatus();
       if (contextKey !== aiChat.contextKey) return;
-      const localGuestPreview = Boolean(status?.ai?.localGuestPreview);
+      const guestAccess = Boolean(status?.ai?.guestAccess ?? status?.ai?.localGuestPreview);
+      const aiAvailable = Boolean(status?.ai?.available);
       aiChat.connection = {
         checked: true,
         checking: false,
-        ai: Boolean(status?.ai?.available) || Boolean(authenticatedUser?.isGuest && localGuestPreview),
-        localGuestPreview,
+        ai: signedInLearner() ? aiAvailable : Boolean(authenticatedUser?.isGuest && guestAccess && aiAvailable),
+        guestAccess,
+        localGuestPreview: guestAccess,
         speech: Boolean(status?.speechToText?.available),
         aiAudio: Boolean(status?.speechToText?.textToSpeech?.available)
       };
@@ -1598,7 +1601,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       }
     } catch (_) {
       if (contextKey !== aiChat.contextKey) return;
-      aiChat.connection = { checked: true, checking: false, ai: false, localGuestPreview: false, speech: false, aiAudio: false };
+      aiChat.connection = { checked: true, checking: false, ai: false, guestAccess: false, localGuestPreview: false, speech: false, aiAudio: false };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
       if (aiChatIsVisible()) {
         render();
@@ -1608,7 +1611,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   };
 
   const openCourseAi = (trigger) => {
-    if (authenticatedUser?.isGuest) {
+    if (authenticatedUser?.isGuest && aiChat.connection.checked && !courseAiAccessAllowed()) {
       openCourseModal('guest-ai', trigger, '[data-action="call-ai"]');
       return;
     }
@@ -1660,10 +1663,15 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     language: aiLanguage()
   });
 
+  const courseAiHistory = () => aiChat.messages
+    .filter((entry) => !entry.initial)
+    .slice(-6)
+    .map((entry) => ({ role: entry.role, content: entry.content }));
+
   const sendAiMessage = async () => {
     const message = aiChat.draft.trim();
     if (!courseAiAccessAllowed() || !message || !aiChat.connection.ai || aiChat.status !== 'idle') return;
-    const history = aiChat.messages.filter((entry) => !entry.initial).slice(-6).map((entry) => ({ role: entry.role, content: entry.content }));
+    const history = courseAiHistory();
     aiChat.messages.push({ role: 'user', content: message });
     aiChat.draft = '';
     aiChat.error = '';
@@ -2001,6 +2009,15 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     signedInLearner() || browserMascotSpeechAvailable()
   );
 
+  // The Listen control must always speak the exact sentence currently visible
+  // beside the bunny. A direct Course AI reply therefore takes priority over
+  // the ordinary task-entry line, instead of producing audio that appears to
+  // do nothing or repeats an unrelated greeting.
+  const currentMascotSpeechText = () => {
+    const companion = state?.view === 'course' ? behaviourPartner.directive : null;
+    return companion?.message || mascotDialogue();
+  };
+
   const stopMascotSpeech = () => {
     mascotSpeech.controller?.abort?.();
     mascotSpeech.controller = null;
@@ -2073,7 +2090,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   // route so it works even when the browser has no usable system voices, then
   // falls back to the device reader if the network voice is unavailable.
   const speakMascotDialogue = async () => {
-    const dialogue = mascotDialogue();
+    const dialogue = currentMascotSpeechText();
     if (!dialogue || !mascotSpeechCanPlay()) {
       announce(courseUi('Mascot speech is not available in this browser yet.', 'اس براؤزر میں ماسکٹ کی آواز ابھی دستیاب نہیں۔'));
       return;
@@ -2149,6 +2166,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const mascotDirection = mascotPresentation.language === 'urdu' ? 'rtl' : 'ltr';
     const dialogue = mascotDialogue();
     const companion = location === 'lesson' ? behaviourPartner.directive : null;
+    const speechText = companion?.message || dialogue;
     const showAiPanel = location === 'lesson' && aiChat.open && canUseMascotAiPanel();
     // A direct learner message must always receive a visible speech bubble,
     // including in Focused layout. The quiet trigger is only for unsolicited
@@ -2157,7 +2175,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       && !behaviourPartner.focusedOpen
       && companion?.trigger !== 'using-support';
     const companionMarkup = !showAiPanel && companion
-      ? companionBubbleMarkup({ directive: companion, language: mascotLanguage, escapeHtml, focused: focusedPartner, speechControl: mascotSpeechButtonMarkup(dialogue) })
+      ? companionBubbleMarkup({ directive: companion, language: mascotLanguage, escapeHtml, focused: focusedPartner, speechControl: mascotSpeechButtonMarkup(speechText) })
       : '';
     const dialogueMarkup = !showAiPanel && dialogue && !companion
       ? '<div class="course-mascot-dialogue" data-mascot-dialogue aria-live="off" lang="' + mascotLanguage + '" dir="' + mascotDirection + '"><p>' + escapeHtml(dialogue) + '</p>' + mascotSpeechButtonMarkup(dialogue) + '</div>'
@@ -2884,6 +2902,13 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       )]));
     }
     const snapshot = behaviourPartner.context.snapshot({ completed });
+    // A learner-initiated companion reply is not a proactive behaviour offer.
+    // Keep it visible through the render it triggers, then naturally retire it
+    // when the learner moves to another module/phase. Without this guard the
+    // normal no-signal cleanup could erase a real Course AI reply immediately.
+    const directCompanionTask = displayedModuleIndex() + ':' + state.progress.phase;
+    if (behaviourPartner.directive?.source === 'companion-chat'
+      && behaviourPartner.directive?.taskKey === directCompanionTask) return;
     const local = controls.enabled ? localCompanionDirective(snapshot) : null;
     const localKey = local ? [snapshot.moduleIndex, snapshot.phase, local.trigger, controls.role].join(':') : '';
     if (local && !behaviourPartner.context.isDismissed(local.trigger)) {
@@ -2998,25 +3023,40 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const sendCompanionMessage = async () => {
     const message = behaviourPartner.draft.trim();
     if (!message || behaviourPartner.requesting) return;
-    if (!courseAiAccessAllowed()) {
-      // Guest learning remains private and authored-only. Show the same clear
-      // explanation used by Course AI rather than leaving this dock silent.
+    // The dock is a compact Course AI surface, not a separate chatbot. Refresh
+    // its shared availability first so a guest can use the server-approved
+    // public-course workflow without a silent redirect.
+    if (!aiChat.connection.checked) await refreshAiConnection();
+    if (!courseAiAccessAllowed() || !aiChat.connection.ai) {
       openCourseAi(app.querySelector('[data-action="companion-send"]'));
       return;
     }
     behaviourPartner.requesting = true;
+    aiChat.error = '';
+    aiChat.status = 'sending';
+    const history = courseAiHistory();
+    aiChat.messages.push({ role: 'user', content: message, companion: true });
     recordUnifiedBehaviourAction('ai-request');
+    const contextKey = aiChat.contextKey;
+    const controller = new AbortController();
+    aiChat.requestController = controller;
     try {
-      const reply = await askCourseAi({ user: authenticatedUser, message, history: [], companionRole: partnerControls().role, ...aiPageRequestContext(), signal: requestTimeoutSignal(20000) });
+      const reply = await askCourseAi({ user: authenticatedUser, message, history, companionRole: partnerControls().role, ...aiPageRequestContext(), signal: controller.signal });
+      if (contextKey !== aiChat.contextKey || controller.signal.aborted) return;
       const response = companionMessage(reply?.reply) || courseUi('I could not make that clear yet. Try sharing one smaller part of the idea.', 'میں اسے ابھی واضح نہیں بنا سکا۔ خیال کا ایک چھوٹا حصہ بتانے کی کوشش کریں۔');
-      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'teach-partner', surface: 'bubble', message: response, reasonCategory: 'using-support' };
+      aiChat.messages.push({ role: 'assistant', content: response, companion: true });
+      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'teach-partner', surface: 'bubble', message: response, reasonCategory: 'using-support', source: 'companion-chat', taskKey: displayedModuleIndex() + ':' + state.progress.phase };
       behaviourPartner.draft = '';
       behaviourPartner.focusedOpen = true;
       behaviourPartner.context.accept('teach-partner');
     } catch (error) {
-      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'return-to-task', surface: 'bubble', message: courseUi('Your partner could not reply right now. Your task is still here, and you can continue when you are ready.', 'آپ کا ساتھی ابھی جواب نہیں دے سکا۔ آپ کا کام محفوظ ہے، اور آپ جب چاہیں جاری رکھ سکتے ہیں۔'), reasonCategory: 'system-error' };
+      if (controller.signal.aborted || contextKey !== aiChat.contextKey) return;
+      aiChat.error = error?.message || courseUi('Your learning partner could not reply right now. Please try again later.', 'آپ کا سیکھنے والا ساتھی ابھی جواب نہیں دے سکا۔ براہ کرم بعد میں دوبارہ کوشش کریں۔');
+      behaviourPartner.directive = { ...(behaviourPartner.directive || {}), role: partnerControls().role, trigger: 'using-support', action: 'return-to-task', surface: 'bubble', message: courseUi('Your partner could not reply right now. Your task is still here, and you can continue when you are ready.', 'آپ کا ساتھی ابھی جواب نہیں دے سکا۔ آپ کا کام محفوظ ہے، اور آپ جب چاہیں جاری رکھ سکتے ہیں۔'), reasonCategory: 'system-error', source: 'companion-chat', taskKey: displayedModuleIndex() + ':' + state.progress.phase };
       behaviourPartner.focusedOpen = true;
     } finally {
+      if (aiChat.requestController === controller) aiChat.requestController = null;
+      if (contextKey === aiChat.contextKey) aiChat.status = 'idle';
       behaviourPartner.requesting = false;
       render();
     }

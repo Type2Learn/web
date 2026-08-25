@@ -37,6 +37,8 @@ test('profile settings dialog is portalled outside the blurred sticky header so 
 
 test('mascot dialogue Listen uses authenticated audio first and a browser-speech fallback with visible state', () => {
   assert.match(course, /const mascotSpeech = \{ controller: null, element: null, url: '', loading: false, text: '' \}/);
+  assert.match(course, /const currentMascotSpeechText = \(\)/);
+  assert.match(course, /const dialogue = currentMascotSpeechText\(\);/);
   assert.match(course, /const speakMascotDialogue = async/);
   assert.match(course, /synthesiseCourseAiReply\(\{/);
   assert.match(course, /const speakMascotWithBrowser/);
@@ -52,7 +54,7 @@ test('mascot dialogue Listen uses authenticated audio first and a browser-speech
   assert.match(course, /mascotPresentation\.language === 'urdu'/);
 });
 
-test('mascot is one language-following partner with a direct dock below its rail', () => {
+test('mascot is one language-following partner with a direct dock centred under its visual rail', () => {
   assert.doesNotMatch(course, /settingsChoiceGroup\('mascot-language'/);
   assert.doesNotMatch(course, /settingsChoiceGroup\('mascot-voice-language'/);
   assert.doesNotMatch(setup, /id: 'mascot-language'/);
@@ -61,7 +63,8 @@ test('mascot is one language-following partner with a direct dock below its rail
   assert.match(course, /const dockMarkup = !showAiPanel && location === 'lesson'/);
   assert.match(course, /companionRole: partnerControls\(\)\.role/);
   assert.match(course, /behaviourPartner\.focusedOpen = true/);
-  assert.match(css, /\.course-companion-dock[\s\S]*right: 50%; bottom: clamp\(14px, 3\.4vh, 34px\)/);
+  assert.match(css, /\.course-companion-dock[\s\S]*right: 57\.2%; bottom: clamp\(14px, 3\.4vh, 34px\)/);
+  assert.match(css, /\.course-companion-dock[\s\S]*width: min\(460px, calc\(100% - 24px\)\)/);
   assert.match(css, /\.course-companion-dock[\s\S]*pointer-events: auto/);
   assert.match(course, /mascotSpeechButtonMarkup\(dialogue\)/);
 });

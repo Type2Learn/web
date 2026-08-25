@@ -24,6 +24,10 @@ services:
       # images remain unavailable until a separately reviewed provider is added.
       - key: AI_VISUALS_ENABLED
         value: "true"
+      # Public-course guest AI remains bounded to bundled lesson context,
+      # guarded by the shared rate ledger and never reaches private manifests.
+      - key: AI_ALLOW_GUESTS
+        value: "true"
       # Public Firebase project metadata, not a credential. Firebase Admin
       # still needs its existing Render service account before private source
       # uploads can use this bucket.

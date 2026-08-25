@@ -54,8 +54,9 @@ export const askCourseAi = async ({ user, message, history, courseId, courseVers
     body: JSON.stringify({ message, history, courseId, courseVersion, page, language, companionRole }),
     signal
   };
-  // Local guest chat is a development-only preview. The server accepts it
-  // solely with AI_ALLOW_GUESTS outside production, otherwise it fails closed.
+  // Guest access is an explicitly bounded public-course route. It never
+  // receives a Firebase token or private manifest context; the server still
+  // applies provider rotation, rate limits and content safeguards.
   return user?.isGuest
     ? request('/api/v1/ai/chat', requestOptions)
     : authenticatedRequest(user, '/api/v1/ai/chat', requestOptions);
@@ -74,9 +75,8 @@ export const requestAdaptiveRecall = async ({ user, courseId, courseVersion, pag
     body: JSON.stringify({ courseId, courseVersion, page, language, response, previousResponse, barrier, behaviourStates }),
     signal
   };
-  // Local guest AI is an explicitly enabled preview path. It has no token and
-  // the server accepts it only in non-production when AI_ALLOW_GUESTS is on;
-  // production guests keep the existing authored support fallback.
+  // Adaptive Recall stays signed-in-only. Guest Course AI is deliberately
+  // conversation support, not storage-backed personalisation or assessment.
   return user?.isGuest
     ? request('/api/v1/adaptive-recall', requestOptions)
     : authenticatedRequest(user, '/api/v1/adaptive-recall', requestOptions);

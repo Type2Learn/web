@@ -6097,8 +6097,11 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
     /* This is anchored to the mascot rail's lower stage, rather than the
        changing course content. It therefore stays under the bunny's feet as
        a layout expands, collapses, or mirrors in Urdu. */
-    right: 50%; bottom: clamp(14px, 3.4vh, 34px); left: auto;
-    width: min(330px, calc(100% - 24px));
+    /* The bunny is intentionally shifted 10% left of this rail. Its visible
+       centre is therefore 42.8% of the rail; anchoring the dock at 57.2%
+       from the right makes both visual midpoints coincide. */
+    right: 57.2%; bottom: clamp(14px, 3.4vh, 34px); left: auto;
+    width: min(460px, calc(100% - 24px));
     transform: translateX(50%);
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -6124,7 +6127,7 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
   html[dir="rtl"] .course-companion-quiet-trigger,
   body[data-course-direction="rtl"] .course-companion-quiet-trigger { right: auto; left: 7%; }
   html[dir="rtl"] .course-companion-dock,
-  body[data-course-direction="rtl"] .course-companion-dock { right: 50%; left: auto; transform: translateX(50%); }
+  body[data-course-direction="rtl"] .course-companion-dock { right: 57.2%; left: auto; transform: translateX(50%); }
 }
 
 @media (min-width: 1181px) and (max-width: 1500px) {

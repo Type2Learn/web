@@ -101,25 +101,27 @@ export const createAiService = ({ config, firebase, ledger, provider = null, con
   const providerAvailable = () => Boolean(provider?.status?.().available);
   const directOpenAiAvailable = () => Boolean(config.openAiApiKey && config.openAiResponsesUrl);
   const available = () => Boolean((providerAvailable() || directOpenAiAvailable()) && firebase.available && ledger);
-  // Local guest chat is intentionally narrower than the signed-in product
-  // route. It exists only for developer/Playwright preview when the explicit
-  // non-production flag is set; production always remains signed-in only.
-  const localGuestPreviewAvailable = () => Boolean(
-    config.allowLocalGuestAi
+  // Guest chat is intentionally narrower than the signed-in product route:
+  // it receives only the bundled public-course context, while the same
+  // provider routing, rate ledger and safety validation still apply.
+  const guestAccessAvailable = () => Boolean(
+    (config.allowGuestAi ?? config.allowLocalGuestAi)
     && firebase.available
     && ledger
     && providerAvailable()
   );
   const status = () => ({
     available: available(),
-    requiresSignIn: true,
-    localGuestPreview: localGuestPreviewAvailable(),
+    requiresSignIn: !guestAccessAvailable(),
+    guestAccess: guestAccessAvailable(),
+    // Kept for old clients while they update to the explicit field above.
+    localGuestPreview: guestAccessAvailable(),
     provider: providerAvailable() ? provider.status().primary : 'openai',
     model: providerAvailable() ? provider.status().chatModel : config.openAiModel
   });
 
   const chat = async ({ authorization, body, localGuest = null }) => {
-    const guestPreview = Boolean(localGuest?.isGuest && localGuestPreviewAvailable());
+    const guestPreview = Boolean(localGuest?.isGuest && guestAccessAvailable());
     if (!providerAvailable() && !directOpenAiAvailable()) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
     if (!providerAvailable() && config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
     if (!firebase.available || !ledger) throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
@@ -128,9 +130,8 @@ export const createAiService = ({ config, firebase, ledger, provider = null, con
     if (!message) throw apiError(400, 'EMPTY_MESSAGE', 'Write a short question before sending it.');
     if (looksLikePrivateData(message)) throw apiError(400, 'PRIVATE_INFORMATION', 'Please remove private information and ask a course question instead.');
     if (attemptsInstructionOverride(message)) throw apiError(400, 'MESSAGE_NOT_SUPPORTED', 'I can help with the current course page, but not with that request.');
-    // The explicit local guest preview is only available outside production.
-    // It uses bundled public-course context, so it never reaches a signed-in
-    // catalogue resolver or a private reviewed-course manifest.
+    // Guest access uses bundled public-course context, so it never reaches a
+    // signed-in catalogue resolver or a private reviewed-course manifest.
     const resolvedContext = !guestPreview && contextResolver?.resolve
       ? await contextResolver.resolve({ authorization, body })
       : coursePageContext(body);
