@@ -284,7 +284,6 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         && assets.simpleAddonCues.length
       );
     });
-    realtime.initialDraft = original;
 
   const finalExam = () => COURSE.finalExam || { questions: [] };
   const finalExamQuestionCount = () => finalExam().questions.length;
