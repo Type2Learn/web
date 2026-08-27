@@ -54,6 +54,26 @@ test('review-only AI translation returns a bounded draft and leaves reviewed Mar
   assert.doesNotMatch(review.markdown, /اردو ترجمہ/);
 });
 
+test('review-only Urdu to English translation preserves direction and does not publish a draft', async () => {
+  const provider = {
+    status: () => ({ available: true }),
+    generate: async ({ purpose, input }) => {
+      assert.equal(purpose, 'course-authoring-translation');
+      assert.match(input, /"sourceLanguage":"ur"/);
+      assert.match(input, /"targetLanguage":"en"/);
+      return { provider: 'gemini', text: JSON.stringify({ translation: 'Clear English review text.' }) };
+    }
+  };
+  const { service } = create({ provider });
+  await save(service, 'urdu-translation-course');
+  const translated = await service.translateReviewedText({ authorization, body: { sourceLanguage: 'ur', text: 'نظر ثانی کا متن' } });
+  assert.equal(translated.translation, 'Clear English review text.');
+  assert.equal(translated.sourceLanguage, 'ur');
+  assert.equal(translated.targetLanguage, 'en');
+  const review = await service.courseReview({ authorization, courseId: 'urdu-translation-course', version: '1.0.0' });
+  assert.doesNotMatch(review.markdown, /Clear English review text/);
+});
+
 test('generated narration uses reviewed module text, saves it privately, and records no learner-facing path', async () => {
   const speech = {
     status: () => ({ textToSpeech: { available: true } }),
@@ -71,4 +91,20 @@ test('generated narration uses reviewed module text, saves it privately, and rec
   assert.equal([...storage.values.keys()].some((key) => key.includes('private-course-audio/narration-course/1.0.0/en/first-module')), true);
   const summary = await service.courseSummary({ authorization, courseId: 'narration-course', version: '1.0.0' });
   assert.equal(JSON.stringify(summary).includes('private-course-audio'), false);
+});
+
+test('an administrator module edit revalidates the complete canonical course without exposing its private manifest', async () => {
+  const { service } = create();
+  const initial = THEORY_COURSE_TEMPLATE.replace('id: replace-with-course-id', 'id: edited-module-course');
+  await service.saveMarkdown({ authorization, body: { courseId: 'edited-module-course', version: '1.0.0', markdown: initial } });
+  const edited = initial.replace('One small idea', 'One reviewed small idea');
+  const saved = await service.saveMarkdown({ authorization, body: { courseId: 'edited-module-course', version: '1.0.0', markdown: edited } });
+  assert.equal(saved.validation.valid, true, saved.validation.errors.join('\n'));
+  assert.equal(saved.learnerManifest.modules[0].en.title, 'One reviewed small idea');
+  const review = await service.courseReview({ authorization, courseId: 'edited-module-course', version: '1.0.0' });
+  assert.match(review.markdown, /# Module: first-module\n/);
+  assert.match(review.markdown, /One reviewed small idea/);
+  const learnerSummary = await service.courseSummary({ authorization, courseId: 'edited-module-course', version: '1.0.0' });
+  assert.equal(Object.hasOwn(learnerSummary, 'markdown'), false);
+  assert.equal(JSON.stringify(learnerSummary).includes('privateManifest'), false);
 });
