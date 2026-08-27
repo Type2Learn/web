@@ -19,6 +19,9 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /application\/pdf/);
   assert.match(admin, /data-open-course-review/);
   assert.match(admin, /data-generate-narration/);
+  assert.match(admin, /Recommended route/);
+  assert.match(admin, /Optional replacement/);
+  assert.match(admin, /admin-narration-route--human/);
   assert.match(admin, /data-translation-form/);
   assert.match(admin, /Generated banks require a configured reviewer/);
   assert.match(admin, /name="distractor3"/);

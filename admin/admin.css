@@ -312,6 +312,46 @@ body[data-workspace="admin"] .admin-translation-form {
   border-top: 1px solid var(--admin-line);
 }
 
+body[data-workspace="admin"] .admin-narration-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+body[data-workspace="admin"] .admin-narration-route {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) minmax(160px, .9fr) minmax(170px, .95fr) minmax(105px, .5fr) auto;
+  gap: 14px;
+  align-items: end;
+  padding: 18px;
+  border: 1px solid #9cc6ff;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+body[data-workspace="admin"] .admin-narration-route--human {
+  grid-template-columns: minmax(240px, 1.2fr) minmax(0, 1fr) auto;
+  border-color: var(--admin-line);
+  background: var(--admin-surface);
+}
+
+body[data-workspace="admin"] .admin-narration-route-copy h3,
+body[data-workspace="admin"] .admin-narration-route-copy p {
+  margin: 0;
+}
+
+body[data-workspace="admin"] .admin-narration-route-copy h3 {
+  margin-top: 2px;
+  font-size: 1rem;
+}
+
+body[data-workspace="admin"] .admin-narration-route-copy > p:last-child {
+  margin-top: 6px;
+  color: var(--admin-muted);
+  font-size: .9rem;
+  line-height: 1.42;
+}
+
 body[data-workspace="admin"] .admin-course-review {
   margin: 24px 0;
   padding: clamp(18px, 2.2vw, 30px);
@@ -509,7 +549,12 @@ body[data-workspace="admin"] .workspace-preview-bar {
   }
 
   body[data-workspace="admin"] .admin-source-intake,
-  body[data-workspace="admin"] .admin-translation-form {
+  body[data-workspace="admin"] .admin-translation-form,
+  body[data-workspace="admin"] .admin-narration-route {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body[data-workspace="admin"] .admin-narration-route--human {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -564,7 +609,9 @@ body[data-workspace="admin"] .workspace-preview-bar {
 
   body[data-workspace="admin"] .admin-workflow,
   body[data-workspace="admin"] .admin-source-intake,
-  body[data-workspace="admin"] .admin-translation-form {
+  body[data-workspace="admin"] .admin-translation-form,
+  body[data-workspace="admin"] .admin-narration-route,
+  body[data-workspace="admin"] .admin-narration-route--human {
     grid-template-columns: 1fr;
   }
 
