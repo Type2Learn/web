@@ -230,12 +230,13 @@ const buildRuntime = async () => {
   const access = createAccessService({ config, firebase });
   const courseCatalog = createCourseCatalogService({ config, firebase, access });
   const courseContextResolver = createCourseContextResolver({ courseCatalog });
+  const speech = createSpeechService({ config, firebase, ledger });
   return {
     config,
     modelProvider,
     ai: createAiService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
     adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
-    speech: createSpeechService({ config, firebase, ledger }),
+    speech,
     courseProgress: createCourseProgressService({ firebase, assertCourseAccess: courseCatalog.assertProgressAccess }),
     // ADAPTIVE LEARNING: all three services independently enforce feature
     // flags, bearer authentication, consent/reviewer checks, and Firestore
@@ -245,7 +246,7 @@ const buildRuntime = async () => {
     assessments: createAssessmentService({ config, firebase, ledger, courseCatalog, provider: modelProvider }),
     behaviouralPartner: createBehaviouralPartnerService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
     access,
-    courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider }),
+    courseAuthoring: createCourseAuthoringService({ config, firebase, access, provider: modelProvider, speech }),
     courseBackups: createCourseBackupService({ config, firebase, access }),
     courseCatalog
   };
@@ -351,6 +352,9 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/ai-draft') {
       return sendJson(response, 200, await courseAuthoring.generateAiDraft({ authorization: request.headers.authorization, body: await readJson(request, 32 * 1024) }));
     }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/translate') {
+      return sendJson(response, 200, await courseAuthoring.translateReviewedText({ authorization: request.headers.authorization, body: await readJson(request, 32 * 1024) }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/deterministic-mcq') {
       return sendJson(response, 200, await courseAuthoring.createDeterministicMcqDraft({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
@@ -361,8 +365,15 @@ const handleApi = async (request, response, pathname, runtime) => {
       const url = new URL(request.url || '/', 'http://localhost');
       return sendJson(response, 200, await courseAuthoring.courseSummary({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') }));
     }
+    if (request.method === 'GET' && pathname === '/api/v1/course-authoring/review') {
+      const url = new URL(request.url || '/', 'http://localhost');
+      return sendJson(response, 200, await courseAuthoring.courseReview({ authorization: request.headers.authorization, courseId: url.searchParams.get('courseId'), version: url.searchParams.get('version') }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/narration') {
       return sendJson(response, 200, await courseAuthoring.uploadNarration({ authorization: request.headers.authorization, form: await readForm(request, 25 * 1024 * 1024) }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/narration/generate') {
+      return sendJson(response, 200, await courseAuthoring.generateNarration({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/backups') {
       return sendJson(response, 200, await courseBackups.verifyBackups({ authorization: request.headers.authorization, body: await readJson(request) }));

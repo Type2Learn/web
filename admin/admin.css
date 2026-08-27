@@ -235,6 +235,210 @@ body[data-workspace="admin"] .admin-review-actions .workspace-button {
   min-height: 40px;
 }
 
+body[data-workspace="admin"] .admin-workflow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 0 18px;
+  padding: 1px;
+  list-style: none;
+  border: 1px solid var(--admin-line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--admin-line);
+}
+
+body[data-workspace="admin"] .admin-workflow li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 3px 10px;
+  min-width: 0;
+  padding: 17px;
+  background: var(--admin-surface);
+}
+
+body[data-workspace="admin"] .admin-workflow span {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #e8f0ff;
+  color: #0a58c7;
+  font-weight: 700;
+}
+
+body[data-workspace="admin"] .admin-workflow strong,
+body[data-workspace="admin"] .admin-workflow small {
+  min-width: 0;
+}
+
+body[data-workspace="admin"] .admin-workflow small {
+  color: var(--admin-muted);
+  line-height: 1.4;
+}
+
+body[data-workspace="admin"] .admin-source-intake {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.25fr) minmax(180px, .9fr) minmax(220px, 1.1fr) auto;
+  gap: 16px;
+  align-items: end;
+  margin: 24px 0;
+  padding: clamp(16px, 2vw, 24px);
+  border: 1px solid #9cc6ff;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f6faff, #fff);
+}
+
+body[data-workspace="admin"] .admin-source-intake h3,
+body[data-workspace="admin"] .admin-source-intake p {
+  margin: 0;
+}
+
+body[data-workspace="admin"] .admin-source-intake > div p:last-child {
+  margin-top: 7px;
+  color: var(--admin-muted);
+  line-height: 1.45;
+}
+
+body[data-workspace="admin"] .admin-translation-form {
+  display: grid;
+  grid-template-columns: minmax(170px, .4fr) minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--admin-line);
+}
+
+body[data-workspace="admin"] .admin-course-review {
+  margin: 24px 0;
+  padding: clamp(18px, 2.2vw, 30px);
+  border: 1px solid #8eb9eb;
+  border-radius: 16px;
+  background: #f9fcff;
+}
+
+body[data-workspace="admin"] .admin-course-review-heading,
+body[data-workspace="admin"] .admin-review-module-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+body[data-workspace="admin"] .admin-course-review-heading h3,
+body[data-workspace="admin"] .admin-course-review-heading p,
+body[data-workspace="admin"] .admin-review-module-head h4,
+body[data-workspace="admin"] .admin-review-module-head p {
+  margin: 0;
+}
+
+body[data-workspace="admin"] .admin-course-review-heading > div > p:last-child,
+body[data-workspace="admin"] .admin-module-editor > p {
+  max-width: 900px;
+  margin-top: 7px;
+  color: var(--admin-muted);
+  line-height: 1.45;
+}
+
+body[data-workspace="admin"] .admin-review-module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+body[data-workspace="admin"] .admin-review-module {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--admin-line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+body[data-workspace="admin"] .admin-review-module > h4 {
+  margin: 12px 0 6px;
+  color: var(--admin-heading);
+  font-size: 1.12rem;
+}
+
+body[data-workspace="admin"] .admin-review-module > p,
+body[data-workspace="admin"] .admin-review-module dd {
+  color: var(--admin-muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+body[data-workspace="admin"] .admin-review-module dl {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 auto;
+}
+
+body[data-workspace="admin"] .admin-review-module dl div {
+  padding-top: 10px;
+  border-top: 1px solid #e4edf8;
+}
+
+body[data-workspace="admin"] .admin-review-module dt {
+  color: var(--admin-heading);
+  font-size: .78rem;
+  font-weight: 650;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+body[data-workspace="admin"] .admin-review-module dd {
+  margin: 4px 0 0;
+  font-size: .9rem;
+}
+
+body[data-workspace="admin"] .admin-review-module .workspace-button {
+  margin-top: 18px;
+}
+
+body[data-workspace="admin"] .workspace-icon-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #8cb4e4;
+  border-radius: 9px;
+  color: #0a58c7;
+  background: #fff;
+  font: 700 1.2rem/1 sans-serif;
+  cursor: pointer;
+}
+
+body[data-workspace="admin"] .workspace-icon-button:hover,
+body[data-workspace="admin"] .workspace-icon-button:focus-visible {
+  border-color: #1769ff;
+  background: #eaf2ff;
+}
+
+body[data-workspace="admin"] .admin-module-editor {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #6da7ec;
+  border-radius: 14px;
+  background: #fff;
+}
+
+body[data-workspace="admin"] .admin-module-editor textarea {
+  display: block;
+  width: 100%;
+  min-height: 440px;
+  margin: 16px 0;
+  resize: vertical;
+  color: #183b67;
+  font: 450 .92rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 body[data-workspace="admin"] .admin-authoring-panel > .workspace-field:first-of-type {
   margin-top: 22px;
 }
@@ -299,6 +503,15 @@ body[data-workspace="admin"] .workspace-preview-bar {
   body[data-workspace="admin"] .admin-review-actions .workspace-row {
     justify-content: flex-start;
   }
+
+  body[data-workspace="admin"] .admin-workflow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body[data-workspace="admin"] .admin-source-intake,
+  body[data-workspace="admin"] .admin-translation-form {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -347,6 +560,18 @@ body[data-workspace="admin"] .workspace-preview-bar {
 
   body[data-workspace="admin"] .admin-review-actions .workspace-button {
     width: 100%;
+  }
+
+  body[data-workspace="admin"] .admin-workflow,
+  body[data-workspace="admin"] .admin-source-intake,
+  body[data-workspace="admin"] .admin-translation-form {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-workspace="admin"] .admin-course-review-heading,
+  body[data-workspace="admin"] .admin-review-module-head {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

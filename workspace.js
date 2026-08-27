@@ -387,6 +387,25 @@ const bindSubmission = () => {
       await loadSubmissions();
     } catch (error) { status(error.message, 'error'); }
   });
+  $('[data-admin-source-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    if (!form.get('sourceFile')?.size) { status('Choose a private PDF, text, or document source first.', 'error'); return; }
+    try {
+      const result = await api('/api/v1/course-authoring/source', { method: 'POST', body: form });
+      const submission = result.submission || {};
+      $('[data-authoring-submission]').value = submission.submissionId || '';
+      event.currentTarget.reset();
+      await loadSubmissions();
+      show('review');
+      // Reuse the single secure review handler instead of exposing extracted
+      // source text through a second browser-only path.
+      $('[data-open-source-review]')?.click();
+      status(submission.source?.extraction === 'safe-pdf-text-extracted'
+        ? 'PDF text was extracted privately. Review it, then create a review-only draft or build the course.'
+        : 'Private source added. Review it before creating any learner-facing material.', 'success');
+    } catch (error) { status(error.message, 'error'); }
+  });
 };
 const bindAuthoring = () => {
   const template = $('[data-markdown]');
@@ -507,7 +526,98 @@ const bindAuthoring = () => {
       await loadSubmissions();
     } catch (error) { status(error.message, 'error'); }
   };
+  const moduleSlice = (markdown, moduleId) => {
+    const escaped = String(moduleId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const source = String(markdown || '');
+    const heading = new RegExp(`^#\\s+Module:\\s*${escaped}\\s*$`, 'mi').exec(source);
+    if (!heading || heading.index === undefined) return null;
+    const start = heading.index;
+    const rest = source.slice(start + 1);
+    const following = /^#\s+(?:Module:|Final exam\s*$)/mi.exec(rest);
+    const end = following?.index === undefined ? source.length : start + 1 + following.index;
+    return { start, end, text: source.slice(start, end).trimEnd() };
+  };
+  const setReviewEditor = (moduleId) => {
+    const output = $('[data-course-review]');
+    const slice = moduleSlice(template?.value || '', moduleId);
+    if (!output || !slice) { status('This reviewed module could not be located in the current course source.', 'warning'); return; }
+    const editor = $('[data-review-editor]', output);
+    if (!editor) return;
+    editor.dataset.moduleId = moduleId;
+    editor.dataset.start = String(slice.start);
+    editor.dataset.end = String(slice.end);
+    editor.value = slice.text;
+    $('[data-review-editor-title]', output).textContent = `Editing module: ${moduleId}`;
+    $('[data-review-editor-wrap]', output).hidden = false;
+    editor.focus();
+  };
+  const renderFullCourseReview = (result) => {
+    const output = $('[data-course-review]');
+    if (!output) return;
+    const manifest = result?.learnerManifest;
+    if (!manifest) { output.hidden = false; output.innerHTML = '<p class="workspace-empty">Validate the course first so the learner-safe module review can be generated.</p>'; return; }
+    if (template) template.value = result.markdown || template.value;
+    const modules = manifest.modules || [];
+    output.hidden = false;
+    output.innerHTML = `<div class="admin-course-review-heading"><div><p class="workspace-eyebrow">Full learner-safe review</p><h3>${escapeHtml(manifest.title?.en || result.course?.courseId || 'Reviewed course')}</h3><p>${modules.length} module${modules.length === 1 ? '' : 's'} · English and Urdu content are compiled from the canonical course source. Use a pencil to edit one module without losing your place.</p></div><button class="workspace-button workspace-button--quiet" type="button" data-close-course-review>Close review</button></div>
+      <div class="admin-review-module-grid">${modules.map((module, index) => `<article class="admin-review-module" data-review-module="${escapeHtml(module.id)}"><div class="admin-review-module-head"><p class="workspace-eyebrow">Module ${index + 1}</p><button class="workspace-icon-button" type="button" data-edit-module="${escapeHtml(module.id)}" aria-label="Edit ${escapeHtml(module.en?.title || module.id)}">✎</button></div><h4>${escapeHtml(module.en?.title || module.id)}</h4><p>${escapeHtml(module.en?.content?.definition || '')}</p><dl><div><dt>Everyday context</dt><dd>${escapeHtml(module.en?.content?.dailyLife || '')}</dd></div><div><dt>Urdu title</dt><dd dir="rtl">${escapeHtml(module.ur?.title || '')}</dd></div></dl><button class="workspace-button workspace-button--quiet" type="button" data-edit-module="${escapeHtml(module.id)}">Edit this module</button></article>`).join('')}</div>
+      <section class="admin-module-editor" data-review-editor-wrap hidden><div class="admin-review-module-head"><div><p class="workspace-eyebrow">One module at a time</p><h4 data-review-editor-title>Editing module</h4></div><button class="workspace-button workspace-button--quiet" type="button" data-cancel-module-edit>Cancel</button></div><p>Keep the visible headings and bilingual structure. Saving validates the complete course before it can replace this reviewed draft.</p><textarea data-review-editor spellcheck="true" aria-label="Editable reviewed module"></textarea><div class="workspace-row"><button class="workspace-button workspace-button--primary" type="button" data-save-reviewed-module>Save and validate this module</button><button class="workspace-button workspace-button--quiet" type="button" data-copy-module-markdown>Copy module text</button></div></section>`;
+  };
+  const saveReviewModule = async () => {
+    const output = $('[data-course-review]');
+    const editor = $('[data-review-editor]', output);
+    const current = String(template?.value || '');
+    const start = Number(editor?.dataset.start);
+    const end = Number(editor?.dataset.end);
+    const replacement = String(editor?.value || '').trim();
+    if (!Number.isInteger(start) || !Number.isInteger(end) || !replacement) throw new Error('Make a complete module edit before saving.');
+    const updated = current.slice(0, start) + replacement + current.slice(end);
+    const result = await api('/api/v1/course-authoring/markdown', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ courseId: $('[data-authoring-course-id]')?.value, version: $('[data-authoring-version]')?.value, ownerOrganisationId: $('[data-authoring-organisation]')?.value, submissionId: $('[data-authoring-submission]')?.value, markdown: updated }) });
+    if (!result.validation?.valid) throw new Error(`The module was not saved: ${(result.validation?.errors || []).join(' ')}`);
+    if (template) template.value = updated;
+    syncAuthoringMetadata(updated);
+    renderFullCourseReview({ ...result, markdown: updated });
+    status('Module saved and the complete bilingual course revalidated. Review another module or continue to narration.', 'success');
+    await loadCourses();
+  };
   $('[data-use-template]')?.addEventListener('click', () => { if (template) { template.value = reviewedTemplate; syncAuthoringMetadata(reviewedTemplate); } });
+  $('[data-ai-draft-from-source]')?.addEventListener('click', () => {
+    const source = String($('[data-source-review-output]')?.textContent || '').trim();
+    if (!source || source.startsWith('Source review opens') || source.startsWith('This private source')) { status('Open an extracted text or PDF source first.', 'warning'); return; }
+    const target = $('[data-ai-source-excerpt]');
+    if (target) target.value = source.slice(0, 12000);
+    $('[data-ai-draft-form]')?.requestSubmit();
+  });
+  $('[data-translation-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      const values = new FormData(event.currentTarget);
+      const result = await api('/api/v1/course-authoring/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceLanguage: values.get('sourceLanguage'), text: values.get('text') }) });
+      $('[data-ai-draft-output]').textContent = `${result.sourceLanguage === 'ur' ? 'English' : 'Urdu'} review draft (check before inserting):\n\n${result.translation}`;
+      status('Translation draft created. Review it and copy it into its matching bilingual field; no course content changed automatically.', 'success');
+    } catch (error) { status(error.message, 'error'); }
+  });
+  $('[data-open-course-review]')?.addEventListener('click', async () => {
+    try {
+      const { courseId, version } = selectedCourse();
+      const result = await api(`/api/v1/course-authoring/review?courseId=${encodeURIComponent(courseId)}&version=${encodeURIComponent(version)}`);
+      renderFullCourseReview(result);
+      $('[data-course-review]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      status('Full course review is ready. Pencil buttons open only the selected module.', 'success');
+    } catch (error) { status(error.message, 'warning'); }
+  });
+  $('[data-course-review]')?.addEventListener('click', async (event) => {
+    const edit = event.target.closest('[data-edit-module]');
+    if (edit) { setReviewEditor(edit.dataset.editModule); return; }
+    if (event.target.closest('[data-close-course-review]')) { $('[data-course-review]').hidden = true; return; }
+    if (event.target.closest('[data-cancel-module-edit]')) { $('[data-review-editor-wrap]', $('[data-course-review]')).hidden = true; return; }
+    if (event.target.closest('[data-copy-module-markdown]')) {
+      const text = $('[data-review-editor]', $('[data-course-review]'))?.value || '';
+      try { await navigator.clipboard.writeText(text); status('Module Markdown copied for review.', 'success'); } catch { status('Copy is unavailable in this browser. Select the module text and copy it manually.', 'warning'); }
+      return;
+    }
+    if (event.target.closest('[data-save-reviewed-module]')) { try { await saveReviewModule(); } catch (error) { status(error.message, 'error'); } }
+  });
   $('[data-markdown-file]')?.addEventListener('change', async (event) => {
     const file = event.currentTarget.files?.[0];
     if (!file) return;
@@ -717,6 +827,20 @@ const bindPublishing = () => {
     const form = new FormData(event.currentTarget);
     if (!form.get('audioFile')?.size) { status('Choose a human narration file, or retain the clearly labelled device text-to-speech fallback.', 'warning'); return; }
     try { const selected = selectedCourse(); form.set('courseId', selected.courseId); form.set('version', selected.version); await api('/api/v1/course-authoring/narration', { method: 'POST', body: form }); status('Private human narration uploaded for administrator review.', 'success'); } catch (error) { status(error.message, 'error'); }
+  });
+  $('[data-generate-narration]')?.addEventListener('click', async () => {
+    const form = $('[data-narration-form]');
+    const values = form ? new FormData(form) : new FormData();
+    try {
+      const selected = selectedCourse();
+      const sectionId = String(values.get('sectionId') || '').trim();
+      if (!sectionId) throw new Error('Enter one reviewed module ID before generating narration.');
+      const result = await api('/api/v1/course-authoring/narration/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selected, sectionId, locale: values.get('locale') }) });
+      const output = $('[data-generated-narration-output]');
+      if (output) { output.hidden = false; output.textContent = `Private narration created from reviewed text. Script preview:\n\n${result.scriptPreview || ''}`; }
+      status('Private narration was generated from the reviewed module. You can still upload a human recording to replace it.', 'success');
+      await loadCourses();
+    } catch (error) { status(error.message, 'error'); }
   });
   $('[data-verify-backups]')?.addEventListener('click', async () => {
     try { const result = await api('/api/v1/course-authoring/backups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selectedCourse()) }); status(result.exportReady ? 'GitHub and Supabase backups verified. Download the immutable ZIP next to acknowledge it.' : 'Backup verification needs attention.', result.exportReady ? 'success' : 'warning'); await loadSubmissions(); } catch (error) { status(error.message, 'error'); }

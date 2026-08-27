@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "@speechmatics/auth": "^0.1.0",
-    "firebase-admin": "^13.5.0"
+    "firebase-admin": "^13.5.0",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"

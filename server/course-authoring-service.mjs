@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { PDFParse } from 'pdf-parse';
 import { apiError } from './errors.mjs';
 import { isTheoryCourseType } from './access-policy.mjs';
 import { compileTheoryCourse, fallbackMcqDraft, parseTheoryMarkdown, validateTheoryCourse } from './theory-course-markdown.mjs';
@@ -11,6 +12,7 @@ const MAX_MARKDOWN_CHARS = 220_000;
 const MAX_AI_SOURCE_CHARS = 12_000;
 const blockedSourceExtensions = new Set(['exe', 'dll', 'msi', 'bat', 'cmd', 'com', 'ps1', 'sh', 'jar', 'apk', 'app']);
 const supportedTextExtensions = new Set(['md', 'markdown', 'txt', 'csv']);
+const supportedPdfExtensions = new Set(['pdf']);
 const supportedAudioExtensions = new Set(['mp3', 'm4a', 'wav', 'ogg', 'webm']);
 
 const nowIso = () => new Date().toISOString();
@@ -93,14 +95,43 @@ const sourceFileInfo = async (file) => {
   const extension = extensionOf(originalName);
   if (blockedSourceExtensions.has(extension)) throw apiError(400, 'SOURCE_FILE_NOT_ALLOWED', 'Executable or script files cannot be uploaded as course source material.');
   const buffer = Buffer.from(await file.arrayBuffer());
+  let text = '';
+  let extraction = 'requires-admin-transcription';
+  let pages = 0;
+  if (supportedTextExtensions.has(extension)) {
+    text = buffer.toString('utf8').slice(0, MAX_MARKDOWN_CHARS);
+    extraction = 'safe-text-extracted';
+  } else if (supportedPdfExtensions.has(extension) || /^application\/pdf$/i.test(clean(file.type, 100))) {
+    // PDF intake is deliberately text-first. We never run OCR or send an
+    // original private document to a model. A text-based PDF is extracted in
+    // this server process, capped, then an administrator can ask the existing
+    // review-only AI draft flow to work from that extracted text. Image-only
+    // scans stay private and are clearly marked for transcription.
+    let parser = null;
+    try {
+      parser = new PDFParse({ data: buffer });
+      const result = await parser.getText();
+      text = String(result?.text || '').replace(/\u0000/g, '').trim().slice(0, MAX_MARKDOWN_CHARS);
+      pages = Number(result?.total || result?.pages?.length || 0) || 0;
+      extraction = text ? 'safe-pdf-text-extracted' : 'requires-admin-transcription';
+    } catch {
+      extraction = 'requires-admin-transcription';
+    } finally {
+      // `pdf-parse` can allocate parser resources even when a malformed PDF
+      // throws before text is returned. Always release them before this
+      // request continues; source uploads must remain bounded under load.
+      await parser?.destroy?.().catch(() => undefined);
+    }
+  }
   return {
     buffer,
     originalName,
     extension,
     contentType: clean(file.type, 100) || 'application/octet-stream',
     sha256: fileHash(buffer),
-    text: supportedTextExtensions.has(extension) ? buffer.toString('utf8').slice(0, MAX_MARKDOWN_CHARS) : '',
-    extraction: supportedTextExtensions.has(extension) ? 'safe-text-extracted' : 'requires-admin-transcription'
+    text,
+    pages,
+    extraction
   };
 };
 
@@ -138,7 +169,35 @@ const safeAiDraft = (payload) => ({
   })).filter((draft) => draft.moduleId && draft.field && draft.language && draft.text) : []
 });
 
-export const createCourseAuthoringService = ({ firebase, config, access, provider }) => {
+const translationSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['translation'],
+  properties: { translation: { type: 'string', minLength: 1, maxLength: 12000 } }
+};
+
+const generatedNarration = (module, locale) => {
+  const lesson = locale === 'ur' ? module?.ur : module?.en;
+  if (!lesson) return '';
+  const pieces = [
+    lesson.title,
+    lesson.content?.definitionHeading,
+    lesson.content?.definition,
+    lesson.content?.dailyLifeHeading,
+    lesson.content?.dailyLife,
+    lesson.content?.strengthsHeading,
+    lesson.content?.strengths,
+    lesson.content?.challengesHeading,
+    ...(lesson.content?.challenges || []),
+    lesson.content?.supportsHeading,
+    ...(lesson.content?.supports || []),
+    lesson.simple,
+    lesson.example
+  ].map((part) => clean(part, 600)).filter(Boolean);
+  return pieces.join('. ').replace(/\s+([.,!?])/g, '$1').slice(0, 1200);
+};
+
+export const createCourseAuthoringService = ({ firebase, config, access, provider, speech = null }) => {
   const accountFor = async (authorization) => {
     requireService({ firebase, config });
     return access.accountFor(authorization);
@@ -161,6 +220,9 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       privateStorageProviders: privateStorageStatus({ firebase, config }),
       theoryOnly: true,
       aiDrafting: Boolean(provider?.status?.().available),
+      pdfTextExtraction: true,
+      automaticTranslation: Boolean(provider?.status?.().available),
+      generatedNarration: Boolean(speech?.status?.().textToSpeech?.available),
       maxSourceBytes: MAX_SOURCE_BYTES
     }),
 
@@ -170,9 +232,13 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       if (!privateStorageStatus({ firebase, config }).available) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private course-source storage is not configured yet.');
       const type = String(form?.get('courseType') || '');
       if (!isTheoryCourseType(type)) throw apiError(400, 'COURSE_TYPE_LOCKED', 'Only theory courses are supported at this time.');
-      const organisationId = workspaceIdentifier(form?.get('organisationId')) || account.organisations.find((entry) => entry.active !== false)?.organisationId || '';
+      const isAdmin = account.roles.includes('platform-admin');
+      // A platform administrator can start a platform-owned course without
+      // first creating a dummy teacher organisation. Teacher and institute
+      // submissions still require their real organisation membership.
+      const organisationId = workspaceIdentifier(form?.get('organisationId')) || account.organisations.find((entry) => entry.active !== false)?.organisationId || (isAdmin ? 'type2learn-platform' : '');
       if (!organisationId) throw apiError(400, 'ORGANISATION_REQUIRED', 'Choose the organisation that owns this course submission.');
-      await access.assertOrganisationAccess(authorization, organisationId);
+      if (!isAdmin || workspaceIdentifier(form?.get('organisationId'))) await access.assertOrganisationAccess(authorization, organisationId);
       const source = await sourceFileInfo(form?.get('sourceFile'));
       const submissionId = `sub_${randomUUID().replace(/-/g, '')}`;
       const objectPath = `private-course-sources/${organisationId}/${submissionId}/${source.sha256}.${source.extension || 'bin'}`;
@@ -201,7 +267,8 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
           objectPath: privateObject.objectPath,
           provider: privateObject.provider,
           extraction: source.extraction,
-          extractedText: source.text
+          extractedText: source.text,
+          extractedPages: source.pages
         }
       };
       await sourceCollection(firebase.firestore, 'submissions').doc(submissionId).set(record);
@@ -232,8 +299,8 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-source-review-opened', submissionId: id, organisationId: record.ownerOrganisationId });
       return {
         submission: publicSubmission({ ...record, status: record.status === 'submitted' ? 'source-reviewed' : record.status }),
-        extractedText: record.source?.extraction === 'safe-text-extracted' ? String(record.source?.extractedText || '') : '',
-        requiresAdminTranscription: record.source?.extraction !== 'safe-text-extracted',
+        extractedText: /^safe-(?:pdf-)?text-extracted$/.test(String(record.source?.extraction || '')) ? String(record.source?.extractedText || '') : '',
+        requiresAdminTranscription: !/^safe-(?:pdf-)?text-extracted$/.test(String(record.source?.extraction || '')),
         downloadAvailable: Boolean(record.source?.objectPath && privateStorageStatus({ firebase, config }).available)
       };
     },
@@ -378,6 +445,35 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       return { aiDraft: { ...aiDraft, provider: result.provider }, course: noSecrets({ ...record, status: 'ai-draft-ready' }) };
     },
 
+    // Translation is a review-only tool. It never changes the canonical
+    // Markdown on its own, so every bilingual sentence can still be checked
+    // in the structured editor before compilation and publishing.
+    async translateReviewedText({ authorization, body }) {
+      const admin = await requireAdmin(authorization);
+      if (!provider?.status?.().available) throw apiError(503, 'AI_TRANSLATION_NOT_CONFIGURED', 'Automatic translation is not configured. You can still enter reviewed bilingual text manually.');
+      const sourceLanguage = body?.sourceLanguage === 'ur' ? 'ur' : 'en';
+      const targetLanguage = sourceLanguage === 'ur' ? 'en' : 'ur';
+      const text = clean(body?.text, MAX_AI_SOURCE_CHARS);
+      if (!text) throw apiError(400, 'TRANSLATION_TEXT_REQUIRED', 'Add the reviewed text you want to translate.');
+      const result = await provider.generate({
+        purpose: 'course-authoring-translation',
+        instructions: [
+          'Translate the reviewed educational text faithfully.',
+          'Do not add facts, diagnoses, learner claims, markup, or commentary.',
+          sourceLanguage === 'en' ? 'Return clear Urdu in Urdu script.' : 'Return clear English.',
+          'The result is a review draft, not publishable content.'
+        ].join(' '),
+        input: JSON.stringify({ sourceLanguage, targetLanguage, text }),
+        jsonSchema: translationSchema,
+        maxOutputTokens: 1800
+      });
+      let translation = '';
+      try { translation = clean(JSON.parse(result.text)?.translation, MAX_AI_SOURCE_CHARS); } catch { /* schema failure falls through */ }
+      if (!translation) throw apiError(502, 'AI_TRANSLATION_INVALID', 'The translation draft was not in the required format. No course content changed.');
+      await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-reviewed-text-translated', sourceLanguage, targetLanguage, provider: result.provider, characters: text.length });
+      return { translation, sourceLanguage, targetLanguage, provider: result.provider, reviewRequired: true };
+    },
+
     async createDeterministicMcqDraft({ authorization, body }) {
       const admin = await requireAdmin(authorization);
       const { reference, record } = await courseFor(body?.courseId, body?.version);
@@ -419,6 +515,46 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         aiDraft: record.aiDraft ? { ...record.aiDraft, sourceExcerpt: undefined } : null,
         deterministicDrafts: record.deterministicDrafts || []
       };
+    },
+
+    // The separate admin review endpoint deliberately includes canonical
+    // Markdown, which is never exposed through public catalogue or learner
+    // endpoints. The UI edits one module slice at a time, then routes the
+    // complete source back through the normal validator/compiler.
+    async courseReview({ authorization, courseId, version }) {
+      await requireAdmin(authorization);
+      const { record } = await courseFor(courseId, version);
+      return {
+        course: noSecrets(record),
+        markdown: String(record.markdown || ''),
+        learnerManifest: record.learnerManifest || null,
+        validation: record.validation || { valid: false, errors: [] }
+      };
+    },
+
+    async generateNarration({ authorization, body }) {
+      const admin = await requireAdmin(authorization);
+      if (!speech?.synthesise || !speech?.status?.().textToSpeech?.available) throw apiError(503, 'NARRATION_GENERATION_NOT_CONFIGURED', 'Automatic narration is not connected. You can upload reviewed narration instead.');
+      if (!privateStorageStatus({ firebase, config }).available) throw apiError(503, 'PRIVATE_SOURCE_STORAGE_NOT_CONFIGURED', 'Private narration storage is not configured yet.');
+      const { reference, record } = await courseFor(body?.courseId, body?.version);
+      const locale = body?.locale === 'ur' ? 'ur' : 'en';
+      const sectionId = slug(body?.sectionId);
+      const module = (record.learnerManifest?.modules || []).find((item) => slug(item?.id) === sectionId);
+      if (!module) throw apiError(400, 'NARRATION_SECTION_UNKNOWN', 'Choose a reviewed module before generating narration.');
+      const script = generatedNarration(module, locale);
+      if (!script) throw apiError(409, 'NARRATION_SCRIPT_UNAVAILABLE', 'This reviewed module does not contain enough text for narration.');
+      const audio = await speech.synthesise({ authorization, body: { text: script, language: locale, purpose: 'course-narration' } });
+      const digest = fileHash(audio.audio);
+      const objectPath = `private-course-audio/${record.courseId}/${record.version}/${locale}/${sectionId}/generated-${digest}.wav`;
+      const privateObject = await uploadPrivateObject({
+        firebase, config, objectPath, content: audio.audio, contentType: audio.contentType,
+        metadata: { courseId: record.courseId, version: record.version, locale, sectionId, sha256: digest, generated: 'true' }
+      });
+      const assets = [...(record.narrationAssets || []), { locale, sectionId, objectPath: privateObject.objectPath, provider: 'speechmatics-generated', sha256: digest, bytes: audio.audio.length, generated: true, scriptCharacters: script.length, uploadedAt: nowIso(), uploadedBy: admin.uid }];
+      const narration = { humanAudioCount: assets.filter((asset) => !asset.generated).length, generatedAudioCount: assets.filter((asset) => asset.generated).length, fallback: 'device-text-to-speech' };
+      await reference.set({ narrationAssets: assets, narration, status: record.status === 'admin-review' ? 'audio-ready' : record.status, updatedAt: nowIso(), updatedBy: admin.uid }, { merge: true });
+      await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-narration-generated', courseId: record.courseId, version: record.version, locale, sectionId, scriptCharacters: script.length });
+      return { narration, status: record.status === 'admin-review' ? 'audio-ready' : record.status, scriptPreview: script };
     },
 
     async uploadNarration({ authorization, form }) {

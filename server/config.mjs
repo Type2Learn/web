@@ -239,6 +239,10 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     // `speech` is supported only for the existing local api.env file. The
     // deployment variable is always the explicit SPEECHMATICS_API_KEY name.
     speechmaticsApiKey: value('SPEECHMATICS_API_KEY', 'speech'),
+    // Keep the established Sarah voice as the safe default. Deployments can
+    // select a reviewed Urdu-capable Speechmatics voice without code changes.
+    speechmaticsEnglishVoice: value('SPEECHMATICS_ENGLISH_VOICE') || 'sarah',
+    speechmaticsUrduVoice: value('SPEECHMATICS_URDU_VOICE') || value('SPEECHMATICS_ENGLISH_VOICE') || 'sarah',
     // OpenAI role map: nano verifies prompts, classifications, feasibility,
     // and JSON; mini handles bounded intent/repair/planning work; 5.1 is
     // reserved for reviewer-triggered final assessment-bank generation.

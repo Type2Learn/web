@@ -13,7 +13,7 @@ const REALTIME_TOKEN_TTL_SECONDS = 60;
 const REALTIME_ENDPOINT = 'wss://global.rt.speechmatics.com/v2/';
 const MAX_TRANSCRIPT_CHARACTERS = 2400;
 const MAX_TTS_CHARACTERS = 1200;
-const TTS_VOICE_ID = 'sarah';
+const DEFAULT_TTS_VOICE_ID = 'sarah';
 const supportedTypes = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/x-wav']);
 const identifierHash = (value) => createHash('sha256').update(String(value)).digest('hex');
 const bounded = (value, maximum) => String(value || '').replace(/\u0000/g, '').trim().slice(0, maximum);
@@ -64,6 +64,9 @@ export const validateCourseAudio = (form) => {
 };
 
 export const createSpeechService = ({ config, firebase, ledger }) => {
+  const voiceFor = (language) => language === 'ur'
+    ? (config.speechmaticsUrduVoice || config.speechmaticsEnglishVoice || DEFAULT_TTS_VOICE_ID)
+    : (config.speechmaticsEnglishVoice || DEFAULT_TTS_VOICE_ID);
   const available = () => Boolean(config.speechmaticsApiKey && firebase.available && ledger);
   // Read-aloud has no learner-uploaded audio and only accepts a bounded piece
   // of already-visible course text. It can therefore remain available to the
@@ -78,7 +81,7 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     requiresSignIn: true,
     purposes: ['chat', 'typing'],
     textToSpeech: {
-      available: ttsAvailable(), language: 'en', voice: TTS_VOICE_ID,
+      available: ttsAvailable(), language: 'en, ur', voice: voiceFor('en'),
       guestAccess: guestTtsAvailable(), requiresSignIn: !guestTtsAvailable()
     },
     // The browser is given a short-lived provider key only after the learner
@@ -166,7 +169,7 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
 
   const synthesise = async ({ authorization, body, localGuest = null, clientAddress = '' }) => {
     if (!config.speechmaticsApiKey || (!firebase.available && !localGuest)) throw apiError(503, 'AI_AUDIO_NOT_CONFIGURED', 'Audio for AI replies is not connected yet.');
-    if (body?.language !== 'en') throw apiError(400, 'AI_AUDIO_LANGUAGE_UNSUPPORTED', 'Audio for AI replies is currently available in English only.');
+    const language = body?.language === 'ur' ? 'ur' : 'en';
     const text = bounded(body?.text, MAX_TTS_CHARACTERS);
     if (!text) throw apiError(400, 'EMPTY_AI_AUDIO', 'There is no AI reply to read aloud.');
     if (localGuest && !config.allowGuestAi) throw apiError(401, 'SIGN_IN_REQUIRED', 'Please sign in to listen to this reply.');
@@ -176,7 +179,8 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     // limit for public narrated text; no address is stored in Firestore.
     const userHash = identifierHash(learner?.uid || ('guest-tts:' + String(clientAddress || 'anonymous')));
     checkTtsRate(userHash, now);
-    const key = createHash('sha256').update(TTS_VOICE_ID + '\n' + text).digest('hex');
+    const voiceId = voiceFor(language);
+    const key = createHash('sha256').update(`${voiceId}\n${language}\n${text}`).digest('hex');
     pruneTtsCache(now);
     const cached = ttsCache.get(key);
     if (cached) return cached;
@@ -185,10 +189,13 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
       // Ask for a browser-decodable WAV explicitly. Relying on the provider
       // default made successful responses depend on the account's preview
       // defaults and could leave the learner-facing Listen control silent.
-      response = await fetch(`https://preview.tts.speechmatics.com/generate/${TTS_VOICE_ID}?output_format=wav_16000`, {
+      response = await fetch(`https://preview.tts.speechmatics.com/generate/${encodeURIComponent(voiceId)}?output_format=wav_16000`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${config.speechmaticsApiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        // Keep the established English payload exactly compatible with the
+        // provider’s published preview endpoint. Urdu is explicit so a
+        // configured Urdu-capable voice receives the intended locale.
+        body: JSON.stringify(language === 'ur' ? { text, language } : { text }),
         signal: AbortSignal.timeout(30000)
       });
     } catch {

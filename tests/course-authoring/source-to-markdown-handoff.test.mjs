@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { createCourseAuthoringService } from '../../server/course-authoring-service.mjs';
 import { THEORY_COURSE_TEMPLATE } from '../../server/theory-course-markdown.mjs';
@@ -149,6 +150,32 @@ test('a private non-text teacher source can be reviewed, downloaded by an admin,
   assert.equal(courseRecord.submissionId, source.submission.submissionId);
 });
 
+test('a text-based PDF is extracted privately, reports its page count, and is available only through administrator review', async () => {
+  const { service } = createService();
+  const pdf = await readFile(new URL('../../assets/legal/Type2Learn_Privacy_Policy.pdf', import.meta.url));
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({
+      courseType: 'theory',
+      organisationId: 'org-water',
+      title: 'Private policy source',
+      sourceFile: {
+        name: 'private-policy.pdf',
+        type: 'application/pdf',
+        size: pdf.length,
+        arrayBuffer: async () => pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength)
+      }
+    })
+  });
+
+  assert.equal(source.submission.source.extraction, 'safe-pdf-text-extracted');
+  assert.equal(JSON.stringify(source).includes('PRIVACY & DATA PROTECTION'), false);
+
+  const reviewed = await service.submissionReview({ authorization: authorisation, submissionId: source.submission.submissionId });
+  assert.match(reviewed.extractedText, /PRIVACY & DATA PROTECTION/);
+  assert.equal(reviewed.requiresAdminTranscription, false);
+});
+
 test('reviewed Markdown cannot silently diverge from the form identifiers or source organisation', async () => {
   const { service } = createService();
   const markdown = THEORY_COURSE_TEMPLATE.replace('id: replace-with-course-id', 'id: valid-course-id');
@@ -192,4 +219,28 @@ test('an administrator can directly compile, inspect, and enter review for a rev
     body: { courseId: 'direct-admin-course', version: '1.0.0', status: 'admin-review', reviewNote: 'Direct administrator Markdown review.' }
   });
   assert.equal(review.course.status, 'admin-review');
+});
+
+test('an administrator can review canonical Markdown one module at a time without exposing it through the learner summary', async () => {
+  const { service } = createService();
+  const markdown = THEORY_COURSE_TEMPLATE.replace('id: replace-with-course-id', 'id: reviewable-course');
+  await service.saveMarkdown({ authorization: authorisation, body: { courseId: 'reviewable-course', version: '1.0.0', markdown } });
+
+  const review = await service.courseReview({ authorization: authorisation, courseId: 'reviewable-course', version: '1.0.0' });
+  assert.match(review.markdown, /^# Module: first-module/m);
+  assert.equal(review.learnerManifest.modules[0].id, 'first-module');
+
+  const learnerSummary = await service.courseSummary({ authorization: authorisation, courseId: 'reviewable-course', version: '1.0.0' });
+  assert.equal(Object.hasOwn(learnerSummary, 'markdown'), false);
+});
+
+test('direct administrator intake uses controlled private source ownership without requiring a teacher submission', async () => {
+  const { firestore, service } = createService();
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({ courseType: 'theory', title: 'Administrator source', sourceFile: binaryFile('reviewed.txt', 'text/plain', 'Private reviewed source') })
+  });
+  const record = (await firestore.collection('type2learnCourseAuthoring').doc('workspace').collection('submissions').doc(source.submission.submissionId).get()).data();
+  assert.equal(record.ownerOrganisationId, 'org-water');
+  assert.equal(source.submission.source.extraction, 'safe-text-extracted');
 });

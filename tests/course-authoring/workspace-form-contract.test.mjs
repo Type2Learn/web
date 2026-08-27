@@ -15,6 +15,11 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /data-open-assessment-draft/);
   assert.match(admin, /data-publish-assessment-draft/);
   assert.match(admin, /data-download-source/);
+  assert.match(admin, /data-admin-source-form/);
+  assert.match(admin, /application\/pdf/);
+  assert.match(admin, /data-open-course-review/);
+  assert.match(admin, /data-generate-narration/);
+  assert.match(admin, /data-translation-form/);
   assert.match(admin, /Generated banks require a configured reviewer/);
   assert.match(admin, /name="distractor3"/);
   assert.match(workspace, /form\.get\('sourceFile'\)\?\.size/);
@@ -27,6 +32,10 @@ test('private educator upload controls use the same source and narration field n
   assert.match(workspace, /\/api\/v1\/assessment\/drafts/);
   assert.match(workspace, /\/api\/v1\/assessment\/publish/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/source-download/);
+  assert.match(workspace, /\/api\/v1\/course-authoring\/translate/);
+  assert.match(workspace, /\/api\/v1\/course-authoring\/review/);
+  assert.match(workspace, /\/api\/v1\/course-authoring\/narration\/generate/);
+  assert.match(workspace, /data-edit-module/);
   assert.match(workspace, /Open and review a draft before publishing it/);
   assert.match(workspace, /correctOptionIndex/);
   assert.doesNotMatch(workspace, /prompt: 'Which answer best matches the reviewed key idea\?'/);
