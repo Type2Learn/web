@@ -10,13 +10,16 @@ test('typing voice UI keeps one external Speak control and an in-field pause/res
   assert.match(source, /voiceIsActive = voiceInput\.listening/);
 });
 
-test('typing selects the authenticated recorder before one-shot browser fallback', async () => {
+test('typing selects authenticated live realtime speech before recorder and browser fallbacks', async () => {
   const source = await readFile(new URL('../../course/course.js', import.meta.url), 'utf8');
-  const speechmaticsFirst = source.indexOf('if (await speechmaticsTypingIsReady())', source.indexOf('const startVoiceInput'));
-  const browserSecond = source.indexOf('if (voiceRecognitionConstructor())', source.indexOf('const startVoiceInput'));
-  assert.ok(speechmaticsFirst >= 0 && browserSecond > speechmaticsFirst);
+  const realtimeFirst = source.indexOf('if (await speechmaticsRealtimeTypingIsReady())', source.indexOf('const startVoiceInput'));
+  const recordingSecond = source.indexOf('if (await speechmaticsTypingIsReady())', source.indexOf('const startVoiceInput'));
+  const browserThird = source.indexOf('if (voiceRecognitionConstructor())', source.indexOf('const startVoiceInput'));
+  assert.ok(realtimeFirst >= 0 && recordingSecond > realtimeFirst && browserThird > recordingSecond);
   assert.match(source, /Never retry a browser recogniser without a new learner action/);
   assert.doesNotMatch(source, /scheduleVoiceRecognitionRestart/);
+  assert.match(source, /Listening live\. Spoken words appear in the box as you speak\./);
+  assert.match(source, /getRealtimeSpeechToken/);
 });
 
 test('Speechmatics compatibility recording has a visible Finish control instead of making learners wait for a timeout', async () => {

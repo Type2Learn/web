@@ -284,9 +284,13 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     geminiFastModel: value('GEMINI_FAST_MODEL') || 'gemini-3.5-flash-lite',
     geminiHeavyModel: value('GEMINI_HEAVY_MODEL') || 'gemini-3.6-flash',
     geminiMaxOutputTokens: numberFrom(value('GEMINI_MAX_OUTPUT_TOKENS'), 420, { min: 64, max: 700 }),
-    speechmaticsMonthlyCreditCap: numberFrom(value('SPEECHMATICS_MONTHLY_CREDIT_CAP'), 180, { min: 0, max: 180 }),
-    speechmaticsUserCreditCap: numberFrom(value('SPEECHMATICS_MONTHLY_USER_CREDIT_CAP'), 12, { min: 0, max: 12 }),
+    // Realtime sessions reserve a bounded 45-second allowance. The earlier
+    // 12-credit per-learner default made a normal learner look "out of
+    // usage" after a few short live attempts. These remain finite safety
+    // caps; a deployment can set lower values explicitly when needed.
+    speechmaticsMonthlyCreditCap: numberFrom(value('SPEECHMATICS_MONTHLY_CREDIT_CAP'), 900, { min: 0, max: 10000 }),
+    speechmaticsUserCreditCap: numberFrom(value('SPEECHMATICS_MONTHLY_USER_CREDIT_CAP'), 45, { min: 0, max: 1000 }),
     speechmaticsCreditsPerMinute: numberFrom(value('SPEECHMATICS_CREDITS_PER_AUDIO_MINUTE'), 1, { min: 0.01, max: 10 }),
-    speechmaticsRequestsPerMinute: numberFrom(value('SPEECHMATICS_REQUESTS_PER_MINUTE'), 6, { min: 1, max: 6 })
+    speechmaticsRequestsPerMinute: numberFrom(value('SPEECHMATICS_REQUESTS_PER_MINUTE'), 8, { min: 1, max: 30 })
   };
 };

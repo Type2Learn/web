@@ -7,6 +7,22 @@ import { openAiUsageCaps, usageEstimate } from './usage-ledger.mjs';
 const MAX_REPLY_CHARACTERS = 2200;
 const COMPANION_ROLES = new Set(['calm-guide', 'learning-partner', 'self-challenge', 'visual-co-explorer']);
 
+// These are public, reviewed project facts. Answering this narrow question
+// locally prevents a small text model from cutting the final team member or
+// inventing an extra closing sentence inside the mascot's compact bubble.
+// It is deliberately not a general chat shortcut: the normal provider path
+// continues to handle all course and learning-support questions.
+const teamReply = (language) => language === 'ur'
+  ? 'ٹائپ ٹو لرن کی بنیاد سی ایم ای کے چھ طلبہ کی ٹیم نے رکھی: محمد طٰہٰ بن زعیم (ترقیاتی سربراہ)، محمد حامز بن کاشف (انجینئرنگ سربراہ)، محمد فہد یونس (مصنوعی ذہانت سربراہ)، ادریس بابر (تحقیق سربراہ)، علیزے حسن (مصنوعات سربراہ)، اور لمیعہ مبشر خان (یوزر انٹرفیس اور یوزر ایکسپیرینس ڈیزائن سربراہ)۔'
+  : 'Type2Learn was founded by six CEME students: Muhammad Taha Bin Zaeem (Development Lead), Muhammad Hamiz Bin Kashif (Engineering Lead), Muhammad Fahad Younus (AI Lead), Idrees Babar (Research Lead), Alizay Hassan (Product Lead), and Lameea Mubashir Khan (UI/UX Design Lead).';
+
+const asksAboutType2LearnTeam = (message) => {
+  const text = String(message || '').trim();
+  const project = /(?:type\s*2\s*learn|type2learn|ٹائپ\s*ٹو\s*لرن|ٹائپ2لرن)/iu.test(text);
+  const teamTopic = /\b(?:team|founders?|co[- ]?founders?|built|made|created|members?|ceme)\b|ٹیم|بانی|کس نے بنایا/iu.test(text);
+  return (project && teamTopic) || /\bwho (?:is|are) (?:on|in) (?:the )?team\b/iu.test(text);
+};
+
 const identifierHash = (value) => createHash('sha256').update(String(value)).digest('hex');
 const estimateTokens = (text) => Math.ceil(String(text).length / 3);
 
@@ -121,9 +137,7 @@ export const createAiService = ({ config, firebase, ledger, provider = null, con
 
   const chat = async ({ authorization, body, localGuest = null }) => {
     const guestPreview = Boolean(localGuest?.isGuest && guestAccessAvailable());
-    if (!providerAvailable() && !directOpenAiAvailable()) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
-    if (!providerAvailable() && config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
-    if (!firebase.available || !ledger) throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
+    if (!firebase.available) throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
     const learner = guestPreview ? localGuest : await firebase.verifyBearer(authorization);
     const message = normaliseLearnerMessage(body?.message);
     if (!message) throw apiError(400, 'EMPTY_MESSAGE', 'Write a short question before sending it.');
@@ -138,6 +152,13 @@ export const createAiService = ({ config, firebase, ledger, provider = null, con
     // raw UI data. It only changes the companion's tone and permitted support
     // shape; page facts and assessment safeguards stay exactly the same.
     const context = { ...resolvedContext, companionRole: COMPANION_ROLES.has(body?.companionRole) ? body.companionRole : '' };
+    // A team query is factual, non-personal and does not require an AI call.
+    // Returning it before the provider/ledger path guarantees every person and
+    // role appears in full even when the model service is temporarily busy.
+    if (asksAboutType2LearnTeam(message)) return { reply: teamReply(context.language) };
+    if (!providerAvailable() && !directOpenAiAvailable()) throw apiError(503, 'AI_NOT_CONFIGURED', 'The AI helper is not connected yet. You can still use the course support on this page.');
+    if (!providerAvailable() && config.openAiModel !== APPROVED_OPENAI_MODEL) throw apiError(503, 'MODEL_NOT_APPROVED', 'The approved AI model is not configured.');
+    if (!ledger) throw apiError(503, 'AI_USAGE_PROTECTION_UNAVAILABLE', 'The AI helper is being set up safely. Please try again later.');
     const history = normaliseConversation(body?.history);
     const instructions = assistantInstructions(context);
     const input = conversationInput(history, message);

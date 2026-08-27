@@ -3,7 +3,10 @@
  * action. Do not add `/api/`, Firebase tokens, teacher submissions, answer
  * keys, private course manifests, or user data to this list.
  */
-export const OFFLINE_CACHE_VERSION = 'type2learn-offline-v3';
+// Advance this whenever learner-facing modules change. Existing offline
+// learners retain their old completed package until they choose the updated
+// download; the active site never silently mixes old JS with new HTML.
+export const OFFLINE_CACHE_VERSION = 'type2learn-offline-v4';
 
 const COURSE_AUDIO_MODULE_KEYS = Object.freeze([
   '01-adhd',

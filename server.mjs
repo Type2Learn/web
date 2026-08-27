@@ -490,6 +490,9 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'POST' && pathname === '/api/v1/speech/transcribe') {
       return sendJson(response, 200, await speech.transcribe({ authorization: request.headers.authorization, form: await readForm(request) }));
     }
+    if (request.method === 'POST' && pathname === '/api/v1/speech/realtime-token') {
+      return sendJson(response, 200, await speech.createRealtimeToken({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/speech/synthesise') {
       const result = await speech.synthesise({
         authorization: request.headers.authorization,

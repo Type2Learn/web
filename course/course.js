@@ -2,7 +2,7 @@ import { COURSE_CONTENT as DEFAULT_COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU as DEFAULT_COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260825-mascot-companion-route3';
+import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, getRealtimeSpeechToken, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260827-live-companion2';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
 import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
 import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
@@ -10,6 +10,7 @@ import { companionBubbleMarkup, companionDockMarkup, localCompanionDirective } f
 import { adaptiveProposalMarkup, taskInitiationMarkup } from './adaptive-support.js?v=20260809-adaptive-learning1';
 import { visualExplanationMarkup } from './visual-explanations.js?v=20260809-adaptive-learning1';
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
+import { RealtimeSpeechInput } from './live-speech.js?v=20260827-live-companion2';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
 import { clearType2LearnGuest, getType2LearnGuest } from '/guest-session.js?v=20260731-guest1';
 import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestOfflinePersistence } from '/offline-client.js?v=20260821-offline2';
@@ -83,6 +84,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     draft: '',
     status: '',
     recognition: null,
+    realtime: null,
     listening: false,
     focusedOpen: false,
     lastOfferKey: '',
@@ -102,6 +104,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     response: '',
     selectedOption: '',
     recognition: null,
+    realtime: null,
     listening: false,
     // A separate aggregate rhythm clock prevents a gap from an earlier
     // guided-typing activity being misclassified as assessment hesitation.
@@ -162,7 +165,17 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   let mascotPresentation = { enabled: false, encouragement: 'balanced', language: 'english', voice: 'text', behaviour: 'calm' };
   // Dialogue playback stays independent from the Course AI message player so
   // a learner can stop/retry the mascot without changing their chat history.
-  const mascotSpeech = { controller: null, element: null, url: '', loading: false, text: '' };
+  const mascotSpeech = {
+    controller: null,
+    element: null,
+    context: null,
+    source: null,
+    url: '',
+    loading: false,
+    playing: false,
+    text: '',
+    error: ''
+  };
   // A tiny silent WAV is played only to retain the explicit click's media
   // permission while the authenticated TTS request is in flight. It contains
   // silence, is never audible, and lets the real spoken clip start reliably
@@ -182,6 +195,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   // causes a microphone permission prompt by itself.
   const voiceInput = {
     recognition: null,
+    realtime: null,
     recorder: null,
     stream: null,
     chunks: [],
@@ -215,11 +229,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     draft: '',
     status: 'idle',
     error: '',
-    connection: { checked: false, checking: false, ai: false, guestAccess: false, localGuestPreview: false, speech: false, aiAudio: false },
+    connection: { checked: false, checking: false, ai: false, guestAccess: false, localGuestPreview: false, speech: false, realtime: false, aiAudio: false },
     requestController: null,
     dictation: {
       recorder: null,
       recognition: null,
+      realtime: null,
       stream: null,
       chunks: [],
       startedAt: 0,
@@ -269,6 +284,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         && assets.simpleAddonCues.length
       );
     });
+    realtime.initialDraft = original;
 
   const finalExam = () => COURSE.finalExam || { questions: [] };
   const finalExamQuestionCount = () => finalExam().questions.length;
@@ -1469,9 +1485,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (dictation.recognition) {
       try { dictation.recognition.abort(); } catch (_) { /* Stopping recognition is best-effort. */ }
     }
+    if (dictation.realtime) void dictation.realtime.stop?.().catch?.(() => {});
     dictation.stream?.getTracks?.().forEach((track) => track.stop());
     dictation.recorder = null;
     dictation.recognition = null;
+    dictation.realtime = null;
     dictation.stream = null;
     dictation.chunks = [];
     dictation.startedAt = 0;
@@ -1562,7 +1580,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const courseAiChatMarkup = (surface) => {
     const busy = ['checking', 'sending', 'recording', 'transcribing'].includes(aiChat.status);
     const canSend = courseAiAccessAllowed() && aiChat.connection.checked && aiChat.connection.ai && !busy && Boolean(aiChat.draft.trim());
-    const canSpeak = signedInLearner() && aiChat.connection.checked && (aiChat.connection.speech || browserSpeechRecognitionAvailable()) && !busy;
+    const canSpeak = signedInLearner() && aiChat.connection.checked && (aiChat.connection.realtime || aiChat.connection.speech || browserSpeechRecognitionAvailable()) && !busy;
     const closeLabel = aiCopy('Close AI chat', 'مصنوعی ذہانت کی گفتگو بند کریں');
     const backLabel = aiCopy('Back to course', 'کورس پر واپس جائیں');
     const heading = aiCopy('Course AI', 'کورس کی مصنوعی ذہانت');
@@ -1599,6 +1617,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         guestAccess,
         localGuestPreview: guestAccess,
         speech: Boolean(status?.speechToText?.available),
+        realtime: Boolean(status?.speechToText?.realtime?.available && status?.speechToText?.realtime?.directBrowserStream),
         aiAudio: Boolean(status?.speechToText?.textToSpeech?.available)
       };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
@@ -1608,7 +1627,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       }
     } catch (_) {
       if (contextKey !== aiChat.contextKey) return;
-      aiChat.connection = { checked: true, checking: false, ai: false, guestAccess: false, localGuestPreview: false, speech: false, aiAudio: false };
+      aiChat.connection = { checked: true, checking: false, ai: false, guestAccess: false, localGuestPreview: false, speech: false, realtime: false, aiAudio: false };
       if (aiChat.status === 'checking') aiChat.status = 'idle';
       if (aiChatIsVisible()) {
         render();
@@ -1892,8 +1911,77 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
   };
 
+  // LIVE COURSE-AI DICTATION: use the signed-in provider stream first. The
+  // textarea receives partial words while the learner speaks; no recording is
+  // uploaded to Type2Learn and the browser recogniser is only a fallback.
+  const startRealtimeAiDictation = async () => {
+    if (!aiChatIsVisible() || !signedInLearner() || !aiChat.connection.realtime || !RealtimeSpeechInput.supported(window)) return false;
+    const dictation = aiChat.dictation;
+    const session = ++dictation.session;
+    clearAiChatTimer();
+    const initialDraft = aiChat.draft.trim();
+    let lastTranscript = '';
+    const realtime = new RealtimeSpeechInput({
+      user: authenticatedUser,
+      language: aiLanguage(),
+      purpose: 'chat',
+      requestToken: ({ language, purpose }) => getRealtimeSpeechToken({ user: authenticatedUser, language, purpose }),
+      onPartial: (transcript) => {
+        if (session !== dictation.session) return;
+        lastTranscript = transcript;
+        appendAiDictationTranscript(transcript, initialDraft);
+        aiChat.error = '';
+        const input = app.querySelector('[data-ai-chat-input]');
+        if (input) input.value = aiChat.draft;
+        syncAiComposerState();
+      },
+      onFinal: (transcript) => {
+        if (session !== dictation.session) return;
+        lastTranscript = transcript || lastTranscript;
+        appendAiDictationTranscript(lastTranscript, initialDraft);
+      },
+      onError: (message) => {
+        if (session !== dictation.session) return;
+        dictation.realtime = null;
+        aiChat.status = 'idle';
+        aiChat.error = message;
+        if (aiChatIsVisible()) render();
+      }
+    });
+    dictation.recorder = null;
+    dictation.recognition = null;
+    dictation.realtime = realtime;
+    dictation.stream = null;
+    dictation.chunks = [];
+    dictation.startedAt = window.performance.now();
+    dictation.stopping = false;
+    dictation.mode = 'realtime';
+    dictation.fallback = false;
+    dictation.initialDraft = initialDraft;
+    dictation.finalTranscript = '';
+    dictation.finalResultIndexes = new Set();
+    aiChat.status = 'recording';
+    aiChat.error = '';
+    recordUnifiedBehaviourAction('speech-start');
+    render();
+    try {
+      await realtime.start();
+      return true;
+    } catch (error) {
+      if (session !== dictation.session) return true;
+      dictation.realtime = null;
+      aiChat.status = 'idle';
+      aiChat.error = error?.message || aiCopy('Live voice input could not start. You can type your question instead.', 'براہِ راست وائس اِن پٹ شروع نہیں ہو سکا۔ آپ سوال ٹائپ کر سکتے ہیں۔');
+      if (aiChatIsVisible()) render();
+      return false;
+    }
+  };
+
   const startAiDictation = async () => {
     if (aiChat.status !== 'idle') return;
+    // This is the default for signed-in learners. It produces editable words
+    // continuously rather than waiting for a recording to stop and upload.
+    if (await startRealtimeAiDictation()) return;
     if (!aiChat.connection.speech) {
       if (startBrowserAiDictation()) return;
       aiChat.error = aiCopy('Voice input is unavailable right now. You can type your question instead.', 'وائس ان پٹ اس وقت دستیاب نہیں ہے۔ آپ سوال ٹائپ کر سکتے ہیں۔');
@@ -1939,9 +2027,29 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const stopAiDictation = () => {
     const recorder = aiChat.dictation.recorder;
     const recognition = aiChat.dictation.recognition;
+    const realtime = aiChat.dictation.realtime;
     if (aiChat.dictation.stopping) return;
     aiChat.dictation.stopping = true;
     clearAiChatTimer();
+    if (realtime) {
+      const session = aiChat.dictation.session;
+      void realtime.stop().then((result) => {
+        if (session !== aiChat.dictation.session) return;
+        appendAiDictationTranscript(result?.transcript || '', aiChat.dictation.initialDraft);
+        aiChat.dictation.realtime = null;
+        aiChat.dictation.stopping = false;
+        aiChat.status = 'idle';
+        recordUnifiedBehaviourAction('speech-complete');
+        if (aiChatIsVisible()) { render(); focusAiInput(); }
+      }).catch(() => {
+        if (session !== aiChat.dictation.session) return;
+        aiChat.dictation.realtime = null;
+        aiChat.dictation.stopping = false;
+        aiChat.status = 'idle';
+        if (aiChatIsVisible()) render();
+      });
+      return;
+    }
     if (recognition) {
       try { recognition.stop(); } catch (_) { discardAiDictation(); }
       return;
@@ -2029,6 +2137,19 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const stopMascotSpeech = () => {
     mascotSpeech.controller?.abort?.();
     mascotSpeech.controller = null;
+    if (mascotSpeech.source) {
+      mascotSpeech.source.onended = null;
+      try { mascotSpeech.source.stop(0); } catch (_) { /* Source may have ended already. */ }
+      try { mascotSpeech.source.disconnect(); } catch (_) { /* Best effort cleanup. */ }
+    }
+    mascotSpeech.source = null;
+    if (mascotSpeech.context && mascotSpeech.context.state !== 'closed') {
+      // A dedicated context is created only after an explicit Listen click.
+      // Closing it here releases browser audio resources when the learner
+      // stops the clip, navigates away, or starts another mascot reply.
+      void mascotSpeech.context.close?.().catch?.(() => {});
+    }
+    mascotSpeech.context = null;
     if (mascotSpeech.element) {
       mascotSpeech.element.pause();
       mascotSpeech.element.src = '';
@@ -2037,20 +2158,88 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (mascotSpeech.url) URL.revokeObjectURL(mascotSpeech.url);
     mascotSpeech.url = '';
     mascotSpeech.loading = false;
+    mascotSpeech.playing = false;
     mascotSpeech.text = '';
+    mascotSpeech.error = '';
   };
 
   const unlockMascotAudioFromClick = () => {
+    let context = null;
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        context = new AudioContext({ latencyHint: 'interactive' });
+        // This resume happens synchronously inside the learner's button click.
+        // The fetched provider clip can therefore begin later without falling
+        // back to a system/robotic browser voice or losing the click gesture.
+        if (context.state === 'suspended') void context.resume().catch(() => {});
+      }
+    } catch (_) {
+      context = null;
+    }
     try {
       const audio = new Audio(SILENT_AUDIO_UNLOCK_WAV);
       audio.muted = true;
       // This happens synchronously inside the learner's Listen click. The
       // later network response reuses this exact element for the real voice.
       void audio.play().catch(() => {});
-      return audio;
+      return { audio, context };
     } catch (_) {
-      return null;
+      return { audio: null, context };
     }
+  };
+
+  const mascotSpeechUnavailableMessage = () => courseUi(
+    'The selected narration voice could not start. You can still read the mascot message.',
+    'منتخب آواز شروع نہیں ہو سکی۔ آپ ماسکٹ کا پیغام پھر بھی پڑھ سکتے ہیں۔'
+  );
+
+  const finishMascotSpeech = (source = null, audio = null) => {
+    if (source && mascotSpeech.source !== source) return;
+    if (audio && mascotSpeech.element !== audio) return;
+    stopMascotSpeech();
+    refreshMascotSpeechControl();
+  };
+
+  // Playback uses the configured provider voice only.  Web Audio is preferred
+  // because its context is resumed during the original learner click; that is
+  // materially more reliable than waiting for a network response and then
+  // asking a fresh HTMLAudioElement to start.  An ordinary audio element stays
+  // as a standards-compatible fallback for browsers without Web Audio.
+  const playMascotProviderAudio = async (blob, url) => {
+    const context = mascotSpeech.context;
+    if (context?.decodeAudioData && context?.createBufferSource) {
+      const bytes = await blob.arrayBuffer();
+      if (mascotSpeech.controller?.signal?.aborted) return;
+      if (context.state === 'suspended') await context.resume();
+      const buffer = await context.decodeAudioData(bytes.slice(0));
+      if (mascotSpeech.controller?.signal?.aborted) return;
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(context.destination);
+      source.addEventListener('ended', () => finishMascotSpeech(source), { once: true });
+      mascotSpeech.source = source;
+      mascotSpeech.playing = true;
+      source.start(0);
+      return;
+    }
+    const audio = mascotSpeech.element || new Audio();
+    audio.pause();
+    audio.currentTime = 0;
+    audio.src = url;
+    audio.muted = false;
+    audio.preload = 'auto';
+    audio.addEventListener('ended', () => finishMascotSpeech(null, audio), { once: true });
+    audio.addEventListener('error', () => {
+      if (mascotSpeech.element !== audio) return;
+      mascotSpeech.error = mascotSpeechUnavailableMessage();
+      stopMascotSpeech();
+      mascotSpeech.error = mascotSpeechUnavailableMessage();
+      refreshMascotSpeechControl();
+    }, { once: true });
+    mascotSpeech.element = audio;
+    mascotSpeech.playing = true;
+    await audio.play();
   };
 
   const refreshMascotSpeechControl = () => {
@@ -2063,7 +2252,9 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const dialogue = currentMascotSpeechText();
     if (!aiChat.connection.checked) await refreshAiConnection();
     if (!dialogue || !mascotSpeechCanPlay()) {
-      announce(courseUi('The selected narration voice is not available right now. You can still read the mascot message.', 'منتخب آواز ابھی دستیاب نہیں۔ آپ ماسکٹ کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
+      mascotSpeech.error = courseUi('The selected narration voice is not available right now. You can still read the mascot message.', 'منتخب آواز ابھی دستیاب نہیں۔ آپ ماسکٹ کا پیغام پھر بھی پڑھ سکتے ہیں۔');
+      refreshMascotSpeechControl();
+      announce(mascotSpeech.error);
       return;
     }
     if (mascotSpeech.loading || mascotSpeech.text === dialogue) {
@@ -2075,9 +2266,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (!aiChat.connection.aiAudio) return;
     const controller = new AbortController();
     mascotSpeech.controller = controller;
-    mascotSpeech.element = unlockMascotAudioFromClick();
+    const unlocked = unlockMascotAudioFromClick();
+    mascotSpeech.element = unlocked.audio;
+    mascotSpeech.context = unlocked.context;
     mascotSpeech.loading = true;
     mascotSpeech.text = dialogue;
+    mascotSpeech.error = '';
     refreshMascotSpeechControl();
     try {
       const blob = await synthesiseCourseAiReply({
@@ -2088,34 +2282,38 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       });
       if (controller.signal.aborted) return;
       const url = URL.createObjectURL(blob);
-      const audio = mascotSpeech.element || new Audio();
-      audio.pause();
-      audio.src = url;
-      audio.muted = false;
-      mascotSpeech.controller = null;
-      mascotSpeech.element = audio;
       mascotSpeech.url = url;
       mascotSpeech.loading = false;
-      audio.addEventListener('ended', () => {
-        if (mascotSpeech.element !== audio) return;
-        stopMascotSpeech();
-        refreshMascotSpeechControl();
-      }, { once: true });
-      await audio.play();
+      await playMascotProviderAudio(blob, url);
+      if (controller.signal.aborted) return;
       announce(courseUi('Mascot speech has started.', 'ماسکٹ کی آواز شروع ہو گئی ہے۔'));
       refreshMascotSpeechControl();
-    } catch (_) {
+    } catch (error) {
       if (controller.signal.aborted) return;
       stopMascotSpeech();
-      announce(courseUi('The selected narration voice could not start. You can still read the mascot message.', 'منتخب آواز شروع نہیں ہو سکی۔ آپ ماسکٹ کا پیغام پھر بھی پڑھ سکتے ہیں۔'));
+      mascotSpeech.error = mascotSpeechUnavailableMessage();
+      // The provider or browser detail is intentionally not displayed: it can
+      // include implementation-specific errors and does not help a learner.
+      // The visible retry state is sufficient and preserves the written reply.
+      void error;
+      refreshMascotSpeechControl();
+      announce(mascotSpeech.error);
     }
   };
 
-  const mascotSpeechButtonMarkup = (dialogue) => mascotSpeechCanPlay()
-    ? '<button class="course-mascot-listen" type="button" data-action="mascot-speak">'
-      + escapeHtml(mascotSpeech.loading ? courseUi('Loading audio…', 'آڈیو لوڈ ہو رہی ہے…') : mascotSpeech.text === dialogue ? courseUi('Stop audio', 'آڈیو روکیں') : courseUi('Listen', 'سنیں'))
-      + '</button>'
-    : '';
+  const mascotSpeechButtonMarkup = (dialogue) => {
+    const available = mascotSpeechCanPlay();
+    const active = mascotSpeech.loading || (mascotSpeech.playing && mascotSpeech.text === dialogue);
+    const control = available
+      ? '<button class="course-mascot-listen" type="button" data-action="mascot-speak" aria-pressed="' + (active ? 'true' : 'false') + '">'
+        + escapeHtml(mascotSpeech.loading ? courseUi('Preparing voice…', 'آواز تیار ہو رہی ہے…') : active ? courseUi('Stop voice', 'آواز روکیں') : mascotSpeech.error ? courseUi('Try voice again', 'آواز دوبارہ آزمائیں') : courseUi('Listen', 'سنیں'))
+        + '</button>'
+      : '';
+    const status = mascotSpeech.error
+      ? '<p class="course-mascot-audio-status" role="status">' + escapeHtml(mascotSpeech.error) + '</p>'
+      : '';
+    return control + status;
+  };
 
   const courseMascotMarkup = (location) => {
     // ADAPTIVE LEARNING: an opted-in learner can request a reviewed visual
@@ -2149,7 +2347,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // suggestion. It stays directly beneath its feet in the same rail and
     // can send a learner-initiated message at any time.
     const dockMarkup = !showAiPanel && location === 'lesson'
-      ? companionDockMarkup({ language: mascotLanguage, escapeHtml, draft: behaviourPartner.draft, canSpeak: browserSpeechRecognitionAvailable(), channel: partnerControls().channel, listening: behaviourPartner.listening, sending: behaviourPartner.requesting, status: behaviourPartner.status })
+      ? companionDockMarkup({ language: mascotLanguage, escapeHtml, draft: behaviourPartner.draft, canSpeak: Boolean((signedInLearner() && aiChat.connection.realtime && RealtimeSpeechInput.supported(window)) || browserSpeechRecognitionAvailable()), channel: partnerControls().channel, listening: behaviourPartner.listening, sending: behaviourPartner.requesting, status: behaviourPartner.status })
       : '';
     if (showAiPanel) {
       // The assistant owns this rail while it is open: the animated mascot is
@@ -2430,19 +2628,77 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     understandingCheck.lastInputAt = 0;
   };
 
-  // ASSESSMENT VOICE INPUT: browser recognition begins only after an explicit
-  // learner click. Its words are placed in the same editable response box and
-  // are never retained in the behaviour context or stored until submission.
+  // ASSESSMENT VOICE INPUT: live provider speech is the first choice after an
+  // explicit learner click. Its words remain editable in the answer field and
+  // are never retained in behaviour telemetry. Browser recognition is kept
+  // only for devices that cannot run the live PCM stream.
   const stopAssessmentDictation = () => {
     const recognition = understandingCheck.recognition;
+    const realtime = understandingCheck.realtime;
     understandingCheck.recognition = null;
+    understandingCheck.realtime = null;
     understandingCheck.listening = false;
     if (recognition) {
       try { recognition.stop(); } catch (_) { /* Best effort only. */ }
     }
+    if (realtime) {
+      void realtime.stop().then((result) => {
+        const transcript = String(result?.transcript || '').trim();
+        if (transcript) updateAssessmentSpeechResponse(transcript, realtime.initialResponse || '');
+        recordUnifiedBehaviourAction('speech-complete');
+        renderUnderstandingCheck('[data-assessment-response]');
+      }).catch(() => {});
+    }
   };
 
-  const startAssessmentDictation = () => {
+  const updateAssessmentSpeechResponse = (transcript, initial = '') => {
+    const clean = normaliseText(transcript);
+    understandingCheck.response = [initial, clean].filter(Boolean).join(initial && clean ? ' ' : '').slice(0, 1400);
+    const input = app.querySelector('[data-assessment-response]');
+    if (input) input.value = understandingCheck.response;
+  };
+
+  const startRealtimeAssessmentDictation = async () => {
+    if (!signedInLearner() || !RealtimeSpeechInput.supported(window)) return false;
+    if (!aiChat.connection.checked) await refreshAiConnection();
+    if (!aiChat.connection.realtime) return false;
+    stopAssessmentDictation();
+    const initial = understandingCheck.response.trim();
+    const realtime = new RealtimeSpeechInput({
+      user: authenticatedUser,
+      language: aiLanguage(),
+      purpose: 'typing',
+      requestToken: ({ language, purpose }) => getRealtimeSpeechToken({ user: authenticatedUser, language, purpose }),
+      onPartial: (transcript) => updateAssessmentSpeechResponse(transcript, initial),
+      onFinal: (transcript) => updateAssessmentSpeechResponse(transcript, initial),
+      onError: (message) => {
+        if (understandingCheck.realtime !== realtime) return;
+        understandingCheck.realtime = null;
+        understandingCheck.listening = false;
+        understandingCheck.error = message;
+        renderUnderstandingCheck('[data-assessment-response]');
+      }
+    });
+    realtime.initialResponse = initial;
+    understandingCheck.realtime = realtime;
+    understandingCheck.listening = true;
+    understandingCheck.error = '';
+    recordUnifiedBehaviourAction('speech-start');
+    renderUnderstandingCheck('[data-assessment-response]');
+    try {
+      await realtime.start();
+      return true;
+    } catch (_) {
+      if (understandingCheck.realtime === realtime) {
+        understandingCheck.realtime = null;
+        understandingCheck.listening = false;
+      }
+      return false;
+    }
+  };
+
+  const startAssessmentDictation = async () => {
+    if (await startRealtimeAssessmentDictation()) return;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition) {
       understandingCheck.error = courseUi('Speech input is not available in this browser. You can type your response instead.', 'اس براؤزر میں آواز سے جواب دستیاب نہیں ہے۔ آپ اپنا جواب ٹائپ کر سکتے ہیں۔');
@@ -2928,7 +3184,17 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (!text) return '';
     // Companion bubbles stay deliberately short. This is a separate compact
     // surface; the full Course AI chat remains available for a longer thread.
-    return text.split(/(?<=[.!?؟])\s+/).slice(0, 2).join(' ').slice(0, 300);
+    // Never use a raw character slice here: it cuts a reviewed factual reply
+    // mid-sentence (including the final team member). Two complete sentences
+    // or one bounded complete factual sentence fit safely in the rail.
+    const sentences = text.split(/(?<=[.!?؟])\s+/).filter(Boolean);
+    const concise = sentences.slice(0, 2).join(' ');
+    if (concise.length <= 640) return concise;
+    const safe = sentences.reduce((accepted, sentence) => {
+      const next = accepted ? accepted + ' ' + sentence : sentence;
+      return next.length <= 640 ? next : accepted;
+    }, '');
+    return safe || sentences[0] || text;
   };
 
   // MASCOT GUIDANCE REQUEST: both “Help with this step” and “I’m stuck →
@@ -2945,14 +3211,76 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     'کیا آپ چاہیں گے کہ میں اس مرحلے کو دوبارہ الفاظ میں بیان کروں، پہلا حصہ چھوٹا کروں، مختصر حصوں میں سمجھاؤں، یا ایک مختصر مثال دوں؟ بتائیں کون سا طریقہ زیادہ مددگار ہوگا۔'
   );
 
-  // Learning-partner voice uses the browser recogniser only after the learner
-  // presses Speak. It writes into the visible draft field first; nothing is
-  // sent to an AI service until the learner reviews and chooses Send.
-  const startCompanionDictation = () => {
+  // The mascot dock uses the same direct live-speech transport as Course AI.
+  // It still writes only into the learner-visible draft first; sending to the
+  // learning partner remains a separate deliberate action.
+  const startRealtimeCompanionDictation = async () => {
+    if (!signedInLearner() || !RealtimeSpeechInput.supported(window)) return false;
+    if (!aiChat.connection.checked) await refreshAiConnection();
+    if (!aiChat.connection.realtime) return false;
+    const original = behaviourPartner.draft.trim();
+    const realtime = new RealtimeSpeechInput({
+      user: authenticatedUser,
+      language: mascotPresentation.language === 'urdu' ? 'ur' : 'en',
+      purpose: 'chat',
+      requestToken: ({ language, purpose }) => getRealtimeSpeechToken({ user: authenticatedUser, language, purpose }),
+      onPartial: (transcript) => {
+        if (behaviourPartner.realtime !== realtime) return;
+        behaviourPartner.draft = [original, normaliseText(transcript)].filter(Boolean).join(original && transcript ? ' ' : '');
+        const input = app.querySelector('[data-companion-input]');
+        if (input) input.value = behaviourPartner.draft;
+      },
+      onFinal: (transcript) => {
+        if (behaviourPartner.realtime !== realtime) return;
+        behaviourPartner.draft = [original, normaliseText(transcript)].filter(Boolean).join(original && transcript ? ' ' : '');
+      },
+      onError: (message) => {
+        if (behaviourPartner.realtime !== realtime) return;
+        behaviourPartner.realtime = null;
+        behaviourPartner.listening = false;
+        behaviourPartner.status = message;
+        render();
+      }
+    });
+    behaviourPartner.recognition = null;
+    behaviourPartner.realtime = realtime;
+    behaviourPartner.listening = true;
+    behaviourPartner.status = '';
+    recordUnifiedBehaviourAction('speech-start');
+    render();
+    try {
+      await realtime.start();
+      return true;
+    } catch (_) {
+      if (behaviourPartner.realtime === realtime) {
+        behaviourPartner.realtime = null;
+        behaviourPartner.listening = false;
+      }
+      return false;
+    }
+  };
+
+  // Browser recognition is a compatibility fallback only. It writes into the
+  // visible draft field first; nothing is sent to an AI service until the
+  // learner reviews and chooses Send.
+  const startCompanionDictation = async () => {
     if (behaviourPartner.listening) {
+      if (behaviourPartner.realtime) {
+        const realtime = behaviourPartner.realtime;
+        behaviourPartner.realtime = null;
+        behaviourPartner.listening = false;
+        void realtime.stop().then((result) => {
+          const transcript = normaliseText(result?.transcript || '');
+          behaviourPartner.draft = [realtime.initialDraft || '', transcript].filter(Boolean).join(realtime.initialDraft && transcript ? ' ' : '');
+          recordUnifiedBehaviourAction('speech-complete');
+          render();
+        });
+        return;
+      }
       try { behaviourPartner.recognition?.stop?.(); } catch (_) { /* best effort */ }
       return;
     }
+    if (await startRealtimeCompanionDictation()) return;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition) {
       announce(courseUi('Voice input is unavailable here. You can type your message instead.', 'وائس اِن پٹ یہاں دستیاب نہیں۔ آپ اپنا پیغام ٹائپ کر سکتے ہیں۔'));
@@ -2976,6 +3304,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     recognition.onerror = () => {
       behaviourPartner.listening = false;
       behaviourPartner.recognition = null;
+      behaviourPartner.realtime = null;
       announce(courseUi('Voice input could not continue. You can type your message instead.', 'وائس اِن پٹ جاری نہیں رہ سکا۔ آپ اپنا پیغام ٹائپ کر سکتے ہیں۔'));
       render();
     };
@@ -2983,6 +3312,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       if (behaviourPartner.recognition !== recognition) return;
       behaviourPartner.listening = false;
       behaviourPartner.recognition = null;
+      behaviourPartner.realtime = null;
       if (finalText) {
         // The transcript remains in the editable local draft. Behaviour data
         // sees only that a learner completed an optional speech interaction.
@@ -4812,7 +5142,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       return '<fieldset class="course-check-options"><legend>' + escapeHtml(question.prompt) + '</legend>'
         + question.options.map((option, index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="understanding-check-answer" value="' + index + '" data-assessment-option' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(option) + '</span></label>').join('') + '</fieldset>';
     }
-    const canSpeak = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    const canSpeak = Boolean(
+      (signedInLearner() && aiChat.connection.realtime && RealtimeSpeechInput.supported(window))
+      || window.SpeechRecognition || window.webkitSpeechRecognition
+    );
     const speech = canSpeak
       ? '<div class="course-assessment-input-tools"><button class="course-secondary-button" type="button" data-action="assessment-dictation"' + (understandingCheck.listening ? ' aria-pressed="true"' : '') + '>' + escapeHtml(understandingCheck.listening ? courseUi('Listening…', 'سن رہا ہے…') : courseUi('Speak response', 'آواز سے جواب دیں')) + '</button><p class="course-input-help">' + escapeHtml(courseUi('Your spoken words appear here for you to review and edit before submitting.', 'آپ کے بولے گئے الفاظ یہاں آئیں گے تاکہ آپ جمع کرنے سے پہلے انہیں دیکھ اور بدل سکیں۔')) + '</p></div>'
       : '';
@@ -5106,7 +5439,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       const controls = document.createElement('div');
       controls.className = 'typing-tester-controls';
       controls.dataset.voiceInputControls = '';
-      const supported = Boolean(browserCanRecordVoice() || voiceRecognitionConstructor());
+      const supported = Boolean(browserCanStreamLiveVoice() || browserCanRecordVoice() || voiceRecognitionConstructor());
       controls.innerHTML = '<button class="course-secondary-button typing-mic-button" type="button" data-action="start-voice-input" aria-label="Use microphone to speak your response" aria-describedby="course-voice-input-status"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 14.5a3 3 0 0 0 3-3v-5a3 3 0 0 0 3 3Zm-5-3v.5a5 5 0 0 0 10 0v-.5M12 17v4M8.5 21h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span data-voice-input-button-label>Speak</span></button>';
       // This is deliberately a sibling of the typing box: Speak starts a
       // voice-entry mode, rather than being part of the learner's text.
@@ -5164,25 +5497,28 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     });
     const liveControlVisible = ['listening', 'paused'].includes(voiceInput.status);
     const voiceFocusActive = liveControlVisible || voiceInput.status === 'recognising';
-    // Speechmatics is a recording-and-transcribe fallback, rather than live
-    // browser recognition. It needs an explicit completion control: leaving a
-    // learner with only Pause would make them wait for the safety timeout.
+    // Both Type2Learn's direct realtime route and the compatibility recorder
+    // need an explicit Finish control. Leaving either path with only Pause
+    // would make a learner wait for the bounded safety timeout before the
+    // editable text is available.
     const recordingForSpeechmatics = voiceInput.recorder?.state === 'recording';
+    const streamingRealtime = Boolean(voiceInput.realtime?.active);
+    const finishSpeaking = recordingForSpeechmatics || streamingRealtime;
     app.querySelectorAll('[data-voice-input-live-control]').forEach((control) => {
       control.hidden = !liveControlVisible;
-      control.dataset.voiceInputMode = recordingForSpeechmatics ? 'recording' : 'live';
+      control.dataset.voiceInputMode = streamingRealtime ? 'realtime' : recordingForSpeechmatics ? 'recording' : 'live';
       const toggle = control.querySelector('[data-action="toggle-voice-input-pause"]');
       const icon = control.querySelector('[data-voice-input-live-icon]');
       const label = control.querySelector('[data-voice-input-live-label]');
       const paused = voiceInput.status === 'paused';
-      if (toggle) toggle.setAttribute('aria-label', recordingForSpeechmatics
+      if (toggle) toggle.setAttribute('aria-label', finishSpeaking
         ? 'Finish speaking and add text'
         : paused ? 'Resume speech recognition' : 'Pause speech recognition');
       if (label) {
-        label.classList.toggle('course-live-region', !recordingForSpeechmatics);
-        label.textContent = recordingForSpeechmatics ? 'Finish' : paused ? 'Resume' : 'Listening';
+        label.classList.toggle('course-live-region', !finishSpeaking);
+        label.textContent = finishSpeaking ? 'Finish' : paused ? 'Resume' : 'Listening';
       }
-      if (icon) icon.innerHTML = recordingForSpeechmatics
+      if (icon) icon.innerHTML = finishSpeaking
         ? '<path d="m5 12 4.2 4.2L19 6.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"/>'
         : paused
           ? '<path d="m9 5 10 7-10 7V5Z" fill="currentColor"/>'
@@ -5200,7 +5536,8 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const stopVoiceInput = (message = '', nextStatus = 'stopped') => {
     const recognition = voiceInput.recognition;
     const recorder = voiceInput.recorder;
-    const hadActiveSpeech = Boolean(recognition || recorder || voiceInput.listening);
+    const realtime = voiceInput.realtime;
+    const hadActiveSpeech = Boolean(recognition || recorder || realtime || voiceInput.listening);
     voiceInput.stopRequested = true;
     voiceInput.sessionId += 1;
     if (voiceInput.restartTimer) {
@@ -5216,6 +5553,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       voiceInput.recordingTimer = null;
     }
     voiceInput.recognition = null;
+    voiceInput.realtime = null;
     voiceInput.recorder = null;
     voiceInput.stream?.getTracks?.().forEach((track) => track.stop());
     voiceInput.stream = null;
@@ -5236,6 +5574,9 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (recorder && recorder.state !== 'inactive') {
       try { recorder.stop(); } catch (_) { /* Stopping a recorder is best-effort. */ }
     }
+    // A realtime EndOfTranscript may arrive after this cleanup. Its callback
+    // verifies the incremented session id, so it cannot alter a later attempt.
+    if (realtime) void realtime.stop().catch(() => {});
     // A stopped microphone is still a completed *interaction*, not proof of
     // understanding. The unified context records only that the learner used
     // an optional input method; it never receives the audio or transcript.
@@ -5244,6 +5585,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   };
 
   const pauseVoiceInput = () => {
+    if (voiceInput.realtime?.active) {
+      void finishRealtimeTypingInput();
+      return;
+    }
     if (voiceInput.recorder?.state === 'recording') {
       // Unlike browser recognition, the Speechmatics compatibility path sends
       // an entire short recording. Finish it immediately so the learner gets
@@ -5292,10 +5637,17 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     else pauseVoiceInput();
   };
 
-  const placeBrowserSpeechTranscript = (transcript) => {
+  // A partial realtime transcript is never silently expanded into the full
+  // authored sentence. The close-enough canonicaliser is only allowed to do
+  // that after the provider has marked speech final (or after a completed
+  // compatibility recording). Until then prefix alignment can only reuse
+  // characters the learner has actually spoken.
+  const placeBrowserSpeechTranscript = (transcript, { final = false } = {}) => {
     const input = app.querySelector('[data-typing-input]');
     const target = typingIsAccuracyObjective() ? activeTypingReference() : '';
-    const canonical = target ? canonicaliseSpokenTyping(transcript, target) : { value: normaliseText(transcript), corrected: false };
+    const canonical = target && final
+      ? canonicaliseSpokenTyping(transcript, target)
+      : { value: normaliseText(transcript), corrected: false };
     const livePrefix = target && !canonical.corrected
       ? canonicaliseSpokenTypingPrefix(transcript, target)
       : { value: canonical.value, aligned: canonical.corrected };
@@ -5441,6 +5793,92 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
 
   const browserCanRecordVoice = () => Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 
+  const browserCanStreamLiveVoice = () => RealtimeSpeechInput.supported(window);
+
+  const completeRealtimeTypingInput = (sessionId, client, transcript) => {
+    if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested || voiceInput.realtime !== client) return;
+    voiceInput.realtime = null;
+    voiceInput.startedAt = 0;
+    const spoken = String(transcript || '').trim();
+    if (!spoken) {
+      renderVoiceInputState('stopped', 'No speech was heard. Your response is still here, and typing stays available.');
+      return;
+    }
+    const canonical = placeBrowserSpeechTranscript(spoken, { final: true });
+    renderVoiceInputState('stopped', canonical.corrected
+      ? 'A close spoken match was aligned with the visible course sentence.'
+      : 'Your spoken words are editable in the response field.');
+    recordUnifiedBehaviourAction('speech-complete');
+  };
+
+  const finishRealtimeTypingInput = async () => {
+    const client = voiceInput.realtime;
+    if (!client) return;
+    const sessionId = voiceInput.sessionId;
+    renderVoiceInputState('recognising', 'Finishing live voice input and keeping your editable words.');
+    try {
+      const result = await client.stop();
+      completeRealtimeTypingInput(sessionId, client, result?.transcript || '');
+    } catch (error) {
+      if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested || voiceInput.realtime !== client) return;
+      voiceInput.realtime = null;
+      renderVoiceInputState('error', error?.message || 'Live voice input could not finish. Your editable words are still here.');
+    }
+  };
+
+  // LIVE SPEECH: audio travels directly from the learner's microphone to the
+  // provider with a short-lived token. The browser receives partial words in
+  // the same text field while the learner speaks; neither Type2Learn nor its
+  // server stores recordings or partial/final transcripts.
+  const startRealtimeTypingInput = async () => {
+    if (!browserCanStreamLiveVoice()) return false;
+    const sessionId = ++voiceInput.sessionId;
+    voiceInput.stopRequested = false;
+    voiceInput.paused = false;
+    voiceInput.initialResponse = state.progress.attempt.response.trim();
+    voiceInput.startedAt = window.performance.now();
+    let client;
+    try {
+      client = new RealtimeSpeechInput({
+        user: authenticatedUser,
+        language: courseUsesUrdu() ? 'ur' : 'en',
+        purpose: 'typing',
+        requestToken: ({ user, language, purpose }) => getRealtimeSpeechToken({ user, language, purpose, signal: requestTimeoutSignal(15000) }),
+        onPartial: (transcript) => {
+          if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested || voiceInput.realtime !== client) return;
+          placeBrowserSpeechTranscript(transcript, { final: false });
+        },
+        onFinal: (transcript) => completeRealtimeTypingInput(sessionId, client, transcript),
+        onState: (status) => {
+          if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested || voiceInput.realtime !== client) return;
+          if (status === 'requesting') renderVoiceInputState('recognising', 'Connecting live voice input. Typing stays available.');
+          else if (status === 'listening') {
+            renderVoiceInputState('listening', 'Listening live. Spoken words appear in the box as you speak.');
+            announce('Live microphone input is listening.');
+          } else if (status === 'buffering') renderVoiceInputState('listening', 'Keeping the connection steady. Your spoken words will continue appearing shortly.');
+          else if (status === 'finishing') renderVoiceInputState('recognising', 'Finishing live voice input and keeping your editable words.');
+        },
+        onError: (message) => {
+          if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested || voiceInput.realtime !== client) return;
+          voiceInput.realtime = null;
+          renderVoiceInputState('error', message || 'Live voice input could not continue. Your editable words are still here.');
+        }
+      });
+      voiceInput.realtime = client;
+      state.progress.attempt.inputMethod = 'voice';
+      state.progress.attempt.alternativeInput = true;
+      recordUnifiedBehaviourAction('speech-start');
+      await client.start();
+      if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested || voiceInput.realtime !== client) return true;
+      return true;
+    } catch (error) {
+      if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return true;
+      if (voiceInput.realtime === client) voiceInput.realtime = null;
+      renderVoiceInputState(error?.name === 'NotAllowedError' ? 'permission-denied' : 'error', error?.message || 'Live voice input could not start. You can type your response instead.');
+      return true;
+    }
+  };
+
   const clearSpeechmaticsTypingTimer = () => {
     if (voiceInput.recordingTimer) window.clearTimeout(voiceInput.recordingTimer);
     voiceInput.recordingTimer = null;
@@ -5482,19 +5920,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       if (sessionId !== voiceInput.sessionId || voiceInput.stopRequested) return;
       const transcript = String(result?.transcript || '').trim();
       if (!transcript) throw new Error('No transcript');
-      const input = app.querySelector('[data-typing-input]');
-      const target = typingIsAccuracyObjective() ? activeTypingReference() : '';
-      const canonical = target ? canonicaliseSpokenTyping(transcript, target) : { value: transcript, corrected: false };
-      const nextValue = target ? canonical.value : [voiceInput.initialResponse, canonical.value].filter(Boolean).join(' ');
-      state.progress.attempt.response = nextValue;
-      state.progress.attempt.feedback = '';
-      state.progress.attempt.inputMethod = 'voice';
-      state.progress.attempt.alternativeInput = true;
-      if (input) {
-        input.value = nextValue;
-        syncTypingTester(input);
-        scheduleTypingAutoSubmit(input);
-      }
+      const canonical = placeBrowserSpeechTranscript(transcript, { final: true });
       save(canonical.corrected
         ? 'A close spoken match was placed as the visible course sentence.'
         : 'Voice input added to your response. You can edit it before checking.');
@@ -5557,6 +5983,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
   };
 
+  const speechmaticsRealtimeTypingIsReady = async () => {
+    if (!authenticatedUser || authenticatedUser.isGuest || !browserCanStreamLiveVoice()) return false;
+    try {
+      const status = await getCourseAiStatus();
+      return Boolean(status?.speechToText?.realtime?.available && status?.speechToText?.realtime?.directBrowserStream);
+    } catch (_) {
+      return false;
+    }
+  };
+
   const startVoiceInput = async () => {
     if (!typingAllowsVoiceInput()) {
       announce(signedInLearner()
@@ -5564,9 +6000,14 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         : 'Log in required to use Speechmatics voice input.');
       return;
     }
-    // For signed-in learners use the explicit recording route first. It works
-    // consistently across Firefox and Chromium and never leaves Brave in a
-    // reconnecting state that appears active without adding text.
+    // Prefer the signed-in realtime route. It delivers partial words as the
+    // learner speaks and avoids Chromium's browser-recognition network loop.
+    // The compatibility recording route remains only for browsers that cannot
+    // run the realtime PCM capture path.
+    if (await speechmaticsRealtimeTypingIsReady()) {
+      await startRealtimeTypingInput();
+      return;
+    }
     if (await speechmaticsTypingIsReady()) {
       await startSpeechmaticsTypingInput();
       return;
@@ -7589,7 +8030,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       }
       case 'companion-send': void sendCompanionMessage(); break;
       case 'companion-dictation':
-        startCompanionDictation();
+        void startCompanionDictation();
         break;
       case 'companion-open-chat':
         openCompanionChat(element);
@@ -7716,7 +8157,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
           recordUnifiedBehaviourAction('speech-complete');
           renderUnderstandingCheck('[data-assessment-response]');
         }
-        else startAssessmentDictation();
+        else void startAssessmentDictation();
         break;
       case 'return-from-understanding-check': leaveUnderstandingCheck(); break;
       case 'review-understanding-module': reviewUnderstandingModule(); break;

@@ -6,6 +6,10 @@ test('deterministic speech fixer restores the authored visible typing reference'
   const target = 'ADHD is a neurodevelopmental condition.';
   assert.deepEqual(canonicaliseSpokenTyping('A D H D is a neurodevelopmental condition', target), { value: target, corrected: true });
   assert.deepEqual(canonicaliseSpokenTyping('ADHD is a neurodevelopmental condition', target), { value: target, corrected: true });
+  // A recogniser often inserts a word break in a compound. This is a close
+  // mechanical match to the already-visible target, so restoring the authored
+  // sentence is safe and preserves the green character feedback.
+  assert.deepEqual(canonicaliseSpokenTyping('A D H D is a neuro developmental condition', target), { value: target, corrected: true });
 });
 
 test('deterministic speech fixer does not invent a target from an unrelated transcript', () => {

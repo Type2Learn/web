@@ -91,6 +91,16 @@ export const transcribeCourseAudio = async ({ user, audio, durationMs, language,
   return authenticatedRequest(user, '/api/v1/speech/transcribe', { method: 'POST', body: form, signal });
 };
 
+// Live microphone input gets a short-lived, provider-scoped token from the
+// protected server route. The browser never receives SPEECHMATICS_API_KEY and
+// Type2Learn never proxies or stores raw microphone audio.
+export const getRealtimeSpeechToken = async ({ user, language, purpose, signal }) => authenticatedRequest(user, '/api/v1/speech/realtime-token', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ language: language === 'ur' ? 'ur' : 'en', purpose: purpose === 'chat' ? 'chat' : 'typing' }),
+  signal
+});
+
 export const loadCourseProgress = async ({ user, courseId, signal }) => {
   const encodedCourseId = encodeURIComponent(courseId);
   return authenticatedRequest(user, '/api/v1/course-progress?courseId=' + encodedCourseId, { signal });

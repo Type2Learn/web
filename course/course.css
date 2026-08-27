@@ -1494,12 +1494,18 @@ body[data-course-direction="rtl"] .course-catalogue-lock {
     font-size: 13px;
     font-weight: 700;
     line-height: 1.45;
+    /* A factual mascot reply can be longer than an ordinary encouragement.
+       Let it grow and wrap instead of clipping the final sentence or button. */
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    overflow-wrap: anywhere;
     /* The lesson rail itself passes clicks through to the course route. The
        speech bubble is an intentional, interactive exception. */
     pointer-events: auto;
   }
 
-  .course-mascot-dialogue p { margin: 0; }
+  .course-mascot-dialogue p { max-inline-size: 100%; margin: 0; overflow-wrap: anywhere; }
   .course-mascot-listen {
     position: relative;
     z-index: 1;
@@ -1515,6 +1521,14 @@ body[data-course-direction="rtl"] .course-catalogue-lock {
     font-weight: 800;
     cursor: pointer;
     touch-action: manipulation;
+  }
+
+  .course-mascot-audio-status {
+    margin: 8px 0 0;
+    color: var(--course-ink-muted);
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1.35;
   }
 
   .course-mascot-dialogue::after {
@@ -6074,6 +6088,12 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
     color: var(--course-ink);
     background: var(--course-paper);
     box-shadow: 0 14px 32px rgba(18, 52, 83, .13);
+    /* Companion replies may contain a complete factual answer. Never clamp
+       or crop that text: it should grow vertically and wrap safely instead. */
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    overflow-wrap: anywhere;
     pointer-events: auto;
   }
   .course-companion-bubble::after {
@@ -6087,7 +6107,7 @@ body.course-reduced-motion .course-success-celebration { display: none !importan
     transform: translateY(-50%) rotate(45deg);
   }
   .course-companion-bubble .course-eyebrow { margin: 0 0 5px; font-size: 10px; }
-  .course-companion-bubble > p:not(.course-eyebrow) { margin: 0; font-size: 13px; font-weight: 700; line-height: 1.45; }
+  .course-companion-bubble > p:not(.course-eyebrow) { max-inline-size: 100%; margin: 0; overflow-wrap: anywhere; font-size: 13px; font-weight: 700; line-height: 1.45; }
   .course-companion-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 11px; }
   .course-companion-actions .course-secondary-button { min-height: 32px; padding: 6px 9px; font-size: 11px; }
   .course-companion-actions .course-text-button { padding: 3px 0; color: var(--course-link); font-size: 10px; font-weight: 800; }

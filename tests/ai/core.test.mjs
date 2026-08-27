@@ -115,6 +115,42 @@ test('development aliases accept a constrained Azure Responses endpoint without 
   }
 });
 
+test('a Type2Learn team question uses the complete reviewed fact set without a model call', async () => {
+  let providerCalls = 0;
+  const service = createAiService({
+    config: {},
+    firebase: {
+      available: true,
+      verifyBearer: async (authorization) => {
+        assert.equal(authorization, 'Bearer learner-token');
+        return { uid: 'learner-1' };
+      }
+    },
+    provider: {
+      status: () => ({ available: false }),
+      generate: async () => {
+        providerCalls += 1;
+        throw new Error('A public team fact must not reach a model.');
+      }
+    }
+  });
+
+  const english = await service.chat({
+    authorization: 'Bearer learner-token',
+    body: { message: 'Who is on the Type2Learn team?', language: 'en', courseId: COURSE_CONTENT.id, page: { moduleIndex: 0, phase: 'read' } }
+  });
+  assert.equal(english.reply, 'Type2Learn was founded by six CEME students: Muhammad Taha Bin Zaeem (Development Lead), Muhammad Hamiz Bin Kashif (Engineering Lead), Muhammad Fahad Younus (AI Lead), Idrees Babar (Research Lead), Alizay Hassan (Product Lead), and Lameea Mubashir Khan (UI/UX Design Lead).');
+  assert.equal(providerCalls, 0);
+
+  const urdu = await service.chat({
+    authorization: 'Bearer learner-token',
+    body: { message: 'ٹائپ ٹو لرن کی ٹیم کون ہے؟', language: 'ur', courseId: COURSE_CONTENT.id, page: { moduleIndex: 0, phase: 'read' } }
+  });
+  assert.match(urdu.reply, /محمد طٰہٰ بن زعیم/);
+  assert.match(urdu.reply, /لمیعہ مبشر خان/);
+  assert.equal(providerCalls, 0);
+});
+
 test('Azure Responses calls use api-key, the exact approved model, and parse Azure output text', { concurrency: false }, async () => {
   const previousFetch = globalThis.fetch;
   const calls = [];

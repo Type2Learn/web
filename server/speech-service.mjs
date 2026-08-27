@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto';
+import { createSpeechmaticsJWT } from '@speechmatics/auth';
 import { apiError } from './errors.mjs';
 import { speechUsageCaps } from './usage-ledger.mjs';
 
 const MAX_AUDIO_BYTES = 6 * 1024 * 1024;
 const MAX_AUDIO_MILLISECONDS = 45 * 1000;
+// Realtime audio goes directly from the learner's browser to Speechmatics
+// using a temporary provider key.  It is deliberately shorter than the key
+// lifetime, so an interrupted tab cannot keep an input stream alive.
+const REALTIME_MAX_AUDIO_MILLISECONDS = 45 * 1000;
+const REALTIME_TOKEN_TTL_SECONDS = 60;
+const REALTIME_ENDPOINT = 'wss://global.rt.speechmatics.com/v2/';
 const MAX_TRANSCRIPT_CHARACTERS = 2400;
 const MAX_TTS_CHARACTERS = 1200;
 const TTS_VOICE_ID = 'sarah';
@@ -27,6 +34,19 @@ export const upstreamSpeechFailure = (response, fallback) => {
 // `audio/webm;codecs=opus`).  The codec parameter is not a different file
 // format, so compare the media type itself rather than rejecting it.
 export const normaliseAudioMimeType = (value) => String(value || '').toLowerCase().split(';', 1)[0].trim();
+
+// The browser must never be handed a JSON/provider error body and asked to
+// play it as an audio clip.  Speechmatics currently returns WAV, but keeping a
+// narrow audio allow-list makes the delivery path safe if a configured voice
+// later returns another standard browser-playable format.
+export const isSupportedTtsContentType = (value) => [
+  'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/ogg', 'audio/webm'
+].includes(normaliseAudioMimeType(value));
+
+const isWavPayload = (audio) => Buffer.isBuffer(audio)
+  && audio.length >= 12
+  && audio.subarray(0, 4).toString('ascii') === 'RIFF'
+  && audio.subarray(8, 12).toString('ascii') === 'WAVE';
 
 export const validateCourseAudio = (form) => {
   const audio = form.get('audio');
@@ -60,8 +80,77 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     textToSpeech: {
       available: ttsAvailable(), language: 'en', voice: TTS_VOICE_ID,
       guestAccess: guestTtsAvailable(), requiresSignIn: !guestTtsAvailable()
+    },
+    // The browser is given a short-lived provider key only after the learner
+    // presses Speak. Audio is never proxied through Type2Learn or persisted.
+    realtime: {
+      available: available(),
+      requiresSignIn: true,
+      directBrowserStream: true,
+      maxDurationMs: REALTIME_MAX_AUDIO_MILLISECONDS
     }
   });
+
+  const realtimeRequest = (body = {}) => {
+    const purpose = String(body?.purpose || 'typing');
+    if (!['chat', 'typing'].includes(purpose)) {
+      throw apiError(400, 'INVALID_SPEECH_PURPOSE', 'Voice input is only available for chat or an eligible typing activity.');
+    }
+    return { purpose, language: body?.language === 'ur' ? 'ur' : 'en' };
+  };
+
+  // A temporary realtime key is the only credential that reaches the browser.
+  // It cannot reveal the long-lived account key, expires in one minute, and is
+  // budgeted before it is issued. We charge the bounded 45-second allowance at
+  // issuance because the browser streams directly to the provider and never
+  // sends raw microphone content back for an exact duration calculation.
+  const createRealtimeToken = async ({ authorization, body }) => {
+    if (!config.speechmaticsApiKey) throw apiError(503, 'SPEECH_NOT_CONFIGURED', 'Voice input is not connected yet. You can type instead.');
+    if (!firebase.available || !ledger) throw apiError(503, 'SPEECH_USAGE_PROTECTION_UNAVAILABLE', 'Voice input is being set up safely. You can type instead.');
+    const learner = await firebase.verifyBearer(authorization);
+    const { purpose, language } = realtimeRequest(body);
+    const estimatedCredits = Math.ceil((REALTIME_MAX_AUDIO_MILLISECONDS / 60000) * config.speechmaticsCreditsPerMinute * 100) / 100;
+    let reservation;
+    try {
+      reservation = await ledger.reserve({
+        kind: 'speechmatics-realtime',
+        userHash: identifierHash(learner.uid),
+        usage: { usd: 0, inputTokens: 0, outputTokens: 0, credits: estimatedCredits },
+        caps: speechUsageCaps(config),
+        requestsPerMinute: config.speechmaticsRequestsPerMinute
+      });
+    } catch (error) {
+      if (String(error?.code || '').includes('PERMISSION_DENIED') || /Firestore API/i.test(String(error?.message || ''))) {
+        throw apiError(503, 'SPEECH_USAGE_PROTECTION_UNAVAILABLE', 'Voice input is being set up safely. You can type instead.');
+      }
+      throw error;
+    }
+    try {
+      const jwt = await createSpeechmaticsJWT({
+        type: 'rt',
+        apiKey: config.speechmaticsApiKey,
+        ttl: REALTIME_TOKEN_TTL_SECONDS
+      });
+      if (!jwt || typeof jwt !== 'string') throw new Error('Temporary speech key was empty');
+      await ledger.settle({
+        ...reservation,
+        actual: { usd: 0, inputTokens: 0, outputTokens: 0, credits: estimatedCredits }
+      });
+      return {
+        endpoint: REALTIME_ENDPOINT,
+        jwt,
+        language,
+        purpose,
+        model: 'enhanced',
+        maxDurationMs: REALTIME_MAX_AUDIO_MILLISECONDS,
+        expiresInSeconds: REALTIME_TOKEN_TTL_SECONDS
+      };
+    } catch (error) {
+      await ledger.release({ ...reservation, tolerateMissing: true }).catch(() => {});
+      if (error?.code) throw error;
+      throw apiError(502, 'SPEECH_REALTIME_TOKEN_ERROR', 'Live voice input could not start. You can type instead.');
+    }
+  };
 
   const pruneTtsCache = (now) => {
     for (const [key, item] of ttsCache.entries()) if (item.expiresAt <= now) ttsCache.delete(key);
@@ -93,7 +182,10 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     if (cached) return cached;
     let response;
     try {
-      response = await fetch(`https://preview.tts.speechmatics.com/generate/${TTS_VOICE_ID}`, {
+      // Ask for a browser-decodable WAV explicitly. Relying on the provider
+      // default made successful responses depend on the account's preview
+      // defaults and could leave the learner-facing Listen control silent.
+      response = await fetch(`https://preview.tts.speechmatics.com/generate/${TTS_VOICE_ID}?output_format=wav_16000`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${config.speechmaticsApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -103,9 +195,18 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
       throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not start.');
     }
     if (!response.ok) throw upstreamSpeechFailure(response, 'Audio for this AI reply could not be created.');
+    const contentType = response.headers.get('content-type') || 'audio/wav';
     const audio = Buffer.from(await response.arrayBuffer());
-    if (!audio.length || audio.length > 3 * 1024 * 1024) throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not be created.');
-    const result = { audio, contentType: response.headers.get('content-type') || 'audio/wav' };
+    if (!isSupportedTtsContentType(contentType) || !audio.length || audio.length > 3 * 1024 * 1024) {
+      throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not be created.');
+    }
+    // The configured endpoint defaults to WAV.  Reject a malformed success
+    // response before it reaches the learner's Listen control, where browsers
+    // otherwise fail silently and make the button appear broken.
+    if (normaliseAudioMimeType(contentType) === 'audio/wav' && !isWavPayload(audio)) {
+      throw apiError(502, 'AI_AUDIO_UPSTREAM_ERROR', 'Audio for this AI reply could not be created.');
+    }
+    const result = { audio, contentType };
     ttsCache.set(key, { ...result, expiresAt: now + 15 * 60 * 1000 });
     return result;
   };
@@ -191,5 +292,5 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
     }
   };
 
-  return { status, transcribe, synthesise };
+  return { status, transcribe, synthesise, createRealtimeToken };
 };

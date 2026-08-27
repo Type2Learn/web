@@ -36,20 +36,26 @@ test('profile settings dialog is portalled outside the blurred sticky header so 
 });
 
 test('mascot dialogue Listen uses only the configured course voice for guests and signed learners', () => {
-  assert.match(course, /const mascotSpeech = \{ controller: null, element: null, url: '', loading: false, text: '' \}/);
+  assert.match(course, /const mascotSpeech = \{[\s\S]*context: null,[\s\S]*source: null,[\s\S]*playing: false,[\s\S]*error: ''[\s\S]*\}/);
   assert.match(course, /const currentMascotSpeechText = \(\)/);
   assert.match(course, /const dialogue = currentMascotSpeechText\(\);/);
   assert.match(course, /const speakMascotDialogue = async/);
   assert.match(course, /synthesiseCourseAiReply\(\{/);
-  assert.match(course, /mascotSpeech\.loading \? courseUi\('Loading audio…'/);
-  assert.match(course, /mascotSpeech\.text === dialogue \? courseUi\('Stop audio'/);
+  assert.match(course, /mascotSpeech\.loading \? courseUi\('Preparing voice…'/);
+  assert.match(course, /active \? courseUi\('Stop voice'/);
+  assert.match(course, /mascotSpeech\.error \? courseUi\('Try voice again'/);
   assert.match(course, /stopMascotSpeech\(\);/);
   assert.match(course, /const SILENT_AUDIO_UNLOCK_WAV/);
   assert.match(course, /const unlockMascotAudioFromClick/);
-  assert.match(course, /mascotSpeech\.element = unlockMascotAudioFromClick\(\)/);
+  assert.match(course, /const unlocked = unlockMascotAudioFromClick\(\)/);
+  assert.match(course, /mascotSpeech\.context = unlocked\.context/);
+  assert.match(course, /const playMascotProviderAudio = async/);
+  assert.match(course, /context\.decodeAudioData/);
+  assert.match(course, /new AudioContext\(\{ latencyHint: 'interactive' \}\)/);
   assert.match(course, /const audio = mascotSpeech\.element \|\| new Audio\(\)/);
   assert.match(css, /\.course-mascot-dialogue[\s\S]*pointer-events: auto/);
   assert.match(css, /\.course-mascot-listen[\s\S]*touch-action: manipulation/);
+  assert.match(css, /\.course-mascot-audio-status/);
   assert.match(course, /Turning text-to-speech off hides this optional control everywhere/);
   assert.doesNotMatch(course, /const speakMascotWithBrowser/);
   const mascotSpeechStart = course.indexOf('const speakMascotDialogue = async');
@@ -88,9 +94,9 @@ test('course entry points share the current cache-busted catalogue and mascot pl
     read('../../course/course-router.js'),
     read('../../course/index.html')
   ]);
-  assert.match(router, /course\.js\?v=20260825-mascot-companion-route3/);
-  assert.match(courseHtml, /course-router\.js\?v=20260825-mascot-companion-route3/);
-  assert.match(courseHtml, /course\.css\?v=20260825-mascot-companion-route3/);
+  assert.match(router, /course\.js\?v=20260827-live-companion2/);
+  assert.match(courseHtml, /course-router\.js\?v=20260827-live-companion2/);
+  assert.match(courseHtml, /course\.css\?v=20260827-live-companion2/);
 });
 
 test('starting preferences show privacy-aware support and reveal mascot controls only after Mascot is enabled', () => {
@@ -123,4 +129,19 @@ test('browser recognition failures stop clearly and never schedule a reconnect l
   assert.match(course, /Live browser recognition lost its connection\. Try Speak again/);
   assert.match(course, /recognition\.onend = \(\) =>[\s\S]*Live browser recognition stopped/);
   assert.doesNotMatch(course, /scheduleVoiceRecognitionRestart/);
+});
+
+test('signed-in voice input can request a short-lived realtime token rather than waiting for a batch recording', async () => {
+  const [client, server, speech] = await Promise.all([
+    read('../../course/ai-client.js'),
+    read('../../server.mjs'),
+    read('../../server/speech-service.mjs')
+  ]);
+  assert.match(client, /getRealtimeSpeechToken/);
+  assert.match(client, /\/api\/v1\/speech\/realtime-token/);
+  assert.match(server, /pathname === '\/api\/v1\/speech\/realtime-token'/);
+  assert.match(speech, /createSpeechmaticsJWT/);
+  assert.match(speech, /REALTIME_TOKEN_TTL_SECONDS = 60/);
+  assert.match(speech, /directBrowserStream: true/);
+  assert.match(speech, /Audio is never proxied through Type2Learn or persisted/);
 });
