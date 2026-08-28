@@ -22,91 +22,91 @@ export const COURSE_CONTENT = {
       {
         question: 'Which statement best explains why support should be individualized?',
         options: [
-          ['Everyone with the same condition learns in exactly the same way.', false],
-          ['A diagnosis determines a person\'s strengths and abilities.', false],
-          ['People can have different strengths, challenges, and support needs.', true],
-          ['Support means lowering expectations.', false]
+          'Everyone with the same condition learns in exactly the same way.',
+          'A diagnosis determines a person\'s strengths and abilities.',
+          'People can have different strengths, challenges, and support needs.',
+          'Support means lowering expectations.'
         ]
       },
       {
         question: 'ADHD may affect a person\'s ability to:',
         options: [
-          ['Hear all sounds clearly.', false],
-          ['Understand numbers only.', false],
-          ['Manage attention, organization, impulses, and task completion.', true],
-          ['Move their body at all times.', false]
+          'Hear all sounds clearly.',
+          'Understand numbers only.',
+          'Manage attention, organization, impulses, and task completion.',
+          'Move their body at all times.'
         ]
       },
       {
         question: 'Dyslexia most commonly affects:',
         options: [
-          ['Reading, spelling, and processing written language.', true],
-          ['Physical balance and coordination.', false],
-          ['Vision in every situation.', false],
-          ['A person\'s intelligence.', false]
+          'Reading, spelling, and processing written language.',
+          'Physical balance and coordination.',
+          'Vision in every situation.',
+          'A person\'s intelligence.'
         ]
       },
       {
         question: 'Autism Spectrum Disorder may involve differences in:',
         options: [
-          ['Social communication, interaction, interests, behavior, or sensory experiences.', true],
-          ['Only handwriting ability.', false],
-          ['Only mathematical ability.', false],
-          ['A person\'s ability to hear.', false]
+          'Social communication, interaction, interests, behavior, or sensory experiences.',
+          'Only handwriting ability.',
+          'Only mathematical ability.',
+          'A person\'s ability to hear.'
         ]
       },
       {
         question: 'Dysgraphia can make which task more difficult?',
         options: [
-          ['Writing, handwriting, spelling, or organizing written ideas.', true],
-          ['Recognizing colors only.', false],
-          ['Understanding spoken language only.', false],
-          ['Walking long distances only.', false]
+          'Writing, handwriting, spelling, or organizing written ideas.',
+          'Recognizing colors only.',
+          'Understanding spoken language only.',
+          'Walking long distances only.'
         ]
       },
       {
         question: 'Dyspraxia, also called Developmental Coordination Disorder, mainly affects:',
         options: [
-          ['Movement, coordination, balance, and motor planning.', true],
-          ['A person\'s intelligence.', false],
-          ['The ability to see all objects.', false],
-          ['The ability to understand emotions.', false]
+          'Movement, coordination, balance, and motor planning.',
+          'A person\'s intelligence.',
+          'The ability to see all objects.',
+          'The ability to understand emotions.'
         ]
       },
       {
         question: 'Dyscalculia is mainly associated with difficulty understanding:',
         options: [
-          ['Numbers, quantities, calculations, or mathematical concepts.', true],
-          ['Written letters only.', false],
-          ['Physical movement only.', false],
-          ['Sounds and volume only.', false]
+          'Numbers, quantities, calculations, or mathematical concepts.',
+          'Written letters only.',
+          'Physical movement only.',
+          'Sounds and volume only.'
         ]
       },
       {
         question: 'Auditory Processing Disorder may make it difficult to:',
         options: [
-          ['Process and understand spoken sounds, especially in noisy environments.', true],
-          ['See small text clearly.', false],
-          ['Control hand movements.', false],
-          ['Recognize numbers visually.', false]
+          'Process and understand spoken sounds, especially in noisy environments.',
+          'See small text clearly.',
+          'Control hand movements.',
+          'Recognize numbers visually.'
         ]
       },
       {
         question: 'Which support may help a learner with visual impairment or low vision?',
         options: [
-          ['Smaller text and lower contrast.', false],
-          ['Larger text, zoom, strong contrast, or screen-reader support.', true],
-          ['Removing all written instructions.', false],
-          ['Using color as the only form of feedback.', false]
+          'Smaller text and lower contrast.',
+          'Larger text, zoom, strong contrast, or screen-reader support.',
+          'Removing all written instructions.',
+          'Using color as the only form of feedback.'
         ]
       },
       {
         question: 'Which statement best describes intellectual/developmental disabilities, physical or motor disabilities, and sensory processing sensitivities?',
         options: [
-          ['They affect every person in exactly the same way.', false],
-          ['They may affect communication, learning, movement, endurance, or responses to sensory input, so support should fit the individual.', true],
-          ['They mean a person cannot learn independently.', false],
-          ['Technology is the only useful form of support.', false]
+          'They affect every person in exactly the same way.',
+          'They may affect communication, learning, movement, endurance, or responses to sensory input, so support should fit the individual.',
+          'They mean a person cannot learn independently.',
+          'Technology is the only useful form of support.'
         ]
       }
     ]
@@ -134,7 +134,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Key idea typing', prompt: 'Type the visible key idea in the field.', target: 'Visible steps and reminders can help make a task easier to begin and follow.' },
       check: {
         question: 'Which support may help someone with ADHD?',
-        options: [['Giving one very large task', false], ['Using visible steps and reminders', true], ['Removing all breaks', false], ['Expecting the learner to remember every step without support.', false]],
+        options: ['Giving one very large task', 'Using visible steps and reminders', 'Removing all breaks', 'Expecting the learner to remember every step without support.'],
         explanation: 'Right. Visible steps and reminders are support ideas named in this module.'
       }
     },
@@ -160,7 +160,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Key idea typing', prompt: 'Type the key idea in the field.', target: 'Dyslexia affects certain language and reading processes, not intelligence.' },
       check: {
         question: 'Does dyslexia mean someone has low intelligence?',
-        options: [['Yes, because reading can take longer.', false], ['No. It affects certain language and reading processes, not intelligence.', true], ['Only if someone uses read-aloud support.', false], ['Only when a person needs extra reading time.', false]],
+        options: ['Yes, because reading can take longer.', 'No. It affects certain language and reading processes, not intelligence.', 'Only if someone uses read-aloud support.', 'Only when a person needs extra reading time.'],
         explanation: 'Correct. The module states that dyslexia does not reflect intelligence or effort.'
       }
     },
@@ -186,7 +186,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Guided typing', prompt: 'Type one short phrase at a time in the field.', phrases: ['Autistic people can have different combinations of strengths.', 'They can also have different support needs.'] },
       check: {
         question: 'What does "autism spectrum" mean?',
-        options: [['Every autistic person has the same strengths and support needs.', false], ['Autistic people can have different combinations of strengths, challenges, and support needs.', true], ['Only one type of support is useful for autistic people.', false], ['It means autistic people cannot have strengths.', false]],
+        options: ['Every autistic person has the same strengths and support needs.', 'Autistic people can have different combinations of strengths, challenges, and support needs.', 'Only one type of support is useful for autistic people.', 'It means autistic people cannot have strengths.'],
         explanation: 'Right. The module explains that autistic people can have different strengths, challenges, and support needs.'
       }
     },
@@ -212,7 +212,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Recall typing', prompt: 'Use your own words to name one alternative to handwriting. The prompt stays inside the field while you type.', reference: 'For example: typing, speech-to-text, voice recording, or an oral explanation.' },
       check: {
         question: 'What is one alternative to handwriting?',
-        options: [['Typing, speech-to-text, voice recording, or an oral explanation', true], ['Removing the learner\'s ideas from the task', false], ['Requiring more unnecessary copying', false], ['Only increasing the amount of handwriting required.', false]],
+        options: ['Typing, speech-to-text, voice recording, or an oral explanation', 'Removing the learner\'s ideas from the task', 'Requiring more unnecessary copying', 'Only increasing the amount of handwriting required.'],
         explanation: 'Correct. The module lists typing, speech-to-text, voice recording, and oral explanation as alternatives.'
       }
     },
@@ -238,7 +238,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Key idea typing', prompt: 'Type the key idea in the field.', target: 'DCD mainly affects movement planning and coordination.' },
       check: {
         question: 'Does DCD indicate low intelligence?',
-        options: [['Yes, because it affects handwriting.', false], ['No. It mainly affects movement planning and coordination.', true], ['Only when someone needs extra time.', false], ['Yes, because coordination always determines intelligence.', false]],
+        options: ['Yes, because it affects handwriting.', 'No. It mainly affects movement planning and coordination.', 'Only when someone needs extra time.', 'Yes, because coordination always determines intelligence.'],
         explanation: 'Right. The module describes DCD as affecting movement planning and coordination.'
       }
     },
@@ -264,7 +264,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Guided typing', prompt: 'Type one short phrase at a time in the field.', phrases: ['Diagrams can make numbers easier to see.', 'They can also help organise mathematical steps.'] },
       check: {
         question: 'Why can diagrams help with dyscalculia?',
-        options: [['They make numbers and mathematical steps easier to see and organise.', true], ['They remove the need to understand the task.', false], ['They make every maths question timed.', false], ['They mean mathematical ideas never need explaining.', false]],
+        options: ['They make numbers and mathematical steps easier to see and organise.', 'They remove the need to understand the task.', 'They make every maths question timed.', 'They mean mathematical ideas never need explaining.'],
         explanation: 'Correct. Diagrams can make number relationships and steps easier to see and organise.'
       }
     },
@@ -290,7 +290,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Key idea typing', prompt: 'Type the key support idea in the field.', target: 'Shorter steps and a written version can make spoken instructions easier.' },
       check: {
         question: 'What is one way to make spoken instructions easier?',
-        options: [['Give them in shorter steps and provide a written version.', true], ['Give them only once in a noisy room.', false], ['Make the direction longer and faster.', false], ['Use only fast spoken directions without a written version.', false]],
+        options: ['Give them in shorter steps and provide a written version.', 'Give them only once in a noisy room.', 'Make the direction longer and faster.', 'Use only fast spoken directions without a written version.'],
         explanation: 'Right. The module recommends shorter directions and a written version.'
       }
     },
@@ -316,7 +316,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Guided typing', prompt: 'Type one short phrase at a time in the field.', phrases: ['Readable text and good contrast help make a page accessible.', 'Alt text and screen-reader-friendly formatting help too.'] },
       check: {
         question: 'What is one way to make a digital page more accessible?',
-        options: [['Use readable text, good contrast, zoom, alt text, or screen-reader-friendly formatting.', true], ['Make all text small and crowded.', false], ['Use low contrast so fewer details are visible.', false], ['Remove zoom and screen-reader support.', false]],
+        options: ['Use readable text, good contrast, zoom, alt text, or screen-reader-friendly formatting.', 'Make all text small and crowded.', 'Use low contrast so fewer details are visible.', 'Remove zoom and screen-reader support.'],
         explanation: 'Correct. The module lists readable text, contrast, zoom, alt text, and screen-reader-friendly formatting.'
       }
     },
@@ -342,7 +342,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Recall typing', prompt: 'In your own words, describe what is better than taking over a task immediately. The prompt stays inside the field while you type.', reference: 'Ask what support the person wants and allow them to try first.' },
       check: {
         question: 'What is better than taking over a task immediately?',
-        options: [['Ask what support the person wants and allow them to try first.', true], ['Assume the person cannot take part.', false], ['Speak over the person so the task ends quickly.', false], ['Make all choices for the person without asking.', false]],
+        options: ['Ask what support the person wants and allow them to try first.', 'Assume the person cannot take part.', 'Speak over the person so the task ends quickly.', 'Make all choices for the person without asking.'],
         explanation: 'Right. The module recommends asking what support the person wants and allowing an independent try.'
       }
     },
@@ -368,7 +368,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Key idea typing', prompt: 'Type the respectful support idea in the field.', target: 'Ask before helping with a mobility device because it is part of a person\'s personal space.' },
       check: {
         question: 'Why should someone ask before helping with a mobility device?',
-        options: [['The person may have a preferred or safer way to move, and their equipment is part of their personal space.', true], ['It is always faster to move the equipment without asking.', false], ['Mobility equipment does not need personal boundaries.', false], ['Touch the equipment first, then ask later.', false]],
+        options: ['The person may have a preferred or safer way to move, and their equipment is part of their personal space.', 'It is always faster to move the equipment without asking.', 'Mobility equipment does not need personal boundaries.', 'Touch the equipment first, then ask later.'],
         explanation: 'Correct. The module notes that a person may have a preferred or safer way to move, and their equipment is part of their personal space.'
       }
     },
@@ -394,7 +394,7 @@ export const COURSE_CONTENT = {
       typing: { level: 'Recall typing', prompt: 'In your own words, describe a helpful response to early signs of sensory overload. The prompt stays inside the field while you type.', reference: 'Reduce stimulation and take a break before the overload becomes more severe.' },
       check: {
         question: 'What should someone do when they notice early signs of sensory overload?',
-        options: [['Reduce stimulation and take a break before the overload becomes more severe.', true], ['Add more flashing images and noise.', false], ['Ignore the signs until the task is over.', false], ['Increase stimulation so the learner gets used to it.', false]],
+        options: ['Reduce stimulation and take a break before the overload becomes more severe.', 'Add more flashing images and noise.', 'Ignore the signs until the task is over.', 'Increase stimulation so the learner gets used to it.'],
         explanation: 'Right. The module recommends reducing stimulation and taking a break before overload becomes more severe.'
       }
     }

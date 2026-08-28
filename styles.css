@@ -6511,3 +6511,35 @@ html[data-color-mode="vivid"] .site-cta-panel { border-color: #006BFF; backgroun
   .professor-interview-card .interview-notes { grid-template-columns: 1fr; }
   .professor-interview-card .interview-notes li { min-height: 0; }
 }
+/* Privacy control: optional third-party analytics waits for an explicit
+   learner choice. The banner is small, keyboard reachable and never blocks
+   the lesson UI. */
+.type2learn-analytics-consent {
+  position: fixed;
+  z-index: 2147483000;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid #9db9d5;
+  border-radius: 1rem;
+  background: #fff;
+  color: #102041;
+  box-shadow: 0 1rem 3rem rgba(17, 44, 79, .22);
+  font: 500 0.93rem/1.45 system-ui, sans-serif;
+}
+
+.type2learn-analytics-consent p { margin: 0 0 .8rem; }
+.type2learn-analytics-consent div { display: flex; flex-wrap: wrap; gap: .55rem; }
+.type2learn-analytics-consent button {
+  min-height: 2.5rem;
+  padding: .55rem .8rem;
+  border: 1px solid #116ad5;
+  border-radius: .55rem;
+  background: #fff;
+  color: #102041;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.type2learn-analytics-consent button[data-analytics-choice="accept"] { background: #20c56b; border-color: #108f4b; }

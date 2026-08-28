@@ -10,6 +10,7 @@ import { createFirebaseRuntime } from './server/firebase-runtime.mjs';
 import { createSpeechService } from './server/speech-service.mjs';
 import { createUsageLedger } from './server/usage-ledger.mjs';
 import { createCourseProgressService } from './server/course-progress-service.mjs';
+import { createLegacyCourseCheckService } from './server/legacy-course-check-service.mjs';
 import { createModelProvider } from './server/model-provider.mjs';
 import { createLearningAnalyticsService } from './server/learning-analytics-service.mjs';
 import { createAdaptiveSupportService } from './server/adaptive-support-service.mjs';
@@ -193,6 +194,19 @@ const safePathname = (pathname) => {
   return resolved;
 };
 
+// Analytics must never run merely because an HTML document loaded. The source
+// contains the historic provider snippets for static-host compatibility, so
+// Render's Node server removes them at delivery time and injects the small
+// consent controller instead. The controller loads a provider only after a
+// learner explicitly accepts optional measurement on that browser.
+export const consentAwareHtml = (html) => {
+  const withoutGoogle = html
+    .replace(/\s*<!-- Google tag \(gtag\.js\) -->\s*<script\s+async\s+src="https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-[^"]+"><\/script>\s*<script>[\s\S]*?gtag\('config',\s*'G-[^']+'\);\s*<\/script>/gi, '')
+    .replace(/\s*<!-- Cloudflare Web Analytics --><script\s+type="module"\s+src="https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js"\s+data-cf-beacon='[^']*'><\/script><!-- End Cloudflare Web Analytics -->/gi, '');
+  if (/analytics-consent\.js/i.test(withoutGoogle)) return withoutGoogle;
+  return withoutGoogle.replace(/<\/head>/i, '    <script src="/analytics-consent.js" defer></script>\n  </head>');
+};
+
 const serveStatic = async (request, response, pathname) => {
   // Make the public origin unambiguous. Some reverse proxies preserve `/` as a
   // special request, while `/index.html` is a normal static-file request.
@@ -209,13 +223,19 @@ const serveStatic = async (request, response, pathname) => {
     const details = await stat(target);
     if (!details.isFile()) throw new Error('Not a file.');
     const extension = path.extname(target).toLowerCase();
+    let body = null;
+    // Build the same consent-aware representation for HEAD and GET. Apart from
+    // the body itself, HEAD must describe the document that GET would return.
+    if (extension === '.html') {
+      body = Buffer.from(consentAwareHtml((await readFile(target)).toString('utf8')));
+    }
     const headers = {
       ...securityHeaders(pathname),
       'Content-Type': mimeTypes.get(extension) || 'application/octet-stream',
-      'Content-Length': details.size
+      'Content-Length': body ? body.length : details.size
     };
     response.writeHead(200, headers);
-    if (request.method !== 'HEAD') response.end(await readFile(target));
+    if (request.method !== 'HEAD') response.end(body || await readFile(target));
     else response.end();
   } catch {
     send(response, 404, 'Not found', { ...securityHeaders(pathname), 'Content-Type': 'text/plain; charset=utf-8' });
@@ -238,6 +258,7 @@ const buildRuntime = async () => {
     adaptiveRecall: createAdaptiveRecallService({ config, firebase, ledger, provider: modelProvider, contextResolver: courseContextResolver }),
     speech,
     courseProgress: createCourseProgressService({ firebase, assertCourseAccess: courseCatalog.assertProgressAccess }),
+    legacyCourseChecks: createLegacyCourseCheckService({ firebase }),
     // ADAPTIVE LEARNING: all three services independently enforce feature
     // flags, bearer authentication, consent/reviewer checks, and Firestore
     // availability. They are present even while disabled for a staged rollout.
@@ -253,11 +274,14 @@ const buildRuntime = async () => {
 };
 
 const handleApi = async (request, response, pathname, runtime) => {
-  const { config, ai, adaptiveRecall, speech, courseProgress, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access, courseAuthoring, courseBackups, courseCatalog } = runtime;
+  const { config, ai, adaptiveRecall, speech, courseProgress, legacyCourseChecks, modelProvider, learningAnalytics, adaptiveSupport, assessments, behaviouralPartner, access, courseAuthoring, courseBackups, courseCatalog } = runtime;
   if (!isAllowedOrigin(request, config)) {
     return sendJson(response, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This website is not allowed to use the AI service.' } });
   }
-  if (request.method === 'GET' && pathname === '/api/v1/health') {
+  if ((request.method === 'GET' || request.method === 'HEAD') && pathname === '/api/v1/health') {
+    if (request.method === 'HEAD') {
+      return send(response, 200, '', securityHeaders('/api', { api: true }));
+    }
     return sendJson(response, 200, {
       // Render provides this at runtime for Git-backed deploys. Publishing the
       // short revision makes support checks deterministic without exposing any
@@ -277,6 +301,7 @@ const handleApi = async (request, response, pathname, runtime) => {
       modelRouting: modelProvider.status(),
       speechToText: speech.status(),
       courseProgress: courseProgress.status(),
+      legacyCourseChecks: legacyCourseChecks.status(),
       educatorWorkspace: access.status(),
       courseAuthoring: courseAuthoring.status(),
       courseBackups: courseBackups.status(),
@@ -524,6 +549,13 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'POST' && pathname === '/api/v1/course-progress') {
       const body = await readJson(request);
       return sendJson(response, 200, await courseProgress.save({ authorization: request.headers.authorization, courseId: String(body?.courseId || ''), body }));
+    }
+    if (request.method === 'DELETE' && pathname === '/api/v1/course-progress') {
+      const courseId = new URL(request.url || '/', 'http://localhost').searchParams.get('courseId') || '';
+      return sendJson(response, 200, await courseProgress.remove({ authorization: request.headers.authorization, courseId }));
+    }
+    if (request.method === 'POST' && pathname === '/api/v1/legacy-course/check') {
+      return sendJson(response, 200, await legacyCourseChecks.check({ authorization: request.headers.authorization, body: await readJson(request) }));
     }
     return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'This API route does not exist.' } });
   } catch (error) {

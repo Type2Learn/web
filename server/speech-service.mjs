@@ -78,6 +78,11 @@ export const createSpeechService = ({ config, firebase, ledger }) => {
   const ttsRecentRequests = new Map();
   const status = () => ({
     available: available(),
+    // This is deliberately configuration health, not a synthetic transcript
+    // claim. A real session still needs a learner gesture, microphone
+    // permission, a live Speechmatics connection, Firebase, and the usage
+    // ledger; the client always keeps typing available as the recovery path.
+    healthScope: 'configuration-and-runtime-dependencies; not a provider transcript probe',
     requiresSignIn: true,
     purposes: ['chat', 'typing'],
     textToSpeech: {

@@ -108,7 +108,11 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     consentVersion: CONSENT_VERSION,
     requiresSignIn: true,
     retentionDays: Math.min(MAX_RETENTION_DAYS, Number(config.adaptiveRetentionDays) || 90),
-    retentionField: 'expiresAt'
+    retentionField: 'expiresAt',
+    // `expiresAt` is written and ignored after expiry by the application. A
+    // Firebase project must still enable Firestore TTL to promise physical
+    // automatic deletion on the requested schedule.
+    physicalDeletionRequiresFirestoreTtl: true
   });
 
   const expiryDate = (timestamp = new Date()) => new Date(timestamp.getTime() + (Math.min(MAX_RETENTION_DAYS, Number(config.adaptiveRetentionDays) || 90) * 24 * 60 * 60 * 1000));

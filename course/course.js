@@ -2,7 +2,7 @@ import { COURSE_CONTENT as DEFAULT_COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU as DEFAULT_COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, getRealtimeSpeechToken, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260827-live-companion2';
+import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkLegacyCourseAnswer, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, deleteCourseProgress, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, getRealtimeSpeechToken, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260829-privacy-hardening1';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
 import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
 import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
@@ -1416,7 +1416,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       );
     } else {
       const dataStatus = signedInLearner() && adaptiveLearning.available
-        ? '<p>With adaptive learning enabled, a compact module summary is saved to your account for up to ' + escapeHtml(String(adaptiveLearning.retentionDays || 90)) + ' days. It excludes typed words, recordings, chats, answer text, scores, IP addresses, and personal profiles.</p><div class="course-partner-data-actions"><button class="course-text-button" type="button" data-action="export-behaviour-data">Download my adaptive data</button><button class="course-text-button" type="button" data-action="delete-behaviour-data">Delete adaptive data</button></div>'
+        ? '<p>With adaptive learning enabled, a compact module summary is marked to expire after ' + escapeHtml(String(adaptiveLearning.retentionDays || 90)) + ' days. It excludes typed words, recordings, chats, answer text, scores, IP addresses, and personal profiles. You can delete it now from this panel.</p><div class="course-partner-data-actions"><button class="course-text-button" type="button" data-action="export-behaviour-data">Download my adaptive data</button><button class="course-text-button" type="button" data-action="delete-behaviour-data">Delete adaptive data</button></div>'
         : '<p>Adaptive support is kept in this browser session unless you explicitly turn on compact course summaries. Guest learners never send course AI or adaptive data.</p>';
       content = panel('Data & privacy', 'See what learning support notices, change consent, or prepare this course for offline learning.',
         settingsSwitch('adaptive-learning', 'Adaptive learning support', 'Use compact course summaries to offer one optional setting suggestion. Raw typing, recordings, and chats are never saved.', choices['adaptive-learning'] === 'on', !signedInLearner())
@@ -1635,8 +1635,14 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
   };
 
-  const openCourseAi = (trigger) => {
-    if (authenticatedUser?.isGuest && aiChat.connection.checked && !courseAiAccessAllowed()) {
+  const openCourseAi = async (trigger) => {
+    // A guest must never briefly see a disabled Course AI composer while its
+    // access policy is still loading. Resolve the compact health contract
+    // first, then either open the permitted public helper or the explicit
+    // sign-in boundary. This also makes the guest policy deterministic for
+    // help-sheet and mascot entry points.
+    if (authenticatedUser?.isGuest && !aiChat.connection.checked) await refreshAiConnection();
+    if (authenticatedUser?.isGuest && !courseAiAccessAllowed()) {
       openCourseModal('guest-ai', trigger, '[data-action="call-ai"]');
       return;
     }
@@ -2117,11 +2123,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     mascotPresentation.enabled && learningChoices()['text-to-speech'] === 'on'
   );
 
-  // The configured response narrator currently supplies English audio only.
-  // Do not render a clickable Listen button for an Urdu reply that the
-  // service cannot produce; the written reply remains fully available.
   const mascotSpeechCanPlay = () => mascotVoiceEnabled()
-    && mascotPresentation.language !== 'urdu'
     && Boolean(aiChat.connection.aiAudio);
 
   // The Listen control must always speak the exact sentence currently visible
@@ -2974,9 +2976,29 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
 
   const cloudProgressSnapshot = () => ({
     // Versioned reviewed manifests must never overwrite the progress of an
-    // earlier published revision with the same course id.
+    // earlier published revision with the same course id. Keep this an
+    // account-resume marker only: raw responses, typing attempts, feedback,
+    // chat text, and assessment answers stay in this browser.
     courseId: progressCourseKey(),
-    state: localCourseSnapshot(),
+    state: {
+      version: 1,
+      view: state.view,
+      previousView: state.previousView,
+      progress: {
+        lessonIndex: state.progress.lessonIndex,
+        phase: state.progress.phase,
+        completedSteps: state.progress.completedSteps,
+        finalExam: {
+          questionIndex: state.progress.finalExam?.questionIndex || 0,
+          completed: Boolean(state.progress.finalExam?.completed)
+        }
+      },
+      manualExampleVisible: state.manualExampleVisible,
+      showSimple: state.showSimple,
+      readingSectionIndex: state.readingSectionIndex,
+      coursePaused: state.coursePaused,
+      updatedAtMs: state.updatedAtMs
+    },
     settings: state.settings,
     choices: learningChoices()
   });
@@ -3431,12 +3453,17 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     behaviourPartner.dataMessage = 'Deleting your adaptive data…';
     render();
     try {
-      await deleteAdaptiveLearningData({ user: authenticatedUser, signal: requestTimeoutSignal(15000) });
+      await Promise.all([
+        deleteAdaptiveLearningData({ user: authenticatedUser, signal: requestTimeoutSignal(15000) }),
+        deleteCourseProgress({ user: authenticatedUser, signal: requestTimeoutSignal(15000) })
+      ]);
       adaptiveLearning.consented = false;
       stopAdaptiveLearningTelemetry();
       behaviourPartner.context = new BehaviourContext();
       behaviourPartner.directive = null;
-      behaviourPartner.dataMessage = 'Your optional adaptive data was deleted. Local course progress stays on this device.';
+      cloudProgress.ready = false;
+      cloudProgress.status = 'local';
+      behaviourPartner.dataMessage = 'Your optional adaptive data and account-synchronised course resume markers were deleted. Your local course progress stays on this device.';
     } catch (error) {
       behaviourPartner.dataMessage = error?.message || 'Your adaptive data could not be deleted right now.';
     }
@@ -5040,15 +5067,17 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const check = currentStep().check;
     const selected = state.progress.attempt.selectedAnswer;
     const feedback = state.progress.attempt.feedback;
-    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Quick check</p><h2 id="course-task-heading" tabindex="-1">Check understanding</h2><p>Choose the answer that best matches the short explanation.</p></div>' + taskHeaderControls() + '</div>' + (state.progress.attempt.integrityNotice ? '<p class="integrity-note">This quick check keeps the focus on understanding, not on how text entered the box.</p>' : '') + '<fieldset class="course-check-options"><legend>' + escapeHtml(check.question) + '</legend>' + check.options.map(([label, correct], index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="course-check" value="' + index + '" data-check-answer' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(label) + '</span></label>').join('') + '</fieldset>' + (feedback ? '<p class="check-feedback" role="alert">' + escapeHtml(feedback) + '</p>' : '') + '<div class="course-task-actions">' + (feedback && selected && !check.options[Number(selected)][1] ? '<button class="course-secondary-button" type="button" data-action="return-to-read">Read this step again</button><button class="course-secondary-button" type="button" data-action="simple-read">Explain more simply</button>' : '') + '<button class="course-primary-button" type="button" data-action="submit-check"' + (selected === '' ? ' disabled' : '') + '>Check understanding <span aria-hidden="true">→</span></button></div></article>';
+    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Quick check</p><h2 id="course-task-heading" tabindex="-1">Check understanding</h2><p>Choose the answer that best matches the short explanation.</p></div>' + taskHeaderControls() + '</div>' + (state.progress.attempt.integrityNotice ? '<p class="integrity-note">This quick check keeps the focus on understanding, not on how text entered the box.</p>' : '') + '<fieldset class="course-check-options"><legend>' + escapeHtml(check.question) + '</legend>' + check.options.map((option, index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="course-check" value="' + index + '" data-check-answer' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(choiceLabel(option)) + '</span></label>').join('') + '</fieldset>' + (feedback ? '<p class="check-feedback" role="alert">' + escapeHtml(feedback) + '</p>' : '') + '<div class="course-task-actions"><button class="course-primary-button" type="button" data-action="submit-check"' + (selected === '' ? ' disabled' : '') + '>Check understanding <span aria-hidden="true">→</span></button></div></article>';
   };
 
   const practiceSupport = () => currentStep().content?.supports?.[0] || currentStep().example || 'Ask the learner what would help with the task.';
+  const choiceLabel = (choice) => Array.isArray(choice) ? choice[0] : String(choice || '');
+  const legacyPracticeChoices = () => [practiceSupport(), 'Assume one support will work for everyone.', 'Make the learner explain or prove a diagnosis before offering support.', 'Withhold support until the learner finishes the task alone.'];
   const applyTask = () => {
     const selected = state.progress.attempt.selectedAnswer;
-    const choices = [[practiceSupport(), true], ['Assume one support will work for everyone.', false], ['Make the learner explain or prove a diagnosis before offering support.', false], ['Withhold support until the learner finishes the task alone.', false]];
+    const choices = legacyPracticeChoices();
     const feedback = state.progress.attempt.feedback;
-    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Adapted practice</p><h2 id="course-task-heading" tabindex="-1">Use the idea in a small situation</h2><p>A learner is working on a similar task. Which response best uses the idea from this module?</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options"><legend>Choose one practical response.</legend>' + choices.map(([label], index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="course-apply" value="' + index + '" data-apply-answer' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(label) + '</span></label>').join('') + '</fieldset>' + (feedback ? '<p class="check-feedback" role="alert">' + escapeHtml(feedback) + '</p>' : '') + '<div class="course-task-actions"><button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === '' ? ' disabled' : '') + '>Finish this step <span aria-hidden="true">→</span></button></div></article>';
+    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">Adapted practice</p><h2 id="course-task-heading" tabindex="-1">Use the idea in a small situation</h2><p>A learner is working on a similar task. Which response best uses the idea from this module?</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options"><legend>Choose one practical response.</legend>' + choices.map((label, index) => '<label class="course-check-option' + (selected === String(index) ? ' is-selected' : '') + '"><input type="radio" name="course-apply" value="' + index + '" data-apply-answer' + (selected === String(index) ? ' checked' : '') + '><span>' + escapeHtml(label) + '</span></label>').join('') + '</fieldset>' + (feedback ? '<p class="check-feedback" role="alert">' + escapeHtml(feedback) + '</p>' : '') + '<div class="course-task-actions"><button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === '' ? ' disabled' : '') + '>Finish this step <span aria-hidden="true">→</span></button></div></article>';
   };
 
   const taskOptionState = (index, selected, correctIndex, submitted) => {
@@ -5067,32 +5096,31 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
 
   const renderedTaskOptions = (options, name, dataAttribute, urduOptions = [], reviewedResult = '') => {
     const selected = state.progress.attempt.selectedAnswer === '' ? null : Number(state.progress.attempt.selectedAnswer);
-    const authoredCorrectIndex = options.findIndex(([, correct]) => correct);
-    // A reviewed manifest never contains an answer key. Once its protected
-    // server request resolves, use only that bounded outcome for feedback.
+    // Every static and reviewed answer is checked outside the browser. Once
+    // the protected request resolves, use only its bounded outcome for UI.
     const correctIndex = reviewedResult === 'complete'
       ? selected
       : reviewedResult === 'try-again'
         ? -1
-        : authoredCorrectIndex;
+        : -1;
     const submitted = Boolean(state.progress.attempt.submitted);
-    return options.map(([label], index) => '<label class="course-check-option' + taskOptionState(index, selected, correctIndex, submitted) + '"><input type="radio" name="' + name + '" value="' + index + '" ' + dataAttribute + (index === selected ? ' checked' : '') + (submitted ? ' disabled' : '') + '><span>' + bilingualCopy(label, urduOptions[index]) + '</span>' + taskOptionFeedback(index, selected, correctIndex, submitted) + '</label>').join('');
+    return options.map((option, index) => '<label class="course-check-option' + taskOptionState(index, selected, correctIndex, submitted) + '"><input type="radio" name="' + name + '" value="' + index + '" ' + dataAttribute + (index === selected ? ' checked' : '') + (submitted ? ' disabled' : '') + '><span>' + bilingualCopy(choiceLabel(option), urduOptions[index]) + '</span>' + taskOptionFeedback(index, selected, correctIndex, submitted) + '</label>').join('');
   };
 
   const checkTaskWithFeedback = () => {
     const check = currentStep().check;
     const urduCheck = urduStep()?.check || {};
     const selected = state.progress.attempt.selectedAnswer === '' ? null : Number(state.progress.attempt.selectedAnswer);
-    const reviewedResult = usesReviewedManifest() ? state.progress.attempt.checkResult : '';
+    const reviewedResult = state.progress.attempt.checkResult;
     const correctIndex = reviewedResult === 'complete'
       ? selected
       : reviewedResult === 'try-again'
         ? -1
-        : check.options.findIndex(([, correct]) => correct);
+        : -1;
     const submitted = Boolean(state.progress.attempt.submitted);
     const correct = submitted && selected === correctIndex;
     const feedback = state.progress.attempt.checking
-      ? '<p class="course-input-help" role="status">' + escapeHtml(courseUi('Checking this reviewed answer…', 'اس منظور شدہ جواب کی جانچ ہو رہی ہے…')) + '</p>'
+      ? '<p class="course-input-help" role="status">' + escapeHtml(courseUi('Checking this answer…', 'اس جواب کی جانچ ہو رہی ہے…')) + '</p>'
       : submitted ? savedSupportMarkup(correct ? 'answer-correct' : 'answer-incorrect', { result: 'quick-check' }) : '';
     const actions = state.progress.attempt.checking
       ? '<button class="course-primary-button" type="button" disabled>' + escapeHtml(courseUi('Checking…', 'جانچ ہو رہی ہے…')) + '</button>'
@@ -5105,20 +5133,22 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   };
 
   const applyTaskWithFeedback = () => {
-    const choices = [[practiceSupport(), true], ['Assume one support will work for everyone.', false], ['Make the learner explain or prove a diagnosis before offering support.', false], ['Withhold support until the learner finishes the task alone.', false]];
+    const choices = legacyPracticeChoices();
     const urduContent = urduStep()?.content || {};
     const urduChoices = [urduContent.supports?.[0], 'یہ فرض کر لیں کہ ایک مدد سب کے لیے کارآمد ہو گی۔', 'مدد دینے سے پہلے سیکھنے والے سے تشخیص سمجھانے یا ثابت کرنے کا مطالبہ کریں۔', 'اس وقت تک مدد روک لیں جب تک سیکھنے والا اکیلے کام مکمل نہ کرے۔'];
     const selected = state.progress.attempt.selectedAnswer === '' ? null : Number(state.progress.attempt.selectedAnswer);
-    const correctIndex = choices.findIndex(([, correct]) => correct);
+    const correctIndex = state.progress.attempt.checkResult === 'complete' ? selected : -1;
     const submitted = Boolean(state.progress.attempt.submitted);
     const correct = submitted && selected === correctIndex;
     const feedback = submitted ? savedSupportMarkup(correct ? 'answer-correct' : 'answer-incorrect', { result: 'applied-practice' }) : '';
-    const actions = !submitted
+    const actions = state.progress.attempt.checking
+      ? '<button class="course-primary-button" type="button" disabled>' + escapeHtml(courseUi('Checking…', 'جانچ ہو رہی ہے…')) + '</button>'
+      : !submitted
       ? '<button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === null ? ' disabled' : '') + '>' + escapeHtml(courseUi('Submit answer', 'جواب جمع کریں')) + ' <span aria-hidden="true">→</span></button>'
       : correct
         ? '<button class="course-primary-button" type="button" data-action="continue-apply">' + escapeHtml(courseUi('Complete this step', 'یہ مرحلہ مکمل کریں')) + ' <span aria-hidden="true">→</span></button>'
         : '<button class="course-secondary-button" type="button" data-action="retry-question">' + escapeHtml(courseUi('Choose another answer', 'دوسرا جواب منتخب کریں')) + '</button>';
-    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Adapted practice', 'عملی مشق') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Use the idea in a small situation', 'خیال کو ایک مختصر صورتحال میں استعمال کریں') + '</h2><p>' + bilingualCopy('A learner is working on a similar task. Which response best uses the idea from this module?', 'ایک سیکھنے والا ملتے جلتے کام پر ہے۔ کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + bilingualCopy('Which response best uses the idea from this module?', 'کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</legend>' + renderedTaskOptions(choices, 'course-apply', 'data-apply-answer', urduChoices) + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
+    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Adapted practice', 'عملی مشق') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Use the idea in a small situation', 'خیال کو ایک مختصر صورتحال میں استعمال کریں') + '</h2><p>' + bilingualCopy('A learner is working on a similar task. Which response best uses the idea from this module?', 'ایک سیکھنے والا ملتے جلتے کام پر ہے۔ کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + bilingualCopy('Which response best uses the idea from this module?', 'کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</legend>' + renderedTaskOptions(choices, 'course-apply', 'data-apply-answer', urduChoices, state.progress.attempt.checkResult) + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
   };
 
   // ADAPTIVE LEARNING: the assessment service returns only one public
@@ -5234,18 +5264,18 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (!question) return '<article class="course-task-card course-final-exam"><p class="course-task-label">Final exam</p><h2 id="course-task-heading" tabindex="-1">The final exam is not available.</h2><p>Please return to the course overview and try again.</p><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="dashboard">Return to learning overview</button></div></article>';
     const selected = exam.answers[exam.questionIndex];
     const submitted = Boolean(exam.submitted);
-    const reviewed = usesReviewedManifest();
+    const reviewed = true;
     const feedback = exam.checking
       ? '<p class="course-input-help" id="exam-feedback" role="status">' + escapeHtml(courseUi('Checking this reviewed answer…', 'اس منظور شدہ جواب کی جانچ ہو رہی ہے…')) + '</p>'
       : reviewed && exam.lastResult === 'try-again'
         ? '<p class="check-feedback" id="exam-feedback" role="status">' + escapeHtml(courseUi('Not quite. You can choose another answer, reread the course, or ask for support.', 'ابھی نہیں۔ آپ دوسرا جواب منتخب کر سکتے ہیں، کورس دوبارہ پڑھ سکتے ہیں یا مدد مانگ سکتے ہیں۔')) + '</p>'
-        : submitted ? '<p class="check-feedback" id="exam-feedback" role="status">' + escapeHtml(reviewed ? courseUi('That response fits the reviewed course content. Continue when you are ready.', 'یہ جواب منظور شدہ کورس کے مواد سے میل کھاتا ہے۔ جب تیار ہوں آگے بڑھیں۔') : courseUi('Result under review. Your choice is recorded, and you can continue when you are ready.', 'نتیجہ زیرِ جائزہ ہے۔ آپ کا انتخاب محفوظ ہو گیا ہے اور جب تیار ہوں آگے بڑھ سکتے ہیں۔')) + '</p>' : '';
+      : submitted ? '<p class="check-feedback" id="exam-feedback" role="status">' + escapeHtml(courseUi('That response fits the course content. Continue when you are ready.', 'یہ جواب کورس کے مواد سے میل کھاتا ہے۔ جب تیار ہوں آگے بڑھیں۔')) + '</p>' : '';
     const action = exam.checking
       ? '<button class="course-primary-button" type="button" disabled>' + escapeHtml(courseUi('Checking…', 'جانچ ہو رہی ہے…')) + '</button>'
       : submitted
       ? '<button class="course-primary-button" type="button" data-action="next-exam-question">' + courseUi(exam.questionIndex === finalExamQuestionCount() - 1 ? 'Finish review' : 'Next question', exam.questionIndex === finalExamQuestionCount() - 1 ? 'جائزہ مکمل کریں' : 'اگلا سوال') + ' <span aria-hidden="true">→</span></button>'
       : '<button class="course-primary-button" type="button" data-action="submit-exam-answer"' + (selected === null || typeof selected === 'undefined' ? ' disabled' : '') + '>' + escapeHtml(courseUi('Submit answer', 'جواب جمع کریں')) + ' <span aria-hidden="true">→</span></button>';
-    return '<article class="course-task-card course-final-exam"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Final review', 'آخری جائزہ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Answer one question at a time.', 'ایک وقت میں ایک سوال کا جواب دیں۔') + '</h2><p>' + bilingualCopy('Choose the answer that best fits what you learned. You can change your choice before you submit it.', 'وہ جواب منتخب کریں جو آپ کی سیکھی ہوئی بات سے سب سے بہتر میل کھاتا ہو۔ جمع کرنے سے پہلے آپ اپنا انتخاب بدل سکتے ہیں۔') + '</p></div>' + taskHeaderControls(courseUi('One question at a time', 'ایک وقت میں ایک سوال')) + '</div><fieldset class="course-check-options" aria-describedby="exam-question-help' + (feedback ? ' exam-feedback' : '') + '"><legend class="exam-question-card" id="exam-question-card" tabindex="-1"><span class="exam-question-count">' + courseUi('Question ', 'سوال ') + (exam.questionIndex + 1) + courseUi(' of ', ' از ') + finalExamQuestionCount() + '</span><strong>' + bilingualCopy(question.question, urduQuestion?.question) + '</strong><span id="exam-question-help">' + bilingualCopy('Choose one answer, then submit when you are ready.', 'ایک جواب منتخب کریں، پھر جب تیار ہوں تو اسے جمع کریں۔') + '</span></legend>' + question.options.map(([label], index) => '<label class="course-check-option exam-option' + examOptionState(index, selected, -1, submitted) + '"><input type="radio" name="final-exam-answer" value="' + index + '" data-exam-answer' + (index === selected ? ' checked' : '') + (submitted || exam.checking ? ' disabled' : '') + '><span class="exam-option-copy">' + bilingualCopy(label, urduQuestion?.options?.[index]) + '</span>' + examOptionFeedback() + '</label>').join('') + '</fieldset>' + feedback + '<div class="course-task-actions">' + action + '</div></article>';
+    return '<article class="course-task-card course-final-exam"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Final review', 'آخری جائزہ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Answer one question at a time.', 'ایک وقت میں ایک سوال کا جواب دیں۔') + '</h2><p>' + bilingualCopy('Choose the answer that best fits what you learned. You can change your choice before you submit it.', 'وہ جواب منتخب کریں جو آپ کی سیکھی ہوئی بات سے سب سے بہتر میل کھاتا ہو۔ جمع کرنے سے پہلے آپ اپنا انتخاب بدل سکتے ہیں۔') + '</p></div>' + taskHeaderControls(courseUi('One question at a time', 'ایک وقت میں ایک سوال')) + '</div><fieldset class="course-check-options" aria-describedby="exam-question-help' + (feedback ? ' exam-feedback' : '') + '"><legend class="exam-question-card" id="exam-question-card" tabindex="-1"><span class="exam-question-count">' + courseUi('Question ', 'سوال ') + (exam.questionIndex + 1) + courseUi(' of ', ' از ') + finalExamQuestionCount() + '</span><strong>' + bilingualCopy(question.question, urduQuestion?.question) + '</strong><span id="exam-question-help">' + bilingualCopy('Choose one answer, then submit when you are ready.', 'ایک جواب منتخب کریں، پھر جب تیار ہوں تو اسے جمع کریں۔') + '</span></legend>' + question.options.map((option, index) => '<label class="course-check-option exam-option' + examOptionState(index, selected, -1, submitted) + '"><input type="radio" name="final-exam-answer" value="' + index + '" data-exam-answer' + (index === selected ? ' checked' : '') + (submitted || exam.checking ? ' disabled' : '') + '><span class="exam-option-copy">' + bilingualCopy(choiceLabel(option), urduQuestion?.options?.[index]) + '</span>' + examOptionFeedback() + '</label>').join('') + '</fieldset>' + feedback + '<div class="course-task-actions">' + action + '</div></article>';
   };
 
   const finalExamResultsTask = () => '<article class="course-task-card course-final-exam exam-results-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Final review complete', 'آخری جائزہ مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Thank you for showing your understanding.', 'اپنی سمجھ ظاہر کرنے کا شکریہ۔') + '</h2><p>' + bilingualCopy('Result under review. Your choices are saved locally; this course does not show scores, answer keys, rankings, or speed results.', 'نتیجہ زیرِ جائزہ ہے۔ آپ کے انتخاب مقامی طور پر محفوظ ہیں؛ یہ کورس اسکور، جوابی کلید، درجہ بندی یا رفتار کے نتائج نہیں دکھاتا۔') + '</p></div>' + taskHeaderControls(courseUi('Saved locally', 'مقامی طور پر محفوظ ہے')) + '</div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="return-course">' + courseUi('Return to learning overview', 'سیکھنے کے خلاصے پر واپس جائیں') + ' <span aria-hidden="true">→</span></button></div></article>';
@@ -6451,7 +6481,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (state.progress.phase === 'exam-intro') return [{ id: 'final-exam-intro', label: 'Final exam introduction', text: [finalExam().title, finalExam().description, 'There are ' + finalExamQuestionCount() + ' questions. There is no timer.'].filter(Boolean).join('. ') }];
     if (state.progress.phase === 'exam') {
       const question = currentFinalExamQuestion();
-      return question ? [{ id: 'final-exam-question', label: 'Final exam question', text: [question.question, ...question.options.map(([label]) => label)].filter(Boolean).join('. ') }] : [];
+      return question ? [{ id: 'final-exam-question', label: 'Final exam question', text: [question.question, ...question.options.map(choiceLabel)].filter(Boolean).join('. ') }] : [];
     }
     if (state.progress.phase === 'exam-results') return [{ id: 'final-exam-results', label: 'Final exam results', text: 'Your final exam results and question-by-question review are available on this page.' }];
     if (state.progress.phase === 'type') {
@@ -6461,7 +6491,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       }
       return [{ id: 'task-prompt', label: 'Current typing task', text: [typing.prompt, typing.target || typing.reference].filter(Boolean).join('. ') }];
     }
-    if (state.progress.phase === 'check') return [{ id: 'question', label: 'Question', text: [check.question, ...(check.options || []).map(([label]) => label)].filter(Boolean).join('. ') }];
+    if (state.progress.phase === 'check') return [{ id: 'question', label: 'Question', text: [check.question, ...(check.options || []).map(choiceLabel)].filter(Boolean).join('. ') }];
     if (state.progress.phase === 'apply') return [{ id: 'practice', label: 'Practice question', text: 'Choose one practical response. ' + practiceSupport() }];
     return [{ id: 'task', label: taskLabel(), text: [step.title, ...sourceReadSections(step)].filter(Boolean).join('. ') }];
   };
@@ -7407,6 +7437,42 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
   };
 
+  const checkLegacyFinalAnswer = async (selectedIndex) => {
+    const exam = state.progress.finalExam;
+    try {
+      const result = await checkLegacyCourseAnswer({
+        user: authenticatedUser,
+        courseId: COURSE.id,
+        version: COURSE.version,
+        scope: 'final',
+        questionIndex: exam.questionIndex,
+        selectedIndex,
+        signal: requestTimeoutSignal(10000)
+      });
+      const accepted = result?.result === 'complete';
+      exam.checking = false;
+      exam.lastResult = accepted ? 'complete' : 'try-again';
+      exam.submitted = accepted;
+      if (accepted) recordSupportMoment('section-complete', { result: 'final-review' });
+      save();
+      render();
+      window.requestAnimationFrame(() => app.querySelector(accepted ? '[data-action="next-exam-question"]' : '[data-exam-answer]')?.focus?.({ preventScroll: true }));
+    } catch (error) {
+      exam.checking = false;
+      exam.lastResult = '';
+      exam.submitted = false;
+      save(courseUi(
+        error?.code === 'SIGN_IN_REQUIRED'
+          ? 'Please sign in to check this answer. Your choice is still here.'
+          : 'This answer could not be checked right now. Your choice is still here—try again when you are ready.',
+        error?.code === 'SIGN_IN_REQUIRED'
+          ? 'اس جواب کی جانچ کے لیے سائن اِن کریں۔ آپ کا انتخاب موجود ہے۔'
+          : 'اس جواب کی ابھی جانچ نہیں ہو سکی۔ آپ کا انتخاب موجود ہے—جب تیار ہوں دوبارہ کوشش کریں۔'
+      ));
+      render();
+    }
+  };
+
   const submitFinalExamAnswer = () => {
     if (state.progress.phase !== 'exam') return;
     const exam = state.progress.finalExam;
@@ -7421,14 +7487,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       void checkReviewedManifestFinalAnswer(selected);
       return;
     }
-    exam.submitted = true;
-    // The legacy offline review is intentionally non-scoring. A server-backed
-    // understanding check provides the guarded evaluation when enabled; this
-    // fallback records the choice locally and never exposes correctness.
-    recordSupportMoment('section-complete', { result: 'final-review' });
+    exam.checking = true;
+    exam.lastResult = '';
     save();
     render();
-    window.requestAnimationFrame(() => app.querySelector('.course-task-actions button')?.focus?.({ preventScroll: true }));
+    void checkLegacyFinalAnswer(selected);
   };
 
   const nextFinalExamQuestion = () => {
@@ -7602,13 +7665,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       void checkReviewedManifestModuleAnswer(selectedIndex);
       return;
     }
-    state.progress.attempt.submitted = true;
-    state.progress.attempt.checkResult = check.options[selectedIndex][1] ? 'complete' : 'try-again';
-    const kind = check.options[selectedIndex][1] ? 'answer-correct' : 'answer-incorrect';
-    state.progress.attempt.feedback = recordSupportMoment(kind, { result: 'quick-check' });
+    state.progress.attempt.checking = true;
+    state.progress.attempt.feedback = '';
     save();
     render();
-    window.requestAnimationFrame(() => app.querySelector('.course-task-actions button')?.focus?.({ preventScroll: true }));
+    void checkLegacyModuleAnswer(selectedIndex);
   };
 
   const checkReviewedManifestModuleAnswer = async (selectedIndex) => {
@@ -7644,6 +7705,42 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
   };
 
+  const checkLegacyModuleAnswer = async (selectedIndex) => {
+    try {
+      const result = await checkLegacyCourseAnswer({
+        user: authenticatedUser,
+        courseId: COURSE.id,
+        version: COURSE.version,
+        scope: 'module',
+        moduleIndex: state.progress.lessonIndex,
+        selectedIndex,
+        signal: requestTimeoutSignal(10000)
+      });
+      const accepted = result?.result === 'complete';
+      state.progress.attempt.checking = false;
+      state.progress.attempt.submitted = true;
+      state.progress.attempt.checkResult = accepted ? 'complete' : 'try-again';
+      state.progress.attempt.feedback = recordSupportMoment(accepted ? 'answer-correct' : 'answer-incorrect', { result: 'quick-check' });
+      save();
+      render();
+      window.requestAnimationFrame(() => app.querySelector('.course-task-actions button')?.focus?.({ preventScroll: true }));
+    } catch (error) {
+      state.progress.attempt.checking = false;
+      state.progress.attempt.submitted = false;
+      state.progress.attempt.checkResult = '';
+      state.progress.attempt.feedback = courseUi(
+        error?.code === 'SIGN_IN_REQUIRED'
+          ? 'Please sign in to check this answer. Your choice is still here.'
+          : 'This answer could not be checked right now. Your choice is still here—try again when you are ready.',
+        error?.code === 'SIGN_IN_REQUIRED'
+          ? 'اس جواب کی جانچ کے لیے سائن اِن کریں۔ آپ کا انتخاب موجود ہے۔'
+          : 'اس جواب کی ابھی جانچ نہیں ہو سکی۔ آپ کا انتخاب موجود ہے—جب تیار ہوں دوبارہ کوشش کریں۔'
+      );
+      save();
+      render();
+    }
+  };
+
   const completeReviewedModule = () => {
     if (!state.progress.completedSteps.includes(state.progress.lessonIndex)) state.progress.completedSteps.push(state.progress.lessonIndex);
     state.progress.phase = 'complete';
@@ -7660,9 +7757,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const continueCheck = () => {
     const check = currentStep().check;
     const selectedIndex = Number(state.progress.attempt.selectedAnswer);
-    const accepted = usesReviewedManifest()
-      ? state.progress.attempt.checkResult === 'complete'
-      : Boolean(check.options[selectedIndex]?.[1]);
+    const accepted = state.progress.attempt.checkResult === 'complete';
     if (!state.progress.attempt.submitted || !Number.isInteger(selectedIndex) || !accepted) return;
     if (usesReviewedManifest()) {
       completeReviewedModule();
@@ -7680,16 +7775,52 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const finishApply = () => {
     const selectedIndex = Number(state.progress.attempt.selectedAnswer);
     if (state.progress.attempt.submitted || state.progress.attempt.selectedAnswer === '' || !Number.isInteger(selectedIndex)) return;
-    state.progress.attempt.submitted = true;
-    state.progress.attempt.feedback = recordSupportMoment(selectedIndex === 0 ? 'answer-correct' : 'answer-incorrect', { result: 'applied-practice' });
+    state.progress.attempt.checking = true;
+    state.progress.attempt.feedback = '';
     save();
     render();
-    window.requestAnimationFrame(() => app.querySelector('.course-task-actions button')?.focus?.({ preventScroll: true }));
+    void checkLegacyApplyAnswer(selectedIndex);
+  };
+
+  const checkLegacyApplyAnswer = async (selectedIndex) => {
+    try {
+      const result = await checkLegacyCourseAnswer({
+        user: authenticatedUser,
+        courseId: COURSE.id,
+        version: COURSE.version,
+        scope: 'apply',
+        moduleIndex: state.progress.lessonIndex,
+        selectedIndex,
+        signal: requestTimeoutSignal(10000)
+      });
+      const accepted = result?.result === 'complete';
+      state.progress.attempt.checking = false;
+      state.progress.attempt.submitted = true;
+      state.progress.attempt.checkResult = accepted ? 'complete' : 'try-again';
+      state.progress.attempt.feedback = recordSupportMoment(accepted ? 'answer-correct' : 'answer-incorrect', { result: 'applied-practice' });
+      save();
+      render();
+      window.requestAnimationFrame(() => app.querySelector('.course-task-actions button')?.focus?.({ preventScroll: true }));
+    } catch (error) {
+      state.progress.attempt.checking = false;
+      state.progress.attempt.submitted = false;
+      state.progress.attempt.checkResult = '';
+      state.progress.attempt.feedback = courseUi(
+        error?.code === 'SIGN_IN_REQUIRED'
+          ? 'Please sign in to check this answer. Your choice is still here.'
+          : 'This answer could not be checked right now. Your choice is still here—try again when you are ready.',
+        error?.code === 'SIGN_IN_REQUIRED'
+          ? 'اس جواب کی جانچ کے لیے سائن اِن کریں۔ آپ کا انتخاب موجود ہے۔'
+          : 'اس جواب کی ابھی جانچ نہیں ہو سکی۔ آپ کا انتخاب موجود ہے—جب تیار ہوں دوبارہ کوشش کریں۔'
+      );
+      save();
+      render();
+    }
   };
 
   const continueApply = () => {
     const selectedIndex = Number(state.progress.attempt.selectedAnswer);
-    if (!state.progress.attempt.submitted || selectedIndex !== 0) return;
+    if (!state.progress.attempt.submitted || !Number.isInteger(selectedIndex) || state.progress.attempt.checkResult !== 'complete') return;
     if (!state.progress.completedSteps.includes(state.progress.lessonIndex)) state.progress.completedSteps.push(state.progress.lessonIndex);
     state.progress.phase = 'complete';
     state.progress.attempt = blankAttempt();
@@ -8628,40 +8759,36 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
 
   const beginAuthenticatedCourse = async () => {
     app.innerHTML = renderAuthChecking();
-    let user = getType2LearnGuest();
-    if (!user) {
-      user = await import('/firebase-auth.js?v=20260807-google-popup2')
-        .then(({ waitForType2LearnUser }) => waitForType2LearnUser())
-        .catch(() => null);
-    }
-    if (!user) {
-      window.location.replace('/login/?next=' + encodeURIComponent(window.location.pathname + window.location.search));
-      return;
-    }
-    authenticatedUser = user;
     try {
+      let user = getType2LearnGuest();
+      if (!user) {
+        user = await import('/firebase-auth.js?v=20260807-google-popup2')
+          .then(({ waitForType2LearnUser }) => waitForType2LearnUser())
+          .catch(() => null);
+      }
+      if (!user) {
+        window.location.replace('/login/?next=' + encodeURIComponent(window.location.pathname + window.location.search));
+        return;
+      }
+      authenticatedUser = user;
       await hydrateReviewedCourseForRoute(user);
-    } catch (error) {
-      renderReviewedManifestFailure(error?.message || 'The reviewed course could not be opened.');
-      return;
-    }
-    const rawLearnerId = user.uid || user.email || 'learner';
-    const learnerId = encodeURIComponent(rawLearnerId);
-    storageKeys = {
-      preferences: 'type2learn-learner-preferences-v1:' + learnerId,
-      course: STORAGE_NAMESPACE + ':' + learnerId + ':' + progressCourseKey(),
-      learnerId: rawLearnerId
-    };
-    state = loadState();
-    await restoreCloudProgress();
-    beginPeriodicSave();
-    queueCloudProgressSave();
-    const entry = new URL(window.location.href).searchParams;
-    const startSelectedCourse = entry.get('start') === 'course'
-      && (usesReviewedManifest()
-        ? entry.get('courseId') === COURSE.id && entry.get('version') === COURSE.version
-        : entry.get('course') === COURSE.id);
-    if (startSelectedCourse) {
+      const rawLearnerId = user.uid || user.email || 'learner';
+      const learnerId = encodeURIComponent(rawLearnerId);
+      storageKeys = {
+        preferences: 'type2learn-learner-preferences-v1:' + learnerId,
+        course: STORAGE_NAMESPACE + ':' + learnerId + ':' + progressCourseKey(),
+        learnerId: rawLearnerId
+      };
+      state = loadState();
+      await restoreCloudProgress();
+      beginPeriodicSave();
+      queueCloudProgressSave();
+      const entry = new URL(window.location.href).searchParams;
+      const startSelectedCourse = entry.get('start') === 'course'
+        && (usesReviewedManifest()
+          ? entry.get('courseId') === COURSE.id && entry.get('version') === COURSE.version
+          : entry.get('course') === COURSE.id);
+      if (startSelectedCourse) {
       // The course-specific preferences page always leads to a clear preview
       // before the learner begins or resumes a learning task.
       state.view = 'course';
@@ -8677,30 +8804,46 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       cleanUrl.searchParams.delete('version');
       cleanUrl.searchParams.delete('start');
       window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
-      recordSupportMoment('task-entry', { result: 'course-entry' });
-      save();
-    }
-    syncBackgroundNoisePreferences();
-    syncMascotPreferences();
-    void registerOffline().then(refreshOfflineLearningStatus).then(() => {
-      if (state.settingsMenu) render();
-    });
-    if (upgradeLegacyNarrationVoice()) save();
-    render();
+        recordSupportMoment('task-entry', { result: 'course-entry' });
+        save();
+      }
+      syncBackgroundNoisePreferences();
+      syncMascotPreferences();
+      void registerOffline().then(refreshOfflineLearningStatus).then(() => {
+        if (state.settingsMenu) render();
+      });
+      if (upgradeLegacyNarrationVoice()) save();
+      render();
     // Published platform/assigned courses belong in this same selection
     // screen. Fetching happens after the normal render so catalogue trouble
     // can never delay the existing course or the learner's saved progress.
-    if (!usesReviewedManifest()) void refreshReviewedCourseCatalogue();
+      if (!usesReviewedManifest()) void refreshReviewedCourseCatalogue();
     // Adaptive support is loaded after the normal course renders. A failed or
     // disabled optional feature must never delay the learner's first task.
-    void hydrateAdaptiveLearning();
+      void hydrateAdaptiveLearning();
     // Preferences are saved immediately before the learner enters the course.
     // The preview audio belongs to that previous document, so rebuild and
     // resume the selected loop here instead of leaving a silent handoff.
     // A browser that blocks cross-page autoplay still leaves the visible
     // Start control available without producing an unnecessary alert.
-    if (backgroundNoise.enabled) {
-      window.requestAnimationFrame(() => playBackgroundNoise({ announceChange: false }));
+      if (backgroundNoise.enabled) {
+        window.requestAnimationFrame(() => playBackgroundNoise({ announceChange: false }));
+      }
+    } catch (error) {
+      console.error('Type2Learn course startup failed', error);
+      if (cloudProgress.timer !== null) {
+        window.clearTimeout(cloudProgress.timer);
+        cloudProgress.timer = null;
+      }
+      if (periodicSaveTimer !== null) {
+        window.clearInterval(periodicSaveTimer);
+        periodicSaveTimer = null;
+      }
+      const message = escapeHtml(courseUi(
+        'We could not open this learning space. Your browser data was not removed. Try opening it again, or return to the course overview.',
+        'یہ سیکھنے کی جگہ نہیں کھل سکی۔ آپ کے براؤزر کا ڈیٹا حذف نہیں ہوا۔ دوبارہ کھولیں یا کورس کے خلاصے پر واپس جائیں۔'
+      ));
+      app.innerHTML = '<main class="course-page"><section class="course-task-card course-startup-error"><p class="course-task-label">' + escapeHtml(courseUi('Course startup', 'کورس آغاز')) + '</p><h1>' + escapeHtml(courseUi('Your learning space needs another try.', 'آپ کے سیکھنے کی جگہ کو دوبارہ کوشش درکار ہے۔')) + '</h1><p>' + message + '</p><div class="course-task-actions"><a class="course-primary-button" href="/course/">' + escapeHtml(courseUi('Try again', 'دوبارہ کوشش کریں')) + '</a><a class="course-secondary-button" href="/course/">' + escapeHtml(courseUi('Course overview', 'کورس خلاصہ')) + '</a></div></section></main>';
     }
   };
 

@@ -112,11 +112,11 @@ feature flags, safeguards, and rollout requirements in
 | --- | --- | --- |
 | Public English and Urdu experience | Yes | Static assets served by the Node application; optional Cloudflare locale worker for country-aware first visit |
 | Login, registration, Google sign-in, reset password | Yes | Firebase Authentication must be configured for the deployment domain |
-| Guided course and local guest progress | Yes | Runs without an AI provider; signed-in progress needs Firebase Admin credentials |
+| Guided course and local guest progress | Yes | Runs without an AI provider; signed-in sync stores a bounded resume marker only—never typed drafts, answer text, chat text, transcripts, or selected assessment answers |
 | Manual learning controls | Yes | Learner-controlled; background audio and speech never start by themselves |
 | Course AI and Adaptive Recall | Yes | Signed-in learner plus configured provider and Firebase; local guest preview is intentionally development-only |
 | Consent-gated adaptive summaries/proposals | Implemented | `ADAPTIVE_LEARNING_ENABLED=true`, signed-in learner, Firebase, and learner opt-in |
-| Behavioural Learning Partner | Implemented behind flags | `BEHAVIOUR_CONTEXT_ENABLED=true`; local authored offers work without consent, while signed-in Gemini/Nano wording and 90-day summaries also require `ADAPTIVE_LEARNING_ENABLED=true`, consent, Firebase, and `MASCOT_PARTNER_AI_ENABLED=true` |
+| Behavioural Learning Partner | Implemented behind flags | `BEHAVIOUR_CONTEXT_ENABLED=true`; local authored offers work without consent, while signed-in Gemini/Nano wording and time-limited summaries also require `ADAPTIVE_LEARNING_ENABLED=true`, consent, Firebase, and `MASCOT_PARTNER_AI_ENABLED=true`. Physical 90-day deletion requires Firestore TTL on `expiresAt`. |
 | Reviewed assessment banks and fallback checks | Implemented | `AI_ASSESSMENTS_ENABLED=true`, adaptive consent, Firebase, and reviewer workflow for generated banks |
 | Objective-evidence monitor and targeted review | Implemented | Assessment runs store only question/objective IDs and bounded outcome categories; never an answer, option choice, score, or model rationale |
 | AI-generated visual assets | Intentionally disabled | Requires separate moderation, storage, retention, and curriculum-review work |
@@ -253,7 +253,7 @@ npm run verify    # release gate: every test must pass and the suite must retain
 npm run test:ui   # focused UI test script
 ```
 
-The current release gate runs **1,002 deterministic automated checks** across
+The current release gate runs **1,122 deterministic automated checks** across
 access roles, authentication, public/Urdu content, learner settings, guided
 typing, audio and speech, AI boundaries, Behaviour Context privacy, assessment
 monitoring, reviewed-course authoring, publishing, and learner-safe manifests.
@@ -271,6 +271,10 @@ The Behavioural Learning Partner matrix is documented in
   authentication, budget, and review boundary.
 - A local guest AI preview is deliberately separate from public guest access and
   is enabled only with a non-production development flag.
+- `expiresAt` is written on consented adaptive records and assessment outcomes,
+  but Firestore TTL must be configured on that field before promising automatic
+  physical deletion after the chosen retention period. Learners can delete
+  consented adaptive records and all account-synced resume markers immediately.
 - Use `security/api.env.example` as the authoritative list of safe variable
   names and defaults.
 

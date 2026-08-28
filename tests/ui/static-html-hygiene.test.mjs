@@ -102,3 +102,17 @@ test('analytics markup is consistently module-based and legal tables do not crea
     assert.doesNotMatch(source, /legal-table-scroll" role="region" aria-label="Policy table"/, `${label} does not repeat unnamed policy-table landmarks`);
   }
 });
+
+test('legal pages are clearly noindex previews and public claims do not promise an educational outcome', async () => {
+  const privacy = await readFile(path.join(root, 'privacy', 'index.html'), 'utf8');
+  const terms = await readFile(path.join(root, 'terms', 'index.html'), 'utf8');
+  const fallback = await readFile(path.join(root, 'fallback', 'index.html'), 'utf8');
+  const publicApp = await readFile(path.join(root, 'app.js'), 'utf8');
+
+  assert.match(privacy, /<meta name="robots" content="noindex, follow">/i);
+  assert.match(terms, /<meta name="robots" content="noindex, follow">/i);
+  assert.match(privacy, /Privacy Notice Preview/i);
+  assert.match(terms, /Terms Preview/i);
+  assert.doesNotMatch(fallback, /durable understanding/i);
+  assert.doesNotMatch(publicApp, /build durable understanding/i);
+});

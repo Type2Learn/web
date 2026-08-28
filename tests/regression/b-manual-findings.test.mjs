@@ -51,7 +51,10 @@ test('B-02: enabling the mascot keeps preference controls inside a usable rail l
 
 test('B-03: guest learners can use the server-approved bounded public Course AI workflow', () => {
   assert.match(courseJs, /const courseAiAccessAllowed = \(\) => signedInLearner\(\)\s*\|\| Boolean\(authenticatedUser\?\.isGuest && aiChat\.connection\.guestAccess\)/);
-  assert.match(courseJs, /authenticatedUser\?\.isGuest && aiChat\.connection\.checked && !courseAiAccessAllowed\(\)/);
+  // The policy check is awaited before the surface opens. A guest must never
+  // briefly land in a disabled composer while the health contract is loading.
+  assert.match(courseJs, /if \(authenticatedUser\?\.isGuest && !aiChat\.connection\.checked\) await refreshAiConnection\(\);/);
+  assert.match(courseJs, /if \(authenticatedUser\?\.isGuest && !courseAiAccessAllowed\(\)\) \{/);
   assert.match(courseJs, /guestAccess = Boolean\(status\?\.ai\?\.guestAccess \?\? status\?\.ai\?\.localGuestPreview\)/);
   assert.match(courseJs, /const courseAiHistory = \(\)/);
   assert.match(courseJs, /history, companionRole: partnerControls\(\)\.role/);

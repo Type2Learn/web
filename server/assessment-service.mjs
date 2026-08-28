@@ -136,7 +136,8 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
       monitoring: 'objective-evidence-without-scores',
       authoredReserveAvailable: true,
       retentionDays: retentionDays(),
-      retentionField: 'expiresAt'
+      retentionField: 'expiresAt',
+      physicalDeletionRequiresFirestoreTtl: true
   });
   const assertAvailable = () => {
     if (!config.aiAssessmentsEnabled) throw apiError(503, 'ASSESSMENTS_UNAVAILABLE', 'Understanding checks are not available right now.');

@@ -113,6 +113,24 @@ export const saveCourseProgress = async ({ user, snapshot, signal }) => authenti
   signal
 });
 
+// Account sync intentionally contains only a minimal resume marker. This
+// explicit deletion path is used by the learner-facing data control as well
+// as support, and clears the server copy rather than merely hiding it locally.
+export const deleteCourseProgress = async ({ user, courseId = '', signal }) => {
+  const query = courseId ? '?courseId=' + encodeURIComponent(courseId) : '';
+  return authenticatedRequest(user, '/api/v1/course-progress' + query, { method: 'DELETE', signal });
+};
+
+// The historical public course has no answer keys in the browser. The server
+// returns one bounded outcome only, so the existing activity UI can remain
+// useful without exposing the static answer bank in page source.
+export const checkLegacyCourseAnswer = async ({ user, courseId, version, scope, moduleIndex, questionIndex, selectedIndex, signal }) => authenticatedRequest(user, '/api/v1/legacy-course/check', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ courseId, version, scope, moduleIndex, questionIndex, selectedIndex }),
+  signal
+});
+
 // Reviewed publishing catalogue. These helpers deliberately use the same
 // signed-in request boundary as account progress: guest preview never gains
 // access to a private course manifest or its server-held answer keys.

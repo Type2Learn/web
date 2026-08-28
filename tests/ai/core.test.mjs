@@ -46,7 +46,7 @@ test('production runtime never loads the local secret file and caps cannot be ra
     assert.equal(production.openAiAppCapUsd, 14);
     assert.equal(production.openAiModel, 'gpt-5.4-nano');
     assert.equal(production.openAiMiniModel, 'gpt-5.4-mini');
-    assert.equal(production.allowGuestAi, true, 'the public course demo keeps its bounded guest helper enabled');
+    assert.equal(production.allowGuestAi, false, 'public Course AI requires sign-in unless an operator explicitly enables a bounded guest preview');
 
     const development = await loadRuntimeConfig({ root, environment: { NODE_ENV: 'development' } });
     assert.equal(development.openAiApiKey, 'local-only-value');
@@ -524,8 +524,15 @@ test('adaptive recall context has no assessment answers or exact typing target',
   });
   const supplied = context.outline.join(' ');
   assert.equal(supplied.includes(COURSE_CONTENT.steps[0].typing.target), false);
-  assert.equal(supplied.includes(String(COURSE_CONTENT.steps[0].check.options[0][0])), false);
+  assert.equal(supplied.includes(String(COURSE_CONTENT.steps[0].check.options[0])), false);
   assert.deepEqual(context.supportStates, ['re-reading', 'working-through-typing']);
+});
+
+test('the historic public course ships choice text but never browser-visible true/false answer keys', () => {
+  for (const step of COURSE_CONTENT.steps) {
+    assert.equal(step.check.options.every((option) => typeof option === 'string'), true);
+  }
+  assert.equal(COURSE_CONTENT.finalExam.questions.every((question) => question.options.every((option) => typeof option === 'string')), true);
 });
 
 test('authored module assessment reserve is deterministic, bounded, and keeps answer keys server-only', () => {

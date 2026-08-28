@@ -178,16 +178,14 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     port: numberFrom(value('PORT'), 4173, { min: 1, max: 65535 }),
     host: value('HOST') || '0.0.0.0',
     allowedOrigins: new Set(configuredOrigins.length ? configuredOrigins : defaultOrigins),
-    // COURSE AI + LEARNING PARTNER: guest learners can use the bounded public
-    // course helper when this is enabled. The same provider routing, rate
-    // ledger and private-information guardrails apply; guests can never load
-    // an assigned/private manifest. Production defaults on so the public
-    // learning demo is genuinely interactive; set AI_ALLOW_GUESTS=false to
-    // turn it off without changing any client code.
-    allowGuestAi: booleanFrom(value('AI_ALLOW_GUESTS') || (production ? 'true' : 'false')),
+    // COURSE AI + LEARNING PARTNER: public guest AI is an explicit deployment
+    // choice, never an implicit production default. A public preview can set
+    // AI_ALLOW_GUESTS=true after accepting its quota and abuse trade-offs;
+    // otherwise guests receive the complete authored course support locally.
+    allowGuestAi: booleanFrom(value('AI_ALLOW_GUESTS') || 'false'),
     // Compatibility alias for older feature checks and deployments. New code
     // should use allowGuestAi; this is intentionally not a separate policy.
-    allowLocalGuestAi: booleanFrom(value('AI_ALLOW_GUESTS') || (production ? 'true' : 'false')),
+    allowLocalGuestAi: booleanFrom(value('AI_ALLOW_GUESTS') || 'false'),
     // ADAPTIVE LEARNING: the production deployment deliberately enables these
     // consent-gated learner features. A deployment may set any flag false to
     // turn the capability off; all routes still require sign-in, explicit
