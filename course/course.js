@@ -4,11 +4,11 @@ import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-
 import { NarrationService } from './narration.js';
 import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkLegacyCourseAnswer, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, deleteCourseProgress, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, getRealtimeSpeechToken, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260829-privacy-hardening1';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
-import { LearningTelemetry } from './learning-telemetry.js?v=20260809-adaptive-learning1';
-import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260811-behaviour-partner1';
+import { LearningTelemetry } from './learning-telemetry.js?v=20260829-behaviour-depth1';
+import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260829-behaviour-depth1';
 import { companionBubbleMarkup, companionDockMarkup, localCompanionDirective } from './learning-partner.js?v=20260825-mascot-companion2';
 import { adaptiveProposalMarkup, taskInitiationMarkup } from './adaptive-support.js?v=20260809-adaptive-learning1';
-import { visualExplanationMarkup } from './visual-explanations.js?v=20260809-adaptive-learning1';
+import { visualExplanationMarkup } from './visual-explanations.js?v=20260829-anchored-visual1';
 import { canonicaliseSpokenTyping, canonicaliseSpokenTypingPrefix, normaliseText, normaliseTypingMatch } from './voice-text.js?v=20260807-stt2';
 import { RealtimeSpeechInput } from './live-speech.js?v=20260827-live-companion2';
 import { createSettingsState, getAvailableInputMethods, loadLearnerSettings, resolveSettings, saveLearnerSettings, setActiveInputMethod, setUserOverride } from './learner-settings.js?v=20260730-course1';
@@ -942,6 +942,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   };
 
   let state = defaultState();
+  // Interaction geometry is reduced to directional/count bands. Coordinates,
+  // selected text and typed content never enter the behaviour context.
+  let lastBehaviourScrollTop = Math.max(0, window.scrollY || 0);
+  let behaviourScrollFrame = 0;
+  let lastBehaviourResizeAt = 0;
   // Support moments are deliberately ephemeral. Progress is saved, but an
   // acknowledgement is created only by the learner action that earned it; it
   // is never restored from storage or recreated by a settings/modal render.
@@ -3204,6 +3209,15 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     recordBehaviourAction(kind, detail);
   };
 
+  // Passive interaction signals use the same privacy boundary as explicit
+  // course actions, but they never trigger an AI request or a support render.
+  // This prevents a scroll, focus, or resize from becoming a noisy "event";
+  // it only enriches the compact local/consented module aggregate.
+  const recordPassiveBehaviourAction = (kind, detail = {}) => {
+    adaptiveLearning.telemetry?.action(kind, detail);
+    behaviourPartner.context.action(kind, detail);
+  };
+
   const companionMessage = (message) => {
     const text = String(message || '').trim().replace(/\s+/g, ' ');
     if (!text) return '';
@@ -3937,10 +3951,13 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const focused = layout === 'focused';
     const balanced = layout === 'balanced';
     const visualRail = adaptiveLearning.visualOpen && state.view === 'course';
-    const shellClass = 'course-learning-shell course-learning-shell--' + layout + (mascotCanAppear() || visualRail ? ' has-course-mascot' : '');
+    const shellClass = 'course-learning-shell course-learning-shell--' + layout + (mascotCanAppear() || visualRail ? ' has-course-mascot' : '') + (visualRail ? ' has-course-visual' : '');
     const context = focused ? '' : courseHeaderMarkup(layout) + (balanced ? '' : courseNowPanelMarkup());
     const taskProgress = focused || balanced ? '' : courseProgressWithFinalExam();
-    return '<main class="course-learning" id="course-main"><div class="' + shellClass + '">' + (focused ? '' : courseModuleStripWithFinalExam()) + '<section class="course-workspace course-workspace--' + layout + '">' + context + renderTask() + taskProgress + '</section>' + courseMascotMarkup('lesson') + '</div></main>' + renderModal();
+    const workspace = visualRail
+      ? '<section class="course-workspace course-workspace--' + layout + ' has-course-visual"><div class="course-visual-context">' + context + '</div><div class="course-visual-task-region">' + renderTask() + taskProgress + '</div>' + courseMascotMarkup('lesson') + '</section>'
+      : '<section class="course-workspace course-workspace--' + layout + '">' + context + renderTask() + taskProgress + '</section>' + courseMascotMarkup('lesson');
+    return '<main class="course-learning" id="course-main"><div class="' + shellClass + '">' + (focused ? '' : courseModuleStripWithFinalExam()) + workspace + '</div></main>' + renderModal();
   };
 
   const renderSavedWithFinalExam = () => '<main class="course-dashboard" id="course-main">' + dashboardWithMascot('<div class="course-panel-page"><button class="course-back-button" type="button" data-action="dashboard">' + courseUi('← Back to learning overview', 'سیکھنے کے خلاصے پر واپس جائیں ←') + '</button><p class="course-eyebrow">' + courseUi('Saved lessons', 'محفوظ سبق') + '</p><h1>' + courseUi('Your learning is waiting in one clear place.', 'آپ کا سیکھنے کا کام ایک واضح جگہ پر محفوظ ہے۔') + '</h1><p class="course-lead">' + courseUi('The course returns to the current small task, along with your response and support choices in this browser.', 'کورس اسی براؤزر میں آپ کے جواب اور مدد کے انتخاب کے ساتھ موجودہ مختصر کام پر واپس آتا ہے۔') + '</p><article class="saved-card"><span class="course-status">' + courseUi('Saved locally', 'مقامی طور پر محفوظ ہے') + '</span><h2>' + escapeHtml(courseUi(COURSE.title, COURSE_URDU.title)) + '</h2><p>' + escapeHtml(courseReturnLocation()) + '</p><div><button class="course-primary-button" type="button" data-action="continue-course">' + courseUi('Return to this step', 'اس مرحلے پر واپس جائیں') + ' <span aria-hidden="true">' + courseUi('→', '←') + '</span></button></div></article></div>', 'saved') + '</main>';
@@ -4020,12 +4037,17 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const exampleControl = state.preferences.extraExamples
       ? ''
       : '<button class="course-secondary-button" type="button" data-action="show-example">' + (shouldShowExample() ? 'Hide examples' : 'Show examples') + '</button>';
-    if (!smallerSectionsAreActive()) return exampleControl + '<button class="course-primary-button" type="button" data-action="read-complete">Continue <span aria-hidden="true">→</span></button>';
+    const returnAction = state.returnToTypingAfterReading ? 'return-to-typing' : 'return-to-preview';
+    const returnButton = taskBackButton(returnAction, courseUi(
+      state.returnToTypingAfterReading ? 'Return to the typing section you left' : 'Return to the lesson preview',
+      state.returnToTypingAfterReading ? 'اس ٹائپنگ حصے پر واپس جائیں جسے آپ نے چھوڑا تھا' : 'سبق کے پیش نظارے پر واپس جائیں'
+    ));
+    if (!smallerSectionsAreActive()) return exampleControl + returnButton + '<button class="course-primary-button" type="button" data-action="read-complete">Continue <span aria-hidden="true">→</span></button>';
     const index = currentReadingSectionIndex();
     const total = readingSections().length;
     const previous = index > 0
       ? '<button class="course-secondary-button" type="button" data-action="previous-reading-section">Previous section</button>'
-      : '';
+      : returnButton;
     const example = exampleControl;
     const primary = index < total - 1
       ? '<button class="course-primary-button" type="button" data-action="next-reading-section">Next section <span aria-hidden="true">→</span></button>'
@@ -4819,11 +4841,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     return sections.join('');
   };
 
+  // Keep every task's return route visually and semantically consistent. The
+  // action may differ by phase, but it always means "the page immediately
+  // before this one", never a destructive restart or a change of module.
+  const taskBackButton = (action, detail = '') => '<button class="course-secondary-button course-task-back-button" type="button" data-action="' + escapeHtml(action) + '"' + (detail ? ' aria-label="' + escapeHtml(detail) + '"' : '') + '><span aria-hidden="true">' + (courseUsesUrdu() ? '→' : '←') + '</span> ' + escapeHtml(courseUi('Go back', 'واپس جائیں')) + '</button>';
+
   const previewTask = () => {
     const urdu = urduStep();
     const initiation = taskInitiationMarkup({ active: adaptiveLearning.taskInitiation, escapeHtml, courseUi });
     const reviewed = usesReviewedManifest();
-    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Preview', 'پیش نظارہ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('See the path before you begin', 'شروع کرنے سے پہلے راستہ دیکھیں') + '</h2><p>' + bilingualCopy(reviewed ? 'This reviewed step contains reading, one complete lesson section at a time to type, and a protected quick check.' : 'This step contains reading, one complete lesson section at a time to type, a quick check, and one adapted practice activity.', reviewed ? 'اس منظور شدہ مرحلے میں پڑھنا، ایک وقت میں سبق کے ایک مکمل حصے کی ٹائپنگ اور ایک محفوظ فوری جانچ شامل ہے۔' : 'اس مرحلے میں پڑھنا، ایک وقت میں سبق کے ایک مکمل حصے کی ٹائپنگ، ایک فوری جانچ اور ایک عملی مشق شامل ہے۔') + '</p></div>' + taskHeaderControls() + '</div>' + initiation + '<div class="course-reading-copy"><section class="course-reading-section"><h3>' + bilingualCopy('Objective', 'مقصد') + '</h3><p>' + bilingualCopy('Understand one respectful idea from “' + currentStep().title + '” and use it in a small situation.', '«' + (urdu?.title || currentStep().title) + '» کے بارے میں ایک باعزت خیال کو سمجھیں اور اسے ایک مختصر صورتحال میں استعمال کریں۔') + '</p></section><section class="course-reading-section"><h3>' + bilingualCopy('What stays in your control', 'کیا چیز آپ کے اختیار میں رہتی ہے') + '</h3><p>' + bilingualCopy('You can pause, use support controls, use your usual compatible input tools, or ask for help. There are no countdown timers, speed scores, or autoplay audio.', 'آپ وقفہ کر سکتے ہیں، مدد کے کنٹرول استعمال کر سکتے ہیں، اپنے معمول کے موافق اِن پٹ ٹولز استعمال کریں یا مدد مانگ سکتے ہیں۔ یہاں کوئی الٹی گنتی، رفتار کا اسکور یا خودکار آواز نہیں ہے۔') + '</p></section><section class="course-reading-section"><h3>' + bilingualCopy('Completion', 'تکمیل') + '</h3><p>' + bilingualCopy(reviewed ? 'Read, type each lesson section one at a time, and check understanding with a reviewed course question.' : 'Read, type each lesson section one at a time, check understanding, and choose a practical response.', reviewed ? 'پڑھیں، سبق کے ہر حصے کو ایک وقت میں ایک ٹائپ کریں، اور منظور شدہ کورس کے سوال کے ذریعے سمجھ جانچیں۔' : 'پڑھیں، سبق کے ہر حصے کو ایک وقت میں ایک ٹائپ کریں، سمجھ جانچیں اور ایک عملی ردِعمل منتخب کریں۔') + '</p></section></div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="preview-complete">' + courseUi('Begin this small step', 'یہ مختصر مرحلہ شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
+    return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Preview', 'پیش نظارہ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('See the path before you begin', 'شروع کرنے سے پہلے راستہ دیکھیں') + '</h2><p>' + bilingualCopy(reviewed ? 'This reviewed step contains reading, one complete lesson section at a time to type, and a protected quick check.' : 'This step contains reading, one complete lesson section at a time to type, a quick check, and one adapted practice activity.', reviewed ? 'اس منظور شدہ مرحلے میں پڑھنا، ایک وقت میں سبق کے ایک مکمل حصے کی ٹائپنگ اور ایک محفوظ فوری جانچ شامل ہے۔' : 'اس مرحلے میں پڑھنا، ایک وقت میں سبق کے ایک مکمل حصے کی ٹائپنگ، ایک فوری جانچ اور ایک عملی مشق شامل ہے۔') + '</p></div>' + taskHeaderControls() + '</div>' + initiation + '<div class="course-reading-copy"><section class="course-reading-section"><h3>' + bilingualCopy('Objective', 'مقصد') + '</h3><p>' + bilingualCopy('Understand one respectful idea from “' + currentStep().title + '” and use it in a small situation.', '«' + (urdu?.title || currentStep().title) + '» کے بارے میں ایک باعزت خیال کو سمجھیں اور اسے ایک مختصر صورتحال میں استعمال کریں۔') + '</p></section><section class="course-reading-section"><h3>' + bilingualCopy('What stays in your control', 'کیا چیز آپ کے اختیار میں رہتی ہے') + '</h3><p>' + bilingualCopy('You can pause, use support controls, use your usual compatible input tools, or ask for help. There are no countdown timers, speed scores, or autoplay audio.', 'آپ وقفہ کر سکتے ہیں، مدد کے کنٹرول استعمال کر سکتے ہیں، اپنے معمول کے موافق اِن پٹ ٹولز استعمال کریں یا مدد مانگ سکتے ہیں۔ یہاں کوئی الٹی گنتی، رفتار کا اسکور یا خودکار آواز نہیں ہے۔') + '</p></section><section class="course-reading-section"><h3>' + bilingualCopy('Completion', 'تکمیل') + '</h3><p>' + bilingualCopy(reviewed ? 'Read, type each lesson section one at a time, and check understanding with a reviewed course question.' : 'Read, type each lesson section one at a time, check understanding, and choose a practical response.', reviewed ? 'پڑھیں، سبق کے ہر حصے کو ایک وقت میں ایک ٹائپ کریں، اور منظور شدہ کورس کے سوال کے ذریعے سمجھ جانچیں۔' : 'پڑھیں، سبق کے ہر حصے کو ایک وقت میں ایک ٹائپ کریں، سمجھ جانچیں اور ایک عملی ردِعمل منتخب کریں۔') + '</p></section></div><div class="course-task-actions">' + taskBackButton('return-to-course-selection') + '<button class="course-primary-button" type="button" data-action="preview-complete">' + courseUi('Begin this small step', 'یہ مختصر مرحلہ شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
   };
 
   const readTask = () => '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Learn', 'سیکھیں') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Read this short explanation', 'یہ مختصر وضاحت پڑھیں') + '</h2><p>' + bilingualCopy(smallerSectionsAreActive() ? 'Read one small section at a time. You decide when to move to the next part.' : 'Read at your own pace. Move on when the explanation feels clear enough.', smallerSectionsAreActive() ? 'ایک وقت میں ایک چھوٹا حصہ پڑھیں۔ اگلے حصے پر کب جانا ہے، یہ آپ طے کریں۔' : 'اپنی رفتار سے پڑھیں۔ جب وضاحت کافی واضح لگے تو آگے بڑھیں۔') + '</p></div>' + taskHeaderControls() + '</div>' + readingSectionProgress() + '<div class="course-reading-copy" data-structured="true">' + readingContentMarkup(false) + '</div><div class="course-task-actions">' + readingTaskActions() + '</div></article>';
@@ -5064,7 +5091,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const recallAction = typing.level === 'Recall typing' && adaptiveRecall.result && !adaptiveRecall.revisionReviewed
       ? courseUi('Review my updated explanation', 'میری بہتر وضاحت کا جائزہ لیں')
       : nextAction;
-    const returnToReading = '<button class="course-secondary-button course-return-to-reading" type="button" data-action="return-to-reading" aria-label="' + escapeHtml(courseUi('Go back to the reading you just completed', 'ابھی مکمل کی گئی پڑھائی پر واپس جائیں')) + '"><span aria-hidden="true">' + (courseUsesUrdu() ? '→' : '←') + '</span> ' + escapeHtml(courseUi('Go back', 'واپس جائیں')) + '</button>';
+    const returnToReading = taskBackButton('return-to-reading', courseUi('Go back to the reading you just completed', 'ابھی مکمل کی گئی پڑھائی پر واپس جائیں'));
     return '<article class="course-task-card course-typing-task"><div class="course-typing-body"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(label) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(title) + '</h2><p>' + escapeHtml(prompt) + '</p></div>' + taskHeaderControls() + '</div><div class="typing-practice"><p class="typing-note">' + escapeHtml(note) + '</p>' + typingMomentumMarkup() + adaptive + typingTarget() + '<label class="course-input-label" for="course-typing-input">' + responseLabel + '</label><textarea id="course-typing-input" data-typing-input rows="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="' + escapeHtml(typing.placeholder || 'Type the visible section here…') + '" aria-describedby="typing-help">' + escapeHtml(attempt.response) + '</textarea><p id="typing-help" class="course-input-help">' + inputHelp + '</p>' + integrity + feedback + '</div></div><div class="course-task-actions">' + returnToReading + '<button class="course-primary-button" type="button" data-action="check-typing"' + (adaptiveRecall.loading ? ' disabled' : '') + '>' + recallAction + ' <span aria-hidden="true">→</span></button></div></article>';
   };
 
@@ -5130,10 +5157,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const actions = state.progress.attempt.checking
       ? '<button class="course-primary-button" type="button" disabled>' + escapeHtml(courseUi('Checking…', 'جانچ ہو رہی ہے…')) + '</button>'
       : !submitted
-      ? '<button class="course-primary-button" type="button" data-action="submit-check"' + (selected === null ? ' disabled' : '') + '>' + escapeHtml(courseUi('Submit answer', 'جواب جمع کریں')) + ' <span aria-hidden="true">→</span></button>'
+      ? taskBackButton('return-to-typing') + '<button class="course-primary-button" type="button" data-action="submit-check"' + (selected === null ? ' disabled' : '') + '>' + escapeHtml(courseUi('Submit answer', 'جواب جمع کریں')) + ' <span aria-hidden="true">→</span></button>'
       : correct
-        ? '<button class="course-primary-button" type="button" data-action="continue-check">' + escapeHtml(courseUi('Continue', 'جاری رکھیں')) + ' <span aria-hidden="true">→</span></button>'
-        : '<button class="course-secondary-button" type="button" data-action="retry-question">' + escapeHtml(courseUi('Choose another answer', 'دوسرا جواب منتخب کریں')) + '</button><button class="course-secondary-button" type="button" data-action="return-to-read">' + escapeHtml(courseUi('Read this step again', 'یہ مرحلہ دوبارہ پڑھیں')) + '</button><button class="course-secondary-button" type="button" data-action="simple-read">' + escapeHtml(courseUi('Explain more simply', 'زیادہ آسان الفاظ میں سمجھائیں')) + '</button>';
+        ? taskBackButton('return-to-typing') + '<button class="course-primary-button" type="button" data-action="continue-check">' + escapeHtml(courseUi('Continue', 'جاری رکھیں')) + ' <span aria-hidden="true">→</span></button>'
+        : taskBackButton('return-to-typing') + '<button class="course-secondary-button" type="button" data-action="retry-question">' + escapeHtml(courseUi('Choose another answer', 'دوسرا جواب منتخب کریں')) + '</button><button class="course-secondary-button" type="button" data-action="return-to-read">' + escapeHtml(courseUi('Read this step again', 'یہ مرحلہ دوبارہ پڑھیں')) + '</button><button class="course-secondary-button" type="button" data-action="simple-read">' + escapeHtml(courseUi('Explain more simply', 'زیادہ آسان الفاظ میں سمجھائیں')) + '</button>';
     return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Quick check', 'فوری جانچ') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Check understanding', 'سمجھ جانچیں') + '</h2><p>' + bilingualCopy('Choose the answer that best matches the short explanation.', 'وہ جواب منتخب کریں جو مختصر وضاحت سے سب سے بہتر میل کھاتا ہو۔') + '</p></div>' + taskHeaderControls() + '</div>' + (state.progress.attempt.integrityNotice ? '<p class="integrity-note">' + bilingualCopy('This quick check keeps the focus on understanding, not on how text entered the box.', 'یہ فوری جانچ اس بات پر توجہ رکھتی ہے کہ آپ نے خیال کو سمجھا ہے، نہ کہ متن باکس میں کیسے داخل ہوا۔') + '</p>' : '') + '<fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + bilingualCopy(check.question, urduCheck.question) + '</legend>' + renderedTaskOptions(check.options, 'course-check', 'data-check-answer', urduCheck.options, reviewedResult) + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
   };
 
@@ -5149,10 +5176,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const actions = state.progress.attempt.checking
       ? '<button class="course-primary-button" type="button" disabled>' + escapeHtml(courseUi('Checking…', 'جانچ ہو رہی ہے…')) + '</button>'
       : !submitted
-      ? '<button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === null ? ' disabled' : '') + '>' + escapeHtml(courseUi('Submit answer', 'جواب جمع کریں')) + ' <span aria-hidden="true">→</span></button>'
+      ? taskBackButton('return-to-check') + '<button class="course-primary-button" type="button" data-action="submit-apply"' + (selected === null ? ' disabled' : '') + '>' + escapeHtml(courseUi('Submit answer', 'جواب جمع کریں')) + ' <span aria-hidden="true">→</span></button>'
       : correct
-        ? '<button class="course-primary-button" type="button" data-action="continue-apply">' + escapeHtml(courseUi('Complete this step', 'یہ مرحلہ مکمل کریں')) + ' <span aria-hidden="true">→</span></button>'
-        : '<button class="course-secondary-button" type="button" data-action="retry-question">' + escapeHtml(courseUi('Choose another answer', 'دوسرا جواب منتخب کریں')) + '</button>';
+        ? taskBackButton('return-to-check') + '<button class="course-primary-button" type="button" data-action="continue-apply">' + escapeHtml(courseUi('Complete this step', 'یہ مرحلہ مکمل کریں')) + ' <span aria-hidden="true">→</span></button>'
+        : taskBackButton('return-to-check') + '<button class="course-secondary-button" type="button" data-action="retry-question">' + escapeHtml(courseUi('Choose another answer', 'دوسرا جواب منتخب کریں')) + '</button>';
     return '<article class="course-task-card"><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Adapted practice', 'عملی مشق') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('Use the idea in a small situation', 'خیال کو ایک مختصر صورتحال میں استعمال کریں') + '</h2><p>' + bilingualCopy('A learner is working on a similar task. Which response best uses the idea from this module?', 'ایک سیکھنے والا ملتے جلتے کام پر ہے۔ کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</p></div>' + taskHeaderControls() + '</div><fieldset class="course-check-options' + (submitted ? ' is-submitted' : '') + '"><legend>' + bilingualCopy('Which response best uses the idea from this module?', 'کون سا ردِعمل اس ماڈیول کے خیال کو سب سے بہتر استعمال کرتا ہے؟') + '</legend>' + renderedTaskOptions(choices, 'course-apply', 'data-apply-answer', urduChoices, state.progress.attempt.checkResult) + '</fieldset>' + feedback + '<div class="course-task-actions">' + actions + '</div></article>';
   };
 
@@ -5216,7 +5243,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
           ? '<button class="course-primary-button" type="button" data-action="restart-understanding-check">' + escapeHtml(courseUi('Try another calm check', 'ایک اور پُرسکون جانچ آزمائیں')) + ' <span aria-hidden="true">→</span></button>'
           : '<button class="course-primary-button" type="button" data-action="review-understanding-module">' + escapeHtml(courseUi('Review this course idea', 'اس کورس کے خیال کا جائزہ لیں')) + ' <span aria-hidden="true">→</span></button>')
         : '<button class="course-primary-button" type="button" data-action="finish-understanding-check">' + escapeHtml(continueLabel) + ' <span aria-hidden="true">→</span></button>';
-      return '<article class="course-task-card course-complete-card course-assessment-task"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(courseUi('Understanding check complete', 'سمجھ جانچ مکمل')) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(next) + '</h2><p>' + escapeHtml(understandingCheck.feedback || courseUi('Your response was recorded. Choose the next step when you are ready.', 'آپ کا جواب محفوظ ہو گیا ہے۔ جب تیار ہوں اگلا مرحلہ منتخب کریں۔')) + '</p></div>' + taskHeaderControls() + '</div>' + recovery + completionAction + '</div></article>';
+      return '<article class="course-task-card course-complete-card course-assessment-task"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(courseUi('Understanding check complete', 'سمجھ جانچ مکمل')) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(next) + '</h2><p>' + escapeHtml(understandingCheck.feedback || courseUi('Your response was recorded. Choose the next step when you are ready.', 'آپ کا جواب محفوظ ہو گیا ہے۔ جب تیار ہوں اگلا مرحلہ منتخب کریں۔')) + '</p></div>' + taskHeaderControls() + '</div>' + recovery + '<div class="course-task-actions">' + taskBackButton('return-from-understanding-check') + completionAction + '</div></article>';
     }
     const question = run.currentQuestion;
     const ready = question?.responseMode === 'mcq' ? understandingCheck.selectedOption !== '' : understandingCheck.response.trim().length >= 2;
@@ -5234,7 +5261,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const readinessCopy = assessmentAction
       ? bilingualCopy('Your learning is saved. When you are ready, use one calm understanding check before the next module.', 'آپ کی تعلیم محفوظ ہے۔ جب تیار ہوں، اگلے ماڈیول سے پہلے ایک پُرسکون سمجھ جانچ استعمال کریں۔')
       : bilingualCopy('Your next step is ready whenever you are.', 'آپ کا اگلا مرحلہ جب چاہیں تیار ہے۔');
-    return '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Progress update', 'پیش رفت کی تازہ کاری') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('One small step complete.', 'ایک مختصر مرحلہ مکمل ہو گیا۔') + '</h2><p>' + readinessCopy + '</p></div>' + taskHeaderControls() + '</div>' + proposal + '<div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button>' + assessmentAction + nextStepAction + '</div></article>';
+    return '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Progress update', 'پیش رفت کی تازہ کاری') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('One small step complete.', 'ایک مختصر مرحلہ مکمل ہو گیا۔') + '</h2><p>' + readinessCopy + '</p></div>' + taskHeaderControls() + '</div>' + proposal + '<div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button>' + taskBackButton('return-to-previous-module-task') + assessmentAction + nextStepAction + '</div></article>';
   };
 
   const finalModuleCompleteTask = () => '<article class="course-task-card course-complete-card"><div class="completion-mark" aria-hidden="true">✓</div><div class="course-task-top"><div><p class="course-task-label">' + bilingualCopy('Course modules complete', 'کورس کے ماڈیولز مکمل') + '</p><h2 id="course-task-heading" tabindex="-1">' + bilingualCopy('The 11 learning modules are complete.', 'سیکھنے کے 11 ماڈیولز مکمل ہو گئے ہیں।') + '</h2><p>' + bilingualCopy('Your completed modules and settings are saved locally. When you are ready, complete the final exam one question at a time. It has ' + finalExamQuestionCount() + ' questions and no timer.', 'آپ کے مکمل ماڈیولز اور ترتیبات مقامی طور پر محفوظ ہیں۔ جب تیار ہوں، آخری امتحان ایک وقت میں ایک سوال مکمل کریں۔ اس میں ' + finalExamQuestionCount() + ' سوال ہیں اور کوئی ٹائمر نہیں ہے۔') + '</p></div>' + taskHeaderControls() + '</div><div class="course-task-actions"><button class="course-secondary-button" type="button" data-action="save-exit">' + courseUi('Save and exit', 'محفوظ کریں اور باہر جائیں') + '</button><button class="course-primary-button" type="button" data-action="start-final-exam">' + courseUi('Start final exam', 'آخری امتحان شروع کریں') + ' <span aria-hidden="true">→</span></button></div></article>';
@@ -6827,15 +6854,18 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     'check-typing', 'submit-check', 'continue-check', 'submit-apply',
     'continue-apply', 'next-step', 'start-final-exam', 'next-exam-question',
     'return-course', 'return-to-read', 'simple-read', 'return-from-module-review',
+    'return-to-course-selection', 'return-to-preview', 'return-to-reading',
+    'return-to-typing', 'return-to-check', 'return-to-previous-module-task',
+    'previous-exam-question', 'return-to-last-exam-question',
     'guest-skip-module', 'guest-previous-module'
   ]);
 
   const routeMotionKind = (action) => {
-    if (['preview-complete', 'read-complete', 'next-reading-section', 'simple-read', 'return-to-read'].includes(action)) return 'reading';
+    if (['preview-complete', 'read-complete', 'next-reading-section', 'simple-read', 'return-to-read', 'return-to-preview', 'return-to-reading'].includes(action)) return 'reading';
     if (['check-typing'].includes(action)) return 'typing';
     if (['submit-check', 'continue-check', 'submit-exam-answer', 'next-exam-question', 'start-understanding-check', 'resume-understanding-check', 'submit-understanding-check'].includes(action)) return 'question';
     if (['submit-apply', 'continue-apply'].includes(action)) return 'applied';
-    if (['next-step', 'start-final-exam', 'start-final-understanding-check', 'finish-understanding-check', 'return-course'].includes(action)) return 'milestone';
+    if (['next-step', 'start-final-exam', 'start-final-understanding-check', 'finish-understanding-check', 'return-course', 'return-to-previous-module-task', 'return-to-last-exam-question'].includes(action)) return 'milestone';
     return 'navigation';
   };
 
@@ -6895,11 +6925,54 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     });
   };
 
+  // Every task route has one explicit, non-destructive way to return to the
+  // immediately preceding surface. This is kept as a post-render enhancer so
+  // authored, reviewed, assessment, and future manifest tasks all inherit the
+  // same control without duplicating navigation markup in each course file.
+  const taskBackRoute = () => {
+    if (state.view !== 'course') return '';
+    if (isReviewingModule()) return 'return-from-module-review';
+    if (state.progress.phase === 'preview') return 'return-to-course-selection';
+    if (state.progress.phase === 'read') return state.returnToTypingAfterReading ? 'return-to-typing' : 'return-to-preview';
+    if (state.progress.phase === 'type') return 'return-to-reading';
+    if (state.progress.phase === 'check') return 'return-to-typing';
+    if (state.progress.phase === 'apply') return 'return-to-check';
+    if (state.progress.phase === 'assessment') return 'return-from-understanding-check';
+    if (state.progress.phase === 'complete' || state.progress.phase === 'exam-intro') return 'return-to-previous-module-task';
+    if (state.progress.phase === 'exam') return 'previous-exam-question';
+    if (state.progress.phase === 'exam-results') return 'return-to-last-exam-question';
+    return '';
+  };
+
+  const addTaskBackAction = () => {
+    const action = taskBackRoute();
+    const actions = app.querySelector('.course-task-card .course-task-actions');
+    if (!action || !actions || actions.querySelector('.course-task-back-button')) return;
+    const existing = actions.querySelector('[data-action="' + action + '"]');
+    if (existing) {
+      existing.classList.remove('course-primary-button');
+      existing.classList.add('course-secondary-button', 'course-task-back-button');
+      existing.setAttribute('aria-label', courseUi('Go back to the immediately previous page', 'فوراً پچھلے صفحے پر واپس جائیں'));
+      existing.innerHTML = '<span aria-hidden="true">' + (courseUsesUrdu() ? '→' : '←') + '</span> ' + escapeHtml(courseUi('Go back', 'واپس جائیں'));
+      return;
+    }
+    const forward = actions.querySelector('.course-primary-button');
+    if (!forward) return;
+    const back = document.createElement('button');
+    back.className = 'course-secondary-button course-task-back-button';
+    back.type = 'button';
+    back.dataset.action = action;
+    back.setAttribute('aria-label', courseUi('Go back to the immediately previous page', 'فوراً پچھلے صفحے پر واپس جائیں'));
+    back.innerHTML = '<span aria-hidden="true">' + (courseUsesUrdu() ? '→' : '←') + '</span> ' + escapeHtml(courseUi('Go back', 'واپس جائیں'));
+    actions.insertBefore(back, forward);
+  };
+
   const enhanceRenderedCourse = () => {
     structureReadingContent();
     addSourceNotice();
     addCourseConclusion();
     updateCourseCopy();
+    addTaskBackAction();
     addGuestModuleNavigation();
     buildTypingTester();
     applyRenderedSupportBehavior();
@@ -8064,6 +8137,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       if (backgroundNoise.enabled) playBackgroundNoise({ announceChange: false });
       else pauseBackgroundNoise();
     }
+    recordUnifiedBehaviourAction('settings-change');
     if (shouldPreviewSupportMode) recordSupportMoment('preference-preview', { result: key });
     save();
     render();
@@ -8122,7 +8196,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       case 'listen': narrateCurrentTask(); break;
       case 'task-narration-toggle': startTaskNarration(); break;
       case 'narration-listen': startNarration(); break;
-      case 'narration-pause': ensureNarrationService().pause(); break;
+      case 'narration-pause':
+        ensureNarrationService().pause();
+        recordUnifiedBehaviourAction('tts-pause');
+        break;
       case 'narration-stop': ensureNarrationService().stop(); break;
       case 'narration-restart': ensureNarrationService().restart(); break;
       case 'narration-jump': startNarration(Number(element.dataset.narrationIndex)); break;
@@ -8216,6 +8293,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         break;
       case 'close-visual-explanation':
         adaptiveLearning.visualOpen = false;
+        recordUnifiedBehaviourAction('visual-close');
         render();
         break;
       case 'close-modal': state.modal === 'ai-chat' ? closeCourseAi() : closeCourseModal(); break;
@@ -8237,6 +8315,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         if (!smallerSectionsAreActive()) break;
         state.readingSectionIndex = Math.max(0, currentReadingSectionIndex() - 1);
         recordUnifiedBehaviourAction('reread');
+        recordUnifiedBehaviourAction('reading-section', { direction: 'back' });
         save('The previous small reading section is ready.');
         retainReadingSectionPosition('[data-action="previous-reading-section"], [data-action="next-reading-section"], [data-action="read-complete"]');
         break;
@@ -8244,6 +8323,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         if (!smallerSectionsAreActive()) break;
         state.readingSectionIndex = Math.min(readingSections().length - 1, currentReadingSectionIndex() + 1);
         recordUnifiedBehaviourAction('reread');
+        recordUnifiedBehaviourAction('reading-section', { direction: 'forward' });
         save('The next small reading section is ready.');
         retainReadingSectionPosition('[data-action="next-reading-section"], [data-action="read-complete"]');
         break;
@@ -8263,6 +8343,56 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         ));
         render();
         showCurrentTaskFromStart('[data-action="read-complete"]');
+        break;
+      case 'return-to-course-selection':
+        state.returnToTypingAfterReading = false;
+        goTo('dashboard', courseUi('Your course selection is ready.', 'آپ کے کورس کا انتخاب تیار ہے۔'));
+        break;
+      case 'return-to-preview':
+        if (state.progress.phase !== 'read') break;
+        state.returnToTypingAfterReading = false;
+        state.progress.phase = 'preview';
+        state.readingSectionIndex = 0;
+        save(courseUi('The step preview is ready.', 'مرحلے کا پیش نظارہ تیار ہے۔'));
+        render();
+        showCurrentTaskFromStart();
+        break;
+      case 'return-to-typing':
+        if (state.progress.phase !== 'read' && state.progress.phase !== 'check') break;
+        state.returnToTypingAfterReading = false;
+        state.progress.phase = 'type';
+        state.progress.attempt.selectedAnswer = '';
+        state.progress.attempt.submitted = false;
+        state.progress.attempt.checkResult = '';
+        state.progress.attempt.checking = false;
+        state.progress.attempt.feedback = '';
+        save(courseUi('Your typing step is ready.', 'آپ کا ٹائپنگ مرحلہ تیار ہے۔'));
+        render();
+        showCurrentTaskFromStart('#course-typing-input');
+        break;
+      case 'return-to-check':
+        if (state.progress.phase !== 'apply') break;
+        state.progress.phase = 'check';
+        state.progress.attempt.selectedAnswer = '';
+        state.progress.attempt.submitted = false;
+        state.progress.attempt.checkResult = '';
+        state.progress.attempt.checking = false;
+        state.progress.attempt.feedback = '';
+        save(courseUi('The quick check is ready.', 'فوری جانچ تیار ہے۔'));
+        render();
+        showCurrentTaskFromStart('[data-check-answer]');
+        break;
+      case 'return-to-previous-module-task':
+        if (state.progress.phase !== 'complete' && state.progress.phase !== 'exam-intro') break;
+        state.progress.phase = usesReviewedManifest() ? 'check' : 'apply';
+        state.progress.attempt.selectedAnswer = '';
+        state.progress.attempt.submitted = false;
+        state.progress.attempt.checkResult = '';
+        state.progress.attempt.checking = false;
+        state.progress.attempt.feedback = '';
+        save(courseUi('The previous course activity is ready.', 'پچھلی کورس سرگرمی تیار ہے۔'));
+        render();
+        showCurrentTaskFromStart(usesReviewedManifest() ? '[data-check-answer]' : '[data-apply-answer]');
         break;
       case 'read-complete':
         {
@@ -8333,6 +8463,31 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         break;
       case 'submit-exam-answer': submitFinalExamAnswer(); break;
       case 'next-exam-question': nextFinalExamQuestion(); break;
+      case 'previous-exam-question':
+        if (state.progress.phase !== 'exam' || state.progress.finalExam.checking) break;
+        if (state.progress.finalExam.questionIndex <= 0) {
+          state.progress.phase = 'exam-intro';
+        } else {
+          state.progress.finalExam.questionIndex -= 1;
+          state.progress.finalExam.submitted = false;
+          state.progress.finalExam.checking = false;
+          state.progress.finalExam.lastResult = '';
+        }
+        save(courseUi('The previous final review page is ready.', 'آخری جائزے کا پچھلا صفحہ تیار ہے۔'));
+        render();
+        showCurrentTaskFromStart(state.progress.phase === 'exam' ? '#exam-question-card' : '#course-task-heading');
+        break;
+      case 'return-to-last-exam-question':
+        if (state.progress.phase !== 'exam-results') break;
+        state.progress.phase = 'exam';
+        state.progress.finalExam.questionIndex = Math.max(0, finalExamQuestionCount() - 1);
+        state.progress.finalExam.submitted = true;
+        state.progress.finalExam.checking = false;
+        state.progress.finalExam.lastResult = 'complete';
+        save(courseUi('The last final review question is ready.', 'آخری جائزے کا سوال تیار ہے۔'));
+        render();
+        showCurrentTaskFromStart('#exam-question-card');
+        break;
       case 'return-course': goTo('dashboard', 'Your final exam results are saved locally.'); break;
       case 'return-to-read':
         state.progress.phase = 'read';
@@ -8365,7 +8520,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
 
   app.addEventListener('click', (event) => {
     const motionControl = event.target.closest('button, summary, .course-check-option, .exam-option');
-    if (motionControl) launchCourseControlMotion(motionControl, event);
+    if (motionControl) {
+      launchCourseControlMotion(motionControl, event);
+      if (state.view === 'course') recordPassiveBehaviourAction('control');
+    }
     const settingsMenuToggle = event.target.closest('[data-action="toggle-settings-menu"]');
     const clickedInsideSettings = Boolean(event.target.closest('.course-settings-menu'));
     if (state.settingsMenu && !clickedInsideSettings && !settingsMenuToggle) {
@@ -8651,7 +8809,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   });
 
   app.addEventListener('focusin', (event) => {
-    if (!event.target.matches?.('[data-typing-input]')) return;
+    const isTypingInput = event.target.matches?.('[data-typing-input]');
+    if (state.view === 'course' && event.target.matches?.('textarea, input, select, button, summary, [tabindex]')) {
+      recordPassiveBehaviourAction('focus', { returning: document.hasFocus(), typing: Boolean(isTypingInput) });
+    }
+    if (!isTypingInput) return;
     syncTypingFocusCurtain(event.target);
     window.requestAnimationFrame(() => keepGuidedTypingCursorAtEnd(event.target));
     if (typingGuidance.active && !typingGuidance.paused && typingGuidance.phase !== 'intro') {
@@ -8663,6 +8825,32 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     if (!event.target.matches?.('[data-typing-input]')) return;
     window.requestAnimationFrame(() => syncTypingFocusCurtain(event.target));
   });
+
+  // A scroll only contributes a bounded direction and coarse depth. It is
+  // intentionally throttled and does not encode a reading position, pointer
+  // path, content, viewport identity, or a reason for scrolling.
+  window.addEventListener('scroll', () => {
+    if (behaviourScrollFrame || state.view !== 'course') return;
+    behaviourScrollFrame = window.requestAnimationFrame(() => {
+      behaviourScrollFrame = 0;
+      const currentTop = Math.max(0, window.scrollY || 0);
+      const delta = currentTop - lastBehaviourScrollTop;
+      lastBehaviourScrollTop = currentTop;
+      if (Math.abs(delta) < 24) return;
+      const maximum = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      recordPassiveBehaviourAction('scroll', {
+        direction: delta < 0 ? 'back' : 'forward',
+        depth: Math.round(Math.min(100, (currentTop / maximum) * 100))
+      });
+    });
+  }, { passive: true });
+
+  window.addEventListener('resize', () => {
+    const at = performance.now();
+    if (state.view !== 'course' || at - lastBehaviourResizeAt < 1000) return;
+    lastBehaviourResizeAt = at;
+    recordPassiveBehaviourAction('viewport');
+  }, { passive: true });
 
   app.addEventListener('click', (event) => {
     const focusCurtain = event.target.closest?.('[data-typing-focus-curtain]');

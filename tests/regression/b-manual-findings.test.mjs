@@ -110,3 +110,19 @@ test('typing tasks offer an immediate return to reading without throwing away th
   assert.match(courseJs, /showCurrentTaskFromStart\('\[data-action="read-complete"\]'\)/);
   assert.match(courseJs, /const immediateBackAction = actions\.querySelector\('\[data-action="return-to-reading"\]'\);[\s\S]*actions\.insertBefore\(navigation, immediateBackAction \|\| primaryAction \|\| null\);/);
 });
+
+test('every course task receives one consistent non-destructive Go back route beside its forward action', () => {
+  assert.match(courseJs, /const taskBackRoute = \(\) => \{/);
+  assert.match(courseJs, /if \(state\.progress\.phase === 'preview'\) return 'return-to-course-selection';/);
+  assert.match(courseJs, /if \(state\.progress\.phase === 'assessment'\) return 'return-from-understanding-check';/);
+  assert.match(courseJs, /if \(state\.progress\.phase === 'exam'\) return 'previous-exam-question';/);
+  assert.match(courseJs, /actions\.insertBefore\(back, forward\);/);
+  assert.match(courseJs, /case 'return-to-previous-module-task':/);
+  assert.match(courseJs, /case 'previous-exam-question':/);
+  assert.match(courseCss, /course-task-actions \.course-task-back-button/);
+});
+
+test('completed understanding checks retain one explicit return path without malformed task-action markup', () => {
+  assert.match(courseJs, /Understanding check complete[\s\S]*<div class="course-task-actions">[\s\S]*return-from-understanding-check/);
+  assert.match(courseJs, /existing\.classList\.remove\('course-primary-button'\);[\s\S]*existing\.classList\.add\('course-secondary-button', 'course-task-back-button'\);/);
+});

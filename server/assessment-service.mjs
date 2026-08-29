@@ -212,7 +212,11 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
           Math.min(10 * 60 * 1000, Math.max(0, Number(item?.metrics?.typingLongestPauseMs) || 0))
         ), 0),
         rereads: metric('rereads', 100),
-        returns: metric('returns', 100)
+        returns: metric('returns', 100),
+        readingSectionBacktracks: metric('readingSectionBacktracks', 100),
+        scrollBacktracks: metric('scrollBacktracks', 500),
+        typingBursts: metric('typingBursts', 12000),
+        typingFocusReturns: metric('typingFocusReturns', 200)
       },
       support: {
         textToSpeech: summaries.some((item) => item?.support?.textToSpeech === true),

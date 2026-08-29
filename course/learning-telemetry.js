@@ -31,10 +31,16 @@ export class LearningTelemetry {
   emptyMetrics() {
     return {
       activeMs: 0, idleMs: 0, firstActionMs: 0, returns: 0, rereads: 0,
+      readingSectionMoves: 0, readingSectionBacktracks: 0,
       typingCharacters: 0, typingCorrectCharacters: 0, typingIncorrectCharacters: 0,
       typingBackspaces: 0, typingAbandons: 0, typingLongestPauseMs: 0,
-      ttsStarts: 0, ttsCompleted: 0, speechStarts: 0, speechCompleted: 0,
-      aiRequests: 0, aiActiveMs: 0
+      typingPauseTotalMs: 0, typingBursts: 0, typingFocusReturns: 0,
+      taskFocusChanges: 0, taskFocusReturns: 0, controlActivations: 0,
+      scrollMoves: 0, scrollBacktracks: 0, maxScrollDepth: 0, viewportChanges: 0,
+      ttsStarts: 0, ttsCompleted: 0, ttsPauses: 0,
+      speechStarts: 0, speechCompleted: 0,
+      aiRequests: 0, aiActiveMs: 0, aiDismissals: 0,
+      visualCloses: 0, settingsChanges: 0
     };
   }
 
@@ -101,12 +107,30 @@ export class LearningTelemetry {
     this.lastMeaningfulActionAt = current;
     if (kind === 'return') this.metrics.returns += 1;
     if (kind === 'reread') this.metrics.rereads += 1;
+    if (kind === 'reading-section') {
+      this.metrics.readingSectionMoves += 1;
+      if (detail.direction === 'back') this.metrics.readingSectionBacktracks += 1;
+    }
+    if (kind === 'focus') {
+      this.metrics.taskFocusChanges += 1;
+      if (detail.returning === true) this.metrics.taskFocusReturns += 1;
+      if (detail.typing === true) this.metrics.typingFocusReturns += 1;
+    }
+    if (kind === 'control') this.metrics.controlActivations += 1;
+    if (kind === 'scroll') {
+      this.metrics.scrollMoves += 1;
+      if (detail.direction === 'back') this.metrics.scrollBacktracks += 1;
+      this.metrics.maxScrollDepth = Math.max(this.metrics.maxScrollDepth, bounded(detail.depth, 100));
+    }
+    if (kind === 'viewport') this.metrics.viewportChanges += 1;
     if (kind === 'tts-start') this.metrics.ttsStarts += 1;
     if (kind === 'tts-complete') this.metrics.ttsCompleted += 1;
+    if (kind === 'tts-pause') this.metrics.ttsPauses += 1;
     if (kind === 'speech-start') this.metrics.speechStarts += 1;
     if (kind === 'speech-complete') this.metrics.speechCompleted += 1;
     if (kind === 'typing-retry') this.metrics.typingAbandons += 1;
     if (kind === 'ai-request') this.metrics.aiRequests += 1;
+    if (kind === 'ai-dismiss') this.metrics.aiDismissals += 1;
     if (kind === 'ai-open') {
       this.aiSessionOpen = true;
       if (document.visibilityState === 'visible' && !this.aiSessionStartedAt) this.aiSessionStartedAt = current;
@@ -120,12 +144,16 @@ export class LearningTelemetry {
     if (kind === 'visual-open') this.support.visualOpened = true;
     if (kind === 'task-initiation-offered') this.support.taskInitiationOffered = true;
     if (kind === 'task-initiation-used') this.support.taskInitiationUsed = true;
+    if (kind === 'visual-close') this.metrics.visualCloses += 1;
+    if (kind === 'settings-change') this.metrics.settingsChanges += 1;
     if (kind === 'typing') {
       this.metrics.typingCharacters += bounded(detail.characters, 12000);
       this.metrics.typingCorrectCharacters += bounded(detail.correctCharacters, 12000);
       this.metrics.typingIncorrectCharacters += bounded(detail.incorrectCharacters, 12000);
       this.metrics.typingBackspaces += bounded(detail.backspaces, 12000);
       this.metrics.typingLongestPauseMs = Math.max(this.metrics.typingLongestPauseMs, bounded(detail.pauseMs, 10 * 60 * 1000));
+      this.metrics.typingPauseTotalMs += bounded(detail.pauseMs, 30 * 60 * 1000);
+      if (bounded(detail.characters, 12000) > 0) this.metrics.typingBursts += 1;
     }
   }
 

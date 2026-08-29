@@ -1438,6 +1438,56 @@ body[data-course-direction="rtl"] .course-catalogue-lock {
     pointer-events: none;
   }
 
+  /* A visual explanation belongs beside the active course workspace, not
+     beside the module strip. Opening it must therefore never jump upward
+     while the learner's main task remains in place. */
+  .course-mascot-rail--lesson.course-mascot-rail--visual {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    /* Keep the explainer anchored to the task's own coordinate system. It
+       must scroll with that task instead of drifting toward the page header. */
+    position: relative;
+    top: auto;
+    height: auto;
+    max-height: calc(100dvh - clamp(116px, 13vh, 158px));
+    overflow: auto;
+    pointer-events: auto;
+    scrollbar-gutter: stable;
+  }
+
+  /* The visual is structurally paired with the active task region, rather
+     than with the course heading. This prevents it from shifting above the
+     task whenever the heading wraps or the browser aspect ratio changes. */
+  .course-learning-shell.has-course-visual .course-workspace.has-course-visual {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(390px, 34vw, 620px);
+    column-gap: clamp(42px, 6vw, 118px);
+    row-gap: 0;
+    width: 100%;
+    max-width: none;
+  }
+
+  .course-workspace.has-course-visual .course-visual-context {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .course-workspace.has-course-visual .course-visual-task-region {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .course-workspace.has-course-visual .course-mascot-rail--lesson.course-mascot-rail--visual {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 0;
+  }
+
   .course-mascot-stage {
     position: relative;
     width: 100%;
@@ -1776,6 +1826,33 @@ body[data-course-layout="focused"] .course-workspace--focused .course-task-card 
     align-self: center;
     height: calc(100dvh - 114px);
   }
+
+  body[data-course-layout="focused"] .course-learning-shell--focused.has-course-visual {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    align-items: start;
+  }
+
+  body[data-course-layout="focused"] .course-learning-shell--focused.has-course-visual .course-workspace.has-course-visual {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 1180px) {
+  /* On smaller screens the same reviewed visual remains available directly
+     after the task; it never requires the 3D mascot rail to load. */
+  .course-workspace.has-course-visual { display: block; }
+  .course-workspace.has-course-visual .course-mascot-rail--visual {
+    position: relative;
+    top: auto;
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    margin-top: 18px;
+    overflow: visible;
+  }
 }
 
 .course-heading {
@@ -2015,6 +2092,14 @@ body.course-high-contrast .course-reading-copy {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 28px;
+}
+
+/* A return route always sits directly beside the primary task action. It has
+   the same target height and balanced footprint in every layout, while its
+   outline keeps the forward/primary action visually unambiguous. */
+.course-task-actions .course-task-back-button {
+  min-width: 148px;
+  justify-content: center;
 }
 
 .course-guest-module-navigation {
@@ -2537,7 +2622,10 @@ body.course-stable-layout *::after { transition-duration: .01ms; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .course-mascot-rail { display: none !important; }
+  /* Motion reduction hides the animated companion, not an explicitly opened
+     text-and-diagram explanation. The visual remains an accessible support. */
+  .course-mascot-rail:not(.course-mascot-rail--visual) { display: none !important; }
+  .course-mascot-rail--visual { display: block !important; }
 
   *,
   *::before,
@@ -6185,6 +6273,7 @@ html[data-website-scheme="playful"] .course-task-initiation {
   background: color-mix(in srgb, var(--course-panel, #fff) 93%, #eaf7ff);
 }
 .course-visual-explanation > header { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
+.course-visual-explanation > header .course-secondary-button { flex: 0 0 auto; min-width: 9.6rem; min-height: 44px; white-space: nowrap; justify-content: center; }
 .course-visual-explanation h3 { margin: .1rem 0 .3rem; color: var(--course-heading, #11294a); }
 .course-visual-explanation header p { margin: 0; max-width: 54ch; }
 .course-visual-map { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; position: relative; }
@@ -6197,6 +6286,11 @@ html[data-website-scheme="playful"] .course-task-initiation {
 .course-visual-node--4 { background: #fff9e9; }
 .course-visual-text-equivalent { margin-top: .85rem; }
 .course-visual-text-equivalent summary { color: var(--course-link, #0b68d5); cursor: pointer; font-weight: 700; }
+.course-visual-connection { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; margin-top: 1rem; border: 1px solid color-mix(in srgb, var(--course-blue, #1369c7) 30%, #dceafa); border-radius: .8rem; padding: .7rem .8rem; background: color-mix(in srgb, var(--course-panel, #fff) 88%, #eaf8ff); }
+.course-visual-connection-dot { display: grid; width: 1.8rem; aspect-ratio: 1; place-items: center; border-radius: 50%; color: #fff; background: var(--course-blue, #1369c7); font-size: .75rem; font-weight: 850; }
+.course-visual-connection p { display: grid; gap: .16rem; margin: 0; color: var(--course-ink, #163252); font-size: .84rem; line-height: 1.38; }
+.course-visual-connection p span { color: var(--course-ink-soft, #48607a); }
+.course-visual-connection-arrow { color: var(--course-blue, #1369c7); font-size: 1.15rem; font-weight: 900; }
 
 html[data-website-scheme="playful"] .course-visual-explanation { border-width: 3px; background: linear-gradient(130deg, #fefdf1, #e9faff 48%, #f0fff3); box-shadow: .32rem .32rem 0 #9dddf4; }
 html[data-website-scheme="playful"] .course-visual-node { border-width: 2px; box-shadow: .15rem .15rem 0 color-mix(in srgb, #2467a2 24%, transparent); }
@@ -6208,6 +6302,8 @@ html[dir="rtl"] .course-visual-explanation { text-align: right; }
   .course-visual-map { grid-template-columns: 1fr; }
   .course-visual-map::before { inset: 20% 45%; }
   .course-visual-node { min-height: 0; }
+  .course-visual-connection { grid-template-columns: auto minmax(0, 1fr); }
+  .course-visual-connection-arrow { display: none; }
 }
 
 /* PROFILE SETTINGS DIALOG: a real settings surface rather than a long
