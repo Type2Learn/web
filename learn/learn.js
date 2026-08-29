@@ -61,6 +61,7 @@ const preferenceControls = [
   { id: 'background-noise', label: 'Background noise', description: 'Optional looping sound, always off to start.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'text-to-speech', label: 'Text to speech', description: 'Optional read-aloud support.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'adaptive-learning', label: 'Behaviour-aware support', description: 'Choose whether compact learning signals may be saved to suggest optional support. Your words, recordings, chats, and scores are never saved as behaviour data.', choices: [['off', 'Keep it on this device'], ['on', 'Use optional adaptive support']] },
+  { id: 'response-evidence', label: 'Learning response evidence', description: 'Optional: retain your submitted own-words assessment responses for up to 90 days so later checks can compare what you demonstrate. It also enables behaviour-aware support; guided typing targets, recordings, chats, and individual keys are never saved.', choices: [['off', 'Keep responses in this check'], ['on', 'Use response evidence + adaptive support']] },
   { id: 'urdu-mode', label: 'Urdu mode', description: 'Show the course and Course AI in Urdu. The typing target stays in English.', choices: [['off', 'Off'], ['on', 'On']] },
   { id: 'mascot', label: 'Mascot', description: 'A learning companion when you want one.', choices: [['off', 'Off'], ['on', 'On']] }
 ];
@@ -70,6 +71,7 @@ const defaultChoices = {
   'website-scheme': 'calm',
   'urdu-mode': 'off',
   'adaptive-learning': 'off',
+  'response-evidence': 'off',
   'learning-partner': 'off',
   'mascot-role': 'calm-guide',
   'mascot-presence': 'available',
@@ -485,7 +487,7 @@ const focusedSteps = (choices) => {
     { id: 'background-noise' }
   ];
   if (choices['background-noise'] === 'on') steps.push({ id: 'noise-details' });
-  steps.push({ id: 'text-to-speech' }, { id: 'adaptive-learning' }, { id: 'urdu-mode' }, { id: 'mascot' });
+  steps.push({ id: 'text-to-speech' }, { id: 'adaptive-learning' }, { id: 'response-evidence' }, { id: 'urdu-mode' }, { id: 'mascot' });
   if (choices.mascot === 'on') steps.push({ id: 'mascot-role' }, { id: 'mascot-presence' }, { id: 'mascot-proactive' });
   return steps;
 };
@@ -818,6 +820,11 @@ const boot = async () => {
       const { preference, value } = preferenceButton.dataset;
       const previousValue = choices[preference];
       choices[preference] = value;
+      // Response evidence is a consciously stronger choice. Selecting it is
+      // also an explicit request for the compact adaptive-support layer it
+      // depends on; turning the parent layer off always turns it off too.
+      if (preference === 'response-evidence' && value === 'on') choices['adaptive-learning'] = 'on';
+      if (preference === 'adaptive-learning' && value === 'off') choices['response-evidence'] = 'off';
       if (preference === 'mascot') choices['learning-partner'] = value === 'on' ? 'on' : 'off';
       applySetupPresentation(choices);
       if (preference === 'colours') window.Type2LearnColorMode?.set(value);

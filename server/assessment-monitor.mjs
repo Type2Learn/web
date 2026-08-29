@@ -27,6 +27,13 @@ export const assessmentLearningSignals = (summary = {}) => {
   const scrollBacktracks = bounded(metrics.scrollBacktracks, 500);
   const typingBursts = bounded(metrics.typingBursts, 12000);
   const typingFocusReturns = bounded(metrics.typingFocusReturns, 200);
+  const taskRevisits = bounded(metrics.taskRevisits, 100);
+  const supportOfferAcceptances = bounded(metrics.supportOfferAcceptances, 100);
+  const supportOfferDismissals = bounded(metrics.supportOfferDismissals, 100);
+  const responseRevisions = bounded(metrics.assessmentResponseRevisions, 400);
+  const visualActiveMs = bounded(metrics.visualActiveMs, 4 * 60 * 60 * 1000);
+  const inputMethodChanges = bounded(metrics.inputMethodChanges, 100);
+  const textPresentationChanges = bounded(metrics.textPresentationChanges, 100);
   const visualOpened = Boolean(support.visualOpened);
   const readAloudUsed = Boolean(support.textToSpeech);
   // This is a temporary, consented support state—not a conclusion about the
@@ -38,15 +45,19 @@ export const assessmentLearningSignals = (summary = {}) => {
     // A brief course interaction prioritises a written explanation first so a
     // learner can show understanding in their own words rather than only pick
     // an option. The check remains optional and never assumes a cause.
-    courseInteraction: activeMs < 75_000 && rereads === 0 ? 'brief' : activeMs >= 6 * 60 * 1000 || rereads > 0 ? 'extended' : 'typical',
+    courseInteraction: activeMs < 75_000 && rereads === 0 && taskRevisits === 0 ? 'brief' : activeMs >= 6 * 60 * 1000 || rereads > 0 || taskRevisits > 0 ? 'extended' : 'typical',
     responseRhythm: longestPauseMs >= 45_000 ? 'paused' : typed >= 260 && activeMs <= 3 * 60 * 1000 ? 'quick' : 'typical',
-    supportUse: readAloudUsed || visualOpened ? 'used' : 'not-recorded',
-    returnCount: Math.min(9, returns + rereads + readingBacktracks),
+    supportUse: readAloudUsed || visualOpened || visualActiveMs >= 20_000 || supportOfferAcceptances > 0 ? 'used' : 'not-recorded',
+    returnCount: Math.min(9, returns + rereads + readingBacktracks + taskRevisits),
     // These are interaction routes, not findings about a learner. They only
     // choose which already-reviewed question format comes first; they cannot
     // select an outcome, score, readiness decision, or an answer hint.
-    navigationPattern: rereads + readingBacktracks + scrollBacktracks >= 3 ? 'revisiting' : 'direct',
-    expressionPattern: typingFocusReturns >= 2 || typingBursts >= 8 ? 're-entering' : 'steady',
+    navigationPattern: rereads + readingBacktracks + scrollBacktracks + taskRevisits >= 3 ? 'revisiting' : 'direct',
+    expressionPattern: typingFocusReturns >= 2 || typingBursts >= 8 || responseRevisions >= 3 ? 're-entering' : 'steady',
+    supportPreference: supportOfferAcceptances > supportOfferDismissals ? 'accepted' : supportOfferDismissals > 0 ? 'dismissed' : 'not-recorded',
+    // These are voluntary interface actions, not inferred learner traits.
+    // They can only influence the order of already approved response formats.
+    presentationPreference: textPresentationChanges > 0 || inputMethodChanges > 0 ? 'adjusted' : 'default',
     supportState: behaviourStates.has('working-through-typing')
       ? 'expression'
       : behaviourStates.has('re-reading')
@@ -71,6 +82,10 @@ export const prioritiseAssessmentItems = ({ items = [], runId, signals = {} }) =
     if (signals.supportState === 're-reading' && item.responseMode === 'mcq') priority += 1;
     if (signals.navigationPattern === 'revisiting' && item.responseMode === 'mcq') priority += 1;
     if (signals.expressionPattern === 're-entering' && item.responseMode === 'open') priority += 1;
+    if (signals.supportPreference === 'accepted' && item.responseMode === 'open') priority += 1;
+    // Keep a voluntarily adjusted presentation as a light ordering tiebreaker
+    // only. It must never outweigh a clearer opportunity to explain an idea.
+    if (signals.presentationPreference === 'adjusted' && item.responseMode === 'mcq') priority += 0.25;
     // Prior module evidence can make the final check start with the one
     // course objective that needs the clearest fresh evidence. This is not a
     // score or a prediction: it only reorders already approved questions.

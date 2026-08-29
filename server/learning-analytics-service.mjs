@@ -9,6 +9,7 @@ const CONSENT_VERSION = 1;
 const MAX_MODULE_INDEX = 99;
 const MAX_DURATION_MS = 4 * 60 * 60 * 1000;
 const MAX_RETENTION_DAYS = 365;
+const RESPONSE_EVIDENCE_SCHEMA_VERSION = 1;
 
 const userHash = (uid) => createHash('sha256').update(String(uid)).digest('hex');
 const boundedNumber = (value, maximum = 1000000) => {
@@ -59,7 +60,15 @@ const metricsFor = (value = {}) => ({
   aiActiveMs: boundedNumber(value.aiActiveMs, MAX_DURATION_MS),
   aiDismissals: boundedNumber(value.aiDismissals, 100),
   visualCloses: boundedNumber(value.visualCloses, 100),
-  settingsChanges: boundedNumber(value.settingsChanges, 200)
+  settingsChanges: boundedNumber(value.settingsChanges, 200),
+  taskTransitions: boundedNumber(value.taskTransitions, 200),
+  taskRevisits: boundedNumber(value.taskRevisits, 100),
+  supportOfferDismissals: boundedNumber(value.supportOfferDismissals, 100),
+  supportOfferAcceptances: boundedNumber(value.supportOfferAcceptances, 100),
+  visualActiveMs: boundedNumber(value.visualActiveMs, MAX_DURATION_MS),
+  inputMethodChanges: boundedNumber(value.inputMethodChanges, 100),
+  textPresentationChanges: boundedNumber(value.textPresentationChanges, 100),
+  assessmentResponseRevisions: boundedNumber(value.assessmentResponseRevisions, 400)
 });
 
 // BEHAVIOUR CONTEXT: only an aggregate and learner-selected presentation
@@ -118,6 +127,25 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     .collection('type2learnAssessmentRuns').doc(userHash(uid)).collection('runs');
   const assessmentRoot = (uid) => firebase.firestore
     .collection('type2learnAssessmentRuns').doc(userHash(uid));
+  const responseEvidenceCollection = (course) => course.collection('responseEvidence');
+
+  const deleteCollection = async (collection) => {
+    while (true) {
+      const snapshot = await collection.limit(200).get();
+      if (snapshot.empty) return;
+      const deletion = firebase.firestore.batch();
+      snapshot.docs.forEach((document) => deletion.delete(document.ref));
+      await deletion.commit();
+    }
+  };
+
+  // Response evidence is a separate, more sensitive optional record. Turning
+  // off that precise consent removes it immediately without forcing a learner
+  // to also discard their non-text behavioural summary.
+  const deleteResponseEvidence = async (uid) => {
+    const listedCourses = await profile(uid).collection('courses').get();
+    await Promise.all(listedCourses.docs.map((document) => deleteCollection(responseEvidenceCollection(document.ref))));
+  };
 
   const status = () => ({
     available: available(),
@@ -155,6 +183,9 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     return {
       available: available(),
       enabled: data.consentVersion === CONSENT_VERSION && data.adaptiveEnabled === true,
+      responseEvidenceEnabled: data.consentVersion === CONSENT_VERSION
+        && data.adaptiveEnabled === true
+        && data.responseEvidenceEnabled === true,
       consentVersion: CONSENT_VERSION
     };
   };
@@ -163,15 +194,24 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     if (!available()) throw apiError(503, 'ADAPTIVE_LEARNING_UNAVAILABLE', 'Adaptive learning support is not available right now.');
     const learner = await firebase.verifyBearer(authorization);
     const enabled = Boolean(body?.enabled);
+    const existing = (await profile(learner.uid).get()).data() || {};
+    // Keep response evidence opt-in separate from general adaptive summaries.
+    // A missing field (for existing learners) is always interpreted as off.
+    const requestedEvidence = typeof body?.responseEvidenceEnabled === 'boolean'
+      ? body.responseEvidenceEnabled
+      : existing.responseEvidenceEnabled === true;
+    const responseEvidenceEnabled = enabled && requestedEvidence === true;
     const timestamp = new Date();
+    if (!responseEvidenceEnabled) await deleteResponseEvidence(learner.uid);
     await profile(learner.uid).set({
       schemaVersion: 1,
       consentVersion: CONSENT_VERSION,
       adaptiveEnabled: enabled,
+      responseEvidenceEnabled,
       updatedAt: timestamp,
       disabledAt: enabled ? null : timestamp
     }, { merge: true });
-    return { enabled, consentVersion: CONSENT_VERSION };
+    return { enabled, responseEvidenceEnabled, consentVersion: CONSENT_VERSION };
   };
 
   const saveSummary = async ({ authorization, body }) => {
@@ -218,15 +258,6 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     const root = profile(learner.uid);
     // Firestore batches are capped. Keep deleting bounded records in batches
     // so this privacy action remains complete even after many optional runs.
-    const deleteCollection = async (collection) => {
-      while (true) {
-        const snapshot = await collection.limit(200).get();
-        if (snapshot.empty) return;
-        const deletion = firebase.firestore.batch();
-        snapshot.docs.forEach((document) => deletion.delete(document.ref));
-        await deletion.commit();
-      }
-    };
     const listedCourses = await root.collection('courses').get();
     // Include the legacy location as well: historic summaries were written
     // before the parent record existed and must still be deleted on request.
@@ -237,7 +268,8 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     await Promise.all([
       ...Array.from(courses.values()).flatMap((course) => [
         deleteCollection(course.collection('modules')),
-        deleteCollection(course.collection('adaptiveProposals'))
+        deleteCollection(course.collection('adaptiveProposals')),
+        deleteCollection(responseEvidenceCollection(course))
       ]),
       deleteCollection(assessmentRuns(learner.uid))
     ]);
@@ -248,6 +280,7 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
       schemaVersion: 1,
       consentVersion: CONSENT_VERSION,
       adaptiveEnabled: false,
+      responseEvidenceEnabled: false,
       updatedAt: new Date(),
       deletedAt: new Date()
     }, { merge: true });
@@ -272,9 +305,10 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
     if (!courses.has(legacyKey)) courses.set(legacyKey, { id: legacyKey, ref: courseDocument(learner.uid, legacyKey), data: () => ({ courseId: LEGACY_COURSE_ID, courseVersion: null }) });
     const courseExports = await Promise.all(Array.from(courses.values()).map(async (document) => {
       const data = document.data() || {};
-      const [moduleSnapshots, proposalSnapshots] = await Promise.all([
+      const [moduleSnapshots, proposalSnapshots, evidenceSnapshots] = await Promise.all([
         document.ref.collection('modules').get(),
-        document.ref.collection('adaptiveProposals').get()
+        document.ref.collection('adaptiveProposals').get(),
+        responseEvidenceCollection(document.ref).get()
       ]);
       return {
         courseId: String(data.courseId || LEGACY_COURSE_ID),
@@ -296,16 +330,38 @@ export const createLearningAnalyticsService = ({ config, firebase }) => {
             candidateId: String(proposalData.candidateId || ''), kind: String(proposalData.kind || ''),
             status: String(proposalData.status || ''), preference: proposalData.preference || null
           };
+        }),
+        // This field exists only after the learner separately opted in to
+        // retaining their own written assessment responses. It is included in
+        // their private export so they can inspect or move the exact evidence
+        // that informed a later assessment comparison.
+        responseEvidence: evidenceSnapshots.docs.map((evidence) => {
+          const evidenceData = evidence.data() || {};
+          return {
+            schemaVersion: Number(evidenceData.schemaVersion) || RESPONSE_EVIDENCE_SCHEMA_VERSION,
+            id: String(evidenceData.id || evidence.id),
+            kind: String(evidenceData.kind || 'assessment-open'),
+            moduleIndex: evidenceData.moduleIndex === 'final'
+              ? 'final'
+              : Number(evidenceData.moduleIndex) || 0,
+            objectiveIds: Array.isArray(evidenceData.objectiveIds) ? evidenceData.objectiveIds.map((id) => String(id)).slice(0, 3) : [],
+            text: String(evidenceData.text || '').slice(0, 1600),
+            responseLength: boundedNumber(evidenceData.responseLength, 1600),
+            createdAt: evidenceData.createdAt || null,
+            expiresAt: evidenceData.expiresAt || null
+          };
         })
       };
     }));
-    // This export is intentionally the same minimised data that can be
-    // stored: aggregates and learner decisions only—never typed answers,
-    // recordings, chat history, individual keystrokes, or model prompts.
+    // Compact summaries never contain text. Separately-consented written
+    // assessment evidence appears only in the learner's own export above;
+    // recordings, chat history, individual keystrokes, and model prompts are
+    // never retained here.
     return {
       schemaVersion: 2,
       consent: {
         enabled: profileData.adaptiveEnabled === true,
+        responseEvidenceEnabled: profileData.responseEvidenceEnabled === true,
         consentVersion: Number(profileData.consentVersion) || null
       },
       courses: courseExports,

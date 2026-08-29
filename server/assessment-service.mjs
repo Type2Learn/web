@@ -23,9 +23,24 @@ const estimateTokens = (text) => Math.ceil(String(text || '').length / 3);
 const MAX_RUN_ITEMS = 21;
 const MAX_RECHECKS_PER_SCOPE = 2;
 const MAX_RETENTION_DAYS = 365;
+const RESPONSE_EVIDENCE_SCHEMA_VERSION = 1;
+const MAX_RESPONSE_EVIDENCE_LENGTH = 1600;
 
 const stableModuleId = (moduleIndex) => moduleIndex === 'final' ? 'final' : `module-${Number(moduleIndex) + 1}`;
 const nowDate = () => new Date();
+// Exported for the privacy contract tests. This is deliberately a small pure
+// transformation: assessment evidence is optional, bounded, and strips
+// contact/link material before it can reach the retained collection.
+export const sanitiseAssessmentResponseEvidence = (answer) => {
+  const original = String(answer || '').replace(/\u0000/g, '').trim().slice(0, MAX_RESPONSE_EVIDENCE_LENGTH);
+  const text = original
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[contact removed]')
+    .replace(/(?:\+?\d[\d\s().-]{7,}\d)/g, '[contact removed]')
+    .replace(/https?:\/\/\S+/gi, '[link removed]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { text, responseLength: original.length, redacted: text !== original };
+};
 const generationInstructions = (curriculum) => [
   'Create a candidate assessment bank for a nonprofit education course.',
   'Use only the supplied approved objective and source text. Do not diagnose, label, infer learner traits, mention scoring, timers, speed, rankings, or private data.',
@@ -44,11 +59,14 @@ const generationInput = (curriculum) => JSON.stringify({
   bankVersion: `candidate-${curriculum.curriculumVersion}-${stableModuleId(curriculum.moduleIndex)}`
 });
 
-const evaluationInstructions = (curriculum, item) => [
+const evaluationInstructions = (curriculum, item, { hasPreviousEvidence = false } = {}) => [
   'Evaluate one learner response against only the supplied approved curriculum source and rubric.',
   'Do not diagnose, infer traits, mention a score, percentage, speed, failure, or confidence. Do not reveal an answer or rewrite a response for the learner.',
   'Use demonstrated only when the response shows the approved objective. Use needs-review when it does not yet show it. Use uncertain when wording is too ambiguous to evaluate safely.',
   'Return one short, calm feedback sentence that invites the next helpful action without supplying the answer.',
+  hasPreviousEvidence
+    ? 'A previous own-words response for the same objective may be supplied. Use it only to notice whether the current response adds clearer evidence. Do not quote it, diagnose the learner, or treat it as an answer key.'
+    : 'No prior learner response is available for comparison.',
   'Return JSON only.',
   `Objective: ${JSON.stringify(curriculum.objectives.filter((objective) => item.objectiveIds.includes(objective.id)))}`,
   `Approved source: ${curriculum.source}`,
@@ -56,7 +74,10 @@ const evaluationInstructions = (curriculum, item) => [
   `Internal answer guide: ${item.answerGuide}`
 ].join('\n');
 
-const evaluationInput = (answer) => JSON.stringify({ learnerResponse: answer });
+const evaluationInput = (answer, previousResponse = '') => JSON.stringify({
+  learnerResponse: answer,
+  ...(previousResponse ? { priorObjectiveEvidence: previousResponse } : {})
+});
 
 const bankKey = (curriculum) => `${curriculum.courseId}--${curriculum.curriculumVersion}--${curriculum.language}`;
 const generatedBankKey = (curriculum) => `${curriculum.courseId}:${curriculum.curriculumVersion}:${curriculum.language}:${curriculum.moduleIndex}`;
@@ -191,6 +212,68 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
       : curriculum.courseId;
     return learningProfile(uid).collection('courses').doc(courseKey).collection('modules');
   };
+  // CONSENTED RESPONSE EVIDENCE: this lives alongside the selected course,
+  // not inside a progress run or aggregate behaviour summary. It is bounded,
+  // learner-exportable/deletable, expires with the other adaptive records,
+  // and contains only submitted own-words assessment responses.
+  const responseEvidenceCollection = (uid, curriculum) => {
+    const courseKey = curriculum.curriculumVersion
+      ? `${curriculum.courseId}@${curriculum.curriculumVersion}`
+      : curriculum.courseId;
+    return learningProfile(uid).collection('courses').doc(courseKey).collection('responseEvidence');
+  };
+  const responseEvidenceEnabled = (profile = {}) => profile.consentVersion === 1
+    && profile.adaptiveEnabled === true
+    && profile.responseEvidenceEnabled === true;
+  const trimExpiredResponseEvidence = async (uid, curriculum) => {
+    const expired = await responseEvidenceCollection(uid, curriculum)
+      .where('expiresAt', '<=', nowDate()).limit(100).get().catch(() => null);
+    if (!expired?.docs?.length) return;
+    const batch = firebase.firestore.batch();
+    expired.docs.forEach((document) => batch.delete(document.ref));
+    await batch.commit();
+  };
+  const previousObjectiveEvidence = async (uid, curriculum, objectiveIds = []) => {
+    if (!Array.isArray(objectiveIds) || objectiveIds.length === 0) return '';
+    // One bounded chronological query, followed by an in-memory objective
+    // match, avoids a composite Firestore index and never scans an account.
+    const snapshot = await responseEvidenceCollection(uid, curriculum)
+      .orderBy('createdAt', 'desc').limit(24).get().catch(() => null);
+    const candidate = snapshot?.docs?.map((document) => document.data() || {}).find((item) => (
+      item?.expiresAt && !isExpired(item)
+      && Array.isArray(item.objectiveIds)
+      && item.objectiveIds.some((id) => objectiveIds.includes(String(id)))
+      && typeof item.text === 'string' && item.text.trim()
+    ));
+    return candidate ? String(candidate.text).slice(0, 900) : '';
+  };
+  const saveResponseEvidence = async ({ uid, curriculum, runId, item, answer, evaluation }) => {
+    const clean = sanitiseAssessmentResponseEvidence(answer);
+    if (!clean.text) return;
+    await trimExpiredResponseEvidence(uid, curriculum);
+    const id = randomUUID();
+    const timestamp = nowDate();
+    await responseEvidenceCollection(uid, curriculum).doc(id).set({
+      schemaVersion: RESPONSE_EVIDENCE_SCHEMA_VERSION,
+      id,
+      kind: 'assessment-open',
+      courseId: curriculum.courseId,
+      courseVersion: curriculum.curriculumVersion || null,
+      moduleIndex: curriculum.moduleIndex === 'final' ? 'final' : Number(curriculum.moduleIndex) || 0,
+      assessmentRunId: cleanIdentifier(runId),
+      itemId: String(item.id || '').slice(0, 160),
+      objectiveIds: Array.isArray(item.objectiveIds) ? item.objectiveIds.map((id) => String(id)).slice(0, 3) : [],
+      language: curriculum.language === 'ur' ? 'ur' : 'en',
+      text: clean.text,
+      responseLength: clean.responseLength,
+      contactRedacted: clean.redacted,
+      // This is a category-only result that accompanies the learner's own
+      // text; it is never rendered as a score or an AI rationale.
+      outcome: ['demonstrated', 'needs-review', 'uncertain'].includes(evaluation?.outcome) ? evaluation.outcome : 'uncertain',
+      createdAt: timestamp,
+      expiresAt: runExpiry(timestamp)
+    });
+  };
   // Behaviour-aware final checks use the same compact, consented aggregate
   // schema as a module. It cannot add raw learner language to an assessment
   // run, and it only influences format/order—not any objective result.
@@ -213,10 +296,18 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
         ), 0),
         rereads: metric('rereads', 100),
         returns: metric('returns', 100),
+        taskTransitions: metric('taskTransitions', 200),
+        taskRevisits: metric('taskRevisits', 100),
         readingSectionBacktracks: metric('readingSectionBacktracks', 100),
         scrollBacktracks: metric('scrollBacktracks', 500),
         typingBursts: metric('typingBursts', 12000),
-        typingFocusReturns: metric('typingFocusReturns', 200)
+        typingFocusReturns: metric('typingFocusReturns', 200),
+        supportOfferAcceptances: metric('supportOfferAcceptances', 100),
+        supportOfferDismissals: metric('supportOfferDismissals', 100),
+        visualActiveMs: metric('visualActiveMs', 4 * 60 * 60 * 1000),
+        inputMethodChanges: metric('inputMethodChanges', 100),
+        textPresentationChanges: metric('textPresentationChanges', 100),
+        assessmentResponseRevisions: metric('assessmentResponseRevisions', 400)
       },
       support: {
         textToSpeech: summaries.some((item) => item?.support?.textToSpeech === true),
@@ -468,11 +559,11 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
     return { run: visibleRun(run, bank) };
   };
 
-  const evaluateOpen = async ({ account, curriculum, item, answer }) => {
+  const evaluateOpen = async ({ account, curriculum, item, answer, previousResponse = '' }) => {
     const deterministic = fallbackEvaluation(item, curriculum, answer);
     if (!ledger || !provider.availableFor?.('chat')) return deterministic;
-    const instructions = evaluationInstructions(curriculum, item);
-    const input = evaluationInput(answer);
+    const instructions = evaluationInstructions(curriculum, item, { hasPreviousEvidence: Boolean(previousResponse) });
+    const input = evaluationInput(answer, previousResponse);
     const estimatedInputTokens = estimateTokens(instructions + input);
     let reservation;
     try {
@@ -491,6 +582,7 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
 
   const answer = async ({ authorization, runId, body }) => {
     const account = await learner(authorization);
+    const learnerProfile = (await learningProfile(account.uid).get()).data() || {};
     const id = cleanIdentifier(runId);
     if (!id) throw apiError(400, 'INVALID_ASSESSMENT_RUN', 'That understanding check is not available.');
     const ref = runCollection(account.uid).doc(id);
@@ -504,11 +596,15 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
     const item = bank.items.find((candidate) => candidate.id === run.itemOrder?.[run.currentIndex]);
     if (!item) throw apiError(409, 'ASSESSMENT_ITEM_NOT_AVAILABLE', 'This understanding check needs to be restarted safely.');
     const cleanAnswer = validateAssessmentAnswer({ item, answer: body?.answer });
+    const keepResponseEvidence = item.responseMode === 'open' && responseEvidenceEnabled(learnerProfile);
+    const priorResponse = keepResponseEvidence
+      ? await previousObjectiveEvidence(account.uid, curriculum, item.objectiveIds)
+      : '';
     const evaluation = item.responseMode === 'mcq'
       ? (cleanAnswer.optionIndex === item.correctOptionIndex
         ? { outcome: 'demonstrated', demonstratedObjectiveIds: item.objectiveIds, needsReviewObjectiveIds: [], feedback: 'Result under review. Your choice is recorded, and you can continue when you are ready.', signal: { responseDepth: 'selected', courseGrounding: 'demonstrated', sourceTermsMatched: 0, rubricTermsMatched: 0 } }
         : { outcome: 'needs-review', demonstratedObjectiveIds: [], needsReviewObjectiveIds: item.objectiveIds, feedback: 'Result under review. Your choice is recorded, and you can continue when you are ready.', signal: { responseDepth: 'selected', courseGrounding: 'needs-review', sourceTermsMatched: 0, rubricTermsMatched: 0 } })
-      : await evaluateOpen({ account, curriculum, item, answer: cleanAnswer.text });
+      : await evaluateOpen({ account, curriculum, item, answer: cleanAnswer.text, previousResponse: priorResponse });
     const outcomes = [...(Array.isArray(run.outcomes) ? run.outcomes : []), {
       itemId: item.id,
       outcome: evaluation.outcome,
@@ -552,8 +648,10 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
       monitoring: complete ? { schemaVersion: 1, nextAction: decision.nextAction, evidence: decision.evidence } : null,
       updatedAt: nowDate()
     };
-    // No raw typed/spoken answer, prompt response, option choice, score, or
-    // model chain-of-thought is persisted. Only a bounded outcome remains.
+    // The normal assessment run never gets raw response prose, a selected
+    // option, a score, or model reasoning. When the learner separately opted
+    // in, a bounded submitted own-words response is stored in the dedicated
+    // 90-day response-evidence collection for later objective comparison.
     await ref.set({
       currentIndex: updated.currentIndex, outcomes, status: updated.status,
       completionKind: updated.completionKind, missingObjectiveIds: updated.missingObjectiveIds,
@@ -563,6 +661,11 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
       monitoring: updated.monitoring,
       updatedAt: updated.updatedAt
     }, { merge: true });
+    if (keepResponseEvidence) {
+      // Retention failure must not block a learner from continuing their calm
+      // assessment. The current answer is still evaluated for this task.
+      await saveResponseEvidence({ uid: account.uid, curriculum, runId: id, item, answer: cleanAnswer.text, evaluation }).catch(() => {});
+    }
     const feedback = /^result under review\./i.test(String(evaluation.feedback || ''))
       ? evaluation.feedback
       : 'Result under review. ' + String(evaluation.feedback || 'You can continue to the next question when you are ready.');

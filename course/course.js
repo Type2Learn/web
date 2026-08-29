@@ -2,10 +2,10 @@ import { COURSE_CONTENT as DEFAULT_COURSE_CONTENT } from './course-content.js';
 import { COURSE_URDU as DEFAULT_COURSE_URDU } from './course-urdu.js';
 import { COURSE_AUDIO_MANIFEST, COURSE_AUDIO_MODULE_KEYS } from './course-audio-manifest.js';
 import { NarrationService } from './narration.js';
-import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkLegacyCourseAnswer, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, deleteCourseProgress, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, getRealtimeSpeechToken, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260829-privacy-hardening1';
+import { acknowledgeUnderstandingReview, answerUnderstandingCheck, askCourseAi, checkLegacyCourseAnswer, checkReviewedCourseAnswer, decideAdaptiveProposal, deleteAdaptiveLearningData, deleteCourseProgress, exportAdaptiveLearningData, getAdaptiveLearningConsent, getCourseAiStatus, getRealtimeSpeechToken, loadCourseProgress, loadPublishedCourseCatalogue, loadReviewedCourseManifest, loadReviewedCourseNarration, loadUnderstandingCheck, requestAdaptiveProposal, requestAdaptiveRecall, requestBehaviourDirective, saveCourseProgress, saveLearningSummary, setAdaptiveLearningConsent, startUnderstandingCheck, synthesiseCourseAiReply, transcribeCourseAudio } from './ai-client.js?v=20260830-response-evidence1';
 import { adaptReviewedManifestForRichCourse, isReviewedLearnerManifest } from './reviewed-manifest.js?v=20260813-rich-manifest1';
-import { LearningTelemetry } from './learning-telemetry.js?v=20260829-behaviour-depth1';
-import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260829-behaviour-depth1';
+import { LearningTelemetry } from './learning-telemetry.js?v=20260830-response-evidence1';
+import { BehaviourContext, normalisePartnerControls } from './behaviour-context.js?v=20260830-response-evidence1';
 import { companionBubbleMarkup, companionDockMarkup, localCompanionDirective } from './learning-partner.js?v=20260825-mascot-companion2';
 import { adaptiveProposalMarkup, taskInitiationMarkup } from './adaptive-support.js?v=20260809-adaptive-learning1';
 import { visualExplanationMarkup } from './visual-explanations.js?v=20260829-anchored-visual1';
@@ -54,21 +54,25 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     status: 'local',
     error: ''
   };
-  // ADAPTIVE LEARNING: this state is entirely opt-in for signed-in learners.
-  // It holds only UI/aggregate state; raw typing, recordings and chat never
-  // enter it or leave the browser through the telemetry path.
+  // ADAPTIVE LEARNING: compact behaviour summaries are entirely opt-in for
+  // signed-in learners. Written assessment evidence has a second, explicit
+  // consent below; raw typing, recordings, and chat never enter telemetry.
   const adaptiveLearning = {
     available: false,
     assessmentsAvailable: false,
     retentionDays: 90,
     consentKnown: false,
     consented: false,
+    responseEvidenceEnabled: false,
     updatingConsent: false,
     telemetry: null,
     proposal: null,
     taskInitiation: false,
     taskInitiationTimer: null,
     visualOpen: false,
+    // The timestamp is session-only and becomes one bounded duration bucket.
+    // It is never a replay of how the learner looked at a visual.
+    visualOpenedAt: 0,
     lastTypingAt: 0
   };
   // BEHAVIOURAL LEARNING PARTNER: local session state is available without
@@ -93,9 +97,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     // changes what the companion says and how it is presented.
     rolePreview: ''
   };
-  // ADAPTIVE LEARNING: assessment answers are held only while the learner is
-  // actively answering. The regular course save gets an opaque run id, never
+  // ADAPTIVE LEARNING: the regular course save gets an opaque run id, never
   // the answer, its evaluation, an answer key, or a learner-visible score.
+  // A separately-consented server-side assessment record may retain a bounded
+  // own-words response for up to 90 days; this browser state remains ephemeral.
   const understandingCheck = {
     run: null,
     loading: false,
@@ -465,6 +470,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     'mascot-presence': 'available',
     'mascot-proactive': 'on',
     'adaptive-learning': 'off',
+    'response-evidence': 'off',
     'urdu-mode': 'off'
   });
 
@@ -1323,6 +1329,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   };
   const recordSupportMoment = (kind, detail = {}) => {
     const moment = setSupportMoment(kind, detail);
+    // A task transition is useful aggregate context for pacing, but it must
+    // not contain a task's words or a learner response. Do not turn ordinary
+    // rerenders into transitions: only explicit task-entry moments reach here.
+    if (kind === 'task-entry') recordPassiveBehaviourAction('task-transition');
     // A completed course action is the only moment Self-Challenge Coach may
     // offer an optional next mission. This stays local unless the learner has
     // separately enabled adaptive summaries, and it never changes the task.
@@ -1425,10 +1435,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       );
     } else {
       const dataStatus = signedInLearner() && adaptiveLearning.available
-        ? '<p>With adaptive learning enabled, a compact module summary is marked to expire after ' + escapeHtml(String(adaptiveLearning.retentionDays || 90)) + ' days. It excludes typed words, recordings, chats, answer text, scores, IP addresses, and personal profiles. You can delete it now from this panel.</p><div class="course-partner-data-actions"><button class="course-text-button" type="button" data-action="export-behaviour-data">Download my adaptive data</button><button class="course-text-button" type="button" data-action="delete-behaviour-data">Delete adaptive data</button></div>'
+        ? '<p>Compact module summaries are marked to expire after ' + escapeHtml(String(adaptiveLearning.retentionDays || 90)) + ' days. They exclude typed words, recordings, chats, IP addresses, and personal profiles. ' + (adaptiveLearning.responseEvidenceEnabled ? 'Your written own-words assessment responses are stored separately for the same period so later checks can compare evidence; you can export or delete both records here.' : 'Written assessment responses stay only in the current check unless you separately turn on learning response evidence below.') + '</p><div class="course-partner-data-actions"><button class="course-text-button" type="button" data-action="export-behaviour-data">Download my adaptive data</button><button class="course-text-button" type="button" data-action="delete-behaviour-data">Delete adaptive data</button></div>'
         : '<p>Adaptive support is kept in this browser session unless you explicitly turn on compact course summaries. Guest learners never send course AI or adaptive data.</p>';
       content = panel('Data & privacy', 'See what learning support notices, change consent, or prepare this course for offline learning.',
         settingsSwitch('adaptive-learning', 'Adaptive learning support', 'Use compact course summaries to offer one optional setting suggestion. Raw typing, recordings, and chats are never saved.', choices['adaptive-learning'] === 'on', !signedInLearner())
+        + settingsSwitch('response-evidence', 'Learning response evidence', 'Save written own-words assessment responses for up to ' + String(adaptiveLearning.retentionDays || 90) + ' days so later checks can compare what you have demonstrated. Guided typing targets, recordings, chats, and individual keys are never saved.', choices['response-evidence'] === 'on', !signedInLearner() || choices['adaptive-learning'] !== 'on')
         + '<details class="course-adaptive-settings-explainer"><summary>What Type2Learn notices</summary><p>Task and support categories only: active or idle time, returns and rereads, optional read-aloud or visual use, aggregate typing pace and corrections, and accepted or dismissed partner offers. It never stores your individual keys or words.</p></details>'
         + dataStatus
         + offlineLearningMarkup()
@@ -2440,6 +2451,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     adaptiveLearning.proposal = null;
     adaptiveLearning.taskInitiation = false;
     adaptiveLearning.visualOpen = false;
+    adaptiveLearning.visualOpenedAt = 0;
     adaptiveLearning.assessmentsAvailable = false;
   };
 
@@ -2531,6 +2543,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       adaptiveLearning.available = false;
       adaptiveLearning.consentKnown = true;
       adaptiveLearning.consented = false;
+      adaptiveLearning.responseEvidenceEnabled = false;
       return;
     }
     try {
@@ -2543,21 +2556,24 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       adaptiveLearning.retentionDays = Math.max(1, Math.min(365, Number(health?.adaptiveLearning?.retentionDays) || 90));
       if (!enabled) {
         adaptiveLearning.consented = false;
+        adaptiveLearning.responseEvidenceEnabled = false;
         adaptiveLearning.consentKnown = true;
         stopAdaptiveLearningTelemetry();
         return;
       }
       const consent = await getAdaptiveLearningConsent({ user: authenticatedUser, signal: requestTimeoutSignal(10000) });
       adaptiveLearning.consented = consent?.enabled === true;
+      adaptiveLearning.responseEvidenceEnabled = consent?.responseEvidenceEnabled === true;
       adaptiveLearning.consentKnown = true;
       // The first-run preferences page asks this question plainly. Honour an
       // explicit answer once the protected consent endpoint is reachable, but
       // never infer an answer from an older preference record that lacks it.
       const savedChoices = readLearningChoices();
-      if (Object.prototype.hasOwnProperty.call(savedChoices, 'adaptive-learning')) {
+      if (Object.prototype.hasOwnProperty.call(savedChoices, 'adaptive-learning') || Object.prototype.hasOwnProperty.call(savedChoices, 'response-evidence')) {
         const requested = savedChoices['adaptive-learning'] === 'on';
-        if (requested !== adaptiveLearning.consented) {
-          void updateAdaptiveLearningConsent(requested);
+        const requestedEvidence = requested && savedChoices['response-evidence'] === 'on';
+        if (requested !== adaptiveLearning.consented || requestedEvidence !== adaptiveLearning.responseEvidenceEnabled) {
+          void updateAdaptiveLearningConsent(requested, requestedEvidence);
           return;
         }
       }
@@ -2565,6 +2581,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     } catch (_) {
       adaptiveLearning.available = false;
       adaptiveLearning.consented = false;
+      adaptiveLearning.responseEvidenceEnabled = false;
       adaptiveLearning.consentKnown = true;
       stopAdaptiveLearningTelemetry();
     } finally {
@@ -2572,23 +2589,32 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
   };
 
-  const updateAdaptiveLearningConsent = async (enabled) => {
+  const updateAdaptiveLearningConsent = async (enabled, responseEvidenceEnabled = adaptiveLearning.responseEvidenceEnabled) => {
     if (!signedInLearner() || !adaptiveLearning.available || adaptiveLearning.updatingConsent) return;
     adaptiveLearning.updatingConsent = true;
     render();
     try {
-      const result = await setAdaptiveLearningConsent({ user: authenticatedUser, enabled, signal: requestTimeoutSignal(10000) });
+      const result = await setAdaptiveLearningConsent({
+        user: authenticatedUser,
+        enabled,
+        responseEvidenceEnabled: Boolean(enabled && responseEvidenceEnabled),
+        signal: requestTimeoutSignal(10000)
+      });
       adaptiveLearning.consented = result?.enabled === true;
+      adaptiveLearning.responseEvidenceEnabled = result?.responseEvidenceEnabled === true;
       adaptiveLearning.consentKnown = true;
       const choices = learningChoices();
       if (choices['adaptive-learning'] !== (adaptiveLearning.consented ? 'on' : 'off')) {
         choices['adaptive-learning'] = adaptiveLearning.consented ? 'on' : 'off';
-        saveLearningChoices(choices);
       }
+      choices['response-evidence'] = adaptiveLearning.responseEvidenceEnabled ? 'on' : 'off';
+      saveLearningChoices(choices);
       if (!adaptiveLearning.consented) stopAdaptiveLearningTelemetry();
       else syncAdaptiveLearningTelemetry();
       announce(adaptiveLearning.consented
-        ? 'Adaptive learning support is on. You can change this anytime from your profile menu.'
+        ? (adaptiveLearning.responseEvidenceEnabled
+          ? 'Adaptive learning support and learning response evidence are on. You can change them anytime from your profile menu.'
+          : 'Adaptive learning support is on. Written assessment responses stay in the current check unless you separately turn on learning response evidence.')
         : 'Adaptive learning support is off. New learning summaries will not be saved.');
     } catch (error) {
       announce(error?.message || 'Adaptive learning support could not be changed right now.');
@@ -3207,6 +3233,13 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const recordUnifiedBehaviourAction = (kind, detail = {}) => {
     adaptiveLearning.telemetry?.action(kind, detail);
     recordBehaviourAction(kind, detail);
+    // A deliberate return is more useful as an aggregate revisit than as a
+    // generic click. Keep the two records category-only and never attach the
+    // previous task's content or learner input.
+    if (kind === 'return') {
+      adaptiveLearning.telemetry?.action('task-revisit');
+      behaviourPartner.context.action('task-revisit');
+    }
   };
 
   // Passive interaction signals use the same privacy boundary as explicit
@@ -3216,6 +3249,31 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   const recordPassiveBehaviourAction = (kind, detail = {}) => {
     adaptiveLearning.telemetry?.action(kind, detail);
     behaviourPartner.context.action(kind, detail);
+  };
+
+  // Visual explanations are reviewed course content. This helper gives the
+  // behavioural summary a single bounded "visual active" duration when the
+  // learner opens and closes one, rather than keeping a scroll path or any
+  // record of where they looked. It also keeps every open/close surface in
+  // sync with the same event vocabulary.
+  const setVisualExplanationOpen = (open) => {
+    const next = Boolean(open);
+    if (next === adaptiveLearning.visualOpen) return;
+    const timestamp = Date.now();
+    if (next) {
+      adaptiveLearning.visualOpen = true;
+      adaptiveLearning.visualOpenedAt = timestamp;
+      recordUnifiedBehaviourAction('visual-offered');
+      recordUnifiedBehaviourAction('visual-open');
+      return;
+    }
+    const durationMs = adaptiveLearning.visualOpenedAt
+      ? Math.max(0, Math.min(30 * 60 * 1000, timestamp - adaptiveLearning.visualOpenedAt))
+      : 0;
+    adaptiveLearning.visualOpen = false;
+    adaptiveLearning.visualOpenedAt = 0;
+    recordUnifiedBehaviourAction('visual-close');
+    if (durationMs) recordPassiveBehaviourAction('visual-duration', { durationMs });
   };
 
   const companionMessage = (message) => {
@@ -8132,12 +8190,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       behaviourPartner.focusedOpen = false;
       lastMascotScene = '';
     }
-    if (key === 'adaptive-learning') void updateAdaptiveLearningConsent(value === 'on');
+    if (key === 'adaptive-learning') void updateAdaptiveLearningConsent(value === 'on', value === 'on' && choices['response-evidence'] === 'on');
+    if (key === 'response-evidence') void updateAdaptiveLearningConsent(choices['adaptive-learning'] === 'on', value === 'on');
     if (key === 'background-noise' || key === 'background-noise-type') {
       if (backgroundNoise.enabled) playBackgroundNoise({ announceChange: false });
       else pauseBackgroundNoise();
     }
     recordUnifiedBehaviourAction('settings-change');
+    if (['reading-text-size', 'reading-spacing', 'reading-width', 'reading-contrast', 'reading-surface'].includes(key)) {
+      recordUnifiedBehaviourAction('text-presentation-change');
+    }
     if (shouldPreviewSupportMode) recordSupportMoment('preference-preview', { result: key });
     save();
     render();
@@ -8220,10 +8282,9 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       case 'companion-use': {
         const partnerAction = String(element.dataset.companionAction || '');
         behaviourPartner.context.accept(partnerAction);
+        recordUnifiedBehaviourAction('support-accept');
         if (partnerAction === 'open-visual') {
-          adaptiveLearning.visualOpen = true;
-          recordUnifiedBehaviourAction('visual-offered');
-          recordUnifiedBehaviourAction('visual-open');
+          setVisualExplanationOpen(true);
           recordUnifiedBehaviourAction('return');
         } else if (partnerAction === 'smaller-step') {
           state.showSimple = true;
@@ -8280,20 +8341,16 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         break;
       case 'dismiss-task-initiation':
         adaptiveLearning.taskInitiation = false;
+        recordUnifiedBehaviourAction('support-dismiss');
         recordUnifiedBehaviourAction('task-initiation-used');
         render();
         break;
       case 'toggle-visual-explanation':
-        adaptiveLearning.visualOpen = !adaptiveLearning.visualOpen;
-        if (adaptiveLearning.visualOpen) {
-          recordUnifiedBehaviourAction('visual-offered');
-          recordUnifiedBehaviourAction('visual-open');
-        }
+        setVisualExplanationOpen(!adaptiveLearning.visualOpen);
         render();
         break;
       case 'close-visual-explanation':
-        adaptiveLearning.visualOpen = false;
-        recordUnifiedBehaviourAction('visual-close');
+        setVisualExplanationOpen(false);
         render();
         break;
       case 'close-modal': state.modal === 'ai-chat' ? closeCourseAi() : closeCourseModal(); break;
@@ -8614,6 +8671,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     }
     if (event.target.matches('[data-active-input-method]')) {
       setCourseActiveInputMethod(event.target.value);
+      recordUnifiedBehaviourAction('input-method-change');
       save('Active input method saved.');
       render();
       return;
@@ -8757,6 +8815,7 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         pauseMs
       };
       recordUnifiedBehaviourAction('typing', aggregate);
+      if (nextResponse !== understandingCheck.response) recordUnifiedBehaviourAction('assessment-response-revision');
       understandingCheck.response = nextResponse;
       understandingCheck.error = '';
       return;

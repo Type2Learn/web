@@ -61,7 +61,7 @@ site architecture, start with the [main README](README.md).
 | One-change support proposals | **Implemented, off by default.** Deterministic policy selects the allowed change; Mini may only shorten the wording. The learner must choose whether to use it. | `server/adaptive-policy.mjs`, `server/adaptive-support-service.mjs` |
 | Task initiation / visual explanation | **Implemented as authored supports.** A small first step and an accessible, authored visual rail never depend on a model. | `course/adaptive-support.js`, `course/visual-explanations.js` |
 | Readability support | **Implemented manual controls.** Text size, spacing, reading width, smaller sections, optional TTS and synced highlighting remain learner-controlled. A dedicated dyslexia-font/colour-overlay control is not yet shipped. | `course/learner-settings.js`, `course/course.js`, `course/course.css` |
-| Module/final understanding checks | **Implemented behind `AI_ASSESSMENTS_ENABLED` and adaptive consent.** One public question is shown at a time; the deterministic monitor records objective evidence categories, then returns one specific review route when needed. No answer key, numeric score, raw answer, option choice, or model rationale is stored in learner progress. | `server/assessment-service.mjs`, `server/assessment-evaluator.mjs`, `server/assessment-monitor.mjs`, `course/course.js` |
+| Module/final understanding checks | **Implemented behind `AI_ASSESSMENTS_ENABLED` and adaptive consent.** One public question is shown at a time; the deterministic monitor records objective evidence categories, then returns one specific review route when needed. No answer key, numeric score, option choice, or model rationale is stored in learner progress. A learner can separately opt in to a 90-day, exportable own-word response-evidence store for comparisons across attempts at the same objective. | `server/assessment-service.mjs`, `server/assessment-evaluator.mjs`, `server/assessment-monitor.mjs`, `course/course.js` |
 | No-provider assessment fallback | **Implemented.** The reviewed/generated bank can be unavailable and the authored reserve still supplies 4 open + 5 MCQ module checks or 9 open + 12 MCQ final checks. | `server/fallback-assessment-bank.mjs` |
 | Targeted review and another check | **Implemented as an optional recovery path.** Learners can review a related module or try another calm check; there is no forced, unlimited retesting. | `server/assessment-service.mjs`, `course/course.js` |
 | Export/delete | **Implemented for adaptive summaries, proposals and opaque assessment outcomes.** | `server/learning-analytics-service.mjs` |
@@ -109,7 +109,7 @@ storage, or a network connection is unavailable.
 | No diagnosis | Never infer ADHD, dyslexia, autism, effort, attention, ability, or another personal trait from interaction data. Say “this page took longer than usual”, never “you cannot focus.” |
 | Choice first | AI may only propose allow-listed changes. It cannot make a lasting preference change until the learner explicitly accepts it. |
 | No speed pressure | Time and typing speed are contextual signals only. They cannot lower a score, gate access alone, create a countdown, or trigger a negative label. |
-| No raw surveillance | Do not persist keystroke logs, microphone recordings, complete chat histories, or raw answers as behavioural analytics. |
+| No raw surveillance | Do not persist keystroke logs, microphone recordings, complete chat histories, or raw answers as behavioural analytics. Submitted assessment prose is a separate, explicit, 90-day response-evidence choice—not behavioural telemetry—and can be exported or deleted immediately. |
 | One support at a time | Do not stack popups or automatically switch on several stimulating features. Respect existing animation, colour, layout, and encouragement choices. |
 | Learner control | Each suggestion names the exact setting it would change, includes Yes/No, can be disabled in Settings, and remains manually editable. |
 | Assessment integrity | Course AI cannot reveal answers, select an option, write a response for the learner, or expose answer keys or scoring criteria. A deterministic evaluator constrains any model judgment, and the monitor uses objective evidence—not behavioural data—to choose readiness or review. |
@@ -200,13 +200,14 @@ used. It is not a hidden judgement of a person.
 | Family | Minimal fields | Use | Never capture |
 | --- | --- | --- | --- |
 | Session/visibility | ephemeral session ID, module/task, start/end, active and idle milliseconds, hidden/visible transitions | Accurate active time and re-entry support | device fingerprint, IP, background heartbeats |
-| Navigation/initiation | task shown, first meaningful action, return/restart, pause/resume, skip/return | Offer one manageable first action | a claim that the learner procrastinated |
-| Reading | active dwell bucket, reread count, TTS start/stop/completion, readability tools used | Offer audio, spacing, chunking or visual | eye tracking, scroll replay, a conclusion that long reading means poor understanding |
-| Typing | active duration, character count, correct/incorrect aggregates, backspace aggregate, longest-pause bucket, submitted/abandoned | Pacing and assessment coverage | key-by-key log, clipboard contents, every key timestamp |
+| Navigation/initiation | task shown, first meaningful action, task-transition/revisit count, return/restart, pause/resume, skip/return | Offer one manageable first action | a claim that the learner procrastinated |
+| Reading | active dwell bucket, reread count, visual-active duration, TTS start/stop/completion, readability tools used | Offer audio, spacing, chunking or visual | eye tracking, scroll replay, a conclusion that long reading means poor understanding |
+| Typing | active duration, character count, correct/incorrect aggregates, backspace aggregate, longest-pause bucket, response-revision count, submitted/abandoned | Pacing and assessment coverage | key-by-key log, clipboard contents, every key timestamp |
 | Speech | feature used, browser/Speechmatics path, audio duration bucket, transcription result, final accepted character count | Learn whether speech support helped | raw audio, voiceprint, raw transcript in analytics |
-| Support/settings | selected presentation/accessibility settings, proposal shown/accepted/declined/dismissed | Respect choices and prevent repeated unwanted suggestions | a secret inferred condition/profile |
+| Support/settings | selected presentation/accessibility settings, input-method/text-presentation change counts, proposal shown/accepted/declined/dismissed | Respect choices and prevent repeated unwanted suggestions | a secret inferred condition/profile |
 | Course AI | opened/closed, request count, active-duration bucket, response success/failure, audio reply used, page ID | Offer a calm return-to-task cue | persistent chat transcript/message text in analytics |
-| Assessment | bank/item/objective IDs, response mode, completion, bounded outcome category, objective-evidence coverage, retry state | Targeted review without visible scores | permanent raw answer text, option choice, rankings, time score, model rationale |
+| Assessment telemetry | bank/item/objective IDs, response mode, completion, bounded outcome category, objective-evidence coverage, retry state, aggregate response-revision count | Targeted review without visible scores | answer text, option choice, rankings, time score, model rationale |
+| Optional response evidence | submitted own-word **open assessment** response, objective IDs, response length, created/expiry time, category-only outcome | Compare a later response with the learner's prior evidence for that same objective | guided typing targets, MCQ selection, chat text, transcripts, keystrokes, audio, hidden score/rationale, or any response without separate learner opt-in |
 
 ### 4.1 Active time
 
@@ -302,9 +303,13 @@ Also provide:
 - “Delete adaptive learning data” with confirmation;
 - retention information.
 
-Initial proposed retention: discard event buffers on upload, keep aggregate
-summaries for 12 months of inactivity, and delete immediately on user request.
-The final period must be approved by legal/privacy review.
+Current implementation: discard event buffers on upload, keep consented
+aggregate summaries for the configured adaptive retention period, and delete
+them immediately on learner request. Separately opted-in response evidence is
+limited to submitted open assessment responses, strips obvious contact details,
+expires after 90 days, and is deleted immediately if the learner turns that
+choice off or deletes adaptive data. Physical scheduled deletion requires the
+Firestore TTL policy on `expiresAt`.
 
 Guest learners receive local deterministic support only in the first release.
 They do not create a cloud profile, invoke authenticated model APIs, or get
@@ -572,7 +577,10 @@ for each learner run. It also ships a 21-question final reserve (9 open
 responses and 12 MCQs): 373 authored assessment prompts in total. If a reviewed AI bank is unavailable, the learner is
 served from this reserve without any wait. If open-response evaluation cannot
 reach the model, the learner sees **“Result under review”** and can continue;
-no answer text is retained in the progress save.
+no answer text is retained in the progress save. Separately, an authenticated
+learner who enables **Learning response evidence** may retain their submitted
+open assessment response for 90 days, solely for a later same-objective
+comparison. This is never enabled by default and is not behavioural telemetry.
 
 ### 9.1 Test mode differs from learning typing
 
@@ -906,9 +914,12 @@ workflow, one-question run API and transient open-response evaluator are
 implemented behind `AI_ASSESSMENTS_ENABLED=false`. A generated bank remains
 `pending-human-review` until an explicitly configured reviewer publishes it.
 The learner endpoint never returns an answer guide, rubric, correct option,
-numeric score or stored raw response. The separate learner-facing assessment
-renderer should be enabled only after a reviewer publishes a bank and the
-passing/retry policy below is approved.
+numeric score or stored raw response in the assessment run. The only exception
+is the separately consented, 90-day response-evidence store described above;
+it receives submitted own-word open responses only, never MCQ choices or
+guided typing targets. The separate learner-facing assessment renderer should
+be enabled only after a reviewer publishes a bank and the passing/retry policy
+below is approved.
 
 ### Phase F — controlled rollout
 

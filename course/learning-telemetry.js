@@ -40,7 +40,14 @@ export class LearningTelemetry {
       ttsStarts: 0, ttsCompleted: 0, ttsPauses: 0,
       speechStarts: 0, speechCompleted: 0,
       aiRequests: 0, aiActiveMs: 0, aiDismissals: 0,
-      visualCloses: 0, settingsChanges: 0
+      visualCloses: 0, settingsChanges: 0,
+      // These are bounded task-shape counts, not cursor trails or content.
+      // They help the optional assessment planner distinguish a revisited
+      // section from a first pass without constructing a behavioural profile.
+      taskTransitions: 0, taskRevisits: 0,
+      supportOfferDismissals: 0, supportOfferAcceptances: 0,
+      visualActiveMs: 0, inputMethodChanges: 0,
+      textPresentationChanges: 0, assessmentResponseRevisions: 0
     };
   }
 
@@ -146,6 +153,14 @@ export class LearningTelemetry {
     if (kind === 'task-initiation-used') this.support.taskInitiationUsed = true;
     if (kind === 'visual-close') this.metrics.visualCloses += 1;
     if (kind === 'settings-change') this.metrics.settingsChanges += 1;
+    if (kind === 'task-transition') this.metrics.taskTransitions += 1;
+    if (kind === 'task-revisit') this.metrics.taskRevisits += 1;
+    if (kind === 'support-dismiss') this.metrics.supportOfferDismissals += 1;
+    if (kind === 'support-accept') this.metrics.supportOfferAcceptances += 1;
+    if (kind === 'visual-duration') this.metrics.visualActiveMs += bounded(detail.durationMs, 30 * 60 * 1000);
+    if (kind === 'input-method-change') this.metrics.inputMethodChanges += 1;
+    if (kind === 'text-presentation-change') this.metrics.textPresentationChanges += 1;
+    if (kind === 'assessment-response-revision') this.metrics.assessmentResponseRevisions += 1;
     if (kind === 'typing') {
       this.metrics.typingCharacters += bounded(detail.characters, 12000);
       this.metrics.typingCorrectCharacters += bounded(detail.correctCharacters, 12000);

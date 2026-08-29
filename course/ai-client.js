@@ -171,10 +171,15 @@ export const checkReviewedCourseAnswer = async ({ user, courseId, version, scope
   signal
 });
 
-export const setAdaptiveLearningConsent = async ({ user, enabled, signal }) => authenticatedRequest(user, '/api/v1/adaptive/consent', {
+export const setAdaptiveLearningConsent = async ({ user, enabled, responseEvidenceEnabled, signal }) => authenticatedRequest(user, '/api/v1/adaptive/consent', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ enabled: Boolean(enabled) }),
+  body: JSON.stringify({
+    enabled: Boolean(enabled),
+    // This is intentionally an explicit, separately named consent. Absence
+    // remains false on the server for existing learners and old clients.
+    ...(typeof responseEvidenceEnabled === 'boolean' ? { responseEvidenceEnabled } : {})
+  }),
   signal
 });
 
