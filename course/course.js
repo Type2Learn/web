@@ -749,6 +749,10 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     showSimple: false,
     readingSectionIndex: 0,
     reviewModuleIndex: null,
+    // This is deliberately session-only. It lets a learner reopen the reading
+    // they just left, then return to the same typing response without turning
+    // an ordinary reread into a new saved learning state.
+    returnToTypingAfterReading: false,
     settingsMenu: false,
     settingsTab: 'general',
     storageAvailable: true
@@ -5060,7 +5064,8 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const recallAction = typing.level === 'Recall typing' && adaptiveRecall.result && !adaptiveRecall.revisionReviewed
       ? courseUi('Review my updated explanation', 'میری بہتر وضاحت کا جائزہ لیں')
       : nextAction;
-    return '<article class="course-task-card course-typing-task"><div class="course-typing-body"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(label) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(title) + '</h2><p>' + escapeHtml(prompt) + '</p></div>' + taskHeaderControls() + '</div><div class="typing-practice"><p class="typing-note">' + escapeHtml(note) + '</p>' + typingMomentumMarkup() + adaptive + typingTarget() + '<label class="course-input-label" for="course-typing-input">' + responseLabel + '</label><textarea id="course-typing-input" data-typing-input rows="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="' + escapeHtml(typing.placeholder || 'Type the visible section here…') + '" aria-describedby="typing-help">' + escapeHtml(attempt.response) + '</textarea><p id="typing-help" class="course-input-help">' + inputHelp + '</p>' + integrity + feedback + '</div></div><div class="course-task-actions"><button class="course-primary-button" type="button" data-action="check-typing"' + (adaptiveRecall.loading ? ' disabled' : '') + '>' + recallAction + ' <span aria-hidden="true">→</span></button></div></article>';
+    const returnToReading = '<button class="course-secondary-button course-return-to-reading" type="button" data-action="return-to-reading" aria-label="' + escapeHtml(courseUi('Go back to the reading you just completed', 'ابھی مکمل کی گئی پڑھائی پر واپس جائیں')) + '"><span aria-hidden="true">' + (courseUsesUrdu() ? '→' : '←') + '</span> ' + escapeHtml(courseUi('Go back', 'واپس جائیں')) + '</button>';
+    return '<article class="course-task-card course-typing-task"><div class="course-typing-body"><div class="course-task-top"><div><p class="course-task-label">' + escapeHtml(label) + '</p><h2 id="course-task-heading" tabindex="-1">' + escapeHtml(title) + '</h2><p>' + escapeHtml(prompt) + '</p></div>' + taskHeaderControls() + '</div><div class="typing-practice"><p class="typing-note">' + escapeHtml(note) + '</p>' + typingMomentumMarkup() + adaptive + typingTarget() + '<label class="course-input-label" for="course-typing-input">' + responseLabel + '</label><textarea id="course-typing-input" data-typing-input rows="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="' + escapeHtml(typing.placeholder || 'Type the visible section here…') + '" aria-describedby="typing-help">' + escapeHtml(attempt.response) + '</textarea><p id="typing-help" class="course-input-help">' + inputHelp + '</p>' + integrity + feedback + '</div></div><div class="course-task-actions">' + returnToReading + '<button class="course-primary-button" type="button" data-action="check-typing"' + (adaptiveRecall.loading ? ' disabled' : '') + '>' + recallAction + ' <span aria-hidden="true">→</span></button></div></article>';
   };
 
   const checkTask = () => {
@@ -7650,7 +7655,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     skip.innerHTML = courseUi('Skip this module <span aria-hidden="true">→</span>', '<span aria-hidden="true">←</span> یہ ماڈیول چھوڑ دیں');
     navigation.append(skip);
     const primaryAction = actions.querySelector('.course-primary-button');
-    actions.insertBefore(navigation, primaryAction || null);
+    // Keep the immediate task-back action adjacent to the task's primary
+    // action. Guest module navigation is broader course navigation, so it
+    // belongs before that pair rather than splitting "Go back" from "Check".
+    const immediateBackAction = actions.querySelector('[data-action="return-to-reading"]');
+    actions.insertBefore(navigation, immediateBackAction || primaryAction || null);
   };
 
   const finishCheck = () => {
@@ -8238,16 +8247,37 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         save('The next small reading section is ready.');
         retainReadingSectionPosition('[data-action="next-reading-section"], [data-action="read-complete"]');
         break;
+      case 'return-to-reading':
+        if (state.progress.phase !== 'type') break;
+        // The preceding activity for every typing task is the reading task.
+        // Keep this response in memory so "Continue" returns to exactly the
+        // same typing section instead of discarding work just to reread.
+        state.returnToTypingAfterReading = true;
+        state.progress.phase = 'read';
+        state.showSimple = false;
+        state.readingSectionIndex = Math.max(0, readingSections().length - 1);
+        recordUnifiedBehaviourAction('reread');
+        save(courseUi(
+          'The reading you just completed is ready. Your typed response will be here when you continue.',
+          'ابھی مکمل کی گئی پڑھائی تیار ہے۔ جب آپ جاری رکھیں گے تو آپ کا ٹائپ کیا گیا جواب یہیں ہوگا۔'
+        ));
+        render();
+        showCurrentTaskFromStart('[data-action="read-complete"]');
+        break;
       case 'read-complete':
+        {
+          const returningToTyping = state.returnToTypingAfterReading;
+          state.returnToTypingAfterReading = false;
         state.progress.phase = 'type';
-        state.progress.attempt = blankAttempt();
+        if (!returningToTyping) state.progress.attempt = blankAttempt();
         state.showSimple = false;
         state.readingSectionIndex = 0;
-        recordSupportMoment('task-entry', { result: 'typing' });
+        if (!returningToTyping) recordSupportMoment('task-entry', { result: 'typing' });
         recordUnifiedBehaviourAction('return');
         save();
         render();
         showCurrentTaskFromStart('#course-typing-input');
+        }
         break;
       case 'preview-complete':
         // The first-step prompt belongs only to this preview. Once the learner

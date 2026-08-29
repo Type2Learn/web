@@ -102,3 +102,11 @@ test('B-07: deterministic support varies with an entered response and a revision
   assert.match(courseJs, /You changed your response\. Now connect it to the current idea\./);
   assert.match(courseJs, /const fallback = adaptiveFallback\(barrier, safeResponse, previousResponse\);/);
 });
+
+test('typing tasks offer an immediate return to reading without throwing away the active response', () => {
+  assert.match(courseJs, /data-action="return-to-reading"/);
+  assert.match(courseJs, /case 'return-to-reading':[\s\S]*state\.returnToTypingAfterReading = true;[\s\S]*state\.progress\.phase = 'read';/);
+  assert.match(courseJs, /const returningToTyping = state\.returnToTypingAfterReading;[\s\S]*if \(!returningToTyping\) state\.progress\.attempt = blankAttempt\(\);/);
+  assert.match(courseJs, /showCurrentTaskFromStart\('\[data-action="read-complete"\]'\)/);
+  assert.match(courseJs, /const immediateBackAction = actions\.querySelector\('\[data-action="return-to-reading"\]'\);[\s\S]*actions\.insertBefore\(navigation, immediateBackAction \|\| primaryAction \|\| null\);/);
+});
