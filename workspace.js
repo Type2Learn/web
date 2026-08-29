@@ -401,8 +401,8 @@ const bindSubmission = () => {
       // Reuse the single secure review handler instead of exposing extracted
       // source text through a second browser-only path.
       $('[data-open-source-review]')?.click();
-      status(submission.source?.extraction === 'safe-pdf-text-extracted'
-        ? 'PDF text was extracted privately. Review it, then create a review-only draft or build the course.'
+      status(['safe-pdf-text-extracted', 'safe-presentation-text-extracted'].includes(submission.source?.extraction)
+        ? 'Source text was extracted privately. Review it, then convert it to canonical Markdown or build the course manually.'
         : 'Private source added. Review it before creating any learner-facing material.', 'success');
     } catch (error) { status(error.message, 'error'); }
   });
@@ -520,6 +520,29 @@ const bindAuthoring = () => {
       $('[data-source-review-output]').textContent = result.requiresAdminTranscription
         ? 'This private source needs administrator transcription before it can become reviewed Markdown. Download the original source only if you need it for review.'
         : result.extractedText || 'No safe text was extracted.';
+      const conversionOutput = $('[data-source-conversion-output]');
+      const conversion = result.conversion || null;
+      if (conversionOutput && conversion) {
+        const summary = {
+          readyForHumanReview: Boolean(conversion.readyForHumanReview),
+          provider: conversion.provider || 'deterministic',
+          validation: conversion.validation,
+          checks: conversion.checks,
+          critic: conversion.critic,
+          updatedAt: conversion.updatedAt
+        };
+        conversionOutput.textContent = `Saved conversion draft — still requires human review:\n${JSON.stringify(summary, null, 2)}`;
+        if (conversion.markdown && template) {
+          template.value = conversion.markdown;
+          syncAuthoringMetadata(conversion.markdown);
+        }
+      } else if (conversionOutput) {
+        conversionOutput.textContent = result.requiresAdminTranscription
+          ? 'This source needs transcription before it can be converted. The original stays private.'
+          : 'Conversion runs only when an administrator requests it. It uses extracted text, strict canonical validation, an AI repair when needed, and a separate critique. The resulting Markdown still requires human review before compiling or publishing.';
+      }
+      const convertButton = $('[data-convert-source]');
+      if (convertButton) convertButton.disabled = Boolean(result.requiresAdminTranscription || !result.extractedText);
       if ($('[data-ai-source-excerpt]') && result.extractedText) $('[data-ai-source-excerpt]').value = result.extractedText.slice(0, 12000);
       if ($('[data-authoring-organisation]') && !($('[data-authoring-organisation]').value)) $('[data-authoring-organisation]').value = result.submission?.ownerOrganisationId || '';
       status('Private source review opened for the administrator. It is never exposed to learner pages.', 'success');
@@ -658,6 +681,45 @@ const bindAuthoring = () => {
     } catch (error) { status(error.message, 'warning'); }
   });
   $('[data-open-source-review]')?.addEventListener('click', () => { openSourceReview(); });
+  $('[data-convert-source]')?.addEventListener('click', async () => {
+    const submissionId = String($('[data-authoring-submission]')?.value || '').trim();
+    if (!submissionId) { status('Open a private source review first.', 'warning'); return; }
+    const output = $('[data-source-conversion-output]');
+    const button = $('[data-convert-source]');
+    if (button) button.disabled = true;
+    if (output) output.textContent = 'Converting extracted source into a private canonical Markdown draft. This can take a little longer than a short AI suggestion…';
+    try {
+      const result = await api('/api/v1/course-authoring/source-convert', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          submissionId,
+          courseId: $('[data-authoring-course-id]')?.value,
+          version: $('[data-authoring-version]')?.value
+        })
+      });
+      if (template && result.markdown) {
+        template.value = result.markdown;
+        syncAuthoringMetadata(result.markdown);
+      }
+      if (output) output.textContent = JSON.stringify({
+        readyForHumanReview: result.readyForHumanReview,
+        reviewRequired: result.reviewRequired,
+        validation: result.validation,
+        checks: result.checks,
+        critic: result.critic,
+        stages: result.stages
+      }, null, 2);
+      status(result.readyForHumanReview
+        ? 'Canonical Markdown draft is ready for your review. Inspect it, edit anything needed, then validate and compile it.'
+        : 'A Markdown draft was created, but its automated checks found issues. Review the report and edit it before validating.', result.readyForHumanReview ? 'success' : 'warning');
+      await loadSubmissions();
+    } catch (error) {
+      if (output) output.textContent = `Conversion was not completed: ${error.message}`;
+      status(error.message, 'error');
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
   $('[data-submission-list]')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-review-submission]');
     if (!button) return;

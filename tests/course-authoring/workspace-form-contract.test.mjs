@@ -17,6 +17,9 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /data-download-source/);
   assert.match(admin, /data-admin-source-form/);
   assert.match(admin, /application\/pdf/);
+  assert.match(admin, /\.pptx/);
+  assert.match(admin, /data-convert-source/);
+  assert.match(admin, /Convert extracted source to reviewed Markdown/);
   assert.match(admin, /data-open-course-review/);
   assert.match(admin, /data-generate-narration/);
   assert.match(admin, /Recommended route/);
@@ -35,10 +38,12 @@ test('private educator upload controls use the same source and narration field n
   assert.match(workspace, /\/api\/v1\/assessment\/drafts/);
   assert.match(workspace, /\/api\/v1\/assessment\/publish/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/source-download/);
+  assert.match(workspace, /\/api\/v1\/course-authoring\/source-convert/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/translate/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/review/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/narration\/generate/);
   assert.match(workspace, /data-edit-module/);
+  assert.match(workspace, /safe-presentation-text-extracted/);
   assert.match(workspace, /Open and review a draft before publishing it/);
   assert.match(workspace, /correctOptionIndex/);
   assert.doesNotMatch(workspace, /prompt: 'Which answer best matches the reviewed key idea\?'/);

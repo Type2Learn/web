@@ -263,10 +263,13 @@ test('structured adaptive work uses its OpenAI role only after Gemini is unavail
       openAiModel: APPROVED_OPENAI_MODEL, openAiMiniModel: APPROVED_OPENAI_MINI_MODEL, openAiTestModel: RESERVED_TEST_GENERATION_MODEL
     });
     await provider.generate({ purpose: 'adaptive-recall', instructions: 'Return JSON.', input: '{}', maxOutputTokens: 50, jsonSchema: { type: 'object' } });
+    await provider.generate({ purpose: 'course-authoring-conversion', instructions: 'Return JSON.', input: '{}', maxOutputTokens: 3600, jsonSchema: { type: 'object' } });
     await provider.generate({ purpose: 'final-assessment-generation', instructions: 'Return JSON.', input: '{}', maxOutputTokens: 50, jsonSchema: { type: 'object' } });
     const openAiCalls = calls.filter((call) => call.url.startsWith('https://api.openai.com/'));
     assert.equal(JSON.parse(openAiCalls[0].options.body).model, APPROVED_OPENAI_MINI_MODEL);
-    assert.equal(JSON.parse(openAiCalls[1].options.body).model, RESERVED_TEST_GENERATION_MODEL);
+    assert.equal(JSON.parse(openAiCalls[1].options.body).model, APPROVED_OPENAI_MINI_MODEL);
+    assert.equal(JSON.parse(openAiCalls[1].options.body).max_output_tokens, 3600);
+    assert.equal(JSON.parse(openAiCalls[2].options.body).model, RESERVED_TEST_GENERATION_MODEL);
   } finally {
     globalThis.fetch = previousFetch;
   }

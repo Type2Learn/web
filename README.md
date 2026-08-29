@@ -120,7 +120,7 @@ feature flags, safeguards, and rollout requirements in
 | Reviewed assessment banks and fallback checks | Implemented | `AI_ASSESSMENTS_ENABLED=true`, adaptive consent, Firebase, and reviewer workflow for generated banks |
 | Objective-evidence monitor and targeted review | Implemented | Assessment runs store only question/objective IDs and bounded outcome categories; never an answer, option choice, score, or model rationale. The optional response-evidence store is separate, exportable/deletable, and restricted to submitted own-word open responses for the same objective. |
 | AI-generated visual assets | Intentionally disabled | Requires separate moderation, storage, retention, and curriculum-review work |
-| Structured and direct-reviewed theory-course authoring | Implemented behind private server configuration | Admins may use the bilingual form or import reviewed Markdown directly; Firebase, human review, narration/TTS choice, and all four backup receipts remain required before publication |
+| Source-to-course conversion, structured and direct-reviewed theory authoring | Implemented behind private server configuration | Admins may use the bilingual form, reviewed Markdown, text-based PDF, or visible-text PPTX slides. Conversion is Gemini-first, deterministic-schema tested, optionally structure-repaired, independently critiqued, and always held for human review before compilation/publication. Firebase, human review, narration/TTS choice, and all four backup receipts remain required before publication |
 | Offline public learning package | Implemented | A learner explicitly downloads the shipped public course, local controls, optional 2D/3D mascot renderer, offline-capable audio, and public site shell to one browser. The browser is then asked to retain the package. AI, authentication, cloud sync, private teacher content, and unpublished/reviewed answer material stay online-only. |
 | PSL-ready on-device sign input foundation | Implemented, intentionally not surfaced in the learner UI yet | Browser-local MediaPipe landmark extraction is tested with a real hand image. It makes **no** sign or translation claim until an evaluated Pakistani Sign Language temporal model is approved and installed. |
 
@@ -147,11 +147,11 @@ privacy boundary, model gate, and third-party notices.
 
 The protected authoring workspace is intentionally separate from learner pages:
 
-- `/admin/` bootstraps the first platform administrator with a one-time server-side secret, then manages role codes, source review, a structured bilingual course form, direct reviewed-Markdown import, AI drafts, narration, backup receipts, release approval, audit history, and a non-destructive learner preview.
+- `/admin/` bootstraps the first platform administrator with a one-time server-side secret, then manages role codes, source review, a structured bilingual course form, direct reviewed-Markdown import, PDF/PPTX source-to-course conversion, AI drafts, narration, backup receipts, release approval, audit history, and a non-destructive learner preview.
 - `/teacher/` and `/institute/` accept **theory** course source material, show review status, create scoped learner invites, maintain private rosters, and distribute only approved courses to their organisation or assignment list. Coding, project, and other course types are visibly locked and rejected by the API until their learning engines exist.
 - `/redeem/` redeems a signed-in user's one-use, revocable, expiring educator or learner code. Fresh Firestore membership checks supplement Firebase custom claims on every protected action.
-- Authoring uses versioned `type2learn-theory-course/v1` Markdown with English and Urdu for every published course. Administrators can fill a structured form that deterministically generates the format or upload an already reviewed Markdown file directly. The compiler produces a private review manifest (including answer keys) and a learner-safe manifest (without keys, uploads, or review notes).
-- AI is Gemini-first and OpenAI-fallback only for missing draft material. Its JSON is schema-validated and marked **AI draft — admin review required**; it cannot become learner-visible until a human accepts the reviewed Markdown and completes the workflow.
+- Authoring uses versioned `type2learn-theory-course/v1` Markdown with English and Urdu for every published course. Administrators can fill a structured form that deterministically generates the format, upload an already reviewed Markdown file directly, or explicitly convert locally extracted source text from a `.pdf`, `.pptx`, or supported text file. See [COURSE_SOURCE_CONVERSION.md](COURSE_SOURCE_CONVERSION.md) for the exact intake contract.
+- Source conversion is an explicit, private administrator action: local extraction → deterministic text normalisation → Gemini-first canonical Markdown draft → strict parser/compiler check → one bounded AI structure repair if needed → independent source critique → human review. Only extracted text is supplied to a model; the original upload remains private. A failed check never publishes a course or bypasses the normal review/backup gate.
 - Publishing cannot bypass the workflow: `Submitted → Source reviewed → Markdown draft → Validation ready → AI draft ready → Admin review → Audio ready → Backups pending → Backups verified → Approved → Published`. The final gate needs Firebase primary storage, private GitHub review artifacts, Supabase package storage, and an administrator-acknowledged downloadable ZIP.
 
 The reusable player is `/course/?courseId=<course-id>&version=<version>`. It uses the same learner support settings as the existing course: small sections, spacing, text size, reading width, contrast, quiet display, motion preferences, optional device text-to-speech, and intentionally requested speech-to-text where the browser supports it. The existing Neurodivergent Conditions course is deterministically migrated through the same bilingual Markdown compiler while its established learner route remains intact.
@@ -196,6 +196,7 @@ The reusable player is `/course/?courseId=<course-id>&version=<version>`. It use
 │   ├── assessment-monitor.mjs         # Objective evidence, question order, and targeted review route
 │   ├── fallback-assessment-bank.mjs   # Authored no-provider assessment reserve
 │   ├── learning-analytics-service.mjs # Minimal summary, export, and deletion routes
+│   ├── course-authoring-service.mjs   # Private source intake, PDF/PPTX extraction, conversion and compile gate
 │   └── firebase-runtime.mjs           # Firebase Admin boundary
 ├── assets/                            # Brand, people, public photography, mascot, audio, rewards
 ├── assets/audio/voice-library/         # Compressed, named voice assets and usage notes
@@ -205,6 +206,7 @@ The reusable player is `/course/?courseId=<course-id>&version=<version>`. It use
 ├── render.yaml                         # Render Blueprint configuration
 ├── sitemap.xml and robots.txt          # Search-engine discovery rules
 ├── AI_ADAPTIVE_LEARNING_README.md      # AI product, privacy, assessment, and rollout spec
+├── COURSE_SOURCE_CONVERSION.md         # Administrator source → canonical course conversion contract
 └── BEHAVIOURAL_PARTNER_TEST_EVIDENCE.md # 693-case Behaviour Context verification matrix
 ```
 

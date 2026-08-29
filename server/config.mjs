@@ -261,6 +261,10 @@ export const loadRuntimeConfig = async ({ environment = process.env, root = repo
     openAiInputUsdPerMillion: numberFrom(value('OPENAI_INPUT_USD_PER_MILLION_TOKENS'), 0.05, { min: 0, max: 0.05 }),
     openAiOutputUsdPerMillion: numberFrom(value('OPENAI_OUTPUT_USD_PER_MILLION_TOKENS'), 0.4, { min: 0, max: 0.4 }),
     openAiMaxOutputTokens: numberFrom(value('OPENAI_MAX_OUTPUT_TOKENS'), 320, { min: 32, max: 320 }),
+    // Source-to-course conversion is an explicit administrator action, not a
+    // learner interaction. It needs enough room for a complete bilingual
+    // Markdown draft, while still staying bounded and review-only.
+    courseAuthoringMaxOutputTokens: numberFrom(value('COURSE_AUTHORING_MAX_OUTPUT_TOKENS'), 3600, { min: 400, max: 4800 }),
     openAiRequestsPerMinute: numberFrom(value('OPENAI_REQUESTS_PER_MINUTE'), 12, { min: 1, max: 12 }),
     // The adaptive proposal service uses a smaller portion of the existing
     // protected ledger. These are ceilings, never new defaults that enable a

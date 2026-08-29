@@ -90,7 +90,7 @@ Start in this order; it gives the quickest accurate picture without exposing pri
 - `server/theory-course-markdown.mjs` defines and parses `type2learn-theory-course/v1` Markdown.
 - It validates ordered modules, bilingual English/Urdu content, short reading sections, supports, activity/check structures, final exam structure, and four-option MCQs.
 - It compiles a **private authoring manifest** (review details and answer keys) and a **learner-safe manifest** (no answer keys, original uploads, or admin notes).
-- `server/course-authoring-service.mjs` accepts private source submissions, validates types/sizes/checksums, extracts safe text from supported textual formats, and keeps scanned/unknown material private with a requires-transcription state.
+- `server/course-authoring-service.mjs` accepts private source submissions, validates types/sizes/checksums, extracts bounded text from supported text files, text-based PDFs, and visible PPTX slide XML, and keeps scans/image-only/unknown material private with a requires-transcription state. The explicit admin-only source converter normalises the extraction, produces a canonical Markdown draft, runs strict parser checks, requests one bounded repair only when needed, records an independent AI critique, and still requires normal human review/compile/publish gates. See `COURSE_SOURCE_CONVERSION.md`.
 - Platform administrators do **not** need a teacher or institute hand-off. In
   `/admin/ → Course review`, they may either import an already reviewed
   `.md`/`.markdown`/`.txt` file directly or use the structured bilingual
@@ -112,8 +112,8 @@ Start in this order; it gives the quickest accurate picture without exposing pri
 
 ### 3. AI drafting and human review
 
-- `server/model-provider.mjs` and the authoring service use Gemini first with OpenAI only as the constrained fallback.
-- AI output is schema-shaped JSON and is limited to filling missing plain-language summaries, examples, hints, and fallback four-option MCQs. It is marked as draft and is not learner-visible until human acceptance/review.
+- `server/model-provider.mjs` and the authoring service use Gemini first, capacity-limited Featherless second, and role-bounded OpenAI last. The administrator-only source converter may use the configured extended output ceiling for a complete review draft; it does not alter learner-chat limits.
+- AI output is schema-shaped JSON and is limited to review drafts, missing plain-language summaries, examples, hints, and fallback four-option MCQs. Every conversion also re-enters strict deterministic validation and an independent critique. It is marked as draft and is not learner-visible until human acceptance/review.
 - `server/fallback-assessment-bank.mjs` provides deterministic fallback MCQ structures.
 - Human narration asset handling is part of `server/course-authoring-service.mjs`. Learner device text-to-speech remains an intentional, labelled fallback and must not autoplay.
 
@@ -201,7 +201,7 @@ The suite uses Node’s test runner:
 npm.cmd test
 ```
 
-The complete suite passed with **992 tests** after the reviewed-manifest compatibility integration. Rerun the full command after checkout to obtain the current exact count.
+The complete suite passed with **1,139 tests** after the source-to-course conversion integration. Rerun the full command after checkout to obtain the current exact count.
 
 Important test folders:
 

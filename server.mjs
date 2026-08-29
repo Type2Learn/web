@@ -357,6 +357,9 @@ const handleApi = async (request, response, pathname, runtime) => {
       const url = new URL(request.url || '/', 'http://localhost');
       return sendJson(response, 200, await courseAuthoring.submissionReview({ authorization: request.headers.authorization, submissionId: url.searchParams.get('submissionId') }));
     }
+    if (request.method === 'POST' && pathname === '/api/v1/course-authoring/source-convert') {
+      return sendJson(response, 200, await courseAuthoring.convertSourceToMarkdown({ authorization: request.headers.authorization, body: await readJson(request, 32 * 1024) }));
+    }
     if (request.method === 'GET' && pathname === '/api/v1/course-authoring/source-download') {
       const url = new URL(request.url || '/', 'http://localhost');
       const result = await courseAuthoring.downloadSource({ authorization: request.headers.authorization, submissionId: url.searchParams.get('submissionId') });

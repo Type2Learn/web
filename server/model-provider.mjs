@@ -71,8 +71,15 @@ export const createModelProvider = (config) => {
     'intent-generation',
     'json-compilation',
     'json-repair',
-    'component-planning'
+    'component-planning',
+    // Private administrator source conversion has a larger, tightly bounded
+    // JSON/Markdown contract. Gemini still runs first; Mini is used only when
+    // the lower-cost providers cannot complete that reviewed draft.
+    'course-authoring-conversion',
+    'course-authoring-repair',
+    'course-authoring-critique'
   ]);
+  const extendedCourseAuthoringPurposes = new Set(['course-authoring-conversion', 'course-authoring-repair']);
 
   const modelForOpenAiPurpose = (purpose) => {
     if (geminiFirstNanoFallbackPurposes.has(purpose)) return config.openAiModel;
@@ -111,13 +118,16 @@ export const createModelProvider = (config) => {
     return '';
   };
 
-  const callGemini = async ({ instructions, input, maxOutputTokens, jsonSchema, heavy = false }) => {
+  const callGemini = async ({ instructions, input, maxOutputTokens, jsonSchema, heavy = false, purpose }) => {
     let lastError = null;
     for (let attempt = 0; attempt < keys.length; attempt += 1) {
       const keySlot = nextAvailableKey();
       if (!keySlot) break;
       const { key, index: keyIndex } = keySlot;
       const model = heavy ? config.geminiHeavyModel : config.geminiFastModel;
+      const outputLimit = extendedCourseAuthoringPurposes.has(purpose)
+        ? Number(config.courseAuthoringMaxOutputTokens) || 3_600
+        : Number(config.geminiMaxOutputTokens) || 420;
       try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
           method: 'POST',
@@ -127,7 +137,7 @@ export const createModelProvider = (config) => {
             contents: [{ role: 'user', parts: [{ text: input }] }],
             generationConfig: {
               temperature: 0.2,
-              maxOutputTokens: Math.min(Number(maxOutputTokens) || 420, Number(config.geminiMaxOutputTokens) || 420),
+              maxOutputTokens: Math.min(Number(maxOutputTokens) || outputLimit, outputLimit),
               ...(jsonSchema ? { responseMimeType: 'application/json', responseSchema: geminiSchema(jsonSchema) } : {})
             }
           }),
@@ -214,7 +224,7 @@ export const createModelProvider = (config) => {
     return '';
   };
 
-  const callFeatherless = async ({ instructions, input, maxOutputTokens }) => {
+  const callFeatherless = async ({ instructions, input, maxOutputTokens, purpose }) => {
     if (!featherlessReady()) throw new Error('Featherless is not configured.');
     // Featherless accounts reserve a finite number of concurrent units. The
     // Type2Learn fallback is intentionally one-at-a-time: when it is busy,
@@ -225,6 +235,9 @@ export const createModelProvider = (config) => {
     }
     featherlessInFlight += 1;
     try {
+      const outputLimit = extendedCourseAuthoringPurposes.has(purpose)
+        ? Number(config.courseAuthoringMaxOutputTokens) || 3_600
+        : 420;
       const response = await fetch(config.featherlessChatCompletionsUrl, {
         method: 'POST',
         headers: {
@@ -234,7 +247,7 @@ export const createModelProvider = (config) => {
         body: JSON.stringify({
           model: config.featherlessModel,
           temperature: 0.2,
-          max_tokens: Math.min(Number(maxOutputTokens) || 420, 420),
+          max_tokens: Math.min(Number(maxOutputTokens) || outputLimit, outputLimit),
           messages: [
             { role: 'system', content: instructions },
             { role: 'user', content: input }

@@ -107,6 +107,23 @@ test('a failed Gemini attempt uses Featherless before OpenAI', { concurrency: fa
   }
 });
 
+test('private course conversion may use the bounded extended output allowance while ordinary learner requests stay small', { concurrency: false }, async () => {
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: String(url), options });
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"markdown":"draft"}' } }] }), { status: 200 });
+  };
+  try {
+    const provider = createModelProvider(baseConfig({ courseAuthoringMaxOutputTokens: 3600 }));
+    await provider.generate({ purpose: 'course-authoring-conversion', instructions: 'Convert.', input: '{}', maxOutputTokens: 5000 });
+    const payload = JSON.parse(calls[0].options.body);
+    assert.equal(payload.max_tokens, 3600);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
 test('feature health advertises the exact offline and PSL capability boundary', async () => {
   const source = await readFile(new URL('../../server.mjs', import.meta.url), 'utf8');
   assert.match(source, /release:\s*\{/);

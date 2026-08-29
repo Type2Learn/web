@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { deflateRawSync } from 'node:zlib';
 import test from 'node:test';
 import { createCourseAuthoringService } from '../../server/course-authoring-service.mjs';
 import { THEORY_COURSE_TEMPLATE } from '../../server/theory-course-markdown.mjs';
@@ -60,14 +61,64 @@ class MemoryStorage {
 const authorisation = 'Bearer administrator-test';
 const binaryFile = (name, type, content) => {
   const bytes = Buffer.from(content, 'utf8');
+  return fileFromBuffer(name, type, bytes);
+};
+const fileFromBuffer = (name, type, bytes) => {
+  const buffer = Buffer.from(bytes);
   return {
     name,
     type,
-    size: bytes.length,
-    arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+    size: buffer.length,
+    arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
   };
 };
 const form = (values) => ({ get: (name) => values[name] ?? null });
+
+// A tiny stored ZIP is enough to exercise the real PPTX parser without
+// checking a proprietary presentation binary into the repository. CRC values
+// are not used by the bounded text extractor; ZIP readers accept these local
+// entries and the central directory supplies every safe size/offset.
+const pptxFromSlides = (slides) => {
+  const locals = [];
+  const central = [];
+  let offset = 0;
+  slides.forEach((slide, index) => {
+    const name = Buffer.from(`ppt/slides/slide${index + 1}.xml`);
+    const content = Buffer.from(typeof slide === 'string' ? slide : slide.xml, 'utf8');
+    const compression = typeof slide === 'object' && slide.deflate ? 8 : 0;
+    const archived = compression === 8 ? deflateRawSync(content) : content;
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(compression, 8);
+    local.writeUInt32LE(archived.length, 18);
+    local.writeUInt32LE(content.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    const entry = Buffer.concat([local, name, archived]);
+    locals.push(entry);
+    const header = Buffer.alloc(46);
+    header.writeUInt32LE(0x02014b50, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(20, 6);
+    header.writeUInt16LE(0, 8);
+    header.writeUInt16LE(compression, 10);
+    header.writeUInt32LE(archived.length, 20);
+    header.writeUInt32LE(content.length, 24);
+    header.writeUInt16LE(name.length, 28);
+    header.writeUInt32LE(offset, 42);
+    central.push(Buffer.concat([header, name]));
+    offset += entry.length;
+  });
+  const centralDirectory = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(slides.length, 8);
+  end.writeUInt16LE(slides.length, 10);
+  end.writeUInt32LE(centralDirectory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, centralDirectory, end]);
+};
 
 const createService = () => {
   const firestore = new MemoryFirestore();
@@ -174,6 +225,117 @@ test('a text-based PDF is extracted privately, reports its page count, and is av
   const reviewed = await service.submissionReview({ authorization: authorisation, submissionId: source.submission.submissionId });
   assert.match(reviewed.extractedText, /PRIVACY & DATA PROTECTION/);
   assert.equal(reviewed.requiresAdminTranscription, false);
+});
+
+test('a PPTX keeps its original private while extracting only visible slide text for administrator review', async () => {
+  const { service } = createService();
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({
+      courseType: 'theory',
+      organisationId: 'org-water',
+      title: 'Water cycle slides',
+      sourceFile: fileFromBuffer('water-cycle.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', pptxFromSlides([
+        { xml: '<p:sld xmlns:p="urn:p" xmlns:a="urn:a"><a:t>Water moves through a cycle.</a:t></p:sld>', deflate: true },
+        '<p:sld xmlns:p="urn:p" xmlns:a="urn:a"><a:t>Sunshine can help water evaporate.</a:t></p:sld>'
+      ]))
+    })
+  });
+  assert.equal(source.submission.source.extraction, 'safe-presentation-text-extracted');
+  assert.equal(JSON.stringify(source).includes('Water moves through a cycle.'), false);
+  const reviewed = await service.submissionReview({ authorization: authorisation, submissionId: source.submission.submissionId });
+  assert.equal(reviewed.requiresAdminTranscription, false);
+  assert.match(reviewed.extractedText, /Slide 1: Water moves through a cycle\./);
+  assert.match(reviewed.extractedText, /Slide 2: Sunshine can help water evaporate\./);
+});
+
+test('an administrator can convert extracted source into canonical Markdown only after strict validation and independent critique', async () => {
+  const calls = [];
+  const markdown = THEORY_COURSE_TEMPLATE
+    .replace('id: replace-with-course-id', 'id: water-from-source')
+    .replace('English course title', 'Learning about water from source');
+  const provider = {
+    status: () => ({ available: true }),
+    generate: async (request) => {
+      calls.push(request);
+      if (request.purpose === 'course-authoring-conversion') return { provider: 'gemini', text: JSON.stringify({ markdown }) };
+      if (request.purpose === 'course-authoring-critique') return { provider: 'gemini', text: JSON.stringify({ decision: 'ready-for-human-review', issues: [] }) };
+      throw new Error(`Unexpected purpose ${request.purpose}`);
+    }
+  };
+  const { service } = (() => {
+    const firestore = new MemoryFirestore();
+    const storage = new MemoryStorage();
+    const account = { uid: 'admin-1', roles: ['platform-admin'], organisations: [{ organisationId: 'org-water', active: true }] };
+    return {
+      service: createCourseAuthoringService({
+        firebase: { available: true, firestore, storage, auth: {} }, config: { educatorWorkspaceEnabled: true },
+        access: { accountFor: async () => account, assertAdmin: async () => account, assertOrganisationAccess: async () => account }, provider
+      })
+    };
+  })();
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({ courseType: 'theory', organisationId: 'org-water', title: 'Learning about water', sourceFile: binaryFile('water.txt', 'text/plain', 'Water moves between land, water, and air. Rain can refill a water source.') })
+  });
+  const conversion = await service.convertSourceToMarkdown({
+    authorization: authorisation,
+    body: { submissionId: source.submission.submissionId, courseId: 'water-from-source', version: '1.0.0' }
+  });
+  assert.equal(conversion.reviewRequired, true);
+  assert.equal(conversion.readyForHumanReview, true);
+  assert.equal(conversion.validation.valid, true, conversion.validation.errors.join('\n'));
+  assert.match(conversion.markdown, /^format: type2learn-theory-course\/v1$/m);
+  assert.deepEqual(calls.map((call) => call.purpose), ['course-authoring-conversion', 'course-authoring-critique']);
+  assert.equal(calls[0].heavy, true);
+  assert.equal(calls[0].allowExtendedOutput, true);
+  assert.match(calls[0].input, /Water moves between land/);
+  assert.doesNotMatch(calls[0].input, /private-course-sources/);
+  await assert.rejects(
+    service.courseSummary({ authorization: authorisation, courseId: 'water-from-source', version: '1.0.0' }),
+    (error) => error?.code === 'COURSE_DRAFT_NOT_FOUND'
+  );
+  const review = await service.submissionReview({ authorization: authorisation, submissionId: source.submission.submissionId });
+  assert.equal(review.conversion.readyForHumanReview, true);
+  assert.match(review.conversion.markdown, /Learning about water from source/);
+  const submissions = await service.listSubmissions({ authorization: authorisation });
+  assert.equal(JSON.stringify(submissions).includes('Learning about water from source'), false);
+  const saved = await service.saveMarkdown({ authorization: authorisation, body: {
+    courseId: 'water-from-source', version: '1.0.0', submissionId: source.submission.submissionId, markdown: conversion.markdown
+  } });
+  assert.equal(saved.validation.valid, true);
+  assert.equal(saved.learnerManifest.id, 'water-from-source');
+});
+
+test('a malformed model draft receives one bounded AI repair and remains review-only after the repaired schema passes', async () => {
+  const calls = [];
+  const repaired = THEORY_COURSE_TEMPLATE.replace('id: replace-with-course-id', 'id: repaired-source-course');
+  const provider = {
+    status: () => ({ available: true }),
+    generate: async (request) => {
+      calls.push(request);
+      if (request.purpose === 'course-authoring-conversion') return { provider: 'gemini', text: JSON.stringify({ markdown: '---\nformat: wrong\nid: bad\n---\n# Module: broken' }) };
+      if (request.purpose === 'course-authoring-repair') return { provider: 'openai', text: JSON.stringify({ markdown: repaired }) };
+      if (request.purpose === 'course-authoring-critique') return { provider: 'gemini', text: JSON.stringify({ decision: 'ready-for-human-review', issues: [] }) };
+      throw new Error(`Unexpected purpose ${request.purpose}`);
+    }
+  };
+  const firestore = new MemoryFirestore();
+  const storage = new MemoryStorage();
+  const account = { uid: 'admin-1', roles: ['platform-admin'], organisations: [{ organisationId: 'org-water', active: true }] };
+  const service = createCourseAuthoringService({
+    firebase: { available: true, firestore, storage, auth: {} }, config: { educatorWorkspaceEnabled: true },
+    access: { accountFor: async () => account, assertAdmin: async () => account, assertOrganisationAccess: async () => account }, provider
+  });
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({ courseType: 'theory', organisationId: 'org-water', title: 'Repaired source', sourceFile: binaryFile('repair.txt', 'text/plain', 'A long enough source paragraph explains an educational concept with reviewed context for a lesson.') })
+  });
+  const conversion = await service.convertSourceToMarkdown({ authorization: authorisation, body: { submissionId: source.submission.submissionId, courseId: 'repaired-source-course', version: '1.0.0' } });
+  assert.equal(conversion.validation.valid, true, conversion.validation.errors.join('\n'));
+  assert.equal(conversion.reviewRequired, true);
+  assert.deepEqual(calls.map((call) => call.purpose), ['course-authoring-conversion', 'course-authoring-repair', 'course-authoring-critique']);
+  assert.ok(conversion.stages.some((stage) => stage.id === 'ai-structure-repair' && stage.passed));
 });
 
 test('reviewed Markdown cannot silently diverge from the form identifiers or source organisation', async () => {
