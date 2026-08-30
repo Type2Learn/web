@@ -5,6 +5,7 @@ import test from 'node:test';
 const workspaceUrl = new URL('../../workspace.js', import.meta.url);
 const adminUrl = new URL('../../admin/index.html', import.meta.url);
 const teacherUrl = new URL('../../teacher/index.html', import.meta.url);
+const workspaceCssUrl = new URL('../../workspace.css', import.meta.url);
 
 test('private educator upload controls use the same source and narration field names as the server', async () => {
   const [workspace, admin, teacher] = await Promise.all([readFile(workspaceUrl, 'utf8'), readFile(adminUrl, 'utf8'), readFile(teacherUrl, 'utf8')]);
@@ -70,4 +71,13 @@ test('private educator upload controls use the same source and narration field n
   assert.match(teacher, /name="sourceLanguage"/);
   assert.match(teacher, /data-source-file-summary/);
   assert.match(teacher, /data-source-next-step/);
+});
+
+test('teacher navigation keeps every primary route visible on a narrow screen', async () => {
+  const [teacher, css] = await Promise.all([readFile(teacherUrl, 'utf8'), readFile(workspaceCssUrl, 'utf8')]);
+  assert.match(teacher, /data-workspace-nav="overview"/);
+  assert.match(teacher, /data-workspace-nav="submit"/);
+  assert.match(teacher, /data-workspace-nav="learners"/);
+  assert.match(teacher, /data-workspace-nav="distribution"/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.workspace-nav \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); overflow: visible;/);
 });
