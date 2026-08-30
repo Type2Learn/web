@@ -20,6 +20,13 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /\.pptx/);
   assert.match(admin, /data-convert-source/);
   assert.match(admin, /Convert extracted source to reviewed Markdown/);
+  assert.match(workspace, /course-authoring-form\.js/);
+  assert.match(workspace, /data-build-and-validate-course/);
+  assert.match(workspace, /Build &amp; validate course/);
+  assert.match(workspace, /<select data-builder-field="\$\{language\}\.typingLevel"/);
+  assert.doesNotMatch(workspace, /typingLevel: 'اہم خیال لکھنا'/);
+  assert.match(workspace, /typingLevel !== 'Recall typing' && !typingTarget/);
+  assert.doesNotMatch(workspace, /typingTarget: need\(`\$\{prefix\}\.typingTarget/);
   assert.match(admin, /data-open-course-review/);
   assert.match(admin, /data-generate-narration/);
   assert.match(admin, /Recommended route/);

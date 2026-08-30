@@ -147,10 +147,10 @@ privacy boundary, model gate, and third-party notices.
 
 The protected authoring workspace is intentionally separate from learner pages:
 
-- `/admin/` bootstraps the first platform administrator with a one-time server-side secret, then manages role codes, source review, a structured bilingual course form, direct reviewed-Markdown import, PDF/PPTX source-to-course conversion, AI drafts, narration, backup receipts, release approval, audit history, and a non-destructive learner preview.
+- `/admin/` bootstraps the first platform administrator with a one-time server-side secret, then manages role codes, source review, a structured bilingual course form with **Build & validate course**, direct reviewed-Markdown import, PDF/PPTX source-to-course conversion, AI drafts, narration, backup receipts, release approval, audit history, and a non-destructive learner preview.
 - `/teacher/` and `/institute/` accept **theory** course source material, show review status, create scoped learner invites, maintain private rosters, and distribute only approved courses to their organisation or assignment list. Coding, project, and other course types are visibly locked and rejected by the API until their learning engines exist.
 - `/redeem/` redeems a signed-in user's one-use, revocable, expiring educator or learner code. Fresh Firestore membership checks supplement Firebase custom claims on every protected action.
-- Authoring uses versioned `type2learn-theory-course/v1` Markdown with English and Urdu for every published course. Administrators can fill a structured form that deterministically generates the format, upload an already reviewed Markdown file directly, or explicitly convert locally extracted source text from a `.pdf`, `.pptx`, or supported text file. See [COURSE_SOURCE_CONVERSION.md](COURSE_SOURCE_CONVERSION.md) for the exact intake contract.
+- Authoring uses versioned `type2learn-theory-course/v1` Markdown with English and Urdu for every published course. Administrators can fill a structured form that deterministically generates **and locally checks** the format before the server compiles it, upload an already reviewed Markdown file directly, or explicitly convert locally extracted source text from a `.pdf`, `.pptx`, or supported text file. See [COURSE_SOURCE_CONVERSION.md](COURSE_SOURCE_CONVERSION.md) for the exact intake contract.
 - Source conversion is an explicit, private administrator action: local extraction → deterministic text normalisation → Gemini-first canonical Markdown draft → strict parser/compiler check → one bounded AI structure repair if needed → independent source critique → human review. Only extracted text is supplied to a model; the original upload remains private. A failed check never publishes a course or bypasses the normal review/backup gate.
 - Publishing cannot bypass the workflow: `Submitted → Source reviewed → Markdown draft → Validation ready → AI draft ready → Admin review → Audio ready → Backups pending → Backups verified → Approved → Published`. The final gate needs Firebase primary storage, private GitHub review artifacts, Supabase package storage, and an administrator-acknowledged downloadable ZIP.
 
@@ -163,6 +163,7 @@ The reusable player is `/course/?courseId=<course-id>&version=<version>`. It use
 ├── index.html                         # English public landing page
 ├── styles.css / app.js                # Shared public-site visual system and interaction
 ├── experience.js                      # Scroll-led public storytelling and motion controls
+├── course-authoring-form.js           # Guided-form → canonical Markdown compiler
 ├── ur/                                # Mirrored, RTL Urdu public routes
 ├── how-it-works/                      # Public “How it works” page
 ├── learning-together/                 # Learner, family, and educator pages

@@ -8,6 +8,7 @@ canonical file without treating a model response as curriculum approval.
 
 | Starting material | Recommended route | What happens |
 | --- | --- | --- |
+| A new theory course typed into the guided admin sections | **Structured course form → Build & validate course** | The browser deterministically creates canonical Markdown, rejects invalid activity values locally, then sends the reviewed result to the normal server compiler. |
 | A complete reviewed Type2Learn Markdown file | **Import reviewed Markdown directly** | The server parses, validates, and compiles it. |
 | A partially formatted Type2Learn Markdown file | **Private source intake → Convert extracted source** | The fixer normalises the text, repairs its structure if needed, then returns an editable canonical draft. |
 | A `.txt`, `.md`, `.markdown`, or `.csv` source | **Private source intake → Convert extracted source** | Text is bounded and retained privately; the admin explicitly starts conversion. |
@@ -17,6 +18,22 @@ canonical file without treating a model response as curriculum approval.
 
 Current limits are 25 MB per source file, 220,000 extracted/Markdown characters,
 and 12,000 source characters passed to an explicit AI conversion request.
+
+## Guided form safety
+
+The guided bilingual form in `/admin/` is not a visual-only helper. It has a
+deterministic compiler at [`course-authoring-form.js`](course-authoring-form.js),
+which is shared with automated tests. The English and Urdu typing-activity
+selectors display localized labels but store one of the three parser-safe values:
+`Key idea typing`, `Guided typing`, or `Recall typing`. A legacy Urdu label is
+normalised once for existing drafts; arbitrary activity labels are rejected before
+the form creates Markdown.
+
+Use **Build reviewed Markdown** to inspect the generated source, or **Build &
+validate course** to run the regular private server validation/compile step. Both
+routes stop at `validation-ready`: an administrator still reviews the bilingual
+modules, narration choice, backups, and release approval before learners can see
+the course.
 
 ## Canonical Markdown contract
 
@@ -183,5 +200,9 @@ The repository includes direct automated coverage in:
   strict validation, repair, critique, and later compilation.
 - `tests/course-authoring/workspace-form-contract.test.mjs` — admin UI/API
   contract for PDF/PPTX intake and conversion control.
+- `tests/course-authoring/structured-form-to-course.test.mjs` — a realistic
+  bilingual form payload, including a localized Urdu activity label, through
+  form compilation, strict parser validation, and learner/private manifest
+  separation.
 - `tests/ai/core.test.mjs` and `tests/ai/featherless-provider.test.mjs` —
   Gemini/Featherless/OpenAI routing and bounded extended authoring output.

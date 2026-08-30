@@ -1,4 +1,5 @@
 import { getType2LearnAuth, signOutType2LearnUser, waitForType2LearnUser } from '/firebase-auth.js';
+import { buildStructuredTheoryMarkdown } from '/course-authoring-form.js';
 
 const PAGE = document.body.dataset.workspace || 'teacher';
 const DEMO = new URLSearchParams(window.location.search).get('demo') === '1';
@@ -49,7 +50,9 @@ const builderStarter = () => ({
       strengths: 'ہر سیکھنے والے کے بارے میں مفروضہ کیے بغیر ایک ممکنہ طاقت لکھیں۔',
       challenges: 'ایک ممکنہ مشکل\nدوسری ممکنہ مشکل', supports: 'ایک باعزت مدد\nدوسری باعزت مدد',
       simple: 'سادہ زبان میں وضاحت لکھیں۔', example: 'ایک واضح مثال لکھیں۔', hint: 'ایک مختصر اختیاری اشارہ لکھیں۔',
-      typingLevel: 'اہم خیال لکھنا', typingPrompt: 'اہم خیال لکھیں۔', typingTarget: 'ایک مختصر جائزہ شدہ اہم خیال۔',
+      // Stored values remain canonical while Urdu labels are localized in the
+      // selector below, matching the strict server-side Markdown contract.
+      typingLevel: 'Key idea typing', typingPrompt: 'اہم خیال لکھیں۔', typingTarget: 'ایک مختصر جائزہ شدہ اہم خیال۔',
       checkQuestion: 'درست بیان کون سا ہے؟', checkCorrect: 'جائزہ شدہ درست جواب',
       checkAlternative1: 'بظاہر درست مگر غلط جواب', checkAlternative2: 'ایک اور غلط جواب', checkAlternative3: 'ایک اور غلط جواب'
     }
@@ -66,6 +69,13 @@ const builderIdentifier = (value, fallback = '') => builderLine(value).toLowerCa
 const builderParagraph = (value) => builderText(value).split('\n').map((line) => builderLine(line)).filter(Boolean).join(' ');
 const builderList = (value) => builderText(value).split('\n').map((line) => builderLine(line.replace(/^[-*]\s*/, ''))).filter(Boolean);
 const builderField = ({ label, key, value = '', help = '', multiline = false, direction = 'auto' }) => `<label class="workspace-field">${escapeHtml(label)}${help ? `<span>${escapeHtml(help)}</span>` : ''}${multiline ? `<textarea data-builder-field="${escapeHtml(key)}" dir="${direction}">${escapeHtml(value)}</textarea>` : `<input data-builder-field="${escapeHtml(key)}" dir="${direction}" value="${escapeHtml(value)}">`}</label>`;
+const builderTypingLevelField = ({ language, value, direction }) => {
+  const labels = language === 'ur'
+    ? [['Key idea typing', 'اہم خیال لکھنا'], ['Guided typing', 'رہنمائی کے ساتھ لکھنا'], ['Recall typing', 'یاد سے لکھنا']]
+    : [['Key idea typing', 'Key idea typing'], ['Guided typing', 'Guided typing'], ['Recall typing', 'Recall typing']];
+  const title = language === 'ur' ? 'Urdu — typing activity' : 'English — typing activity';
+  return `<label class="workspace-field">${title}<span>Choose the learner activity. Its valid course value is set automatically.</span><select data-builder-field="${language}.typingLevel" dir="${direction}">${labels.map(([stored, label]) => `<option value="${stored}"${stored === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label>`;
+};
 const builderLanguageFields = (language, fields) => {
   const urdu = language === 'ur';
   const suffix = urdu ? 'Urdu' : 'English';
@@ -83,7 +93,7 @@ const builderLanguageFields = (language, fields) => {
       ${builderField({ label: label('plain-language explanation'), key: `${language}.simple`, value: fields.simple, multiline: true, direction })}
       ${builderField({ label: label('concrete example'), key: `${language}.example`, value: fields.example, multiline: true, direction })}
       ${builderField({ label: label('optional hint'), key: `${language}.hint`, value: fields.hint, multiline: true, direction })}
-      ${builderField({ label: label('typing activity label'), key: `${language}.typingLevel`, value: fields.typingLevel, direction })}
+      ${builderTypingLevelField({ language, value: fields.typingLevel, direction })}
       ${builderField({ label: label('typing instruction'), key: `${language}.typingPrompt`, value: fields.typingPrompt, multiline: true, direction })}
       ${builderField({ label: label('reviewed typing target'), key: `${language}.typingTarget`, value: fields.typingTarget, multiline: true, direction })}
     </div>
@@ -134,10 +144,13 @@ const builderModuleFromNode = (node, index, errors) => {
     const supports = builderList(builderFieldValue(node, `${prefix}.supports`));
     if (!challenges.length) errors.push(`Module ${index + 1}: ${readable} challenges need at least one line.`);
     if (!supports.length) errors.push(`Module ${index + 1}: ${readable} supports need at least one line.`);
+    const typingLevel = need(`${prefix}.typingLevel`, `${readable} typing activity label`);
+    const typingTarget = builderParagraph(builderFieldValue(node, `${prefix}.typingTarget`));
+    if (typingLevel !== 'Recall typing' && !typingTarget) errors.push(`Module ${index + 1}: ${readable} typing target is required unless the activity is Recall typing.`);
     return {
       title: need(`${prefix}.title`, `${readable} title`), definition: need(`${prefix}.definition`, `${readable} definition`), dailyLife: need(`${prefix}.dailyLife`, `${readable} daily-life context`), strengths: need(`${prefix}.strengths`, `${readable} strengths`),
       challenges, supports, simple: need(`${prefix}.simple`, `${readable} plain-language explanation`), example: need(`${prefix}.example`, `${readable} example`), hint: need(`${prefix}.hint`, `${readable} hint`),
-      typingLevel: need(`${prefix}.typingLevel`, `${readable} typing activity label`), typingPrompt: need(`${prefix}.typingPrompt`, `${readable} typing instruction`), typingTarget: need(`${prefix}.typingTarget`, `${readable} typing target`),
+      typingLevel, typingPrompt: need(`${prefix}.typingPrompt`, `${readable} typing instruction`), typingTarget,
       checkQuestion: need(`${prefix}.checkQuestion`, `${readable} check question`), checkCorrect: need(`${prefix}.checkCorrect`, `${readable} correct answer`),
       checkAlternative1: need(`${prefix}.checkAlternative1`, `${readable} alternative one`), checkAlternative2: need(`${prefix}.checkAlternative2`, `${readable} alternative two`), checkAlternative3: need(`${prefix}.checkAlternative3`, `${readable} alternative three`)
     };
@@ -175,18 +188,10 @@ const markdownForBuilder = (root) => {
   if (!finalQuestions.length) errors.push('Add at least one bilingual final-check question.');
   if (finalQuestions.length > 21) errors.push('A final check can contain at most 21 questions.');
   if (errors.length) return { errors, markdown: '' };
-  const moduleMarkdown = (module) => {
-    const language = (name, item) => `## ${name}\n### Title\n${item.title}\n### Definition\n${item.definition}\n### Daily life\n${item.dailyLife}\n### Strengths\n${item.strengths}\n### Challenges\n${item.challenges.map((line) => `- ${line}`).join('\n')}\n### Supports\n${item.supports.map((line) => `- ${line}`).join('\n')}\n### Simple\n${item.simple}\n### Example\n${item.example}\n### Hint\n${item.hint}\n### Typing\nlevel: ${item.typingLevel}\nprompt: ${item.typingPrompt}\ntarget: ${item.typingTarget}\n### Check\nquestion: ${item.checkQuestion}\n- [x] ${item.checkCorrect}\n- [ ] ${item.checkAlternative1}\n- [ ] ${item.checkAlternative2}\n- [ ] ${item.checkAlternative3}`;
-    return `# Module: ${module.id}\n\n${language('English', module.en)}\n\n${language('Urdu', module.ur)}`;
-  };
-  const finalMarkdown = (key) => finalQuestions.map((question, index) => {
-    const item = question[key];
-    return `### Question ${index + 1}\nquestion: ${item.question}\n- [x] ${item.correct}\n- [ ] ${item.alternative1}\n- [ ] ${item.alternative2}\n- [ ] ${item.alternative3}`;
-  }).join('\n\n');
-  return {
-    errors: [],
-    markdown: `---\nformat: type2learn-theory-course/v1\nid: ${course.id}\nversion: ${course.version}\ntitle.en: ${course.titleEn}\ntitle.ur: ${course.titleUr}\nlabel.en: ${course.labelEn}\nlabel.ur: ${course.labelUr}\nnotice.en: ${course.noticeEn}\nnotice.ur: ${course.noticeUr}\n---\n\n${modules.map(moduleMarkdown).join('\n\n')}\n\n# Final exam\n\n## English\n${finalMarkdown('en')}\n\n## Urdu\n${finalMarkdown('ur')}\n`
-  };
+  // Run the exact deterministic compiler used by automated tests. This is a
+  // second local guard before the server parser validates and stores the same
+  // reviewed Markdown.
+  return buildStructuredTheoryMarkdown({ course, modules, finalQuestions });
 };
 
 let user = null;
@@ -428,7 +433,7 @@ const bindAuthoring = () => {
       <div data-builder-modules>${starter.modules.map(builderModuleMarkup).join('')}</div>
       <div class="workspace-row authoring-builder-actions"><button class="workspace-button workspace-button--quiet" type="button" data-add-builder-module>Add another module</button></div>
       <div data-builder-final-questions>${starter.finalQuestions.map(builderFinalQuestionMarkup).join('')}</div>
-      <div class="workspace-row authoring-builder-actions"><button class="workspace-button workspace-button--quiet" type="button" data-add-builder-final-question>Add final-check question</button><button class="workspace-button workspace-button--primary" type="button" data-build-reviewed-markdown>Build reviewed Markdown</button></div>
+      <div class="workspace-row authoring-builder-actions"><button class="workspace-button workspace-button--quiet" type="button" data-add-builder-final-question>Add final-check question</button><button class="workspace-button workspace-button--quiet" type="button" data-build-reviewed-markdown>Build reviewed Markdown</button><button class="workspace-button workspace-button--primary" type="button" data-build-and-validate-course>Build &amp; validate course</button></div>
       <div class="workspace-status" data-builder-errors hidden aria-live="polite"></div>
     </section>`;
   };
@@ -471,6 +476,18 @@ const bindAuthoring = () => {
     builder.addEventListener('click', (event) => {
       const action = event.target.closest('button');
       if (!action) return;
+      const buildStructuredCourse = () => {
+        const built = markdownForBuilder(builder);
+        displayBuilderErrors(built.errors);
+        if (built.errors.length) { status('Complete the listed course details before generating Markdown.', 'warning'); return false; }
+        if (template) {
+          template.value = built.markdown;
+          template.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        syncAuthoringMetadata(built.markdown);
+        status('The form is compiler-valid. Inspect the generated Markdown, then validate and compile it, or use Build & validate course.', 'success');
+        return true;
+      };
       if (action.matches('[data-reset-course-builder]')) { renderBuilder(); return; }
       if (action.matches('[data-add-builder-module]')) {
         const next = builderCopy(builderStarter().modules[0]);
@@ -502,12 +519,12 @@ const bindAuthoring = () => {
         return;
       }
       if (action.matches('[data-build-reviewed-markdown]')) {
-        const built = markdownForBuilder(builder);
-        displayBuilderErrors(built.errors);
-        if (built.errors.length) { status('Complete the highlighted course details before generating Markdown.', 'warning'); return; }
-        if (template) template.value = built.markdown;
-        syncAuthoringMetadata(built.markdown);
-        status('Reviewed Markdown was generated from the structured form. Inspect it below, then validate and compile it.', 'success');
+        buildStructuredCourse();
+        return;
+      }
+      if (action.matches('[data-build-and-validate-course]')) {
+        if (!buildStructuredCourse()) return;
+        $('[data-markdown-form]')?.requestSubmit();
       }
     });
   }
