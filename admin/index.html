@@ -81,7 +81,13 @@
               <h2>Structured course authoring and review</h2>
               <p>Administrators can start from a PDF, PowerPoint deck, text file, guided bilingual form, or reviewed Markdown. Every route ends in the same validated learner course; answer keys remain in the private authoring manifest.</p>
 
-              <form data-admin-source-form class="admin-source-intake" enctype="multipart/form-data">
+              <nav class="authoring-route-nav" aria-label="Course authoring shortcuts">
+                <button class="workspace-button workspace-button--quiet" type="button" data-authoring-jump="source">1. Add source</button>
+                <button class="workspace-button workspace-button--quiet" type="button" data-authoring-jump="form">2. Fill guided form</button>
+                <button class="workspace-button workspace-button--quiet" type="button" data-authoring-jump="markdown">3. Review &amp; compile</button>
+              </nav>
+
+              <form data-admin-source-form data-authoring-anchor="source" class="admin-source-intake" enctype="multipart/form-data">
                 <div><p class="workspace-eyebrow">Start from source</p><h3>Private source intake</h3><p>Text-based PDFs and visible PPTX slide text are extracted locally on the server. Scanned PDFs, image-only slides, and unsupported formats remain private and are clearly marked for transcription; the original file is never sent to a model.</p></div>
                 <label class="workspace-field">Course title<input name="title" maxlength="160" required placeholder="e.g. Introduction to environmental science"></label>
                 <input name="courseType" type="hidden" value="theory">
@@ -95,7 +101,7 @@
               <section class="admin-course-review" data-course-review hidden aria-live="polite"></section>
 
               <form data-markdown-form>
-                <div data-course-builder></div>
+                <div data-course-builder data-authoring-anchor="form"></div>
                 <div class="workspace-grid">
                   <label class="workspace-field">Course ID <span>Must match the reviewed Markdown metadata.</span><input data-authoring-course-id value="new-theory-course" maxlength="80"></label>
                   <label class="workspace-field">Version <span>Must match the reviewed Markdown metadata.</span><input data-authoring-version value="1.0.0" maxlength="32"></label>
@@ -110,7 +116,7 @@
                 <div class="workspace-row"><button class="workspace-button workspace-button--primary" data-convert-source type="button" disabled>Convert extracted source to reviewed Markdown</button></div>
                 <pre class="workspace-note" data-source-conversion-output aria-live="polite">Conversion runs only when an administrator requests it. It uses extracted text, strict canonical validation, an AI repair when needed, and a separate critique. The resulting Markdown still requires human review before compiling or publishing.</pre>
                 <label class="workspace-field">Import already-canonical Markdown directly <span>Use this only for an administrator-reviewed, complete .md, .markdown, or .txt file. It stays in this browser until you validate and compile it. For ordinary or partial Markdown that needs fixing, add it through private source intake and choose Convert extracted source.</span><input data-markdown-file type="file" accept=".md,.markdown,.txt,text/markdown,text/plain"></label>
-                <label class="workspace-field">Canonical reviewed Markdown <span>The structured form and source converter both produce this exact deterministic format. Inspect and edit it before compiling.</span><textarea data-markdown spellcheck="false" aria-label="Reviewed course Markdown"></textarea></label>
+                <label data-authoring-anchor="markdown" class="workspace-field">Canonical reviewed Markdown <span>The structured form and source converter both produce this exact deterministic format. Inspect and edit it before compiling.</span><textarea data-markdown spellcheck="false" aria-label="Reviewed course Markdown"></textarea></label>
                 <button class="workspace-button workspace-button--primary" type="submit">Validate and compile course</button>
               </form>
             </div>

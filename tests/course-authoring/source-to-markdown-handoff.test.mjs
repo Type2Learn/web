@@ -276,8 +276,16 @@ test('an administrator can convert extracted source into canonical Markdown only
   })();
   const source = await service.submitSource({
     authorization: authorisation,
-    form: form({ courseType: 'theory', organisationId: 'org-water', title: 'Learning about water', sourceFile: binaryFile('water.txt', 'text/plain', 'Water moves between land, water, and air. Rain can refill a water source.') })
+    form: form({
+      courseType: 'theory', organisationId: 'org-water', title: 'Learning about water',
+      learningGoal: 'Explain in their own words how water moves between land, water, and air.',
+      intendedLearners: 'Year 7 science learners', sourceLanguage: 'en',
+      sourceFile: binaryFile('water.txt', 'text/plain', 'Water moves between land, water, and air. Rain can refill a water source.')
+    })
   });
+  assert.equal(source.submission.authoringBrief.learningGoal, 'Explain in their own words how water moves between land, water, and air.');
+  assert.equal(source.submission.authoringBrief.intendedLearners, 'Year 7 science learners');
+  assert.equal(source.submission.authoringBrief.sourceLanguage, 'en');
   const conversion = await service.convertSourceToMarkdown({
     authorization: authorisation,
     body: { submissionId: source.submission.submissionId, courseId: 'water-from-source', version: '1.0.0' }
@@ -290,6 +298,8 @@ test('an administrator can convert extracted source into canonical Markdown only
   assert.equal(calls[0].heavy, true);
   assert.equal(calls[0].allowExtendedOutput, true);
   assert.match(calls[0].input, /Water moves between land/);
+  assert.match(calls[0].input, /Year 7 science learners/);
+  assert.match(calls[0].input, /Explain in their own words how water moves/);
   assert.doesNotMatch(calls[0].input, /private-course-sources/);
   await assert.rejects(
     service.courseSummary({ authorization: authorisation, courseId: 'water-from-source', version: '1.0.0' }),
@@ -305,6 +315,8 @@ test('an administrator can convert extracted source into canonical Markdown only
   } });
   assert.equal(saved.validation.valid, true);
   assert.equal(saved.learnerManifest.id, 'water-from-source');
+  assert.equal(JSON.stringify(saved.learnerManifest).includes('Year 7 science learners'), false);
+  assert.equal(JSON.stringify(saved.learnerManifest).includes('Explain in their own words how water moves'), false);
 });
 
 test('a malformed model draft receives one bounded AI repair and remains review-only after the repaired schema passes', async () => {

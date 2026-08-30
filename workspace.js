@@ -256,7 +256,10 @@ const renderSubmissions = () => {
     list.innerHTML = '<li class="workspace-empty">No course submissions are visible yet. Theory-course source material stays private until an administrator reviews it.</li>';
     return;
   }
-  list.innerHTML = submissions.map((entry) => `<li><div><strong>${escapeHtml(entry.submittedTitle || entry.source?.originalName || 'Untitled source submission')}</strong><small>Submission ${escapeHtml(entry.submissionId)} · ${escapeHtml(entry.type)} · ${escapeHtml(entry.source?.extraction || 'private source')} · Organisation ${escapeHtml(entry.ownerOrganisationId || 'not set')} · Updated ${escapeHtml(entry.updatedAt || 'just now')}</small></div><span class="workspace-tag" data-state="${escapeHtml(entry.status)}">${escapeHtml(humanise(entry.status))}</span>${PAGE === 'admin' ? `<button class="workspace-button workspace-button--quiet" type="button" data-review-submission="${escapeHtml(entry.submissionId)}">Review source</button>` : ''}</li>`).join('');
+  list.innerHTML = submissions.map((entry) => {
+    const goal = String(entry.authoringBrief?.learningGoal || '').trim();
+    return `<li><div><strong>${escapeHtml(entry.submittedTitle || entry.source?.originalName || 'Untitled source submission')}</strong><small>Submission ${escapeHtml(entry.submissionId)} · ${escapeHtml(entry.type)} · ${escapeHtml(entry.source?.extraction || 'private source')} · Organisation ${escapeHtml(entry.ownerOrganisationId || 'not set')} · Updated ${escapeHtml(entry.updatedAt || 'just now')}</small>${goal ? `<small>Teaching goal: ${escapeHtml(goal)}</small>` : ''}</div><span class="workspace-tag" data-state="${escapeHtml(entry.status)}">${escapeHtml(humanise(entry.status))}</span>${PAGE === 'admin' ? `<button class="workspace-button workspace-button--quiet" type="button" data-review-submission="${escapeHtml(entry.submissionId)}">Review source</button>` : ''}</li>`;
+  }).join('');
 };
 const renderCourses = () => {
   const options = `<option value="">Choose a validated course</option>${courses.map((entry) => `<option value="${escapeHtml(entry.courseId)}@${escapeHtml(entry.version)}">${escapeHtml(entry.title?.en || entry.courseId)} · ${escapeHtml(entry.version)}</option>`).join('')}`;
@@ -381,14 +384,42 @@ const bindSubmission = () => {
     button.closest('.workspace-card')?.classList.add('is-selected');
     $('[data-course-type-input]').value = button.dataset.courseType;
   }));
-  $('[data-source-form]')?.addEventListener('submit', async (event) => {
+  const teacherSourceForm = $('[data-source-form]');
+  teacherSourceForm?.querySelector('[name="sourceFile"]')?.addEventListener('change', (event) => {
+    const file = event.currentTarget.files?.[0];
+    const summary = $('[data-source-file-summary]');
+    if (!summary) return;
+    if (!file) { event.currentTarget.setCustomValidity(''); summary.textContent = 'No file chosen yet. Maximum file size: 25 MB.'; return; }
+    const megabytes = (Number(file.size || 0) / (1024 * 1024)).toFixed(1);
+    const extension = String(file.name || '').split('.').pop()?.toUpperCase() || 'FILE';
+    const tooLarge = Number(file.size || 0) > 25 * 1024 * 1024;
+    event.currentTarget.setCustomValidity(tooLarge ? 'Choose a file that is 25 MB or smaller.' : '');
+    if (tooLarge) {
+      summary.textContent = `${file.name} · ${megabytes} MB. This is larger than the 25 MB private-source limit; choose a smaller export before sending it.`;
+      return;
+    }
+    summary.textContent = `${file.name} · ${megabytes} MB · ${extension}. It will remain private while the review workflow checks whether safe text can be extracted.`;
+    const title = teacherSourceForm.querySelector('[name="title"]');
+    if (title && !title.value.trim()) title.value = String(file.name || '').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  });
+  teacherSourceForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     if (!form.get('sourceFile')?.size) { status('Choose source material to submit privately.', 'error'); return; }
     try {
       const result = await api('/api/v1/course-authoring/source', { method: 'POST', body: form });
-      status(`Source submitted as ${result.submission?.submissionId}. ${result.submission?.source?.extraction === 'requires-admin-transcription' ? 'It is private and requires administrator transcription.' : 'Its safe text is ready for review.'}`, 'success');
+      const submission = result.submission || {};
+      const next = $('[data-source-next-step]');
+      if (next) {
+        next.hidden = false;
+        next.dataset.kind = submission.source?.extraction === 'requires-admin-transcription' ? 'warning' : 'success';
+        next.textContent = submission.source?.extraction === 'requires-admin-transcription'
+          ? `Sent privately as ${submission.submissionId}. This source will need administrator transcription before it can become a course draft. You can track the review state in Overview.`
+          : `Sent privately as ${submission.submissionId}. Safe text is available for authorised review. Next, the reviewer prepares a bilingual Type2Learn course and you will see its status in Overview.`;
+      }
+      status(`Source submitted as ${submission.submissionId}. ${submission.source?.extraction === 'requires-admin-transcription' ? 'It is private and requires administrator transcription.' : 'Its safe text is ready for review.'}`, 'success');
       event.currentTarget.reset();
+      $('[data-source-file-summary]')?.replaceChildren(document.createTextNode('No file chosen yet. Maximum file size: 25 MB.'));
       await loadSubmissions();
     } catch (error) { status(error.message, 'error'); }
   });
@@ -415,6 +446,13 @@ const bindSubmission = () => {
 const bindAuthoring = () => {
   const template = $('[data-markdown]');
   const builder = $('[data-course-builder]');
+  $$('[data-authoring-jump]').forEach((button) => button.addEventListener('click', () => {
+    const destination = String(button.dataset.authoringJump || '');
+    const target = $(`[data-authoring-anchor="${CSS.escape(destination)}"]`);
+    if (!target) return;
+    $$('[data-authoring-jump]').forEach((item) => item.setAttribute('aria-current', String(item === button ? 'location' : 'false')));
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
   const renderBuilder = () => {
     if (!builder) return;
     const starter = builderCopy(builderStarter());
@@ -534,9 +572,16 @@ const bindAuthoring = () => {
     try {
       const result = await api(`/api/v1/course-authoring/submission-review?submissionId=${encodeURIComponent(submissionId)}`);
       $('[data-authoring-submission]').value = result.submission?.submissionId || submissionId;
-      $('[data-source-review-output]').textContent = result.requiresAdminTranscription
+      const brief = result.submission?.authoringBrief || {};
+      const briefLines = [
+        brief.learningGoal ? `Teacher learning goal: ${brief.learningGoal}` : '',
+        brief.intendedLearners ? `Intended learners: ${brief.intendedLearners}` : '',
+        brief.sourceLanguage ? `Source language: ${brief.sourceLanguage === 'bilingual' ? 'English and Urdu' : brief.sourceLanguage === 'ur' ? 'Urdu' : 'English'}` : ''
+      ].filter(Boolean);
+      const sourceReview = result.requiresAdminTranscription
         ? 'This private source needs administrator transcription before it can become reviewed Markdown. Download the original source only if you need it for review.'
         : result.extractedText || 'No safe text was extracted.';
+      $('[data-source-review-output]').textContent = `${briefLines.length ? `${briefLines.join('\n')}\n\n` : ''}${sourceReview}`;
       const conversionOutput = $('[data-source-conversion-output]');
       const conversion = result.conversion || null;
       if (conversionOutput && conversion) {

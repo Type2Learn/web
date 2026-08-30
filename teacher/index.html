@@ -1,7 +1,124 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Teacher workspace · Type2Learn</title><link rel="stylesheet" href="/workspace.css"></head>
-<body data-workspace="teacher"><div class="workspace-shell"><header class="workspace-header"><a class="workspace-brand" href="/"><span class="workspace-brand-mark">T2L</span> TYPE2LEARN</a><div class="workspace-header-actions"><span data-role-name class="workspace-tag">Checking access</span><button class="workspace-button workspace-button--quiet" data-view-learner type="button">View as learner</button><button class="workspace-button workspace-button--quiet" data-sign-out type="button">Sign out</button></div></header><main class="workspace-main"><p class="workspace-eyebrow">Private teacher workspace</p><h1 class="workspace-title">Submit a course. Keep your learners in control.</h1><p class="workspace-intro">Theory courses can enter the private review workflow now. You can see their status, invite enrolled learners, and enable approved courses for your roster.</p><div data-workspace-status class="workspace-status" role="status" aria-live="polite" hidden></div><div data-role-required class="workspace-status" data-kind="warning" hidden>This page needs a teacher role. Redeem a one-use authorised code first.</div><div class="workspace-layout" data-private-workspace><nav class="workspace-nav" aria-label="Teacher sections"><p>Teacher</p><button data-workspace-nav="overview" aria-current="page" type="button">Overview</button><button data-workspace-nav="submit" type="button">Submit course</button><button data-workspace-nav="learners" type="button">Learners</button><button data-workspace-nav="distribution" type="button">Distribution</button></nav><div class="workspace-content">
-<section data-panel="overview"><div class="workspace-panel"><h2>Your course submissions</h2><p>A submitted source remains private. The administrator prepares reviewed bilingual Markdown and controls final publication.</p><ul class="workspace-list" data-submission-list><li class="workspace-empty">Loading submissions…</li></ul></div><div class="workspace-grid"><article class="workspace-card"><h3>Organisation-only</h3><p>After approval, choose enrolled learners in your own roster. This is the default release path.</p></article><article class="workspace-card"><h3>Platform-wide request</h3><p>Ask for wider availability. A platform administrator must still approve publication after all review and backup checks.</p></article></div></section>
-<section data-panel="submit" class="workspace-hidden"><div class="workspace-panel"><h2>New course source</h2><p>Choose the learning type first. Only theory is available now; locked choices make the current boundary clear before you upload anything.</p><div class="workspace-grid workspace-grid--three"><article class="workspace-card is-selected"><h3>Theory</h3><p>Short readings, examples, typing or alternative responses, checks, and a four-option final exam.</p><button data-course-type="theory" class="workspace-button" type="button">Select theory</button></article><article class="workspace-card is-locked"><h3>Theory + coding</h3><p>Reserved for a reviewed coding engine.</p><button data-course-type="theory-coding" class="workspace-button" type="button" disabled>Locked</button></article><article class="workspace-card is-locked"><h3>Project / interactive</h3><p>Reserved for activity-specific authoring.</p><button data-course-type="interactive-project" class="workspace-button" type="button" disabled>Locked</button></article></div><form data-source-form enctype="multipart/form-data"><input data-course-type-input name="courseType" type="hidden" value="theory"><label class="workspace-field">Private source material <span>Common document, text, PDF, image, or other non-executable source up to 25 MB. Direct safe text extraction is only used for supported text files.</span><input name="sourceFile" type="file" required></label><label class="workspace-field">Course title (optional)<input name="title" maxlength="160"></label><label class="workspace-field">Organisation ID (optional)<input name="organisationId" maxlength="96"></label><button class="workspace-button workspace-button--primary" type="submit">Submit privately for review</button></form></div></section>
-<section data-panel="learners" class="workspace-hidden"><div class="workspace-panel"><h2>Private learner roster</h2><p>Learners join only through one-use, revocable, expiring invitations. A learner must be signed in to redeem a code.</p><form data-learner-code-form class="workspace-row"><label class="workspace-field">Expiry in hours<input name="expiresInHours" type="number" min="1" max="720" value="72"></label><button class="workspace-button workspace-button--primary" type="submit">Create learner invite</button></form><div data-generated-code-wrap class="workspace-status" data-kind="success" hidden>Copy now — raw code: <strong data-generated-code></strong></div><h3>Issued learner invites</h3><ul data-code-list class="workspace-list"><li class="workspace-empty">Loading issued invites…</li></ul><button data-load-roster class="workspace-button" type="button">Refresh active roster</button><ul data-roster-list class="workspace-list"><li class="workspace-empty">Select refresh to view active members.</li></ul></div></section>
-<section data-panel="distribution" class="workspace-hidden"><div class="workspace-panel"><h2>Approved course distribution</h2><p>Only an approved published course can be enabled. This never publishes an unreviewed course and never bypasses administrator approval.</p><label class="workspace-field">Approved course<select data-course-select aria-label="Choose approved course for distribution"></select></label><div class="workspace-row"><button data-set-organisation-distribution class="workspace-button" type="button">Enable for my organisation</button><button data-request-platform-release class="workspace-button" type="button">Request platform-wide release</button></div><label class="workspace-field">Assign selected learners only <span>Paste active learner IDs from the private roster, separated by commas. The server verifies they belong to your organisation.</span><input data-assigned-learner-ids></label><button data-set-assigned-distribution class="workspace-button workspace-button--primary" type="button">Save selected-learner assignment</button></div><div data-learner-preview class="workspace-preview workspace-hidden"><div class="workspace-preview-bar"><span>View as learner · no data saved</span><span>Course catalogue</span></div><div class="workspace-preview-content"><h3>Continue learning</h3><p>Only the assigned, approved theory course appears here.</p><button class="workspace-button workspace-button--primary" type="button">Open course</button></div></div></section>
-</div></div></main></div><script type="module" src="/workspace.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Teacher workspace · Type2Learn</title>
+  <link rel="preload" href="/assets/type2learn-logo-nav.webp" as="image" type="image/webp">
+  <link rel="stylesheet" href="/workspace.css">
+</head>
+<body data-workspace="teacher" class="workspace-auth-pending">
+  <div class="workspace-access-gate" data-workspace-gate role="status" aria-live="polite" aria-busy="true">
+    <div>
+      <p class="workspace-eyebrow">Type2Learn</p>
+      <h1>Checking private workspace access…</h1>
+      <p data-workspace-gate-message>Please wait while access is verified.</p>
+    </div>
+  </div>
+
+  <div class="workspace-shell" data-workspace-shell aria-hidden="true" inert>
+    <header class="workspace-header">
+      <a class="workspace-brand" href="/" aria-label="Type2Learn home">
+        <img class="workspace-brand-logo" src="/assets/type2learn-logo-nav.webp" alt="Type2Learn">
+      </a>
+      <div class="workspace-header-actions">
+        <span data-role-name class="workspace-tag">Checking access</span>
+        <button class="workspace-button workspace-button--quiet" data-view-learner type="button">View as learner</button>
+        <button class="workspace-button workspace-button--quiet" data-sign-out type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main class="workspace-main">
+      <p class="workspace-eyebrow">Private teacher workspace</p>
+      <h1 class="workspace-title">Turn your teaching into a calm online course.</h1>
+      <p class="workspace-intro">Bring the material you already use. Type2Learn keeps it private, then an administrator prepares the bilingual, accessible learner course with you—not a generic copy of your notes.</p>
+      <div data-workspace-status class="workspace-status" role="status" aria-live="polite" hidden></div>
+      <div data-role-required class="workspace-status" data-kind="warning" hidden>This page needs a teacher role. Redeem a one-use authorised code first.</div>
+
+      <div class="workspace-layout" data-private-workspace>
+        <nav class="workspace-nav" aria-label="Teacher sections">
+          <p>Teacher</p>
+          <button data-workspace-nav="overview" aria-current="page" type="button">Overview</button>
+          <button data-workspace-nav="submit" type="button">Create a course</button>
+          <button data-workspace-nav="learners" type="button">Learners</button>
+          <button data-workspace-nav="distribution" type="button">Share approved courses</button>
+        </nav>
+
+        <div class="workspace-content">
+          <section data-panel="overview">
+            <div class="workspace-panel">
+              <div class="workspace-panel-heading">
+                <div><p class="workspace-eyebrow">Your handover queue</p><h2>Courses you have sent for review</h2></div>
+                <button class="workspace-button workspace-button--primary" type="button" data-workspace-nav="submit">Create a course</button>
+              </div>
+              <p>Each source remains private. The status tells you where it is in the review path; no unreviewed material reaches learners.</p>
+              <ul class="workspace-list" data-submission-list><li class="workspace-empty">Loading submissions…</li></ul>
+            </div>
+            <div class="workspace-grid workspace-grid--three">
+              <article class="workspace-card"><p class="workspace-eyebrow">Your material</p><h3>Use what you already teach</h3><p>Start from a PDF, PowerPoint deck, plain text, Markdown, or CSV notes—up to 25 MB.</p></article>
+              <article class="workspace-card"><p class="workspace-eyebrow">Our conversion</p><h3>Reviewed for Type2Learn</h3><p>Small bilingual modules, learner-safe checks, accessibility supports, and narration choices are reviewed before release.</p></article>
+              <article class="workspace-card"><p class="workspace-eyebrow">Your learners</p><h3>You choose who receives it</h3><p>After approval, enable it for your organisation or selected roster. You remain in control of distribution.</p></article>
+            </div>
+          </section>
+
+          <section data-panel="submit" class="workspace-hidden">
+            <div class="workspace-panel teacher-authoring-panel">
+              <p class="workspace-eyebrow">Create a theory course</p>
+              <h2>Three short steps. We handle the course format.</h2>
+              <p>You do not need to write Type2Learn Markdown or design MCQs. Send clear source material and a short teaching brief; the administrator returns a reviewed learner course for approval.</p>
+
+              <ol class="teacher-authoring-steps" aria-label="Teacher course handover steps">
+                <li><span>1</span><strong>Choose material</strong><small>PDF, PPTX, text, Markdown, or CSV</small></li>
+                <li><span>2</span><strong>Name the learning goal</strong><small>Tell the reviewer what learners should be able to explain</small></li>
+                <li><span>3</span><strong>Send privately</strong><small>Track review here, then share only after approval</small></li>
+              </ol>
+
+              <div class="workspace-grid workspace-grid--three teacher-course-types" aria-label="Available course types">
+                <article class="workspace-card is-selected"><h3>Theory</h3><p>Short readings, examples, typing or alternative responses, knowledge checks, and a final understanding check.</p><button data-course-type="theory" class="workspace-button" type="button">Selected</button></article>
+                <article class="workspace-card is-locked"><h3>Theory + coding</h3><p>Reserved for a reviewed coding engine.</p><button data-course-type="theory-coding" class="workspace-button" type="button" disabled>Coming later</button></article>
+                <article class="workspace-card is-locked"><h3>Project / interactive</h3><p>Reserved for activity-specific authoring.</p><button data-course-type="interactive-project" class="workspace-button" type="button" disabled>Coming later</button></article>
+              </div>
+
+              <form data-source-form class="teacher-source-form" enctype="multipart/form-data">
+                <input data-course-type-input name="courseType" type="hidden" value="theory">
+                <section class="teacher-source-step" aria-labelledby="teacher-source-title">
+                  <div><p class="workspace-eyebrow">Step 1</p><h3 id="teacher-source-title">Choose your course material</h3><p>Use one readable file: PDF, PowerPoint `.pptx`, `.md`, `.markdown`, `.txt`, or `.csv`. Text-based PDFs and slide text can be extracted for review; scanned/image-only files stay private and are marked for transcription.</p></div>
+                  <label class="workspace-field">Course source file<input name="sourceFile" type="file" accept="application/pdf,.pdf,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation,.md,.markdown,.txt,.csv,text/plain,text/markdown,text/csv" required></label>
+                  <p class="workspace-file-summary" data-source-file-summary aria-live="polite">No file chosen yet. Maximum file size: 25 MB.</p>
+                </section>
+
+                <section class="teacher-source-step" aria-labelledby="teacher-brief-title">
+                  <div><p class="workspace-eyebrow">Step 2</p><h3 id="teacher-brief-title">Give the reviewer a teaching brief</h3><p>This private context helps the reviewer preserve your intended learning goal. It is never shown to learners as a score, profile, or assessment result.</p></div>
+                  <div class="workspace-grid">
+                    <label class="workspace-field">Course title<input name="title" maxlength="160" required placeholder="e.g. Introduction to environmental science"></label>
+                    <label class="workspace-field">Source language<select name="sourceLanguage" required><option value="en">English</option><option value="ur">Urdu</option><option value="bilingual">English and Urdu</option></select></label>
+                    <label class="workspace-field workspace-field--full">What should learners be able to explain or do after this course?<textarea name="learningGoal" maxlength="480" required placeholder="e.g. Explain how the water cycle moves water between land, water, and air in their own words."></textarea></label>
+                    <label class="workspace-field workspace-field--full">Who is this for? <span>Optional: age group, class, prerequisite, or context.</span><input name="intendedLearners" maxlength="160" placeholder="e.g. Year 7 science learners who have completed basic weather vocabulary"></label>
+                  </div>
+                </section>
+
+                <section class="teacher-source-step teacher-source-step--submit" aria-labelledby="teacher-send-title">
+                  <div><p class="workspace-eyebrow">Step 3</p><h3 id="teacher-send-title">Send it to private review</h3><p>The source and brief go only to the authorised course-review workflow. You will see the review state in this workspace and can distribute the course only once it is approved.</p></div>
+                  <label class="workspace-field">Organisation ID <span>Usually filled from your teacher membership. Only change it if you belong to more than one organisation.</span><input name="organisationId" maxlength="96" autocomplete="off"></label>
+                  <button class="workspace-button workspace-button--primary" type="submit">Send for Type2Learn review</button>
+                </section>
+              </form>
+              <div class="workspace-status" data-source-next-step hidden aria-live="polite"></div>
+            </div>
+          </section>
+
+          <section data-panel="learners" class="workspace-hidden">
+            <div class="workspace-panel"><h2>Private learner roster</h2><p>Learners join only through one-use, revocable, expiring invitations. A learner must be signed in to redeem a code.</p><form data-learner-code-form class="workspace-row"><label class="workspace-field">Expiry in hours<input name="expiresInHours" type="number" min="1" max="720" value="72"></label><button class="workspace-button workspace-button--primary" type="submit">Create learner invite</button></form><div data-generated-code-wrap class="workspace-status" data-kind="success" hidden>Copy now — raw code: <strong data-generated-code></strong></div><h3>Issued learner invites</h3><ul data-code-list class="workspace-list"><li class="workspace-empty">Loading issued invites…</li></ul><button data-load-roster class="workspace-button" type="button">Refresh active roster</button><ul data-roster-list class="workspace-list"><li class="workspace-empty">Select refresh to view active members.</li></ul></div>
+          </section>
+
+          <section data-panel="distribution" class="workspace-hidden">
+            <div class="workspace-panel"><h2>Share an approved course</h2><p>Only an approved published course can be enabled. This never publishes an unreviewed course and never bypasses administrator approval.</p><label class="workspace-field">Approved course<select data-course-select aria-label="Choose approved course for distribution"></select></label><div class="workspace-row"><button data-set-organisation-distribution class="workspace-button" type="button">Enable for my organisation</button><button data-request-platform-release class="workspace-button" type="button">Request platform-wide release</button></div><label class="workspace-field">Assign selected learners only <span>Paste active learner IDs from the private roster, separated by commas. The server verifies they belong to your organisation.</span><input data-assigned-learner-ids></label><button data-set-assigned-distribution class="workspace-button workspace-button--primary" type="button">Save selected-learner assignment</button></div><div data-learner-preview class="workspace-preview workspace-hidden"><div class="workspace-preview-bar"><span>View as learner · no data saved</span><span>Course catalogue</span></div><div class="workspace-preview-content"><h3>Continue learning</h3><p>Only the assigned, approved theory course appears here.</p><button class="workspace-button workspace-button--primary" type="button">Open course</button></div></div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="/workspace.js"></script>
+</body>
+</html>

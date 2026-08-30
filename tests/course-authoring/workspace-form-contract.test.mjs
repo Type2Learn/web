@@ -4,9 +4,10 @@ import test from 'node:test';
 
 const workspaceUrl = new URL('../../workspace.js', import.meta.url);
 const adminUrl = new URL('../../admin/index.html', import.meta.url);
+const teacherUrl = new URL('../../teacher/index.html', import.meta.url);
 
 test('private educator upload controls use the same source and narration field names as the server', async () => {
-  const [workspace, admin] = await Promise.all([readFile(workspaceUrl, 'utf8'), readFile(adminUrl, 'utf8')]);
+  const [workspace, admin, teacher] = await Promise.all([readFile(workspaceUrl, 'utf8'), readFile(adminUrl, 'utf8'), readFile(teacherUrl, 'utf8')]);
   assert.match(admin, /name="audioFile"/);
   assert.match(admin, /name="sectionId"/);
   assert.match(admin, /data-narration-section-hint/);
@@ -20,8 +21,12 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /\.pptx/);
   assert.match(admin, /data-convert-source/);
   assert.match(admin, /Convert extracted source to reviewed Markdown/);
+  assert.match(admin, /data-authoring-jump="source"/);
+  assert.match(admin, /data-authoring-anchor="form"/);
+  assert.match(admin, /data-authoring-anchor="markdown"/);
   assert.match(workspace, /course-authoring-form\.js/);
   assert.match(workspace, /data-build-and-validate-course/);
+  assert.match(workspace, /data-authoring-jump/);
   assert.match(workspace, /Build &amp; validate course/);
   assert.match(workspace, /<select data-builder-field="\$\{language\}\.typingLevel"/);
   assert.doesNotMatch(workspace, /typingLevel: 'اہم خیال لکھنا'/);
@@ -50,8 +55,19 @@ test('private educator upload controls use the same source and narration field n
   assert.match(workspace, /\/api\/v1\/course-authoring\/review/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/narration\/generate/);
   assert.match(workspace, /data-edit-module/);
+  assert.match(workspace, /data-source-file-summary/);
+  assert.match(workspace, /data-source-next-step/);
+  assert.match(workspace, /authoringBrief/);
   assert.match(workspace, /safe-presentation-text-extracted/);
   assert.match(workspace, /Open and review a draft before publishing it/);
   assert.match(workspace, /correctOptionIndex/);
   assert.doesNotMatch(workspace, /prompt: 'Which answer best matches the reviewed key idea\?'/);
+  assert.match(teacher, /<body data-workspace="teacher" class="workspace-auth-pending">/);
+  assert.match(teacher, /data-workspace-gate/);
+  assert.match(teacher, /application\/pdf/);
+  assert.match(teacher, /\.pptx/);
+  assert.match(teacher, /name="learningGoal"/);
+  assert.match(teacher, /name="sourceLanguage"/);
+  assert.match(teacher, /data-source-file-summary/);
+  assert.match(teacher, /data-source-next-step/);
 });

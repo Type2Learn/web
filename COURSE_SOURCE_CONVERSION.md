@@ -8,6 +8,7 @@ canonical file without treating a model response as curriculum approval.
 
 | Starting material | Recommended route | What happens |
 | --- | --- | --- |
+| Teacher’s existing teaching material | **Teacher workspace → Create a course** | The teacher selects a supported source and adds a private teaching goal, learner context, and source language. The brief helps the human reviewer preserve scope; it is not learner-facing evidence or an automatic curriculum decision. |
 | A new theory course typed into the guided admin sections | **Structured course form → Build & validate course** | The browser deterministically creates canonical Markdown, rejects invalid activity values locally, then sends the reviewed result to the normal server compiler. |
 | A complete reviewed Type2Learn Markdown file | **Import reviewed Markdown directly** | The server parses, validates, and compiles it. |
 | A partially formatted Type2Learn Markdown file | **Private source intake → Convert extracted source** | The fixer normalises the text, repairs its structure if needed, then returns an editable canonical draft. |

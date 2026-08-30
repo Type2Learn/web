@@ -3,8 +3,9 @@ import { readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const [adminHtml, workspaceJs, workspaceCss, courseJs, courseCss, learnJs, learnCss] = await Promise.all([
+const [adminHtml, teacherHtml, workspaceJs, workspaceCss, courseJs, courseCss, learnJs, learnCss] = await Promise.all([
   read('../../admin/index.html'),
+  read('../../teacher/index.html'),
   read('../../workspace.js'),
   read('../../workspace.css'),
   read('../../course/course.js'),
@@ -13,10 +14,13 @@ const [adminHtml, workspaceJs, workspaceCss, courseJs, courseCss, learnJs, learn
   read('../../learn/learn.css')
 ]);
 
-test('B-01: the admin document starts behind a private access gate', () => {
+test('B-01: administrator and teacher documents start behind private access gates', () => {
   assert.match(adminHtml, /<body data-workspace="admin" class="workspace-auth-pending">/);
   assert.match(adminHtml, /data-workspace-gate/);
   assert.match(adminHtml, /data-workspace-shell aria-hidden="true" inert/);
+  assert.match(teacherHtml, /<body data-workspace="teacher" class="workspace-auth-pending">/);
+  assert.match(teacherHtml, /data-workspace-gate/);
+  assert.match(teacherHtml, /data-workspace-shell aria-hidden="true" inert/);
   assert.match(workspaceCss, /workspace-auth-pending \.workspace-shell[\s\S]*display: none !important/);
 });
 
