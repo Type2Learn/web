@@ -987,6 +987,30 @@ const bindPublishing = () => {
   $('[data-approve-course]')?.addEventListener('click', async () => {
     try { await api('/api/v1/course-authoring/transition', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selectedCourse(), status: 'approved', reviewNote: 'Administrator approval after learner-preview, accessibility, MCQ, narration, and backup review.' }) }); status('Administrator approval recorded. The course can now pass through the final publication gate.', 'success'); await loadCourses(); } catch (error) { status(error.message, 'error'); }
   });
+  $('[data-delete-course]')?.addEventListener('click', async () => {
+    try {
+      const selected = selectedCourse();
+      const course = selectedCourseRecord();
+      const title = course?.title?.en || selected.courseId;
+      if (DEMO) { status('Preview mode cannot remove a course. A signed-in administrator must type DELETE before the protected endpoint will remove it.', 'warning'); return; }
+      if (!confirm(`Remove “${title}” (${selected.version}) from the workspace and learner catalogue? Its private source, immutable backup receipt, audit trail, and learner data will be retained.`)) return;
+      if (prompt('Type DELETE to remove this course version.') !== 'DELETE') {
+        status('Course removal was cancelled. The confirmation text did not match.', 'warning');
+        return;
+      }
+      const result = await api('/api/v1/course-authoring/course', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selected, confirmation: 'DELETE' }) });
+      courses = courses.filter((entry) => !(entry.courseId === selected.courseId && entry.version === selected.version));
+      renderCourses();
+      const markdown = $('[data-markdown]');
+      if (markdown) markdown.value = '';
+      const sourceSubmission = $('[data-authoring-submission]');
+      if (sourceSubmission) sourceSubmission.value = '';
+      status(`${result.courseId}@${result.version} was removed from the workspace and learner catalogue. Its source and immutable records were retained.`, 'success');
+      await loadSubmissions();
+      await loadCourses();
+      show('overview');
+    } catch (error) { status(error.message, 'error'); }
+  });
 };
 const bindRoster = () => {
   const loadRoster = async () => {

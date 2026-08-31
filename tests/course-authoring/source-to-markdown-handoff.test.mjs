@@ -43,6 +43,7 @@ class MemoryDocument {
     const current = this.store.records.get(key) || {};
     this.store.records.set(key, structuredClone(options.merge ? { ...current, ...value } : value));
   }
+  async delete() { this.store.records.delete(this.store.key(this.parts)); }
 }
 
 class MemoryStorage {
@@ -199,6 +200,56 @@ test('a private non-text teacher source can be reviewed, downloaded by an admin,
   });
   const courseRecord = (await firestore.collection('type2learnCourseAuthoring').doc('workspace').collection('courses').doc('new-theory-course@1.0.0').get()).data();
   assert.equal(courseRecord.submissionId, source.submission.submissionId);
+});
+
+test('an administrator can deliberately remove a reviewed course from the workspace and learner catalogue without erasing its private source trail', async () => {
+  const { firestore, service } = createService();
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({
+      courseType: 'theory',
+      organisationId: 'org-water',
+      title: 'Withdrawn water course source',
+      sourceFile: binaryFile('withdrawn-water.txt', 'text/plain', 'Water can move between land, water, and air. Review the water cycle in small stages.')
+    })
+  });
+  await service.saveMarkdown({
+    authorization: authorisation,
+    body: {
+      courseId: 'withdrawn-water-course',
+      version: '1.0.0',
+      submissionId: source.submission.submissionId,
+      markdown: THEORY_COURSE_TEMPLATE.replace('id: replace-with-course-id', 'id: withdrawn-water-course')
+    }
+  });
+  await firestore.collection('type2learnCourseAuthoring').doc('workspace').collection('courses').doc('withdrawn-water-course@1.0.0').set({ status: 'published' }, { merge: true });
+
+  await assert.rejects(
+    service.deleteCourse({ authorization: authorisation, body: { courseId: 'withdrawn-water-course', version: '1.0.0', confirmation: 'remove' } }),
+    /Type DELETE to confirm/
+  );
+
+  const removed = await service.deleteCourse({
+    authorization: authorisation,
+    body: { courseId: 'withdrawn-water-course', version: '1.0.0', confirmation: 'DELETE' }
+  });
+  assert.deepEqual(removed, {
+    deleted: true,
+    courseId: 'withdrawn-water-course',
+    version: '1.0.0',
+    wasPublished: true,
+    sourceSubmissionRetained: true
+  });
+  assert.deepEqual((await service.listCourses({ authorization: authorisation })).courses, []);
+  await assert.rejects(
+    service.courseSummary({ authorization: authorisation, courseId: 'withdrawn-water-course', version: '1.0.0' }),
+    /This course draft was not found/
+  );
+  const retainedSubmission = (await firestore.collection('type2learnCourseAuthoring').doc('workspace').collection('submissions').doc(source.submission.submissionId).get()).data();
+  assert.equal(retainedSubmission.status, 'course-deleted');
+  assert.equal(retainedSubmission.source.originalName, 'withdrawn-water.txt');
+  const auditRecords = await firestore.collection('type2learnCourseAuthoring').doc('workspace').collection('audit').get();
+  assert.ok(auditRecords.docs.some((entry) => entry.data().action === 'course-deleted-from-workspace'));
 });
 
 test('a text-based PDF is extracted privately, reports its page count, and is available only through administrator review', async () => {

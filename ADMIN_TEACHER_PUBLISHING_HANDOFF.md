@@ -124,6 +124,7 @@ Start in this order; it gives the quickest accurate picture without exposing pri
 - `server/course-backup-service.mjs` is the publishing gate. Before it allows publication, it requires verified Firebase, private GitHub metadata, Supabase package storage, and a human-acknowledged downloadable ZIP. It rejects attempts made before `backups-pending` and blocks if any receipt is missing.
 - `server/course-package.mjs` builds deterministic package ZIPs. Never commit raw educator uploads, learner data, credentials, raw codes, or Firebase service-account data to GitHub.
 - `server/course-catalog-service.mjs` handles publishing/distribution, organisation-only and selected-learner assignment states, and platform-wide release requests. Admin approval remains the final release boundary.
+- `DELETE /api/v1/course-authoring/course` is an administrator-only, explicit course-removal path. It requires a `DELETE` confirmation, immediately removes the selected course version from the private workspace and learner catalogue, records the action, and retains the separate private source, immutable backup receipt, audit trail, and learner data rather than silently purging them.
 
 ### 5. Reusable learner course player
 

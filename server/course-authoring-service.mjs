@@ -742,6 +742,44 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       return { courses: snapshot.docs.map((document) => document.data() || {}).filter((record) => canReadCourse(account, record)).map(noSecrets) };
     },
 
+    // COURSE REMOVAL -----------------------------------------------------------
+    // A platform administrator may deliberately withdraw a course version from
+    // the private workspace and learner catalogue. This removes the course
+    // document immediately, including a published one, but purposefully keeps
+    // its private source submission, immutable backup receipt, and audit trail
+    // intact. Those records are evidence of the original review, not learner
+    // course content; learner progress is also never silently erased here.
+    async deleteCourse({ authorization, body }) {
+      const admin = await requireAdmin(authorization);
+      const confirmation = String(body?.confirmation || '').trim().toUpperCase();
+      if (confirmation !== 'DELETE') {
+        throw apiError(400, 'COURSE_DELETE_CONFIRMATION_REQUIRED', 'Type DELETE to confirm that this course version should be removed from the workspace and learner catalogue.');
+      }
+      const { reference, record } = await courseFor(body?.courseId, body?.version);
+      const wasPublished = record.status === 'published';
+      await reference.delete();
+      const submissionId = workspaceIdentifier(record.submissionId);
+      if (submissionId) {
+        await sourceCollection(firebase.firestore, 'submissions').doc(submissionId).set({
+          status: 'course-deleted',
+          courseId: record.courseId,
+          version: record.version,
+          deletedAt: nowIso(),
+          deletedBy: admin.uid,
+          updatedAt: nowIso()
+        }, { merge: true });
+      }
+      await audit(firebase.firestore, {
+        actorUid: admin.uid,
+        action: 'course-deleted-from-workspace',
+        courseId: record.courseId,
+        version: record.version,
+        wasPublished,
+        submissionId
+      });
+      return { deleted: true, courseId: record.courseId, version: record.version, wasPublished, sourceSubmissionRetained: Boolean(submissionId) };
+    },
+
     async saveMarkdown({ authorization, body }) {
       const admin = await requireAdmin(authorization);
       const markdown = String(body?.markdown || '');

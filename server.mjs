@@ -374,6 +374,9 @@ const handleApi = async (request, response, pathname, runtime) => {
     if (request.method === 'GET' && pathname === '/api/v1/course-authoring/courses') {
       return sendJson(response, 200, await courseAuthoring.listCourses({ authorization: request.headers.authorization }));
     }
+    if (request.method === 'DELETE' && pathname === '/api/v1/course-authoring/course') {
+      return sendJson(response, 200, await courseAuthoring.deleteCourse({ authorization: request.headers.authorization, body: await readJson(request) }));
+    }
     if (request.method === 'POST' && pathname === '/api/v1/course-authoring/markdown') {
       return sendJson(response, 200, await courseAuthoring.saveMarkdown({ authorization: request.headers.authorization, body: await readJson(request, 256 * 1024) }));
     }

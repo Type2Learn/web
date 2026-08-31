@@ -58,6 +58,9 @@ test('private educator upload controls use the same source and narration field n
   assert.match(workspace, /data-edit-module/);
   assert.match(workspace, /data-source-file-summary/);
   assert.match(workspace, /data-source-next-step/);
+  assert.match(workspace, /data-delete-course/);
+  assert.match(workspace, /course-authoring\/course', \{ method: 'DELETE'/);
+  assert.match(workspace, /Type DELETE to remove this course version/);
   assert.match(workspace, /authoringBrief/);
   assert.match(workspace, /safe-presentation-text-extracted/);
   assert.match(workspace, /Open and review a draft before publishing it/);
@@ -71,6 +74,8 @@ test('private educator upload controls use the same source and narration field n
   assert.match(teacher, /name="sourceLanguage"/);
   assert.match(teacher, /data-source-file-summary/);
   assert.match(teacher, /data-source-next-step/);
+  assert.match(admin, /data-delete-course/);
+  assert.match(admin, /Remove a course version/);
 });
 
 test('teacher navigation keeps every primary route visible on a narrow screen', async () => {

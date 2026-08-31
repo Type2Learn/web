@@ -48,6 +48,8 @@ body.workspace-access-denied .workspace-access-gate { display: grid; }
 .workspace-content { min-width: 0; }
 .workspace-panel { margin-bottom: 22px; padding: clamp(20px, 3.2vw, 34px); border: 1px solid var(--workspace-line); border-radius: var(--workspace-radius); background: var(--workspace-panel); }
 .workspace-panel > :first-child { margin-top: 0; }
+.workspace-panel--danger { border-color: #efb9b4; background: #fffafa; }
+.workspace-panel--danger .workspace-eyebrow { color: var(--workspace-danger); }
 .workspace-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .workspace-panel-heading > div { min-width: 0; }
 .workspace-panel-heading .workspace-eyebrow { margin-bottom: 6px; }
