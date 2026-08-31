@@ -585,18 +585,30 @@ const bindAuthoring = () => {
       const conversionOutput = $('[data-source-conversion-output]');
       const conversion = result.conversion || null;
       if (conversionOutput && conversion) {
-        const summary = {
-          readyForHumanReview: Boolean(conversion.readyForHumanReview),
-          provider: conversion.provider || 'deterministic',
-          validation: conversion.validation,
-          checks: conversion.checks,
-          critic: conversion.critic,
-          updatedAt: conversion.updatedAt
-        };
-        conversionOutput.textContent = `Saved conversion draft — still requires human review:\n${JSON.stringify(summary, null, 2)}`;
-        if (conversion.markdown && template) {
-          template.value = conversion.markdown;
-          syncAuthoringMetadata(conversion.markdown);
+        if (conversion.state === 'running') {
+          conversionOutput.textContent = 'Conversion is running securely in the background. This source remains private. Keep this page open or return shortly to review the saved Markdown draft.';
+          const convertButton = $('[data-convert-source]');
+          if (convertButton) convertButton.disabled = true;
+          window.setTimeout(() => {
+            if (String($('[data-authoring-submission]')?.value || '') === submissionId) openSourceReview(submissionId);
+          }, 5000);
+        } else if (conversion.state === 'failed') {
+          conversionOutput.textContent = conversion.failure || 'Automated conversion did not complete. Re-open the source review and retry, or use the guided form and reviewed Markdown template.';
+        } else {
+          const summary = {
+            state: conversion.state || 'complete',
+            readyForHumanReview: Boolean(conversion.readyForHumanReview),
+            provider: conversion.provider || 'deterministic',
+            validation: conversion.validation,
+            checks: conversion.checks,
+            critic: conversion.critic,
+            updatedAt: conversion.updatedAt
+          };
+          conversionOutput.textContent = `Saved conversion draft — still requires human review:\n${JSON.stringify(summary, null, 2)}`;
+          if (conversion.markdown && template) {
+            template.value = conversion.markdown;
+            syncAuthoringMetadata(conversion.markdown);
+          }
         }
       } else if (conversionOutput) {
         conversionOutput.textContent = result.requiresAdminTranscription
@@ -604,10 +616,15 @@ const bindAuthoring = () => {
           : 'Conversion runs only when an administrator requests it. It uses extracted text, strict canonical validation, an AI repair when needed, and a separate critique. The resulting Markdown still requires human review before compiling or publishing.';
       }
       const convertButton = $('[data-convert-source]');
-      if (convertButton) convertButton.disabled = Boolean(result.requiresAdminTranscription || !result.extractedText);
+      if (convertButton) convertButton.disabled = Boolean(result.requiresAdminTranscription || !result.extractedText || conversion?.state === 'running');
       if ($('[data-ai-source-excerpt]') && result.extractedText) $('[data-ai-source-excerpt]').value = result.extractedText.slice(0, 12000);
       if ($('[data-authoring-organisation]') && !($('[data-authoring-organisation]').value)) $('[data-authoring-organisation]').value = result.submission?.ownerOrganisationId || '';
-      status('Private source review opened for the administrator. It is never exposed to learner pages.', 'success');
+      const reviewMessage = conversion?.state === 'running'
+        ? 'The conversion is still running. Type2Learn will show the draft or a clear review message when it finishes.'
+        : conversion?.state === 'failed'
+          ? 'The automated conversion did not complete. Your private source is still safe and available for review.'
+          : 'Private source review opened for the administrator. It is never exposed to learner pages.';
+      status(reviewMessage, conversion?.state === 'running' || conversion?.state === 'failed' ? 'warning' : 'success');
       await loadSubmissions();
     } catch (error) { status(error.message, 'error'); }
   };
@@ -756,9 +773,19 @@ const bindAuthoring = () => {
         body: JSON.stringify({
           submissionId,
           courseId: $('[data-authoring-course-id]')?.value,
-          version: $('[data-authoring-version]')?.value
+          version: $('[data-authoring-version]')?.value,
+          // A complete bilingual course can take longer than a gateway's
+          // request window. The server persists a visible running state and
+          // finishes this explicit admin job without leaving the review stuck.
+          background: true
         })
       });
+      if (result.queued) {
+        if (output) output.textContent = 'Conversion is running securely in the background. The source remains private; this page will refresh the review when a draft is ready.';
+        status('Conversion started. You can continue reviewing other material while the Markdown draft is prepared.', 'success');
+        window.setTimeout(() => openSourceReview(submissionId), 2500);
+        return;
+      }
       if (template && result.markdown) {
         template.value = result.markdown;
         syncAuthoringMetadata(result.markdown);

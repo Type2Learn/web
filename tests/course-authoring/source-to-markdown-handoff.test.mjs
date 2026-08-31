@@ -401,6 +401,70 @@ test('a malformed model draft receives one bounded AI repair and remains review-
   assert.ok(conversion.stages.some((stage) => stage.id === 'ai-structure-repair' && stage.passed));
 });
 
+test('a long source conversion persists a running state, prevents duplicate jobs, and later saves its reviewed draft', async () => {
+  let releaseConversion;
+  const conversionPending = new Promise((resolve) => { releaseConversion = resolve; });
+  const markdown = THEORY_COURSE_TEMPLATE.replace('id: replace-with-course-id', 'id: background-water-course');
+  const provider = {
+    status: () => ({ available: true }),
+    generate: async (request) => {
+      if (request.purpose === 'course-authoring-conversion') return conversionPending;
+      if (request.purpose === 'course-authoring-critique') return { provider: 'gemini', text: JSON.stringify({ decision: 'ready-for-human-review', issues: [] }) };
+      throw new Error(`Unexpected purpose ${request.purpose}`);
+    }
+  };
+  const firestore = new MemoryFirestore();
+  const storage = new MemoryStorage();
+  const account = { uid: 'admin-1', roles: ['platform-admin'], organisations: [{ organisationId: 'org-water', active: true }] };
+  const service = createCourseAuthoringService({
+    firebase: { available: true, firestore, storage, auth: {} }, config: { educatorWorkspaceEnabled: true },
+    access: { accountFor: async () => account, assertAdmin: async () => account, assertOrganisationAccess: async () => account }, provider
+  });
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({ courseType: 'theory', organisationId: 'org-water', title: 'Background water source', sourceFile: binaryFile('background-water.txt', 'text/plain', 'Water moves between land, water, and air. Rain can refill a water source.') })
+  });
+  const body = { submissionId: source.submission.submissionId, courseId: 'background-water-course', version: '1.0.0', background: true };
+  const queued = await service.convertSourceToMarkdown({ authorization: authorisation, body });
+  assert.deepEqual(queued, { submissionId: source.submission.submissionId, courseId: 'background-water-course', version: '1.0.0', queued: true, state: 'running', reviewRequired: true });
+  const running = await service.submissionReview({ authorization: authorisation, submissionId: source.submission.submissionId });
+  assert.equal(running.submission.status, 'conversion-running');
+  assert.equal(running.conversion.state, 'running');
+  assert.equal(running.conversion.markdown, '');
+  const duplicate = await service.convertSourceToMarkdown({ authorization: authorisation, body });
+  assert.equal(duplicate.state, 'running');
+  releaseConversion({ provider: 'gemini', text: JSON.stringify({ markdown }) });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  const complete = await service.submissionReview({ authorization: authorisation, submissionId: source.submission.submissionId });
+  assert.equal(complete.conversion.state, 'complete');
+  assert.equal(complete.conversion.readyForHumanReview, true);
+  assert.match(complete.conversion.markdown, /^format: type2learn-theory-course\/v1$/m);
+});
+
+test('a failed background conversion is persisted as a reviewable failure instead of leaving the source reviewed forever', async () => {
+  const provider = { status: () => ({ available: true }), generate: async () => { throw new Error('provider unavailable'); } };
+  const firestore = new MemoryFirestore();
+  const storage = new MemoryStorage();
+  const account = { uid: 'admin-1', roles: ['platform-admin'], organisations: [{ organisationId: 'org-water', active: true }] };
+  const service = createCourseAuthoringService({
+    firebase: { available: true, firestore, storage, auth: {} }, config: { educatorWorkspaceEnabled: true },
+    access: { accountFor: async () => account, assertAdmin: async () => account, assertOrganisationAccess: async () => account }, provider
+  });
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({ courseType: 'theory', organisationId: 'org-water', title: 'Unavailable model source', sourceFile: binaryFile('unavailable.txt', 'text/plain', 'This source contains enough text for a course conversion attempt, but the configured model is unavailable today.') })
+  });
+  await service.convertSourceToMarkdown({ authorization: authorisation, body: { submissionId: source.submission.submissionId, courseId: 'unavailable-model-course', version: '1.0.0', background: true } });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  const review = await service.submissionReview({ authorization: authorisation, submissionId: source.submission.submissionId });
+  assert.equal(review.submission.status, 'conversion-needs-review');
+  assert.equal(review.conversion.state, 'failed');
+  assert.match(review.conversion.failure, /Automated conversion did not complete/);
+  assert.equal(review.conversion.markdown, '');
+});
+
 test('reviewed Markdown cannot silently diverge from the form identifiers or source organisation', async () => {
   const { service } = createService();
   const markdown = THEORY_COURSE_TEMPLATE.replace('id: replace-with-course-id', 'id: valid-course-id');

@@ -437,7 +437,12 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
     return { reference: snapshot.ref, record: snapshot.data() || {} };
   };
 
-  return {
+  // A large, bilingual source conversion can legitimately outlast an HTTP
+  // gateway's request window. Keep the work server-side after an admin has
+  // explicitly started it, while persisting every state so the review screen
+  // can report progress, success, or failure honestly on refresh.
+  let service;
+  service = {
     status: () => ({
       enabled: Boolean(config?.educatorWorkspaceEnabled),
       firebase: Boolean(firebase?.available && firebase.firestore),
@@ -538,6 +543,10 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         extractedText: isExtractedSource(record.source) ? String(record.source?.extractedText || '') : '',
         requiresAdminTranscription: !isExtractedSource(record.source),
         conversion: record.sourceConversion ? {
+          state: record.sourceConversion.state || 'complete',
+          startedAt: record.sourceConversion.startedAt || '',
+          failedAt: record.sourceConversion.failedAt || '',
+          failure: record.sourceConversion.failure || '',
           readyForHumanReview: Boolean(record.sourceConversion.readyForHumanReview),
           provider: record.sourceConversion.provider || 'deterministic',
           updatedAt: record.sourceConversion.updatedAt || '',
@@ -574,6 +583,72 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const version = clean(body?.version, 32) || clean(sourceValidation.metadata?.version, 32) || '1.0.0';
       if (!/^[a-z0-9][a-z0-9-]{2,79}$/.test(courseId)) throw apiError(400, 'CONVERSION_COURSE_ID_INVALID', 'Use a lowercase course ID with letters, numbers, and hyphens.');
       if (!/^\d+\.\d+(?:\.\d+)?$/.test(version)) throw apiError(400, 'CONVERSION_VERSION_INVALID', 'Use a semantic-style version such as 1.0.0.');
+
+      if (body?.background === true) {
+        if (record.sourceConversion?.state === 'running') {
+          return { submissionId, courseId, version, queued: true, state: 'running', reviewRequired: true };
+        }
+        const startedAt = nowIso();
+        await reference.set({
+          status: 'conversion-running',
+          sourceConversion: {
+            state: 'running',
+            courseId,
+            version,
+            provider: 'pending',
+            validation: { valid: false, errors: [] },
+            checks: [],
+            critic: null,
+            readyForHumanReview: false,
+            reviewRequired: true,
+            startedAt,
+            updatedAt: startedAt,
+            updatedBy: admin.uid
+          },
+          updatedAt: startedAt,
+          reviewedBy: admin.uid
+        }, { merge: true });
+        await audit(firebase.firestore, {
+          actorUid: admin.uid,
+          action: 'course-source-conversion-started',
+          submissionId,
+          courseId,
+          version
+        });
+        queueMicrotask(() => {
+          void service.convertSourceToMarkdown({ authorization, body: { ...body, background: false } }).catch(async () => {
+            const failedAt = nowIso();
+            try {
+              await reference.set({
+                status: 'conversion-needs-review',
+                sourceConversion: {
+                  state: 'failed',
+                  courseId,
+                  version,
+                  provider: 'unavailable',
+                  validation: { valid: false, errors: [] },
+                  checks: [],
+                  critic: null,
+                  readyForHumanReview: false,
+                  reviewRequired: true,
+                  startedAt,
+                  failedAt,
+                  updatedAt: failedAt,
+                  updatedBy: admin.uid,
+                  failure: 'Automated conversion did not complete. Re-open the source review and retry, or use the guided form and reviewed Markdown template.'
+                },
+                updatedAt: failedAt,
+                reviewedBy: admin.uid
+              }, { merge: true });
+              await audit(firebase.firestore, { actorUid: admin.uid, action: 'course-source-conversion-failed', submissionId, courseId, version });
+            } catch {
+              // The source remains private and reviewable even if a transient
+              // database error prevents recording this attempt's result.
+            }
+          });
+        });
+        return { submissionId, courseId, version, queued: true, state: 'running', reviewRequired: true };
+      }
 
       const sourceExcerpt = normaliseSourceText(sourceText, MAX_AI_SOURCE_CHARS);
       const stages = [];
@@ -667,6 +742,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const criticReady = !critic || critic.decision === 'ready-for-human-review';
       const readyForHumanReview = Boolean(checks.validation.valid && checks.deterministicPassed && criticReady);
       const sourceConversion = {
+        state: 'complete',
         markdown: checks.markdown,
         courseId,
         version,
@@ -1030,4 +1106,5 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       return { narration, status: record.status === 'admin-review' ? 'audio-ready' : record.status };
     }
   };
+  return service;
 };
