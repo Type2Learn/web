@@ -408,6 +408,49 @@ test('a malformed model draft receives one bounded AI repair and remains review-
   assert.ok(conversion.stages.some((stage) => stage.id === 'ai-structure-repair' && stage.passed));
 });
 
+test('a structurally valid draft is repaired when named learning-goal requirements are missing from learner modules', async () => {
+  const calls = [];
+  const initial = THEORY_COURSE_TEMPLATE.replace('id: replace-with-course-id', 'id: pakistan-named-goals');
+  const repaired = initial
+    .replace(/### Title\nOne small idea/g, '### Title\nSir Syed Ahmad Khan, Allama Muhammad Iqbal, and Quaid-e-Azam Muhammad Ali Jinnah')
+    .replace(/### Definition\nThis is a short definition\./g, '### Definition\nSir Syed Ahmad Khan, Allama Muhammad Iqbal, and Quaid-e-Azam Muhammad Ali Jinnah are reviewed in this source.');
+  const provider = {
+    status: () => ({ available: true }),
+    generate: async (request) => {
+      calls.push(request);
+      if (request.purpose === 'course-authoring-conversion') return { provider: 'gemini', text: JSON.stringify({ markdown: initial }) };
+      if (request.purpose === 'course-authoring-repair') return { provider: 'openai', text: JSON.stringify({ markdown: repaired }) };
+      if (request.purpose === 'course-authoring-critique') return { provider: 'gemini', text: JSON.stringify({ decision: 'ready-for-human-review', issues: [] }) };
+      throw new Error(`Unexpected purpose ${request.purpose}`);
+    }
+  };
+  const firestore = new MemoryFirestore();
+  const storage = new MemoryStorage();
+  const account = { uid: 'admin-1', roles: ['platform-admin'], organisations: [{ organisationId: 'org-water', active: true }] };
+  const service = createCourseAuthoringService({
+    firebase: { available: true, firestore, storage, auth: {} }, config: { educatorWorkspaceEnabled: true },
+    access: { accountFor: async () => account, assertAdmin: async () => account, assertOrganisationAccess: async () => account }, provider
+  });
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({
+      courseType: 'theory', organisationId: 'org-water', title: 'Pakistan Studies named goals',
+      learningGoal: 'Explain contributions of Sir Syed Ahmad Khan, Allama Muhammad Iqbal, and Quaid-e-Azam Muhammad Ali Jinnah.',
+      sourceFile: binaryFile('pakistan.txt', 'text/plain', 'Sir Syed Ahmad Khan, Allama Muhammad Iqbal, and Quaid-e-Azam Muhammad Ali Jinnah are named in this reviewed Pakistan Studies source.')
+    })
+  });
+  const conversion = await service.convertSourceToMarkdown({
+    authorization: authorisation,
+    body: { submissionId: source.submission.submissionId, courseId: 'pakistan-named-goals', version: '1.0.0' }
+  });
+  assert.equal(conversion.validation.valid, true, conversion.validation.errors.join('\n'));
+  assert.equal(conversion.readyForHumanReview, true);
+  assert.ok(conversion.checks.find((check) => check.id === 'learning-goal-module-coverage' && check.passed));
+  assert.deepEqual(calls.map((call) => call.purpose), ['course-authoring-conversion', 'course-authoring-repair', 'course-authoring-critique']);
+  assert.match(calls[0].instructions, /Sir Syed Ahmad Khan; Allama Muhammad Iqbal; Quaid-e-Azam Muhammad Ali Jinnah/);
+  assert.match(calls[1].input, /Learner modules must cover the named learning-goal requirement: Quaid-e-Azam Muhammad Ali Jinnah/);
+});
+
 test('a coherent conventional bilingual model outline is deterministically normalised into the strict reviewed-course contract', async () => {
   const calls = [];
   const looseDraft = `---

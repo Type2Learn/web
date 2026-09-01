@@ -439,7 +439,31 @@ const markdownFromResult = (result) => {
   }
 };
 
-const conversionChecks = ({ markdown, sourceText }) => {
+// A course brief can name essential people, places, or concepts that should
+// be visible in the learner-facing modules—not only in private metadata or a
+// final question. This is deliberately a narrow deterministic signal: it
+// detects multi-word title-cased names and never guesses new curriculum facts.
+const namedLearningGoalTerms = (learningGoal) => {
+  const matches = String(learningGoal || '').match(/\b(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’.-]*)(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’.-]*)+\b/g) || [];
+  return [...new Map(matches
+    .map((term) => clean(term.replace(/[.,;:]+$/g, ''), 120))
+    .filter((term) => term.length >= 7)
+    .map((term) => [term.toLocaleLowerCase(), term]))
+    .values()]
+    .slice(0, 8);
+};
+
+const comparableText = (value) => String(value || '')
+  .toLocaleLowerCase()
+  .replace(/[^\p{L}\p{N}]+/gu, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const moduleText = (parsed) => (parsed?.modules || []).map((module) => Object.values(module?.languages || {})
+  .flatMap((language) => Object.values(language?.fields || {}))
+  .join('\n')).join('\n');
+
+const conversionChecks = ({ markdown, sourceText, learningGoal = '' }) => {
   const normalised = normaliseSourceText(markdown);
   const parsed = parseTheoryMarkdown(normalised);
   const validation = validateTheoryCourse(parsed);
@@ -448,9 +472,20 @@ const conversionChecks = ({ markdown, sourceText }) => {
   const uniqueSourceWords = new Set(sourceWords.map((word) => word.toLowerCase()));
   const candidateWords = normalised.split(/\s+/).filter((word) => word.length >= 4).map((word) => word.toLowerCase());
   const overlap = candidateWords.filter((word) => uniqueSourceWords.has(word)).length;
+  const requiredGoalTerms = namedLearningGoalTerms(learningGoal);
+  const learnerModuleText = comparableText(moduleText(parsed));
+  const missingGoalTerms = requiredGoalTerms.filter((term) => !learnerModuleText.includes(comparableText(term)));
+  const learningGoalCovered = missingGoalTerms.length === 0;
   const checks = [
     { id: 'canonical-format', passed: parsed.format === THEORY_MARKDOWN_FORMAT, message: parsed.format === THEORY_MARKDOWN_FORMAT ? 'Canonical Type2Learn format recognised.' : `Expected ${THEORY_MARKDOWN_FORMAT}.` },
     { id: 'strict-bilingual-schema', passed: validation.valid, message: validation.valid ? 'English, Urdu, modules, typing activities, and checks passed strict validation.' : `${validation.errors.length} strict validation issue${validation.errors.length === 1 ? '' : 's'} found.` },
+    {
+      id: 'learning-goal-module-coverage',
+      passed: learningGoalCovered,
+      message: learningGoalCovered
+        ? (requiredGoalTerms.length ? 'Named learning-goal requirements appear in learner modules.' : 'No named learning-goal requirement needs a module coverage check.')
+        : `Learner modules do not yet cover: ${missingGoalTerms.join(', ')}.`
+    },
     { id: 'source-grounding-signal', passed: sourceWords.length < 12 || overlap >= Math.min(8, Math.max(3, Math.floor(sourceWords.length * 0.015))), message: sourceWords.length < 12 || overlap >= Math.min(8, Math.max(3, Math.floor(sourceWords.length * 0.015))) ? 'Candidate retains source-language evidence for human review.' : 'Candidate has too little visible overlap with the extracted source; verify factual grounding.' },
     { id: 'placeholder-scan', passed: !placeholderPattern.test(normalised), message: !placeholderPattern.test(normalised) ? 'No obvious authoring placeholders were found.' : 'Possible placeholder wording remains; complete it before approval.' }
   ];
@@ -458,11 +493,12 @@ const conversionChecks = ({ markdown, sourceText }) => {
     markdown: normalised,
     validation,
     checks,
+    missingGoalTerms,
     // The parser/schema checks are release-blocking; source-overlap and
-    // placeholder signals are deliberately visible review warnings. They
-    // cannot silently publish a draft, but they also should not hide a useful
-    // incomplete draft from the human who needs to correct it.
-    deterministicPassed: checks.filter((check) => ['canonical-format', 'strict-bilingual-schema'].includes(check.id)).every((check) => check.passed),
+    // placeholder signals are deliberately visible review warnings. Named
+    // brief requirements are release-blocking: a valid-looking draft that
+    // omits an explicit required person or concept must be repaired first.
+    deterministicPassed: checks.filter((check) => ['canonical-format', 'strict-bilingual-schema', 'learning-goal-module-coverage'].includes(check.id)).every((check) => check.passed),
     groundingWarning: !checks.find((check) => check.id === 'source-grounding-signal')?.passed
   };
 };
@@ -749,10 +785,12 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       }
 
       const sourceExcerpt = normaliseSourceText(sourceText, MAX_AI_SOURCE_CHARS);
+      const learningGoal = clean(record.authoringBrief?.learningGoal, 480);
+      const requiredLearningGoalTerms = namedLearningGoalTerms(learningGoal);
       const stages = [];
       let providerName = 'deterministic';
       let candidate = withCanonicalIdentity(sourceText, { courseId, version });
-      let checks = conversionChecks({ markdown: candidate, sourceText });
+      let checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
 
       const generateMarkdown = async ({ purpose, currentMarkdown = '', validationErrors = [] }) => {
         if (!provider?.status?.().available) throw apiError(503, 'AI_CONVERSION_NOT_CONFIGURED', 'AI course conversion is not configured. You can use the guided authoring form or reviewed Markdown template.');
@@ -777,6 +815,9 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
             `Return exactly one JSON object containing a complete Markdown document using ${THEORY_MARKDOWN_FORMAT}.`,
             'Write concise, age-respectful English and faithful Urdu. Do not invent factual claims, diagnoses, personal data, citations, scores, or learner labels.',
             'Keep every module small. Include all required bilingual fields, one safe typing activity, and one four-choice check per module plus matching final questions.',
+            requiredLearningGoalTerms.length
+              ? `Each of these named learning-goal requirements must be visibly covered in learner-facing module content: ${requiredLearningGoalTerms.join('; ')}. Do not place a required name only in metadata or a final question.`
+              : 'Keep the learner-facing modules aligned with the reviewed learning goal.',
             'Question alternatives may be plausible misconceptions but must remain clearly reviewable. The result is never publishable without administrator review.',
             CANONICAL_MARKDOWN_CONTRACT
           ].join(' '),
@@ -785,15 +826,16 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
             version,
             submittedTitle: clean(record.submittedTitle, 160),
             authoringBrief: {
-              learningGoal: clean(record.authoringBrief?.learningGoal, 480),
+              learningGoal,
               intendedLearners: clean(record.authoringBrief?.intendedLearners, 160),
               sourceLanguage: ['en', 'ur', 'bilingual'].includes(String(record.authoringBrief?.sourceLanguage || '')) ? record.authoringBrief.sourceLanguage : ''
             },
+            requiredLearningGoalTerms,
             extractedSource: sourceExcerpt,
             ...(currentMarkdown ? { currentMarkdown: normaliseSourceText(currentMarkdown, 42_000), validationErrors: validationErrors.slice(0, 40) } : {})
           }),
           jsonSchema: sourceConversionSchema,
-          maxOutputTokens: purpose === 'course-authoring-conversion' ? 3_600 : 3_200
+          maxOutputTokens: purpose === 'course-authoring-conversion' ? 4_800 : 3_800
         });
         const markdown = markdownFromResult(result);
         if (!markdown) throw apiError(502, 'AI_CONVERSION_INVALID', 'The conversion model did not return a usable Markdown draft. No course was created.');
@@ -806,7 +848,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       // call. It still runs the same strict parser and human-review gate.
       if (!checks.validation.valid) {
         candidate = await generateMarkdown({ purpose: 'course-authoring-conversion' });
-        checks = conversionChecks({ markdown: candidate, sourceText });
+        checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
       } else {
         stages.push({ id: 'canonical-source-detected', passed: true, provider: 'deterministic' });
       }
@@ -814,21 +856,24 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         const normalisedLooseDraft = canonicaliseLooseCourseDraft(candidate, { courseId, version, submittedTitle: record.submittedTitle });
         if (normalisedLooseDraft) {
           candidate = normalisedLooseDraft;
-          checks = conversionChecks({ markdown: candidate, sourceText });
-          stages.push({ id: 'deterministic-loose-markdown-normalisation', passed: checks.validation.valid, provider: 'deterministic' });
+          checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
+          stages.push({ id: 'deterministic-loose-markdown-normalisation', passed: checks.validation.valid && checks.missingGoalTerms.length === 0, provider: 'deterministic' });
         }
       }
-      if (!checks.validation.valid) {
+      if (!checks.validation.valid || checks.missingGoalTerms.length) {
         candidate = await generateMarkdown({
           purpose: 'course-authoring-repair',
           currentMarkdown: candidate,
-          validationErrors: checks.validation.errors
+          validationErrors: [
+            ...checks.validation.errors,
+            ...checks.missingGoalTerms.map((term) => `Learner modules must cover the named learning-goal requirement: ${term}.`)
+          ]
         });
-        checks = conversionChecks({ markdown: candidate, sourceText });
+        checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
       }
 
       let critic = null;
-      if (checks.validation.valid && provider?.status?.().available) {
+      if (checks.deterministicPassed && provider?.status?.().available) {
         try {
           const result = await provider.generate({
             purpose: 'course-authoring-critique',
