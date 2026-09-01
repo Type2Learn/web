@@ -408,6 +408,75 @@ test('a malformed model draft receives one bounded AI repair and remains review-
   assert.ok(conversion.stages.some((stage) => stage.id === 'ai-structure-repair' && stage.passed));
 });
 
+test('a coherent conventional bilingual model outline is deterministically normalised into the strict reviewed-course contract', async () => {
+  const calls = [];
+  const looseDraft = `---
+format: type2learn-theory-course/v1
+id: source-topic
+version: 1.0.0
+title:
+ en: "Pakistan Studies source"
+ ur: "پاکستان اسٹڈیز ماخذ"
+label:
+ en: "Semester demo"
+ ur: "سمسٹر ڈیمو"
+---
+
+# Module 1: Sir Syed and education
+# ماڈیول 1: سر سید اور تعلیم
+
+## Section 1.1: Educational reform
+## سیکشن 1.1: تعلیمی اصلاح
+
+**English:**
+Sir Syed Ahmed Khan promoted modern education after 1857.
+
+**Urdu:**
+سر سید احمد خان نے 1857 کے بعد جدید تعلیم کو فروغ دیا۔
+
+**Target:**
+Education and reform.
+
+# Final Exam
+
+**English:**
+Explain one idea from the reviewed source.
+
+**Urdu:**
+جائزہ شدہ ماخذ سے ایک خیال بیان کریں۔`;
+  const provider = {
+    status: () => ({ available: true }),
+    generate: async (request) => {
+      calls.push(request.purpose);
+      if (request.purpose === 'course-authoring-conversion') return { provider: 'gemini', text: JSON.stringify({ markdown: looseDraft }) };
+      if (request.purpose === 'course-authoring-critique') return { provider: 'gemini', text: JSON.stringify({ decision: 'ready-for-human-review', issues: [] }) };
+      throw new Error(`Unexpected purpose ${request.purpose}`);
+    }
+  };
+  const firestore = new MemoryFirestore();
+  const storage = new MemoryStorage();
+  const account = { uid: 'admin-1', roles: ['platform-admin'], organisations: [{ organisationId: 'org-water', active: true }] };
+  const service = createCourseAuthoringService({
+    firebase: { available: true, firestore, storage, auth: {} }, config: { educatorWorkspaceEnabled: true },
+    access: { accountFor: async () => account, assertAdmin: async () => account, assertOrganisationAccess: async () => account }, provider
+  });
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({ courseType: 'theory', organisationId: 'org-water', title: 'Pakistan Studies source', sourceFile: binaryFile('pakistan-studies.txt', 'text/plain', 'Sir Syed Ahmed Khan promoted modern education after 1857. This source is reviewed before a learner course is released.') })
+  });
+  const conversion = await service.convertSourceToMarkdown({
+    authorization: authorisation,
+    body: { submissionId: source.submission.submissionId, courseId: 'pakistan-studies-source', version: '1.0.0' }
+  });
+  assert.equal(conversion.validation.valid, true, conversion.validation.errors.join('\n'));
+  assert.equal(conversion.readyForHumanReview, true);
+  assert.deepEqual(calls, ['course-authoring-conversion', 'course-authoring-critique']);
+  assert.ok(conversion.stages.some((stage) => stage.id === 'deterministic-loose-markdown-normalisation' && stage.passed));
+  assert.match(conversion.markdown, /^title\.en: Pakistan Studies source$/m);
+  assert.match(conversion.markdown, /^# Module: source-topic-1$/m);
+  assert.match(conversion.markdown, /^# Final exam$/m);
+});
+
 test('a long source conversion persists a running state, prevents duplicate jobs, and later saves its reviewed draft', async () => {
   let releaseConversion;
   const conversionPending = new Promise((resolve) => { releaseConversion = resolve; });

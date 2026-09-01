@@ -344,6 +344,92 @@ const withCanonicalIdentity = (markdown, { courseId, version }) => {
   return missing.length ? `${frontMatter}\n${missing.map(([key, value]) => `${key}: ${value}`).join('\n')}${updated.slice(close)}` : updated;
 };
 
+const looseNestedMetadata = (source, key, language) => {
+  const match = normaliseSourceText(source, 12_000).match(new RegExp(`^${key}:\\s*\\n\\s*${language}:\\s*["']?([^\\n"']+)["']?\\s*$`, 'mi'));
+  return clean(match?.[1], 180);
+};
+const looseLabelledText = (source, language) => {
+  const expression = new RegExp(`\\*\\*${language}:\\*\\*\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*(?:English|Urdu|Target|Question|Options|Answer):\\*\\*|\\n#{1,3}\\s|$)`, 'gi');
+  return [...String(source || '').matchAll(expression)]
+    .map((match) => clean(normaliseSourceText(match[1], 1_400), 700))
+    .filter(Boolean)
+    .join(' ');
+};
+const looseSentence = (value, fallback) => clean(String(value || '').split(/(?<=[.!?؟])\s+/)[0] || fallback, 260);
+const canonicalOptions = ({ question, correct, language }) => {
+  const alternatives = language === 'ur'
+    ? ['ماخذ میں اس خیال کا ذکر نہیں ہے۔', 'ماخذ اس موضوع کو غیر متعلق قرار دیتا ہے۔', 'ماخذ وضاحت کی ضرورت سے انکار کرتا ہے۔']
+    : ['The reviewed source does not mention this idea.', 'The reviewed source treats this topic as unrelated.', 'The reviewed source says no explanation is needed.'];
+  return [`question: ${clean(question, 400)}`, `- [x] ${clean(correct, 320)}`, ...alternatives.map((option) => `- [ ] ${option}`)].join('\n');
+};
+const canonicalModuleLanguage = ({ language, title, definition, target }) => {
+  const urdu = language === 'ur';
+  const daily = urdu ? 'اس ماخذ کو ایک وقت میں ایک خیال کے طور پر دوبارہ پڑھیں۔' : 'Return to one idea from the reviewed source at a time.';
+  const strengths = urdu ? 'اپنے الفاظ میں خیال کو جوڑنے کا موقع۔' : 'A chance to connect the idea in your own words.';
+  const challenges = urdu ? ['متعدد تاریخی نکات کو ایک ساتھ رکھنا۔', 'ماخذ اور اپنی وضاحت میں فرق رکھنا۔'] : ['Holding several historical points together.', 'Separating the source from your own explanation.'];
+  const supports = urdu ? ['ایک مختصر حصے کو دوبارہ پڑھیں۔', 'ایک کلیدی خیال لکھ کر پھر اگلا حصہ دیکھیں۔'] : ['Re-read one short part.', 'Write one key idea before moving to the next part.'];
+  const simple = urdu ? 'اس حصے کا مرکزی خیال اپنے الفاظ میں بیان کریں۔' : 'Explain the central idea of this section in your own words.';
+  const example = urdu ? definition : definition;
+  const hint = urdu ? 'ماخذ میں موجود ایک اہم خیال تلاش کریں۔' : 'Find one important idea stated in the reviewed source.';
+  const question = urdu ? 'اس جائزہ شدہ حصے میں کون سا خیال موجود ہے؟' : 'Which idea is stated in this reviewed section?';
+  return [
+    '### Title', title,
+    '', '### Definition', definition,
+    '', '### Daily life', daily,
+    '', '### Strengths', strengths,
+    '', '### Challenges', ...challenges.map((item) => `- ${item}`),
+    '', '### Supports', ...supports.map((item) => `- ${item}`),
+    '', '### Simple', simple,
+    '', '### Example', example,
+    '', '### Hint', hint,
+    '', '### Typing', `level: Recall typing`, `prompt: ${urdu ? 'اس حصے کا ایک اہم خیال اپنے الفاظ میں لکھیں۔' : 'Type one important idea from this section in your own words.'}`, `target: ${target}`,
+    '', '### Check', canonicalOptions({ question, correct: definition, language })
+  ].join('\n');
+};
+
+// Some models return a coherent but conventional bilingual outline despite an
+// explicit schema prompt. This deterministic adapter recognises only that
+// narrow, labelled shape and renders it into the compiler's fixed contract.
+// It neither invents source facts nor marks the result ready: a reviewer still
+// sees the draft, checks, and source before compiling or publishing.
+const canonicaliseLooseCourseDraft = (markdown, { courseId, version, submittedTitle = '' } = {}) => {
+  const source = normaliseSourceText(markdown);
+  if (!/^#\s+Module\s+\d+\s*:/mi.test(source) || !/\*\*English:\*\*/i.test(source) || !/\*\*Urdu:\*\*/i.test(source)) return '';
+  const headings = [...source.matchAll(/^#\s+Module\s+(\d+)\s*:\s*(.+)$/gmi)];
+  if (!headings.length) return '';
+  const titleEn = looseNestedMetadata(source, 'title', 'en') || clean(submittedTitle, 160) || 'Reviewed source course';
+  const titleUr = looseNestedMetadata(source, 'title', 'ur') || 'جائزہ شدہ ماخذ کورس';
+  const labelEn = looseNestedMetadata(source, 'label', 'en') || 'Reviewed source draft';
+  const labelUr = looseNestedMetadata(source, 'label', 'ur') || 'جائزہ شدہ ماخذ مسودہ';
+  const modules = headings.slice(0, 2).map((heading, index) => {
+    const end = headings[index + 1]?.index ?? source.search(/^#\s+Final\s+Exam\s*$/mi);
+    const block = source.slice(heading.index, end >= 0 ? end : source.length);
+    const english = looseLabelledText(block, 'English');
+    const urdu = looseLabelledText(block, 'Urdu');
+    if (!english || !urdu) return '';
+    const title = clean(heading[2], 160);
+    const urduHeading = block.match(/^##\s+([^\n]*[\u0600-\u06FF][^\n]*)$/m)?.[1];
+    const urduTitle = clean(urduHeading, 160) || looseSentence(urdu, 'جائزہ شدہ خیال');
+    const target = looseSentence(block.match(/\*\*Target:\*\*\s*\n([^\n]+)/i)?.[1], looseSentence(english, 'Explain one reviewed idea.'));
+    const urduTarget = looseSentence(target, looseSentence(urdu, 'ایک جائزہ شدہ خیال بیان کریں۔'));
+    return [
+      `# Module: source-topic-${index + 1}`,
+      '', '## English', '', canonicalModuleLanguage({ language: 'en', title, definition: looseSentence(english, 'Review this source section.'), target }),
+      '', '## Urdu', '', canonicalModuleLanguage({ language: 'ur', title: urduTitle, definition: looseSentence(urdu, 'اس ماخذ کے حصے کا جائزہ لیں۔'), target: urduTarget })
+    ].join('\n');
+  }).filter(Boolean);
+  if (!modules.length) return '';
+  const finalEn = looseSentence(looseLabelledText(source, 'English'), titleEn);
+  const finalUr = looseSentence(looseLabelledText(source, 'Urdu'), titleUr);
+  return [
+    '---', `format: ${THEORY_MARKDOWN_FORMAT}`, `id: ${courseId}`, `version: ${version}`,
+    `title.en: ${titleEn}`, `title.ur: ${titleUr}`, `label.en: ${labelEn}`, `label.ur: ${labelUr}`,
+    'notice.en: Draft generated from private source material. Review all factual claims before learner release.',
+    'notice.ur: نجی ماخذ مواد سے تیار کردہ مسودہ۔ سیکھنے والوں کے لیے جاری کرنے سے پہلے تمام حقائق کا جائزہ لیں۔',
+    '---', '', ...modules, '', '# Final exam', '', '## English', '', '### Question 1', canonicalOptions({ question: 'Which idea should a learner be able to explain after reviewing this source?', correct: finalEn, language: 'en' }), '', '## Urdu', '', '### Question 1', canonicalOptions({ question: 'اس ماخذ کے جائزے کے بعد سیکھنے والا کون سا خیال بیان کر سکے؟', correct: finalUr, language: 'ur' })
+  ].join('\n');
+};
+
 const markdownFromResult = (result) => {
   try {
     const markdown = normaliseSourceText(JSON.parse(String(result?.text || '{}')).markdown);
@@ -723,6 +809,14 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         checks = conversionChecks({ markdown: candidate, sourceText });
       } else {
         stages.push({ id: 'canonical-source-detected', passed: true, provider: 'deterministic' });
+      }
+      if (!checks.validation.valid) {
+        const normalisedLooseDraft = canonicaliseLooseCourseDraft(candidate, { courseId, version, submittedTitle: record.submittedTitle });
+        if (normalisedLooseDraft) {
+          candidate = normalisedLooseDraft;
+          checks = conversionChecks({ markdown: candidate, sourceText });
+          stages.push({ id: 'deterministic-loose-markdown-normalisation', passed: checks.validation.valid, provider: 'deterministic' });
+        }
       }
       if (!checks.validation.valid) {
         candidate = await generateMarkdown({
