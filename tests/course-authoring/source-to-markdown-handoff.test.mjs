@@ -451,6 +451,50 @@ test('a structurally valid draft is repaired when named learning-goal requiremen
   assert.match(calls[1].input, /Learner modules must cover the named learning-goal requirement: Quaid-e-Azam Muhammad Ali Jinnah/);
 });
 
+test('a long labelled slide source samples every source section for the bounded conversion prompt', async () => {
+  const calls = [];
+  const markdown = THEORY_COURSE_TEMPLATE
+    .replace('id: replace-with-course-id', 'id: stratified-slide-source')
+    .replace(/### Title\nOne small idea/g, '### Title\nSir Syed Ahmed Khan, Allama Muhammad Iqbal, and Quaid-e-Azam Muhammad Ali Jinnah');
+  const provider = {
+    status: () => ({ available: true }),
+    generate: async (request) => {
+      calls.push(request);
+      if (request.purpose === 'course-authoring-conversion') return { provider: 'gemini', text: JSON.stringify({ markdown }) };
+      if (request.purpose === 'course-authoring-critique') return { provider: 'gemini', text: JSON.stringify({ decision: 'ready-for-human-review', issues: [] }) };
+      throw new Error(`Unexpected purpose ${request.purpose}`);
+    }
+  };
+  const firestore = new MemoryFirestore();
+  const storage = new MemoryStorage();
+  const account = { uid: 'admin-1', roles: ['platform-admin'], organisations: [{ organisationId: 'org-water', active: true }] };
+  const service = createCourseAuthoringService({
+    firebase: { available: true, firestore, storage, auth: {} }, config: { educatorWorkspaceEnabled: true },
+    access: { accountFor: async () => account, assertAdmin: async () => account, assertOrganisationAccess: async () => account }, provider
+  });
+  const sourceText = [
+    'Course source pack | Sir Syed Ahmed Khan | source slide 1', 'SIR-SYED-OPENING-FACT '.repeat(700),
+    'Course source pack | Allama Muhammad Iqbal | source slide 1', 'IQBAL-MIDDLE-FACT '.repeat(700),
+    'Course source pack | Quaid-e-Azam Muhammad Ali Jinnah | source slide 1', 'JINNAH-LATE-PAGE-FACT '.repeat(700)
+  ].join('\n');
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({ courseType: 'theory', organisationId: 'org-water', title: 'Long labelled slide source', sourceFile: binaryFile('source-slides.txt', 'text/plain', sourceText) })
+  });
+  const conversion = await service.convertSourceToMarkdown({
+    authorization: authorisation,
+    body: { submissionId: source.submission.submissionId, courseId: 'stratified-slide-source', version: '1.0.0' }
+  });
+  assert.equal(conversion.readyForHumanReview, true);
+  assert.ok(conversion.checks.find((check) => check.id === 'source-section-module-coverage' && check.passed));
+  assert.match(calls[0].instructions, /Create at least one small learner-facing module that covers each section/);
+  assert.match(calls[0].input, /\[SOURCE SECTION: Sir Syed Ahmed Khan\]/);
+  assert.match(calls[0].input, /\[SOURCE SECTION: Allama Muhammad Iqbal\]/);
+  assert.match(calls[0].input, /\[SOURCE SECTION: Quaid-e-Azam Muhammad Ali Jinnah\]/);
+  assert.match(calls[0].input, /JINNAH-LATE-PAGE-FACT/);
+  assert.ok(calls[0].input.length < sourceText.length, 'the model prompt stays bounded for long source files');
+});
+
 test('a coherent conventional bilingual model outline is deterministically normalised into the strict reviewed-course contract', async () => {
   const calls = [];
   const looseDraft = `---

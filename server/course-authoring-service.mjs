@@ -319,6 +319,58 @@ const normaliseSourceText = (value, limit = MAX_MARKDOWN_CHARS) => String(value 
   .trim()
   .slice(0, limit);
 
+// Slide-derived sources commonly repeat a stable pack title once per page.
+// Keep that structure when fitting a long private source into the bounded
+// model context: taking only the first N characters silently drops later
+// topics and makes an apparently valid course incomplete.
+const sourcePackSections = (source) => {
+  const text = normaliseSourceText(source);
+  const headers = [...text.matchAll(/^Course source pack\s*\|\s*([^|\n]+?)\s*\|\s*source slide\s*\d+\s*$/gmi)];
+  if (!headers.length) return [];
+  const sections = [];
+  let active = null;
+  headers.forEach((match) => {
+    const title = clean(match[1], 160);
+    if (!title) return;
+    if (!active || active.title.toLocaleLowerCase() !== title.toLocaleLowerCase()) {
+      if (active) active.end = match.index;
+      active = { title, start: match.index, end: text.length };
+      sections.push(active);
+    }
+  });
+  if (active) active.end = text.length;
+  return sections.map((section) => ({
+    title: section.title,
+    text: text.slice(section.start, section.end).trim()
+  })).filter((section) => section.text);
+};
+
+const sampleSourceText = (source, limit) => {
+  const text = normaliseSourceText(source);
+  if (text.length <= limit) return text;
+  const pages = text.split(/(?=^--\s*\d+\s+of\s+\d+\s*--\s*$)/mi).filter(Boolean);
+  if (pages.length < 2) return text.slice(0, limit);
+  const perPage = Math.max(80, Math.floor((limit - pages.length) / pages.length));
+  return pages.map((page) => page.length > perPage ? `${page.slice(0, Math.max(1, perPage - 1)).trim()}…` : page)
+    .join('\n')
+    .slice(0, limit);
+};
+
+const sourceExcerptForAi = (source, limit = MAX_AI_SOURCE_CHARS) => {
+  const text = normaliseSourceText(source);
+  if (text.length <= limit) return text;
+  const sections = sourcePackSections(text);
+  if (sections.length < 2) return sampleSourceText(text, limit);
+  const firstSectionStart = Math.min(...sections.map((section) => text.indexOf(section.text)));
+  const introduction = text.slice(0, Math.max(0, firstSectionStart)).slice(0, 900).trim();
+  const separators = sections.length * 36 + (introduction ? 2 : 0);
+  const sectionBudget = Math.max(240, Math.floor((limit - introduction.length - separators) / sections.length));
+  return [
+    ...(introduction ? [introduction] : []),
+    ...sections.map((section) => `[SOURCE SECTION: ${section.title}]\n${sampleSourceText(section.text, sectionBudget)}`)
+  ].join('\n\n').slice(0, limit);
+};
+
 const sourceCourseId = (value) => slug(value)
   || `reviewed-course-${createHash('sha256').update(String(value || 'course')).digest('hex').slice(0, 8)}`;
 
@@ -455,6 +507,9 @@ const namedLearningGoalTerms = (learningGoal) => {
 
 const comparableText = (value) => String(value || '')
   .toLocaleLowerCase()
+  // Source presentations vary between the common Ahmed/Ahmad transliterations.
+  // This comparison is only a coverage signal; it never rewrites course text.
+  .replace(/\bahmed\b/gu, 'ahmad')
   .replace(/[^\p{L}\p{N}]+/gu, ' ')
   .replace(/\s+/g, ' ')
   .trim();
@@ -468,14 +523,17 @@ const conversionChecks = ({ markdown, sourceText, learningGoal = '' }) => {
   const parsed = parseTheoryMarkdown(normalised);
   const validation = validateTheoryCourse(parsed);
   const placeholderPattern = /\b(?:replace-with|\[\s*(?:todo|tbd|review)\s*\]|write (?:a|an|the)|placeholder)\b/i;
-  const sourceWords = normaliseSourceText(sourceText, MAX_AI_SOURCE_CHARS).split(/\s+/).filter((word) => word.length >= 4);
+  const sourceWords = normaliseSourceText(sourceText).split(/\s+/).filter((word) => word.length >= 4);
   const uniqueSourceWords = new Set(sourceWords.map((word) => word.toLowerCase()));
   const candidateWords = normalised.split(/\s+/).filter((word) => word.length >= 4).map((word) => word.toLowerCase());
   const overlap = candidateWords.filter((word) => uniqueSourceWords.has(word)).length;
   const requiredGoalTerms = namedLearningGoalTerms(learningGoal);
+  const requiredSourceSections = sourcePackSections(sourceText).map((section) => section.title).slice(0, 8);
   const learnerModuleText = comparableText(moduleText(parsed));
   const missingGoalTerms = requiredGoalTerms.filter((term) => !learnerModuleText.includes(comparableText(term)));
+  const missingSourceSections = requiredSourceSections.filter((term) => !learnerModuleText.includes(comparableText(term)));
   const learningGoalCovered = missingGoalTerms.length === 0;
+  const sourceSectionsCovered = missingSourceSections.length === 0;
   const checks = [
     { id: 'canonical-format', passed: parsed.format === THEORY_MARKDOWN_FORMAT, message: parsed.format === THEORY_MARKDOWN_FORMAT ? 'Canonical Type2Learn format recognised.' : `Expected ${THEORY_MARKDOWN_FORMAT}.` },
     { id: 'strict-bilingual-schema', passed: validation.valid, message: validation.valid ? 'English, Urdu, modules, typing activities, and checks passed strict validation.' : `${validation.errors.length} strict validation issue${validation.errors.length === 1 ? '' : 's'} found.` },
@@ -486,6 +544,13 @@ const conversionChecks = ({ markdown, sourceText, learningGoal = '' }) => {
         ? (requiredGoalTerms.length ? 'Named learning-goal requirements appear in learner modules.' : 'No named learning-goal requirement needs a module coverage check.')
         : `Learner modules do not yet cover: ${missingGoalTerms.join(', ')}.`
     },
+    {
+      id: 'source-section-module-coverage',
+      passed: sourceSectionsCovered,
+      message: sourceSectionsCovered
+        ? (requiredSourceSections.length ? 'Distinct source-pack sections appear in learner modules.' : 'The source has no labelled sections to enforce.')
+        : `Learner modules do not yet cover source sections: ${missingSourceSections.join(', ')}.`
+    },
     { id: 'source-grounding-signal', passed: sourceWords.length < 12 || overlap >= Math.min(8, Math.max(3, Math.floor(sourceWords.length * 0.015))), message: sourceWords.length < 12 || overlap >= Math.min(8, Math.max(3, Math.floor(sourceWords.length * 0.015))) ? 'Candidate retains source-language evidence for human review.' : 'Candidate has too little visible overlap with the extracted source; verify factual grounding.' },
     { id: 'placeholder-scan', passed: !placeholderPattern.test(normalised), message: !placeholderPattern.test(normalised) ? 'No obvious authoring placeholders were found.' : 'Possible placeholder wording remains; complete it before approval.' }
   ];
@@ -494,11 +559,12 @@ const conversionChecks = ({ markdown, sourceText, learningGoal = '' }) => {
     validation,
     checks,
     missingGoalTerms,
+    missingSourceSections,
     // The parser/schema checks are release-blocking; source-overlap and
     // placeholder signals are deliberately visible review warnings. Named
     // brief requirements are release-blocking: a valid-looking draft that
     // omits an explicit required person or concept must be repaired first.
-    deterministicPassed: checks.filter((check) => ['canonical-format', 'strict-bilingual-schema', 'learning-goal-module-coverage'].includes(check.id)).every((check) => check.passed),
+    deterministicPassed: checks.filter((check) => ['canonical-format', 'strict-bilingual-schema', 'learning-goal-module-coverage', 'source-section-module-coverage'].includes(check.id)).every((check) => check.passed),
     groundingWarning: !checks.find((check) => check.id === 'source-grounding-signal')?.passed
   };
 };
@@ -784,9 +850,10 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         return { submissionId, courseId, version, queued: true, state: 'running', reviewRequired: true };
       }
 
-      const sourceExcerpt = normaliseSourceText(sourceText, MAX_AI_SOURCE_CHARS);
+      const sourceExcerpt = sourceExcerptForAi(sourceText, MAX_AI_SOURCE_CHARS);
       const learningGoal = clean(record.authoringBrief?.learningGoal, 480);
       const requiredLearningGoalTerms = namedLearningGoalTerms(learningGoal);
+      const requiredSourceSections = sourcePackSections(sourceText).map((section) => section.title).slice(0, 8);
       const stages = [];
       let providerName = 'deterministic';
       let candidate = withCanonicalIdentity(sourceText, { courseId, version });
@@ -818,6 +885,9 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
             requiredLearningGoalTerms.length
               ? `Each of these named learning-goal requirements must be visibly covered in learner-facing module content: ${requiredLearningGoalTerms.join('; ')}. Do not place a required name only in metadata or a final question.`
               : 'Keep the learner-facing modules aligned with the reviewed learning goal.',
+            requiredSourceSections.length
+              ? `The private source contains these distinct labelled sections: ${requiredSourceSections.join('; ')}. Create at least one small learner-facing module that covers each section; do not collapse later sections into an overview or omit them because the source is long.`
+              : 'When the source is long, distribute its reviewed topics across clear, small modules rather than using only the opening pages.',
             'Question alternatives may be plausible misconceptions but must remain clearly reviewable. The result is never publishable without administrator review.',
             CANONICAL_MARKDOWN_CONTRACT
           ].join(' '),
@@ -831,6 +901,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
               sourceLanguage: ['en', 'ur', 'bilingual'].includes(String(record.authoringBrief?.sourceLanguage || '')) ? record.authoringBrief.sourceLanguage : ''
             },
             requiredLearningGoalTerms,
+            requiredSourceSections,
             extractedSource: sourceExcerpt,
             ...(currentMarkdown ? { currentMarkdown: normaliseSourceText(currentMarkdown, 42_000), validationErrors: validationErrors.slice(0, 40) } : {})
           }),
@@ -860,13 +931,14 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
           stages.push({ id: 'deterministic-loose-markdown-normalisation', passed: checks.validation.valid && checks.missingGoalTerms.length === 0, provider: 'deterministic' });
         }
       }
-      if (!checks.validation.valid || checks.missingGoalTerms.length) {
+      if (!checks.validation.valid || checks.missingGoalTerms.length || checks.missingSourceSections.length) {
         candidate = await generateMarkdown({
           purpose: 'course-authoring-repair',
           currentMarkdown: candidate,
           validationErrors: [
             ...checks.validation.errors,
-            ...checks.missingGoalTerms.map((term) => `Learner modules must cover the named learning-goal requirement: ${term}.`)
+            ...checks.missingGoalTerms.map((term) => `Learner modules must cover the named learning-goal requirement: ${term}.`),
+            ...checks.missingSourceSections.map((term) => `Learner modules must cover the labelled source section: ${term}.`)
           ]
         });
         checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
