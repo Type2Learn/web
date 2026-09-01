@@ -3,7 +3,7 @@ import { inflateRawSync } from 'node:zlib';
 import { PDFParse } from 'pdf-parse';
 import { apiError } from './errors.mjs';
 import { isTheoryCourseType } from './access-policy.mjs';
-import { THEORY_MARKDOWN_FORMAT, compileTheoryCourse, fallbackMcqDraft, parseTheoryMarkdown, validateTheoryCourse } from './theory-course-markdown.mjs';
+import { THEORY_COURSE_TEMPLATE, THEORY_MARKDOWN_FORMAT, compileTheoryCourse, fallbackMcqDraft, parseTheoryMarkdown, validateTheoryCourse } from './theory-course-markdown.mjs';
 import { canTransitionCourseWorkflow, isWorkflowState } from './course-workflow.mjs';
 import { downloadPrivateObject, privateStorageStatus, uploadPrivateObject } from './private-object-storage.mjs';
 
@@ -11,6 +11,18 @@ const ROOT = 'type2learnCourseAuthoring';
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 const MAX_MARKDOWN_CHARS = 220_000;
 const MAX_AI_SOURCE_CHARS = 12_000;
+// This is included in an explicitly requested source-to-course model call so
+// the model cannot substitute attractive-but-incompatible ordinary Markdown
+// for the deliberately narrow format consumed by the deterministic compiler.
+// The final course still requires human review; this only makes the draft
+// syntax reliable enough to inspect and edit in the workspace.
+const CANONICAL_MARKDOWN_CONTRACT = [
+  'Use the following Type2Learn Markdown template as an exact syntax contract. Replace its placeholder content but retain the flat metadata names (title.en, title.ur, label.en, label.ur, notice.en, notice.ur), the literal `# Module: lower-case-id` heading, every English and Urdu field heading, and the literal `# Final exam` heading.',
+  'Do not use nested YAML such as `title:`, headings such as `# Module 1`, numbered section headings, bold field labels, or any syntax not shown in this template.',
+  'For each Typing field use the three literal lines `level:`, `prompt:`, and `target:`. For each Check and final question use a `question:` line and exactly four `- [ ]` / `- [x]` options with exactly one `[x]` option.',
+  'Keep the draft to no more than two complete modules plus one final question in each language, so every required field can be complete and reviewable.',
+  `\n${THEORY_COURSE_TEMPLATE}`
+].join('\n\n');
 const blockedSourceExtensions = new Set(['exe', 'dll', 'msi', 'bat', 'cmd', 'com', 'ps1', 'sh', 'jar', 'apk', 'app']);
 const supportedTextExtensions = new Set(['md', 'markdown', 'txt', 'csv']);
 const supportedPdfExtensions = new Set(['pdf']);
@@ -679,7 +691,8 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
             `Return exactly one JSON object containing a complete Markdown document using ${THEORY_MARKDOWN_FORMAT}.`,
             'Write concise, age-respectful English and faithful Urdu. Do not invent factual claims, diagnoses, personal data, citations, scores, or learner labels.',
             'Keep every module small. Include all required bilingual fields, one safe typing activity, and one four-choice check per module plus matching final questions.',
-            'Question alternatives may be plausible misconceptions but must remain clearly reviewable. The result is never publishable without administrator review.'
+            'Question alternatives may be plausible misconceptions but must remain clearly reviewable. The result is never publishable without administrator review.',
+            CANONICAL_MARKDOWN_CONTRACT
           ].join(' '),
           input: JSON.stringify({
             courseId,

@@ -352,6 +352,9 @@ test('an administrator can convert extracted source into canonical Markdown only
   assert.equal(calls[0].timeoutMs, 18_000);
   assert.equal(calls[1].maxGeminiAttempts, 1);
   assert.equal(calls[1].timeoutMs, 12_000);
+  assert.match(calls[0].instructions, /title\.en, title\.ur, label\.en, label\.ur, notice\.en, notice\.ur/);
+  assert.match(calls[0].instructions, /# Module: lower-case-id/);
+  assert.match(calls[0].instructions, /# Final exam/);
   assert.match(calls[0].input, /Water moves between land/);
   assert.match(calls[0].input, /Year 7 science learners/);
   assert.match(calls[0].input, /Explain in their own words how water moves/);
