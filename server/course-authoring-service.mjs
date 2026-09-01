@@ -518,6 +518,10 @@ const moduleText = (parsed) => (parsed?.modules || []).map((module) => Object.va
   .flatMap((language) => Object.values(language?.fields || {}))
   .join('\n')).join('\n');
 
+const moduleTexts = (parsed) => (parsed?.modules || []).map((module) => comparableText(Object.values(module?.languages || {})
+  .flatMap((language) => Object.values(language?.fields || {}))
+  .join('\n')));
+
 const conversionChecks = ({ markdown, sourceText, learningGoal = '' }) => {
   const normalised = normaliseSourceText(markdown);
   const parsed = parseTheoryMarkdown(normalised);
@@ -530,10 +534,18 @@ const conversionChecks = ({ markdown, sourceText, learningGoal = '' }) => {
   const requiredGoalTerms = namedLearningGoalTerms(learningGoal);
   const requiredSourceSections = sourcePackSections(sourceText).map((section) => section.title).slice(0, 8);
   const learnerModuleText = comparableText(moduleText(parsed));
+  const individualModuleTexts = moduleTexts(parsed);
   const missingGoalTerms = requiredGoalTerms.filter((term) => !learnerModuleText.includes(comparableText(term)));
-  const missingSourceSections = requiredSourceSections.filter((term) => !learnerModuleText.includes(comparableText(term)));
+  const sourceSectionAssignments = requiredSourceSections.map((term) => individualModuleTexts.findIndex((module) => module.includes(comparableText(term))));
+  const missingSourceSections = requiredSourceSections.filter((_, index) => sourceSectionAssignments[index] < 0);
+  const sharedSourceSectionIndexes = [...new Set(sourceSectionAssignments.filter((index) => index >= 0)
+    .filter((index, _, assignments) => assignments.filter((candidate) => candidate === index).length > 1))];
+  const combinedSourceSections = sharedSourceSectionIndexes.flatMap((moduleIndex) => requiredSourceSections
+    .filter((_, sectionIndex) => sourceSectionAssignments[sectionIndex] === moduleIndex)
+    .slice(1));
+  const sourceSectionProblems = [...missingSourceSections, ...combinedSourceSections];
   const learningGoalCovered = missingGoalTerms.length === 0;
-  const sourceSectionsCovered = missingSourceSections.length === 0;
+  const sourceSectionsCovered = sourceSectionProblems.length === 0;
   const checks = [
     { id: 'canonical-format', passed: parsed.format === THEORY_MARKDOWN_FORMAT, message: parsed.format === THEORY_MARKDOWN_FORMAT ? 'Canonical Type2Learn format recognised.' : `Expected ${THEORY_MARKDOWN_FORMAT}.` },
     { id: 'strict-bilingual-schema', passed: validation.valid, message: validation.valid ? 'English, Urdu, modules, typing activities, and checks passed strict validation.' : `${validation.errors.length} strict validation issue${validation.errors.length === 1 ? '' : 's'} found.` },
@@ -548,8 +560,8 @@ const conversionChecks = ({ markdown, sourceText, learningGoal = '' }) => {
       id: 'source-section-module-coverage',
       passed: sourceSectionsCovered,
       message: sourceSectionsCovered
-        ? (requiredSourceSections.length ? 'Distinct source-pack sections appear in learner modules.' : 'The source has no labelled sections to enforce.')
-        : `Learner modules do not yet cover source sections: ${missingSourceSections.join(', ')}.`
+        ? (requiredSourceSections.length ? 'Each distinct source-pack section has its own learner module.' : 'The source has no labelled sections to enforce.')
+        : `Each labelled source section needs its own learner module: ${sourceSectionProblems.join(', ')}.`
     },
     { id: 'source-grounding-signal', passed: sourceWords.length < 12 || overlap >= Math.min(8, Math.max(3, Math.floor(sourceWords.length * 0.015))), message: sourceWords.length < 12 || overlap >= Math.min(8, Math.max(3, Math.floor(sourceWords.length * 0.015))) ? 'Candidate retains source-language evidence for human review.' : 'Candidate has too little visible overlap with the extracted source; verify factual grounding.' },
     { id: 'placeholder-scan', passed: !placeholderPattern.test(normalised), message: !placeholderPattern.test(normalised) ? 'No obvious authoring placeholders were found.' : 'Possible placeholder wording remains; complete it before approval.' }
@@ -560,6 +572,7 @@ const conversionChecks = ({ markdown, sourceText, learningGoal = '' }) => {
     checks,
     missingGoalTerms,
     missingSourceSections,
+    sourceSectionProblems,
     // The parser/schema checks are release-blocking; source-overlap and
     // placeholder signals are deliberately visible review warnings. Named
     // brief requirements are release-blocking: a valid-looking draft that
@@ -886,7 +899,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
               ? `Each of these named learning-goal requirements must be visibly covered in learner-facing module content: ${requiredLearningGoalTerms.join('; ')}. Do not place a required name only in metadata or a final question.`
               : 'Keep the learner-facing modules aligned with the reviewed learning goal.',
             requiredSourceSections.length
-              ? `The private source contains these distinct labelled sections: ${requiredSourceSections.join('; ')}. Create at least one small learner-facing module that covers each section; do not collapse later sections into an overview or omit them because the source is long.`
+              ? `The private source contains these distinct labelled sections: ${requiredSourceSections.join('; ')}. Create one distinct small learner-facing module for each section; do not combine two labelled sections in one module, collapse later sections into an overview, or omit them because the source is long.`
               : 'When the source is long, distribute its reviewed topics across clear, small modules rather than using only the opening pages.',
             'Question alternatives may be plausible misconceptions but must remain clearly reviewable. The result is never publishable without administrator review.',
             CANONICAL_MARKDOWN_CONTRACT
@@ -931,14 +944,14 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
           stages.push({ id: 'deterministic-loose-markdown-normalisation', passed: checks.validation.valid && checks.missingGoalTerms.length === 0, provider: 'deterministic' });
         }
       }
-      if (!checks.validation.valid || checks.missingGoalTerms.length || checks.missingSourceSections.length) {
+      if (!checks.validation.valid || checks.missingGoalTerms.length || checks.sourceSectionProblems.length) {
         candidate = await generateMarkdown({
           purpose: 'course-authoring-repair',
           currentMarkdown: candidate,
           validationErrors: [
             ...checks.validation.errors,
             ...checks.missingGoalTerms.map((term) => `Learner modules must cover the named learning-goal requirement: ${term}.`),
-            ...checks.missingSourceSections.map((term) => `Learner modules must cover the labelled source section: ${term}.`)
+            ...checks.sourceSectionProblems.map((term) => `Create a separate learner module for the labelled source section: ${term}.`)
           ]
         });
         checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });

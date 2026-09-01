@@ -461,7 +461,7 @@ test('a long labelled slide source samples every source section for the bounded 
     generate: async (request) => {
       calls.push(request);
       if (request.purpose === 'course-authoring-conversion') return { provider: 'gemini', text: JSON.stringify({ markdown }) };
-      if (request.purpose === 'course-authoring-critique') return { provider: 'gemini', text: JSON.stringify({ decision: 'ready-for-human-review', issues: [] }) };
+      if (request.purpose === 'course-authoring-repair') return { provider: 'openai', text: JSON.stringify({ markdown }) };
       throw new Error(`Unexpected purpose ${request.purpose}`);
     }
   };
@@ -485,14 +485,16 @@ test('a long labelled slide source samples every source section for the bounded 
     authorization: authorisation,
     body: { submissionId: source.submission.submissionId, courseId: 'stratified-slide-source', version: '1.0.0' }
   });
-  assert.equal(conversion.readyForHumanReview, true);
-  assert.ok(conversion.checks.find((check) => check.id === 'source-section-module-coverage' && check.passed));
-  assert.match(calls[0].instructions, /Create at least one small learner-facing module that covers each section/);
+  assert.equal(conversion.readyForHumanReview, false);
+  assert.ok(conversion.checks.find((check) => check.id === 'source-section-module-coverage' && !check.passed));
+  assert.match(calls[0].instructions, /Create one distinct small learner-facing module for each section/);
   assert.match(calls[0].input, /\[SOURCE SECTION: Sir Syed Ahmed Khan\]/);
   assert.match(calls[0].input, /\[SOURCE SECTION: Allama Muhammad Iqbal\]/);
   assert.match(calls[0].input, /\[SOURCE SECTION: Quaid-e-Azam Muhammad Ali Jinnah\]/);
   assert.match(calls[0].input, /JINNAH-LATE-PAGE-FACT/);
   assert.ok(calls[0].input.length < sourceText.length, 'the model prompt stays bounded for long source files');
+  assert.match(calls[1].input, /Create a separate learner module for the labelled source section: Allama Muhammad Iqbal/);
+  assert.match(calls[1].input, /Create a separate learner module for the labelled source section: Quaid-e-Azam Muhammad Ali Jinnah/);
 });
 
 test('a coherent conventional bilingual model outline is deterministically normalised into the strict reviewed-course contract', async () => {
