@@ -9076,9 +9076,12 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
       state.showSimple = false;
       state.readingSectionIndex = 0;
       const cleanUrl = new URL(window.location.href);
+      // Retain the reviewed course identity on the address bar.  A learner
+      // may refresh, reopen a saved tab, or return after an interruption; if
+      // `courseId` and `version` are stripped here the protected manifest
+      // cannot be loaded again and the player falls back to the legacy
+      // course.  Only the one-time entry flags are transient.
       cleanUrl.searchParams.delete('course');
-      cleanUrl.searchParams.delete('courseId');
-      cleanUrl.searchParams.delete('version');
       cleanUrl.searchParams.delete('start');
       window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
         recordSupportMoment('task-entry', { result: 'course-entry' });

@@ -50,6 +50,9 @@ test('catalogue-selected reviewed links retain the rich compatibility player rat
   assert.match(richPlayer, /activeCourseVersion/);
   assert.match(richPlayer, /destination\.searchParams\.set\('version', COURSE\.version\)/);
   assert.match(richPlayer, /entry\.get\('courseId'\) === COURSE\.id/);
+  assert.match(richPlayer, /Retain the reviewed course identity on the address bar/);
+  assert.doesNotMatch(richPlayer, /cleanUrl\.searchParams\.delete\('courseId'\)/);
+  assert.doesNotMatch(richPlayer, /cleanUrl\.searchParams\.delete\('version'\)/);
   assert.match(richPlayer, /checkReviewedManifestModuleAnswer/);
   assert.match(richPlayer, /checkReviewedManifestFinalAnswer/);
   assert.match(courseClient, /\/api\/v1\/course-manifest/);
