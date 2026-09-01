@@ -26,6 +26,8 @@ const errorMessage = async (response) => {
 };
 
 const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const boundedTimeout = (value, fallback = 35_000) => Math.min(35_000, Math.max(1_000, number(value, fallback)));
+const boundedAttempts = (value, fallback) => Math.min(Math.max(1, number(value, fallback)), Math.max(1, fallback));
 
 // Gemini accepts a useful, but smaller, JSON Schema dialect. Strip fields that
 // are valid in standard/OpenAI schemas yet rejected by Gemini (notably
@@ -118,9 +120,10 @@ export const createModelProvider = (config) => {
     return '';
   };
 
-  const callGemini = async ({ instructions, input, maxOutputTokens, jsonSchema, heavy = false, purpose }) => {
+  const callGemini = async ({ instructions, input, maxOutputTokens, jsonSchema, heavy = false, purpose, timeoutMs, maxGeminiAttempts }) => {
     let lastError = null;
-    for (let attempt = 0; attempt < keys.length; attempt += 1) {
+    const attempts = boundedAttempts(maxGeminiAttempts, keys.length);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       const keySlot = nextAvailableKey();
       if (!keySlot) break;
       const { key, index: keyIndex } = keySlot;
@@ -141,7 +144,7 @@ export const createModelProvider = (config) => {
               ...(jsonSchema ? { responseMimeType: 'application/json', responseSchema: geminiSchema(jsonSchema) } : {})
             }
           }),
-          signal: AbortSignal.timeout(35000)
+          signal: AbortSignal.timeout(boundedTimeout(timeoutMs))
         });
         if (!response.ok) {
           const message = await errorMessage(response);
@@ -183,7 +186,7 @@ export const createModelProvider = (config) => {
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .slice(0, 64) || 'structured_output';
 
-  const callOpenAi = async ({ instructions, input, maxOutputTokens, jsonSchema, purpose }) => {
+  const callOpenAi = async ({ instructions, input, maxOutputTokens, jsonSchema, purpose, timeoutMs }) => {
     if (!openAiReady()) throw new Error('No fallback model is configured.');
     const model = modelForOpenAiPurpose(purpose);
     const response = await fetch(config.openAiResponsesUrl, {
@@ -200,7 +203,7 @@ export const createModelProvider = (config) => {
         max_output_tokens: maxOutputTokens,
         ...(jsonSchema ? { text: { format: { type: 'json_schema', name: schemaNameFor(purpose), strict: true, schema: jsonSchema } } } : {})
       }),
-      signal: AbortSignal.timeout(35000)
+      signal: AbortSignal.timeout(boundedTimeout(timeoutMs))
     });
     if (!response.ok) throw new Error(await errorMessage(response));
     const payload = await response.json().catch(() => ({}));
@@ -224,7 +227,7 @@ export const createModelProvider = (config) => {
     return '';
   };
 
-  const callFeatherless = async ({ instructions, input, maxOutputTokens, purpose }) => {
+  const callFeatherless = async ({ instructions, input, maxOutputTokens, purpose, timeoutMs }) => {
     if (!featherlessReady()) throw new Error('Featherless is not configured.');
     // Featherless accounts reserve a finite number of concurrent units. The
     // Type2Learn fallback is intentionally one-at-a-time: when it is busy,
@@ -253,7 +256,7 @@ export const createModelProvider = (config) => {
             { role: 'user', content: input }
           ]
         }),
-        signal: AbortSignal.timeout(35000)
+        signal: AbortSignal.timeout(boundedTimeout(timeoutMs))
       });
       if (!response.ok) throw new Error(await errorMessage(response));
       const payload = await response.json().catch(() => ({}));

@@ -107,6 +107,35 @@ test('a failed Gemini attempt uses Featherless before OpenAI', { concurrency: fa
   }
 });
 
+test('a bounded authoring request tries one Gemini key before continuing through its configured fallbacks', { concurrency: false }, async () => {
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).includes('generativelanguage.googleapis.com')) return new Response(JSON.stringify({ error: { message: 'temporarily unavailable' } }), { status: 503 });
+    if (String(url).includes('api.openai.com')) return new Response(JSON.stringify({
+      output: [{ type: 'message', content: [{ type: 'output_text', text: '{"markdown":"review draft"}' }] }]
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    throw new Error(`Unexpected provider call: ${url}`);
+  };
+  try {
+    const provider = createModelProvider(baseConfig({
+      geminiApiKeys: ['first-gemini-key', 'second-gemini-key', 'third-gemini-key'],
+      featherlessApiKey: '', featherlessChatCompletionsUrl: '', featherlessModel: '',
+      openAiApiKey: 'openai-test-key', openAiResponsesUrl: 'https://api.openai.com/v1/responses'
+    }));
+    const result = await provider.generate({
+      purpose: 'course-authoring-conversion', instructions: 'Convert.', input: '{}', maxOutputTokens: 600,
+      maxGeminiAttempts: 1, timeoutMs: 7_000
+    });
+    assert.equal(result.provider, 'openai');
+    assert.equal(calls.filter((url) => url.includes('generativelanguage.googleapis.com')).length, 1);
+    assert.equal(calls.filter((url) => url.includes('api.openai.com')).length, 1);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
 test('private course conversion may use the bounded extended output allowance while ordinary learner requests stay small', { concurrency: false }, async () => {
   const previousFetch = globalThis.fetch;
   const calls = [];
