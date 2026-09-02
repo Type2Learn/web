@@ -52,6 +52,8 @@ test('private educator upload controls use the same source and narration field n
   assert.match(workspace, /\/api\/v1\/assessment\/publish/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/source-download/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/source-convert/);
+  assert.match(workspace, /type2learn:admin-source-added/);
+  assert.match(workspace, /Source text was extracted privately\. Type2Learn is preparing a reviewed Markdown draft now/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/translate/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/review/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/narration\/generate/);
@@ -76,6 +78,14 @@ test('private educator upload controls use the same source and narration field n
   assert.match(teacher, /data-source-next-step/);
   assert.match(admin, /data-delete-course/);
   assert.match(admin, /Remove a course version/);
+});
+
+test('source conversion preserves the fast draft path, detailed timing evidence, and heavy repair only when structure needs it', async () => {
+  const service = await readFile(new URL('../../server/course-authoring-service.mjs', import.meta.url), 'utf8');
+  assert.match(service, /heavy: purpose === 'course-authoring-repair'/);
+  assert.match(service, /timeoutMs: purpose === 'course-authoring-conversion' \? 12_000 : 18_000/);
+  assert.match(service, /durationMs: Math\.max\(0, Date\.now\(\) - conversionStartedMs\)/);
+  assert.match(service, /durationMs: Math\.max\(0, Date\.now\(\) - stageStartedMs\)/);
 });
 
 test('teacher navigation keeps every primary route visible on a narrow screen', async () => {

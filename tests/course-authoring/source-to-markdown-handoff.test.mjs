@@ -346,12 +346,12 @@ test('an administrator can convert extracted source into canonical Markdown only
   assert.equal(conversion.validation.valid, true, conversion.validation.errors.join('\n'));
   assert.match(conversion.markdown, /^format: type2learn-theory-course\/v1$/m);
   assert.deepEqual(calls.map((call) => call.purpose), ['course-authoring-conversion', 'course-authoring-critique']);
-  assert.equal(calls[0].heavy, true);
+  assert.equal(calls[0].heavy, false);
   assert.equal(calls[0].allowExtendedOutput, true);
   assert.equal(calls[0].maxGeminiAttempts, 1);
-  assert.equal(calls[0].timeoutMs, 18_000);
+  assert.equal(calls[0].timeoutMs, 12_000);
   assert.equal(calls[1].maxGeminiAttempts, 1);
-  assert.equal(calls[1].timeoutMs, 12_000);
+  assert.equal(calls[1].timeoutMs, 8_000);
   assert.match(calls[0].instructions, /title\.en, title\.ur, label\.en, label\.ur, notice\.en, notice\.ur/);
   assert.match(calls[0].instructions, /# Module: lower-case-id/);
   assert.match(calls[0].instructions, /# Final exam/);

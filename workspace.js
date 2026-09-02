@@ -431,14 +431,25 @@ const bindSubmission = () => {
       const result = await api('/api/v1/course-authoring/source', { method: 'POST', body: form });
       const submission = result.submission || {};
       $('[data-authoring-submission]').value = submission.submissionId || '';
+      // A platform administrator has already made the explicit source-upload
+      // decision. For safely extracted text, take them straight into the
+      // private draft workflow instead of making them repeat the same intent
+      // with a second "convert" click. Scanned and unsupported files still
+      // stop at the visible transcription review gate.
+      if (['safe-pdf-text-extracted', 'safe-presentation-text-extracted', 'safe-text-extracted'].includes(submission.source?.extraction)) {
+        const suggestedCourseId = builderIdentifier(submission.submittedTitle || submission.source?.originalName, 'new-theory-course');
+        if ($('[data-authoring-course-id]')) $('[data-authoring-course-id]').value = suggestedCourseId;
+        if ($('[data-authoring-version]')) $('[data-authoring-version]').value = '1.0.0';
+      }
       event.currentTarget.reset();
       await loadSubmissions();
       show('review');
-      // Reuse the single secure review handler instead of exposing extracted
-      // source text through a second browser-only path.
-      $('[data-open-source-review]')?.click();
-      status(['safe-pdf-text-extracted', 'safe-presentation-text-extracted'].includes(submission.source?.extraction)
-        ? 'Source text was extracted privately. Review it, then convert it to canonical Markdown or build the course manually.'
+      const extracted = ['safe-pdf-text-extracted', 'safe-presentation-text-extracted', 'safe-text-extracted'].includes(submission.source?.extraction);
+      // Reuse the secure review handler and its background conversion route;
+      // extracted text never enters a learner page or a second browser cache.
+      window.dispatchEvent(new CustomEvent('type2learn:admin-source-added', { detail: { submissionId: submission.submissionId, extracted } }));
+      status(extracted
+        ? 'Source text was extracted privately. Type2Learn is preparing a reviewed Markdown draft now; you can inspect or edit it before compiling.'
         : 'Private source added. Review it before creating any learner-facing material.', 'success');
     } catch (error) { status(error.message, 'error'); }
   });
@@ -599,6 +610,8 @@ const bindAuthoring = () => {
             state: conversion.state || 'complete',
             readyForHumanReview: Boolean(conversion.readyForHumanReview),
             provider: conversion.provider || 'deterministic',
+            startedAt: conversion.startedAt || '',
+            durationMs: Number(conversion.durationMs || 0),
             validation: conversion.validation,
             checks: conversion.checks,
             critic: conversion.critic,
@@ -759,9 +772,8 @@ const bindAuthoring = () => {
       status('The safe learner preview is open. It uses the compiled course manifest without answer keys or private source material.', 'success');
     } catch (error) { status(error.message, 'warning'); }
   });
-  $('[data-open-source-review]')?.addEventListener('click', () => { openSourceReview(); });
-  $('[data-convert-source]')?.addEventListener('click', async () => {
-    const submissionId = String($('[data-authoring-submission]')?.value || '').trim();
+  const startSourceConversion = async (requestedSubmissionId = '') => {
+    const submissionId = String(requestedSubmissionId || $('[data-authoring-submission]')?.value || '').trim();
     if (!submissionId) { status('Open a private source review first.', 'warning'); return; }
     const output = $('[data-source-conversion-output]');
     const button = $('[data-convert-source]');
@@ -808,6 +820,18 @@ const bindAuthoring = () => {
     } finally {
       if (button) button.disabled = false;
     }
+  };
+  $('[data-open-source-review]')?.addEventListener('click', () => { openSourceReview(); });
+  $('[data-convert-source]')?.addEventListener('click', () => { void startSourceConversion(); });
+  window.addEventListener('type2learn:admin-source-added', async (event) => {
+    const submissionId = String(event.detail?.submissionId || '').trim();
+    if (!submissionId || !event.detail?.extracted) return;
+    await openSourceReview(submissionId);
+    if ($('[data-convert-source]')?.disabled) {
+      status('The source was stored privately, but its safe text is not ready for automatic conversion. Review the clear transcription notice before continuing.', 'warning');
+      return;
+    }
+    await startSourceConversion(submissionId);
   });
   $('[data-submission-list]')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-review-submission]');
