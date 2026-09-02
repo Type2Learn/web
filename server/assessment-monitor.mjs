@@ -66,7 +66,20 @@ export const assessmentLearningSignals = (summary = {}) => {
   };
 };
 
-const stableRank = (id, seed) => `${seed}:${id}`;
+// Use a tiny deterministic hash rather than a literal `${runId}:${itemId}`
+// string.  A literal shared run prefix would only sort item IDs alphabetically
+// and make every learner see the same tie order.  This hash keeps the reviewed
+// bank intact while giving each assessment run a reproducible, auditable tie
+// order.  It is not a score, random judgement, or content generator.
+const stableRank = (id, seed) => {
+  let value = 2166136261;
+  const source = `${String(seed || '')}:${String(id || '')}`;
+  for (let index = 0; index < source.length; index += 1) {
+    value ^= source.charCodeAt(index);
+    value = Math.imul(value, 16777619);
+  }
+  return value >>> 0;
+};
 
 // Ordering is deterministic for a run. It may choose an open question sooner
 // when the compact, consented summary says a learner had only a brief course
@@ -95,7 +108,7 @@ export const prioritiseAssessmentItems = ({ items = [], runId, signals = {} }) =
     if (focusIndex >= 0) priority += Math.max(2, 7 - focusIndex);
     return { item, priority, rank: stableRank(item.id, runId) };
   })
-  .sort((left, right) => right.priority - left.priority || left.rank.localeCompare(right.rank))
+  .sort((left, right) => right.priority - left.priority || left.rank - right.rank)
   .map(({ item }) => item.id);
 
 // FINAL-CHECK PRIORITISATION: aggregate only stored objective outcomes from
