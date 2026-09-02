@@ -20,6 +20,7 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /data-admin-source-form/);
   assert.match(admin, /Upload and prepare course/);
   assert.match(admin, /data-admin-source-progress/);
+  assert.match(admin, /data-open-editable-course-review/);
   assert.match(admin, /class="admin-source-progress-spinner"/);
   assert.match(admin, /application\/pdf/);
   assert.match(admin, /\.pptx/);
@@ -61,6 +62,10 @@ test('private educator upload controls use the same source and narration field n
   assert.doesNotMatch(workspace, /event\.currentTarget\.reset\(\)/);
   assert.match(workspace, /startSourceConversion\(submissionId, \{ autoPreview: true \}\)/);
   assert.match(workspace, /compileCurrentMarkdown\(\{ preview: true \}\)/);
+  assert.match(workspace, /data-open-editable-course-review/);
+  assert.match(workspace, /const openEditableCourseReview = async/);
+  assert.match(workspace, /\/api\/v1\/course-authoring\/review\?courseId=/);
+  assert.doesNotMatch(workspace, /Continue in learner course<\/button>/);
   const adminSourceHandler = workspace.slice(workspace.indexOf("$('[data-admin-source-form]')"), workspace.indexOf('const bindAuthoring'));
   assert.ok(adminSourceHandler.indexOf("setAdminSourceProgress(extracted ? 'extracting'") < adminSourceHandler.indexOf("window.dispatchEvent(new CustomEvent('type2learn:admin-source-added'"));
   assert.ok(adminSourceHandler.indexOf("window.dispatchEvent(new CustomEvent('type2learn:admin-source-added'") < adminSourceHandler.lastIndexOf('await loadSubmissions();'));
