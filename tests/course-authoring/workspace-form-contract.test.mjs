@@ -93,8 +93,8 @@ test('private educator upload controls use the same source and narration field n
   assert.match(teacher, /data-source-next-step/);
   assert.match(admin, /data-delete-course/);
   assert.match(admin, /Remove a course version/);
-  assert.match(admin, /workspace\.js\?v=20260902-pdf-intake2/);
-  assert.match(teacher, /workspace\.js\?v=20260902-pdf-intake2/);
+  assert.match(admin, /workspace\.js\?v=20260902-editable-preview1/);
+  assert.match(teacher, /workspace\.js\?v=20260902-editable-preview1/);
 });
 
 test('source conversion preserves the fast draft path, detailed timing evidence, and heavy repair only when structure needs it', async () => {
