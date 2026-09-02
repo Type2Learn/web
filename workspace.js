@@ -1037,6 +1037,8 @@ const bindAuthoring = () => {
       status: draft?.status,
       provider: draft?.provider || 'reviewed reserve',
       model: draft?.model || 'deterministic',
+      generationMode: draft?.generationMode || 'ai',
+      fallbackReason: draft?.fallbackReason || '',
       course: `${draft?.courseId || ''}@${draft?.courseVersion || ''}`,
       scope: draft?.scope,
       moduleIndex: draft?.moduleIndex,
@@ -1072,7 +1074,10 @@ const bindAuthoring = () => {
       const result = await api('/api/v1/assessment/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
       const draft = result.draft || {};
       $('[data-assessment-draft-id]').value = draft.id || '';
-      $('[data-assessment-draft-output]').textContent = `Candidate ${draft.id || 'created'} is awaiting human review. Open it to inspect every question, answer guide, and rubric before publishing.`;
+      const origin = draft.generationMode === 'deterministic-fallback'
+        ? 'The reviewed-source fallback was used because an AI result was unavailable or invalid.'
+        : 'AI generated the candidate from the approved course source.';
+      $('[data-assessment-draft-output]').textContent = `Candidate ${draft.id || 'created'} is awaiting human review. ${origin} Open it to inspect every question, answer guide, and rubric before publishing.`;
       status('Assessment candidate created. It is still private and not learner-visible.', 'success');
     } catch (error) { status(error.message, 'error'); }
   });

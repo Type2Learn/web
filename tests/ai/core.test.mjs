@@ -275,6 +275,36 @@ test('structured adaptive work uses its OpenAI role only after Gemini is unavail
   }
 });
 
+test('a bounded model deadline covers Gemini key rotation as one request budget', { concurrency: false }, async () => {
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push(String(url));
+    return new Promise((resolve, reject) => {
+      // Keep the unit test event loop alive long enough for AbortSignal.timeout
+      // (which uses an unref'ed timer) to deliver its cancellation.
+      const holdOpen = setTimeout(() => resolve(new Response('{}', { status: 500 })), 5_000);
+      options.signal.addEventListener('abort', () => {
+        clearTimeout(holdOpen);
+        reject(options.signal.reason);
+      }, { once: true });
+    });
+  };
+  try {
+    const provider = createModelProvider({
+      geminiApiKeys: ['timed-key-one', 'timed-key-two'],
+      geminiFastModel: 'gemini-3.5-flash-lite', geminiHeavyModel: 'gemini-3.6-flash', geminiMaxOutputTokens: 420,
+      openAiApiKey: '', openAiResponsesUrl: ''
+    });
+    const startedAt = Date.now();
+    await assert.rejects(provider.generate({ purpose: 'assessment-generation', instructions: 'Return JSON.', input: '{}', maxOutputTokens: 50, jsonSchema: { type: 'object' }, timeoutMs: 1_000 }));
+    assert.ok(Date.now() - startedAt < 1_700, 'the deadline must not be spent once per rotated key');
+    assert.equal(calls.length, 1, 'the second key must not start after the shared deadline');
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
 test('signed-in Course AI uses the shared Gemini-first provider before an unavailable OpenAI fallback', async () => {
   const settled = [];
   const service = createAiService({

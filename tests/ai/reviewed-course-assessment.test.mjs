@@ -202,6 +202,15 @@ test('assessment outcomes share the 90-day consented-record lifecycle and reject
   assert.match(source, /filter\(\(summary\) => !isExpired\(summary\)\)/);
 });
 
+test('review candidates use one bounded AI deadline and transparently retain a valid reviewed-source reserve', async () => {
+  const source = await readFile(new URL('../../server/assessment-service.mjs', import.meta.url), 'utf8');
+  assert.match(source, /timeoutMs: 12_000/);
+  assert.match(source, /createFallbackAssessmentBank\(curriculum\)/);
+  assert.match(source, /provider: 'deterministic', model: 'reviewed-source-reserve'/);
+  assert.match(source, /fallbackReason = 'model-generation-unavailable-or-invalid'/);
+  assert.match(source, /generationMode: fallbackReason \? 'deterministic-fallback' : 'ai'/);
+});
+
 test('the server retains an objective-specific evidence trace without storing a learner answer or score', async () => {
   const source = await readFile(new URL('../../server/assessment-service.mjs', import.meta.url), 'utf8');
   const answerSection = source.slice(source.indexOf('const outcomes = ['), source.indexOf('const nextIndex =', source.indexOf('const outcomes = [')));

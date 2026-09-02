@@ -120,10 +120,12 @@ export const createModelProvider = (config) => {
     return '';
   };
 
-  const callGemini = async ({ instructions, input, maxOutputTokens, jsonSchema, heavy = false, purpose, timeoutMs, maxGeminiAttempts }) => {
+  const callGemini = async ({ instructions, input, maxOutputTokens, jsonSchema, heavy = false, purpose, timeoutMs, maxGeminiAttempts, deadlineAt = 0 }) => {
     let lastError = null;
     const attempts = boundedAttempts(maxGeminiAttempts, keys.length);
     for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const remainingMs = deadlineAt ? deadlineAt - Date.now() : timeoutMs;
+      if (deadlineAt && remainingMs < 1_000) throw lastError || new Error('The model generation deadline was reached.');
       const keySlot = nextAvailableKey();
       if (!keySlot) break;
       const { key, index: keyIndex } = keySlot;
@@ -144,7 +146,7 @@ export const createModelProvider = (config) => {
               ...(jsonSchema ? { responseMimeType: 'application/json', responseSchema: geminiSchema(jsonSchema) } : {})
             }
           }),
-          signal: AbortSignal.timeout(boundedTimeout(timeoutMs))
+          signal: AbortSignal.timeout(boundedTimeout(remainingMs, timeoutMs))
         });
         if (!response.ok) {
           const message = await errorMessage(response);
@@ -186,8 +188,10 @@ export const createModelProvider = (config) => {
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .slice(0, 64) || 'structured_output';
 
-  const callOpenAi = async ({ instructions, input, maxOutputTokens, jsonSchema, purpose, timeoutMs }) => {
+  const callOpenAi = async ({ instructions, input, maxOutputTokens, jsonSchema, purpose, timeoutMs, deadlineAt = 0 }) => {
     if (!openAiReady()) throw new Error('No fallback model is configured.');
+    const remainingMs = deadlineAt ? deadlineAt - Date.now() : timeoutMs;
+    if (deadlineAt && remainingMs < 1_000) throw new Error('The model generation deadline was reached.');
     const model = modelForOpenAiPurpose(purpose);
     const response = await fetch(config.openAiResponsesUrl, {
       method: 'POST',
@@ -203,7 +207,7 @@ export const createModelProvider = (config) => {
         max_output_tokens: maxOutputTokens,
         ...(jsonSchema ? { text: { format: { type: 'json_schema', name: schemaNameFor(purpose), strict: true, schema: jsonSchema } } } : {})
       }),
-      signal: AbortSignal.timeout(boundedTimeout(timeoutMs))
+      signal: AbortSignal.timeout(boundedTimeout(remainingMs, timeoutMs))
     });
     if (!response.ok) throw new Error(await errorMessage(response));
     const payload = await response.json().catch(() => ({}));
@@ -227,8 +231,10 @@ export const createModelProvider = (config) => {
     return '';
   };
 
-  const callFeatherless = async ({ instructions, input, maxOutputTokens, purpose, timeoutMs }) => {
+  const callFeatherless = async ({ instructions, input, maxOutputTokens, purpose, timeoutMs, deadlineAt = 0 }) => {
     if (!featherlessReady()) throw new Error('Featherless is not configured.');
+    const remainingMs = deadlineAt ? deadlineAt - Date.now() : timeoutMs;
+    if (deadlineAt && remainingMs < 1_000) throw new Error('The model generation deadline was reached.');
     // Featherless accounts reserve a finite number of concurrent units. The
     // Type2Learn fallback is intentionally one-at-a-time: when it is busy,
     // the caller immediately continues to OpenAI rather than queuing a learner
@@ -256,7 +262,7 @@ export const createModelProvider = (config) => {
             { role: 'user', content: input }
           ]
         }),
-        signal: AbortSignal.timeout(boundedTimeout(timeoutMs))
+        signal: AbortSignal.timeout(boundedTimeout(remainingMs, timeoutMs))
       });
       if (!response.ok) throw new Error(await errorMessage(response));
       const payload = await response.json().catch(() => ({}));
@@ -282,6 +288,9 @@ export const createModelProvider = (config) => {
     // validators that consume the returned JSON.
     const normalisedRequest = {
       ...request,
+      // An end-to-end deadline covers rotation and fallback attempts as one
+      // request budget instead of letting each provider consume it again.
+      deadlineAt: request?.timeoutMs ? Date.now() + boundedTimeout(request.timeoutMs) : 0,
       heavy: Boolean(request?.heavy || request?.purpose === 'heavy')
     };
     // A compact behavioural-partner message normally begins with Gemini. If

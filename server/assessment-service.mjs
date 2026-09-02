@@ -406,19 +406,34 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
     const estimatedInputTokens = estimateTokens(instructions + input);
     let reservation;
     try {
-      reservation = await reserve({ userHash: hash(`assessment-bank:${generatedBankKey(curriculum)}`), inputTokens: estimatedInputTokens, outputTokens: config.assessmentMaxOutputTokens });
-      const generated = await provider.generate({
-        purpose: curriculum.scope === 'final' ? 'final-assessment-generation' : 'assessment-generation',
-        instructions,
-        input,
-        maxOutputTokens: config.assessmentMaxOutputTokens,
-        jsonSchema: assessmentBankJsonSchema(curriculum)
-      });
-      await settle({ reservation, generated, estimatedInputTokens });
-      reservation = null;
-      let parsed;
-      try { parsed = JSON.parse(generated.text); } catch { throw apiError(422, 'INVALID_ASSESSMENT_BANK', 'The generated assessment bank was not safe to publish.'); }
-      const bank = validateAssessmentBank(parsed, curriculum);
+      let generated;
+      let bank;
+      let fallbackReason = '';
+      try {
+        reservation = await reserve({ userHash: hash(`assessment-bank:${generatedBankKey(curriculum)}`), inputTokens: estimatedInputTokens, outputTokens: config.assessmentMaxOutputTokens });
+        generated = await provider.generate({
+          purpose: curriculum.scope === 'final' ? 'final-assessment-generation' : 'assessment-generation',
+          instructions,
+          input,
+          maxOutputTokens: config.assessmentMaxOutputTokens,
+          jsonSchema: assessmentBankJsonSchema(curriculum),
+          // This applies once across Gemini rotation and fallback providers.
+          timeoutMs: 12_000
+        });
+        await settle({ reservation, generated, estimatedInputTokens });
+        reservation = null;
+        let parsed;
+        try { parsed = JSON.parse(generated.text); } catch { throw apiError(422, 'INVALID_ASSESSMENT_BANK', 'The generated assessment bank was not safe to publish.'); }
+        bank = validateAssessmentBank(parsed, curriculum);
+      } catch (generationError) {
+        if (reservation) await ledger.release({ ...reservation, tolerateMissing: true }).catch(() => {});
+        reservation = null;
+        // This reviewed-source reserve is generic and shown as a fallback to
+        // reviewers; it is never presented as AI-generated content.
+        bank = validateAssessmentBank(createFallbackAssessmentBank(curriculum), curriculum);
+        generated = { provider: 'deterministic', model: 'reviewed-source-reserve' };
+        fallbackReason = 'model-generation-unavailable-or-invalid';
+      }
       const id = cleanIdentifier(body?.draftId) || randomUUID();
       const ref = moduleRef.collection('drafts').doc(id);
       await ref.create({
@@ -428,10 +443,11 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
         bank,
         provider: generated.provider,
         model: generated.model,
+        ...(fallbackReason ? { fallbackReason } : {}),
         createdAt: nowDate(),
         createdByHash: hash(account.uid)
       });
-      return { draft: { id, status: 'pending-human-review', moduleIndex: curriculum.moduleIndex, language: curriculum.language, itemCount: bank.items.length } };
+      return { draft: { id, status: 'pending-human-review', moduleIndex: curriculum.moduleIndex, language: curriculum.language, itemCount: bank.items.length, generationMode: fallbackReason ? 'deterministic-fallback' : 'ai' } };
     } catch (error) {
       if (reservation) await ledger.release({ ...reservation, tolerateMissing: true }).catch(() => {});
       throw error;
@@ -463,6 +479,8 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
         createdAt: draft.createdAt || null,
         provider: String(draft.provider || ''),
         model: String(draft.model || ''),
+        generationMode: draft.fallbackReason ? 'deterministic-fallback' : 'ai',
+        fallbackReason: String(draft.fallbackReason || ''),
         courseId: curriculum.courseId,
         courseVersion: curriculum.curriculumVersion,
         scope: curriculum.scope,
