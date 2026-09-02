@@ -1,7 +1,7 @@
 // This policy is intentionally deterministic. A model can make the wording
 // warmer, but it never decides whether support is warranted or changes a
 // preference itself.
-export const ADAPTIVE_POLICY_VERSION = 2;
+export const ADAPTIVE_POLICY_VERSION = 3;
 
 const copy = (english, urdu) => ({ english, urdu });
 
@@ -36,6 +36,18 @@ const candidates = {
     description: copy('Use calm, more visible progress moments in the next module.', 'اگلے ماڈیول میں پرسکون اور زیادہ نمایاں پیش رفت کے لمحات استعمال کریں۔'),
     reason: copy('You returned to this task more than once.', 'آپ اس کام پر ایک سے زیادہ بار واپس آئے۔')
   },
+  readingSpacing: {
+    id: 'reading-spacing-relaxed', kind: 'preference', preference: { key: 'reading-spacing', value: 'relaxed' },
+    title: copy('More room between reading lines', 'پڑھنے کی سطروں کے درمیان زیادہ جگہ'),
+    description: copy('Try roomier line and paragraph spacing in the next module. You can change it back anytime.', 'اگلے ماڈیول میں سطروں اور پیراگراف کے درمیان زیادہ جگہ آزمائیں۔ آپ اسے کبھی بھی واپس بدل سکتے ہیں۔'),
+    reason: copy('You moved back through several parts of this reading task.', 'آپ اس پڑھنے کے کام کے کئی حصوں میں واپس گئے۔')
+  },
+  readingSurface: {
+    id: 'reading-surface-soft-blue', kind: 'preference', preference: { key: 'reading-surface', value: 'soft-blue' },
+    title: copy('A softer reading surface', 'نرم پڑھنے کی سطح'),
+    description: copy('Try the soft-blue lesson surface in the next module. It changes presentation only, not the lesson.', 'اگلے ماڈیول میں نرم نیلی سبق کی سطح آزمائیں۔ یہ صرف پیشکش بدلتی ہے، سبق نہیں۔'),
+    reason: copy('You spent time with an optional visual explanation and then returned to the lesson.', 'آپ نے اختیاری بصری وضاحت کے ساتھ وقت گزارا اور پھر سبق پر واپس آئے۔')
+  },
   returnFromAi: {
     id: 'return-from-ai-one-step', kind: 'task-initiation',
     title: copy('Return to one clear next step', 'ایک واضح اگلے قدم پر واپس آئیں'),
@@ -52,6 +64,13 @@ export const adaptiveCandidateForSummary = (summary) => {
   const typingPauseMs = metric(summary, 'typingLongestPauseMs');
   const ttsStarts = metric(summary, 'ttsStarts');
   const returns = metric(summary, 'returns') + metric(summary, 'rereads');
+  const rereads = metric(summary, 'rereads');
+  const readingSectionMoves = metric(summary, 'readingSectionMoves');
+  const scrollBacktracks = metric(summary, 'scrollBacktracks');
+  const taskRevisits = metric(summary, 'taskRevisits');
+  const typingRetries = metric(summary, 'typingAbandons') + (metric(summary, 'typingBackspaces') >= 8 ? 1 : 0);
+  const visualActiveMs = metric(summary, 'visualActiveMs');
+  const visualCloses = metric(summary, 'visualCloses');
   const aiActiveMs = metric(summary, 'aiActiveMs');
   const aiRequests = metric(summary, 'aiRequests');
   // The Behaviour Context contributes only its neutral, temporary support
@@ -61,16 +80,22 @@ export const adaptiveCandidateForSummary = (summary) => {
   const behaviourStates = new Set(Array.isArray(summary?.behaviour?.states)
     ? summary.behaviour.states.map((state) => String(state)) : []);
 
+  // The saved state names below are themselves created only after their
+  // documented matched signals. `using-support` alone is not enough for an
+  // offer; it must be paired with `returning`, which denotes support use with
+  // no task movement. This keeps the policy at two neutral signals minimum.
   if (behaviourStates.has('starting')) return candidates.start;
-  if (behaviourStates.has('using-support')) return candidates.returnFromAi;
+  if (behaviourStates.has('returning')) return candidates.returnFromAi;
   if (behaviourStates.has('re-reading')) return candidates.readingWidth;
   if (behaviourStates.has('working-through-typing')) return candidates.spacing;
-  if (firstActionMs >= 90000) return candidates.start;
-  if (aiActiveMs >= 6 * 60 * 1000 || aiRequests >= 5) return candidates.returnFromAi;
-  if (typingPauseMs >= 45000) return candidates.spacing;
-  if (activeMs >= 12 * 60 * 1000 && summary?.phase === 'read') return candidates.readingWidth;
-  if (activeMs >= 8 * 60 * 1000 && summary?.phase === 'read' && ttsStarts === 0) return candidates.audio;
-  if (returns >= 2) return candidates.encouragement;
+  if (firstActionMs >= 90000 && returns >= 1) return candidates.start;
+  if (aiActiveMs >= 6 * 60 * 1000 && aiRequests >= 3) return candidates.returnFromAi;
+  if (typingPauseMs >= 45000 && typingRetries >= 1) return candidates.spacing;
+  if (activeMs >= 8 * 60 * 1000 && rereads >= 2 && summary?.phase === 'read') return candidates.readingWidth;
+  if (activeMs >= 8 * 60 * 1000 && readingSectionMoves >= 3 && summary?.phase === 'read' && ttsStarts === 0) return candidates.audio;
+  if (returns >= 2 && taskRevisits >= 1) return candidates.encouragement;
+  if (activeMs >= 8 * 60 * 1000 && scrollBacktracks >= 3 && summary?.phase === 'read') return candidates.readingSpacing;
+  if (visualActiveMs >= 45_000 && visualCloses >= 1) return candidates.readingSurface;
   return null;
 };
 

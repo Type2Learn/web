@@ -8,10 +8,10 @@ import { adaptiveRecallContext } from '../../server/course-context.mjs';
 const states = ['starting', 'returning', 're-reading', 'working-through-typing', 'using-support', 'ready-for-next-step', 'needs-a-choice'];
 const proposalForState = {
   starting: 'start-one-small-step',
-  returning: null,
+  returning: 'return-from-ai-one-step',
   're-reading': 'reading-width-narrow',
   'working-through-typing': 'layout-open',
-  'using-support': 'return-from-ai-one-step',
+  'using-support': null,
   'ready-for-next-step': null,
   'needs-a-choice': null
 };
