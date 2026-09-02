@@ -472,15 +472,18 @@ const bindSubmission = () => {
         if ($('[data-authoring-version]')) $('[data-authoring-version]').value = '1.0.0';
       }
       submittedForm.reset();
-      await loadSubmissions();
-      show('review');
       const extracted = ['safe-pdf-text-extracted', 'safe-presentation-text-extracted', 'safe-text-extracted'].includes(submission.source?.extraction);
-      // Reuse the secure review handler and its background conversion route;
-      // extracted text never enters a learner page or a second browser cache.
-      window.dispatchEvent(new CustomEvent('type2learn:admin-source-added', { detail: { submissionId: submission.submissionId, extracted } }));
+      // Start the important, visible path before refreshing the optional
+      // submission queue. A large existing queue must never make a successful
+      // PDF upload look frozen while the browser waits on an unrelated list.
+      show('review');
       setAdminSourceProgress(extracted ? 'extracting' : 'error', extracted
         ? 'Readable text was extracted privately. Building a bilingual Type2Learn review draft now…'
         : 'This source needs administrator transcription before it can be converted. The original file remains private.');
+      // Reuse the secure review handler and its background conversion route;
+      // extracted text never enters a learner page or a second browser cache.
+      window.dispatchEvent(new CustomEvent('type2learn:admin-source-added', { detail: { submissionId: submission.submissionId, extracted } }));
+      await loadSubmissions();
       status(extracted
         ? 'Source text was extracted privately. Type2Learn is preparing a reviewed Markdown draft now; you can inspect or edit it before compiling.'
         : 'Private source added. Review it before creating any learner-facing material.', 'success');

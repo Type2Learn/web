@@ -61,6 +61,9 @@ test('private educator upload controls use the same source and narration field n
   assert.doesNotMatch(workspace, /event\.currentTarget\.reset\(\)/);
   assert.match(workspace, /startSourceConversion\(submissionId, \{ autoPreview: true \}\)/);
   assert.match(workspace, /compileCurrentMarkdown\(\{ preview: true \}\)/);
+  const adminSourceHandler = workspace.slice(workspace.indexOf("$('[data-admin-source-form]')"), workspace.indexOf('const bindAuthoring'));
+  assert.ok(adminSourceHandler.indexOf("setAdminSourceProgress(extracted ? 'extracting'") < adminSourceHandler.indexOf("window.dispatchEvent(new CustomEvent('type2learn:admin-source-added'"));
+  assert.ok(adminSourceHandler.indexOf("window.dispatchEvent(new CustomEvent('type2learn:admin-source-added'") < adminSourceHandler.lastIndexOf('await loadSubmissions();'));
   assert.match(workspace, /\/api\/v1\/course-authoring\/translate/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/review/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/narration\/generate/);
