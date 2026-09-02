@@ -1023,7 +1023,12 @@ const bindAuthoring = () => {
       throw new Error('Choose a module number from 1 to 21.');
     }
     return {
-      ...selected,
+      courseId: selected.courseId,
+      // Assessment APIs deliberately name the versioned curriculum field
+      // `courseVersion`; authoring APIs retain the shorter `version` field.
+      // Do not spread the authoring selection here or the review request can
+      // silently lose its version after an otherwise valid course is chosen.
+      courseVersion: selected.version,
       scope,
       moduleIndex: scope === 'final' ? 'final' : moduleNumber - 1,
       language: values.get('language') === 'ur' ? 'ur' : 'en'

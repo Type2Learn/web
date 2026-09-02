@@ -119,6 +119,14 @@ test('private educator upload controls use the same source and narration field n
   assert.match(teacher, /workspace\.js\?v=20260903-admin-course-select1/);
 });
 
+test('assessment requests translate the shared authoring selector version into the assessment courseVersion contract', async () => {
+  const workspace = await readFile(new URL('../../workspace.js', import.meta.url), 'utf8');
+  const assessment = await readFile(new URL('../../server/assessment-service.mjs', import.meta.url), 'utf8');
+  assert.match(workspace, /courseVersion: selected\.version/);
+  assert.match(assessment, /courseVersion: body\?\.courseVersion \|\| body\?\.version/);
+  assert.match(assessment, /courseVersion: query\?\.courseVersion \|\| query\?\.version/);
+});
+
 test('source conversion preserves the fast draft path, detailed timing evidence, and heavy repair only when structure needs it', async () => {
   const service = await readFile(new URL('../../server/course-authoring-service.mjs', import.meta.url), 'utf8');
   assert.match(service, /heavy: purpose === 'course-authoring-repair'/);

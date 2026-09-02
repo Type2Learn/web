@@ -388,7 +388,7 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
   const createDraft = async ({ authorization, body }) => {
     const account = await reviewer(authorization);
     assertGenerationAvailable();
-    const curriculum = await curriculumFor({ authorization, courseId: body?.courseId, courseVersion: body?.courseVersion, moduleIndex: body?.scope === 'final' ? 'final' : body?.moduleIndex, language: body?.language });
+    const curriculum = await curriculumFor({ authorization, courseId: body?.courseId, courseVersion: body?.courseVersion || body?.version, moduleIndex: body?.scope === 'final' ? 'final' : body?.moduleIndex, language: body?.language });
     const moduleRef = bankModuleRef(curriculum);
     const generationRef = moduleRef.collection('generationRequests').doc(String(Math.floor(Date.now() / config.assessmentGenerationIntervalMs)));
     try {
@@ -462,7 +462,7 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
     const curriculum = await curriculumFor({
       authorization,
       courseId: query?.courseId,
-      courseVersion: query?.courseVersion,
+      courseVersion: query?.courseVersion || query?.version,
       moduleIndex: query?.scope === 'final' ? 'final' : query?.moduleIndex,
       language: query?.language
     });
@@ -496,7 +496,7 @@ export const createAssessmentService = ({ config, firebase, ledger, courseCatalo
 
   const publishDraft = async ({ authorization, body }) => {
     await reviewer(authorization);
-    const curriculum = await curriculumFor({ authorization, courseId: body?.courseId, courseVersion: body?.courseVersion, moduleIndex: body?.scope === 'final' ? 'final' : body?.moduleIndex, language: body?.language });
+    const curriculum = await curriculumFor({ authorization, courseId: body?.courseId, courseVersion: body?.courseVersion || body?.version, moduleIndex: body?.scope === 'final' ? 'final' : body?.moduleIndex, language: body?.language });
     const id = cleanIdentifier(body?.draftId);
     if (!id) throw apiError(400, 'INVALID_ASSESSMENT_DRAFT', 'Choose a valid reviewed draft.');
     const moduleRef = bankModuleRef(curriculum);
