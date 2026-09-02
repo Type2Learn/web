@@ -313,7 +313,15 @@ const loadCourses = async () => {
   try { const data = await api('/api/v1/course-authoring/courses'); courses = data.courses || []; renderCourses(); } catch (error) { status(error.message, 'warning'); }
 };
 const selectedCourse = () => {
-  const [courseId, version] = String($$('[data-course-select]').find((select) => select.value)?.value || '').split('@');
+  // ADMIN SECTION ROUTING: source intake, review, assessment, and publishing
+  // now live in separate panels. A hidden panel can retain a stale selection,
+  // so actions must always prefer the selector the administrator can see.
+  // This keeps every page's buttons bound to the course shown on that page.
+  const selects = $$('[data-course-select]');
+  const activeSelect = selects.find((select) => select.value && select.getClientRects().length > 0)
+    || selects.find((select) => select.value)
+    || selects[0];
+  const [courseId, version] = String(activeSelect?.value || '').split('@');
   if (!courseId || !version) throw new Error('Choose a course first.');
   return { courseId, version };
 };

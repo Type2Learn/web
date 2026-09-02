@@ -82,6 +82,8 @@ test('private educator upload controls use the same source and narration field n
   assert.match(workspace, /startSourceConversion\(submissionId, \{ autoPreview: true \}\)/);
   assert.match(workspace, /compileCurrentMarkdown\(\{ preview: true \}\)/);
   assert.match(workspace, /show\('source'\);/);
+  assert.match(workspace, /select\.getClientRects\(\)\.length > 0/);
+  assert.match(workspace, /ADMIN SECTION ROUTING/);
   assert.match(workspace, /data-open-editable-course-review/);
   assert.match(workspace, /const openEditableCourseReview = async/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/review\?courseId=/);
@@ -113,8 +115,8 @@ test('private educator upload controls use the same source and narration field n
   assert.match(teacher, /data-source-next-step/);
   assert.match(admin, /data-delete-course/);
   assert.match(admin, /Remove a course version/);
-  assert.match(admin, /workspace\.js\?v=20260903-admin-sections1/);
-  assert.match(teacher, /workspace\.js\?v=20260903-admin-sections1/);
+  assert.match(admin, /workspace\.js\?v=20260903-admin-course-select1/);
+  assert.match(teacher, /workspace\.js\?v=20260903-admin-course-select1/);
 });
 
 test('source conversion preserves the fast draft path, detailed timing evidence, and heavy repair only when structure needs it', async () => {
