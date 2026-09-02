@@ -302,6 +302,52 @@ body[data-workspace="admin"] .admin-source-intake > div p:last-child {
   line-height: 1.45;
 }
 
+/* ADMIN SOURCE INTAKE: distinct, non-blocking progress for the private
+   upload → extraction → draft → preview path. It is intentionally textual as
+   well as animated so reduced-motion users get the same clear state. */
+body[data-workspace="admin"] .admin-source-progress {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #8ebdf6;
+  border-radius: 12px;
+  background: #eef7ff;
+  color: #123e70;
+}
+
+body[data-workspace="admin"] .admin-source-progress[hidden] { display: none; }
+body[data-workspace="admin"] .admin-source-progress > div { min-width: 0; }
+body[data-workspace="admin"] .admin-source-progress strong,
+body[data-workspace="admin"] .admin-source-progress p { display: block; margin: 0; }
+body[data-workspace="admin"] .admin-source-progress p { margin-top: 3px; color: #365f8f; line-height: 1.4; }
+body[data-workspace="admin"] .admin-source-progress[data-phase="complete"] { border-color: #41bd7d; background: #effcf5; }
+body[data-workspace="admin"] .admin-source-progress[data-phase="error"] { border-color: #d49342; background: #fff8e9; }
+
+body[data-workspace="admin"] .admin-source-progress-spinner {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #b9d7f9;
+  border-top-color: #1266c4;
+  border-radius: 999px;
+  animation: admin-source-progress-spin .8s linear infinite;
+}
+
+body[data-workspace="admin"] .admin-source-progress[data-phase="complete"] .admin-source-progress-spinner {
+  border-color: #35bd78;
+  border-top-color: #35bd78;
+  animation: none;
+}
+
+@keyframes admin-source-progress-spin { to { transform: rotate(1turn); } }
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-workspace="admin"] .admin-source-progress-spinner { animation: none; }
+}
+
 body[data-workspace="admin"] .admin-translation-form {
   display: grid;
   grid-template-columns: minmax(170px, .4fr) minmax(0, 1fr) auto;

@@ -18,6 +18,9 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /data-publish-assessment-draft/);
   assert.match(admin, /data-download-source/);
   assert.match(admin, /data-admin-source-form/);
+  assert.match(admin, /Upload and prepare course/);
+  assert.match(admin, /data-admin-source-progress/);
+  assert.match(admin, /class="admin-source-progress-spinner"/);
   assert.match(admin, /application\/pdf/);
   assert.match(admin, /\.pptx/);
   assert.match(admin, /data-convert-source/);
@@ -54,6 +57,10 @@ test('private educator upload controls use the same source and narration field n
   assert.match(workspace, /\/api\/v1\/course-authoring\/source-convert/);
   assert.match(workspace, /type2learn:admin-source-added/);
   assert.match(workspace, /Source text was extracted privately\. Type2Learn is preparing a reviewed Markdown draft now/);
+  assert.match(workspace, /const submittedForm = event\.currentTarget/);
+  assert.doesNotMatch(workspace, /event\.currentTarget\.reset\(\)/);
+  assert.match(workspace, /startSourceConversion\(submissionId, \{ autoPreview: true \}\)/);
+  assert.match(workspace, /compileCurrentMarkdown\(\{ preview: true \}\)/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/translate/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/review/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/narration\/generate/);
@@ -86,6 +93,14 @@ test('source conversion preserves the fast draft path, detailed timing evidence,
   assert.match(service, /timeoutMs: purpose === 'course-authoring-conversion' \? 12_000 : 18_000/);
   assert.match(service, /durationMs: Math\.max\(0, Date\.now\(\) - conversionStartedMs\)/);
   assert.match(service, /durationMs: Math\.max\(0, Date\.now\(\) - stageStartedMs\)/);
+});
+
+test('private PDF intake has a visible accessible progress state and a reduced-motion-safe spinner', async () => {
+  const [admin, css] = await Promise.all([readFile(adminUrl, 'utf8'), readFile(new URL('../../admin/admin.css', import.meta.url), 'utf8')]);
+  assert.match(admin, /role="status" aria-live="polite"/);
+  assert.match(css, /admin-source-progress-spinner/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(css, /admin-source-progress-spin/);
 });
 
 test('teacher navigation keeps every primary route visible on a narrow screen', async () => {

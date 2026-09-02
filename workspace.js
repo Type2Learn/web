@@ -12,6 +12,33 @@ const status = (message, kind = 'info') => {
   target.dataset.kind = kind;
   target.textContent = message;
 };
+// ADMIN SOURCE INTAKE: this is deliberately separate from the small global
+// status line. A large PDF has two visible phases—private upload/extraction
+// and private course preparation—so administrators never mistake a quiet
+// background job for a failed click.
+const setAdminSourceProgress = (phase = 'idle', message = '') => {
+  const progress = $('[data-admin-source-progress]');
+  const form = $('[data-admin-source-form]');
+  const submit = form?.querySelector('button[type="submit"]');
+  if (!progress) return;
+  const active = !['idle', 'complete', 'error'].includes(phase);
+  progress.hidden = phase === 'idle';
+  progress.dataset.phase = phase;
+  $('[data-admin-source-progress-title]', progress)?.replaceChildren(document.createTextNode(
+    phase === 'uploading' ? 'Uploading private source…'
+      : phase === 'extracting' ? 'Extracting readable text…'
+        : phase === 'converting' ? 'Preparing a Type2Learn course…'
+          : phase === 'previewing' ? 'Opening learner-safe preview…'
+            : phase === 'complete' ? 'Course draft ready for review'
+              : phase === 'error' ? 'Course preparation needs attention'
+                : 'Preparing source…'
+  ));
+  $('[data-admin-source-progress-copy]', progress)?.replaceChildren(document.createTextNode(message));
+  if (submit) {
+    submit.disabled = active;
+    submit.setAttribute('aria-busy', String(active));
+  }
+};
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 const humanise = (value) => String(value || '').replace(/-/g, ' ');
 // This is a deliberately complete, valid file rather than a collection of
@@ -404,7 +431,8 @@ const bindSubmission = () => {
   });
   teacherSourceForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const submittedForm = event.currentTarget;
+    const form = new FormData(submittedForm);
     if (!form.get('sourceFile')?.size) { status('Choose source material to submit privately.', 'error'); return; }
     try {
       const result = await api('/api/v1/course-authoring/source', { method: 'POST', body: form });
@@ -418,15 +446,17 @@ const bindSubmission = () => {
           : `Sent privately as ${submission.submissionId}. Safe text is available for authorised review. Next, the reviewer prepares a bilingual Type2Learn course and you will see its status in Overview.`;
       }
       status(`Source submitted as ${submission.submissionId}. ${submission.source?.extraction === 'requires-admin-transcription' ? 'It is private and requires administrator transcription.' : 'Its safe text is ready for review.'}`, 'success');
-      event.currentTarget.reset();
+      submittedForm.reset();
       $('[data-source-file-summary]')?.replaceChildren(document.createTextNode('No file chosen yet. Maximum file size: 25 MB.'));
       await loadSubmissions();
     } catch (error) { status(error.message, 'error'); }
   });
   $('[data-admin-source-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const submittedForm = event.currentTarget;
+    const form = new FormData(submittedForm);
     if (!form.get('sourceFile')?.size) { status('Choose a private PDF, text, or document source first.', 'error'); return; }
+    setAdminSourceProgress('uploading', 'Keeping the original file private and checking the uploaded source…');
     try {
       const result = await api('/api/v1/course-authoring/source', { method: 'POST', body: form });
       const submission = result.submission || {};
@@ -441,17 +471,23 @@ const bindSubmission = () => {
         if ($('[data-authoring-course-id]')) $('[data-authoring-course-id]').value = suggestedCourseId;
         if ($('[data-authoring-version]')) $('[data-authoring-version]').value = '1.0.0';
       }
-      event.currentTarget.reset();
+      submittedForm.reset();
       await loadSubmissions();
       show('review');
       const extracted = ['safe-pdf-text-extracted', 'safe-presentation-text-extracted', 'safe-text-extracted'].includes(submission.source?.extraction);
       // Reuse the secure review handler and its background conversion route;
       // extracted text never enters a learner page or a second browser cache.
       window.dispatchEvent(new CustomEvent('type2learn:admin-source-added', { detail: { submissionId: submission.submissionId, extracted } }));
+      setAdminSourceProgress(extracted ? 'extracting' : 'error', extracted
+        ? 'Readable text was extracted privately. Building a bilingual Type2Learn review draft now…'
+        : 'This source needs administrator transcription before it can be converted. The original file remains private.');
       status(extracted
         ? 'Source text was extracted privately. Type2Learn is preparing a reviewed Markdown draft now; you can inspect or edit it before compiling.'
         : 'Private source added. Review it before creating any learner-facing material.', 'success');
-    } catch (error) { status(error.message, 'error'); }
+    } catch (error) {
+      setAdminSourceProgress('error', error.message || 'The source was not uploaded. Try again or choose a different file.');
+      status(error.message, 'error');
+    }
   });
 };
 const bindAuthoring = () => {
@@ -639,7 +675,32 @@ const bindAuthoring = () => {
           : 'Private source review opened for the administrator. It is never exposed to learner pages.';
       status(reviewMessage, conversion?.state === 'running' || conversion?.state === 'failed' ? 'warning' : 'success');
       await loadSubmissions();
-    } catch (error) { status(error.message, 'error'); }
+      return result;
+    } catch (error) { status(error.message, 'error'); return null; }
+  };
+  const compileCurrentMarkdown = async ({ preview = false } = {}) => {
+    const result = await api('/api/v1/course-authoring/markdown', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        courseId: $('[data-authoring-course-id]')?.value,
+        version: $('[data-authoring-version]')?.value,
+        ownerOrganisationId: $('[data-authoring-organisation]')?.value,
+        submissionId: $('[data-authoring-submission]')?.value,
+        markdown: template?.value || ''
+      })
+    });
+    if (!result.validation?.valid || !result.learnerManifest) {
+      throw new Error(`Markdown needs attention: ${(result.validation?.errors || []).join(' ') || 'the learner-safe manifest could not be built.'}`);
+    }
+    const value = `${result.course?.courseId || ''}@${result.course?.version || ''}`;
+    $$('[data-course-select]').forEach((select) => { select.value = value; });
+    await loadSubmissions();
+    await loadCourses();
+    if (preview) {
+      renderLearnerPreview(result.learnerManifest);
+      show('audit');
+    }
+    return result;
   };
   const moduleSlice = (markdown, moduleId) => {
     const escaped = String(moduleId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -772,11 +833,12 @@ const bindAuthoring = () => {
       status('The safe learner preview is open. It uses the compiled course manifest without answer keys or private source material.', 'success');
     } catch (error) { status(error.message, 'warning'); }
   });
-  const startSourceConversion = async (requestedSubmissionId = '') => {
+  const startSourceConversion = async (requestedSubmissionId = '', { autoPreview = false } = {}) => {
     const submissionId = String(requestedSubmissionId || $('[data-authoring-submission]')?.value || '').trim();
     if (!submissionId) { status('Open a private source review first.', 'warning'); return; }
     const output = $('[data-source-conversion-output]');
     const button = $('[data-convert-source]');
+    let backgroundJobQueued = false;
     if (button) button.disabled = true;
     if (output) output.textContent = 'Converting extracted source into a private canonical Markdown draft. This can take a little longer than a short AI suggestion…';
     try {
@@ -793,9 +855,33 @@ const bindAuthoring = () => {
         })
       });
       if (result.queued) {
+        backgroundJobQueued = true;
         if (output) output.textContent = 'Conversion is running securely in the background. The source remains private; this page will refresh the review when a draft is ready.';
         status('Conversion started. You can continue reviewing other material while the Markdown draft is prepared.', 'success');
-        window.setTimeout(() => openSourceReview(submissionId), 2500);
+        setAdminSourceProgress('converting', 'Creating a bilingual, review-only course draft. The original PDF remains private.');
+        const refreshDraft = async () => {
+          const review = await openSourceReview(submissionId);
+          const conversion = review?.conversion;
+          if (conversion?.state === 'running') {
+            window.setTimeout(refreshDraft, 2500);
+            return;
+          }
+          if (!autoPreview) return;
+          if (!conversion?.readyForHumanReview || !template?.value) {
+            setAdminSourceProgress('error', 'The draft needs administrator attention before a learner-safe preview can open. Review the conversion checks above.');
+            return;
+          }
+          try {
+            setAdminSourceProgress('previewing', 'The draft passed its automated checks. Creating the private learner-safe preview…');
+            await compileCurrentMarkdown({ preview: true });
+            setAdminSourceProgress('complete', 'The review-only learner-safe preview is open below. Inspect it before any publication decision.');
+            status('Your private source is now a validated course draft in learner-safe preview. It is not published to learners.', 'success');
+          } catch (error) {
+            setAdminSourceProgress('error', error.message || 'The generated draft could not be compiled for preview.');
+            status(error.message, 'error');
+          }
+        };
+        window.setTimeout(refreshDraft, 2500);
         return;
       }
       if (template && result.markdown) {
@@ -814,11 +900,20 @@ const bindAuthoring = () => {
         ? 'Canonical Markdown draft is ready for your review. Inspect it, edit anything needed, then validate and compile it.'
         : 'A Markdown draft was created, but its automated checks found issues. Review the report and edit it before validating.', result.readyForHumanReview ? 'success' : 'warning');
       await loadSubmissions();
+      if (autoPreview && result.readyForHumanReview) {
+        setAdminSourceProgress('previewing', 'The draft passed its automated checks. Creating the private learner-safe preview…');
+        await compileCurrentMarkdown({ preview: true });
+        setAdminSourceProgress('complete', 'The review-only learner-safe preview is open below. Inspect it before any publication decision.');
+      }
     } catch (error) {
       if (output) output.textContent = `Conversion was not completed: ${error.message}`;
+      if (autoPreview) setAdminSourceProgress('error', error.message || 'The source could not be converted.');
       status(error.message, 'error');
     } finally {
-      if (button) button.disabled = false;
+      // Keep the source action protected until the review refresh observes the
+      // terminal conversion state. The server also rejects duplicate jobs, but
+      // this prevents a confusing second click while the visible spinner runs.
+      if (button) button.disabled = backgroundJobQueued;
     }
   };
   $('[data-open-source-review]')?.addEventListener('click', () => { openSourceReview(); });
@@ -831,7 +926,7 @@ const bindAuthoring = () => {
       status('The source was stored privately, but its safe text is not ready for automatic conversion. Review the clear transcription notice before continuing.', 'warning');
       return;
     }
-    await startSourceConversion(submissionId);
+    await startSourceConversion(submissionId, { autoPreview: true });
   });
   $('[data-submission-list]')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-review-submission]');
@@ -859,15 +954,8 @@ const bindAuthoring = () => {
   $('[data-markdown-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
-      const result = await api('/api/v1/course-authoring/markdown', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ courseId: $('[data-authoring-course-id]')?.value, version: $('[data-authoring-version]')?.value, ownerOrganisationId: $('[data-authoring-organisation]')?.value, submissionId: $('[data-authoring-submission]')?.value, markdown: template?.value || '' }) });
-      if (result.validation?.valid && result.learnerManifest) {
-        renderLearnerPreview(result.learnerManifest);
-        const value = `${result.course?.courseId || ''}@${result.course?.version || ''}`;
-        $$('[data-course-select]').forEach((select) => { select.value = value; });
-      }
-      status(result.validation?.valid ? 'Markdown is valid. The learner-safe and private authoring manifests are ready for review; the generated course is ready to inspect.' : `Markdown needs attention: ${(result.validation?.errors || []).join(' ')}`, result.validation?.valid ? 'success' : 'warning');
-      await loadSubmissions();
-      await loadCourses();
+      await compileCurrentMarkdown();
+      status('Markdown is valid. The learner-safe and private authoring manifests are ready for review; the generated course is ready to inspect.', 'success');
     } catch (error) { status(error.message, 'error'); }
   });
   $('[data-ai-draft-form]')?.addEventListener('submit', async (event) => {

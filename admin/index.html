@@ -92,7 +92,11 @@
                 <label class="workspace-field">Course title<input name="title" maxlength="160" required placeholder="e.g. Introduction to environmental science"></label>
                 <input name="courseType" type="hidden" value="theory">
                 <label class="workspace-field">PDF, PowerPoint, or text source<input name="sourceFile" type="file" accept="application/pdf,.pdf,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation,.md,.markdown,.txt,.csv,text/plain,text/markdown,text/csv" required></label>
-                <button class="workspace-button workspace-button--primary" type="submit">Add private source</button>
+                <button class="workspace-button workspace-button--primary" type="submit">Upload and prepare course</button>
+                <div class="admin-source-progress" data-admin-source-progress hidden role="status" aria-live="polite">
+                  <span class="admin-source-progress-spinner" aria-hidden="true"></span>
+                  <div><strong data-admin-source-progress-title>Preparing source…</strong><p data-admin-source-progress-copy>Your original file remains private while Type2Learn prepares a review-only course draft.</p></div>
+                </div>
               </form>
 
               <label class="workspace-field">Existing validated course<select data-course-select aria-label="Choose course for review"></select></label>
