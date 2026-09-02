@@ -4,11 +4,12 @@ import test from 'node:test';
 
 const workspaceUrl = new URL('../../workspace.js', import.meta.url);
 const adminUrl = new URL('../../admin/index.html', import.meta.url);
+const adminUiUrl = new URL('../../admin/admin-ui.js', import.meta.url);
 const teacherUrl = new URL('../../teacher/index.html', import.meta.url);
 const workspaceCssUrl = new URL('../../workspace.css', import.meta.url);
 
 test('private educator upload controls use the same source and narration field names as the server', async () => {
-  const [workspace, admin, teacher] = await Promise.all([readFile(workspaceUrl, 'utf8'), readFile(adminUrl, 'utf8'), readFile(teacherUrl, 'utf8')]);
+  const [workspace, admin, teacher, adminUi] = await Promise.all([readFile(workspaceUrl, 'utf8'), readFile(adminUrl, 'utf8'), readFile(teacherUrl, 'utf8'), readFile(adminUiUrl, 'utf8')]);
   assert.match(admin, /name="audioFile"/);
   assert.match(admin, /name="sectionId"/);
   assert.match(admin, /data-narration-section-hint/);
@@ -19,6 +20,24 @@ test('private educator upload controls use the same source and narration field n
   assert.match(admin, /data-download-source/);
   assert.match(admin, /data-admin-source-form/);
   assert.match(admin, /Upload and prepare course/);
+  assert.match(admin, /data-workspace-nav="source"/);
+  assert.match(admin, /data-workspace-nav="builder"/);
+  assert.match(admin, /data-workspace-nav="tools"/);
+  assert.match(admin, /data-workspace-nav="assessments"/);
+  assert.match(admin, /data-panel="source"/);
+  assert.match(admin, /data-panel="builder"/);
+  assert.match(admin, /data-panel="tools"/);
+  assert.match(admin, /data-panel="assessments"/);
+  assert.match(admin, /data-admin-slot="source"/);
+  assert.match(admin, /data-admin-slot="builder"/);
+  assert.match(adminUi, /const organiseAdministratorWorkspace/);
+  assert.match(adminUi, /\[data-admin-source-form\]/);
+  assert.match(adminUi, /\[data-markdown-form\]/);
+  assert.match(adminUi, /\[data-ai-draft-form\]/);
+  assert.match(adminUi, /\[data-assessment-draft-form\]/);
+  assert.match(adminUi, /\[data-mcq-draft-form\]/);
+  assert.match(adminUi, /templateButton/);
+  assert.match(adminUi, /openCourseReviewButton/);
   assert.match(admin, /data-admin-source-progress/);
   assert.match(admin, /data-open-editable-course-review/);
   assert.match(admin, /class="admin-source-progress-spinner"/);
@@ -62,6 +81,7 @@ test('private educator upload controls use the same source and narration field n
   assert.doesNotMatch(workspace, /event\.currentTarget\.reset\(\)/);
   assert.match(workspace, /startSourceConversion\(submissionId, \{ autoPreview: true \}\)/);
   assert.match(workspace, /compileCurrentMarkdown\(\{ preview: true \}\)/);
+  assert.match(workspace, /show\('source'\);/);
   assert.match(workspace, /data-open-editable-course-review/);
   assert.match(workspace, /const openEditableCourseReview = async/);
   assert.match(workspace, /\/api\/v1\/course-authoring\/review\?courseId=/);
@@ -93,8 +113,8 @@ test('private educator upload controls use the same source and narration field n
   assert.match(teacher, /data-source-next-step/);
   assert.match(admin, /data-delete-course/);
   assert.match(admin, /Remove a course version/);
-  assert.match(admin, /workspace\.js\?v=20260902-editable-preview1/);
-  assert.match(teacher, /workspace\.js\?v=20260902-editable-preview1/);
+  assert.match(admin, /workspace\.js\?v=20260903-admin-sections1/);
+  assert.match(teacher, /workspace\.js\?v=20260903-admin-sections1/);
 });
 
 test('source conversion preserves the fast draft path, detailed timing evidence, and heavy repair only when structure needs it', async () => {

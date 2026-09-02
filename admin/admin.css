@@ -114,6 +114,29 @@ body[data-workspace="admin"] .workspace-panel h2 {
   font-weight: 620;
 }
 
+/* Focused administrator sections keep the upload path calm and make the
+   manual builder, review helpers, and assessment controls deliberate choices
+   instead of a single scroll-heavy form. */
+body[data-workspace="admin"] .admin-task-panel > h2 {
+  margin-top: 4px;
+}
+
+body[data-workspace="admin"] .admin-task-panel > p:not(.workspace-eyebrow) {
+  max-width: 850px;
+  line-height: 1.5;
+}
+
+body[data-workspace="admin"] [data-admin-slot] > .workspace-panel,
+body[data-workspace="admin"] [data-admin-slot] > form,
+body[data-workspace="admin"] [data-admin-slot] > .admin-course-review {
+  margin-top: 24px;
+}
+
+body[data-workspace="admin"] [data-admin-slot="source-actions"] > .workspace-row,
+body[data-workspace="admin"] [data-admin-slot="source-actions"] > .workspace-note {
+  margin-top: 18px;
+}
+
 body[data-workspace="admin"] .workspace-panel h3,
 body[data-workspace="admin"] .workspace-card h3,
 body[data-workspace="admin"] .authoring-language h4,

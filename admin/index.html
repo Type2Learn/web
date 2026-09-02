@@ -39,10 +39,14 @@
         <nav class="workspace-nav" aria-label="Administrator sections">
           <p>Workspace</p>
           <button data-workspace-nav="overview" aria-current="page" type="button">Overview</button>
-          <button data-workspace-nav="review" type="button">Course review</button>
-          <button data-workspace-nav="access" type="button">Access codes</button>
-          <button data-workspace-nav="publish" type="button">Audio & publish</button>
+          <button data-workspace-nav="source" type="button">1. Source to course</button>
+          <button data-workspace-nav="builder" type="button">2. Manual builder</button>
+          <button data-workspace-nav="review" type="button">3. Review & edit</button>
+          <button data-workspace-nav="tools" type="button">Review helpers</button>
+          <button data-workspace-nav="assessments" type="button">Assessment checks</button>
+          <button data-workspace-nav="publish" type="button">4. Audio & publish</button>
           <button data-workspace-nav="audit" type="button">Audit & preview</button>
+          <button data-workspace-nav="access" type="button">Access codes</button>
         </nav>
 
         <div class="workspace-content">
@@ -56,6 +60,46 @@
               <article class="workspace-card"><h3>1. Private intake</h3><p>Safe text extracts can help review. Scanned, image, and unsupported sources are retained privately and marked for transcription.</p></article>
               <article class="workspace-card"><h3>2. Bilingual Markdown</h3><p>English and Urdu are both required. Deterministic validation creates a learner-safe manifest and private review manifest.</p></article>
               <article class="workspace-card"><h3>3. Release gate</h3><p>Firebase, private GitHub, Supabase, and an acknowledged ZIP must all verify before a course can publish.</p></article>
+            </div>
+          </section>
+
+          <!-- ADMIN INFORMATION ARCHITECTURE: each authoring route receives
+               its own panel so uploading a source never competes visually
+               with manual course entry, assessment tooling, or publishing. -->
+          <section data-panel="source" class="workspace-hidden">
+            <div class="workspace-panel admin-task-panel">
+              <p class="workspace-eyebrow">Step 1 · Source to course</p>
+              <h2>Upload a private course source</h2>
+              <p>Choose one PDF, PowerPoint, or text file. Type2Learn extracts readable text privately, builds a review-only course draft, and opens its learner-safe preview. Nothing is published in this step.</p>
+              <div data-admin-slot="source"></div>
+            </div>
+            <div class="workspace-panel admin-task-panel" data-admin-slot="source-actions"></div>
+          </section>
+
+          <section data-panel="builder" class="workspace-hidden">
+            <div class="workspace-panel admin-task-panel">
+              <p class="workspace-eyebrow">Step 2 · Manual builder</p>
+              <h2>Build or revise a course by hand</h2>
+              <p>Use this only when you are entering a course manually or revising reviewed Markdown. The guided fields, Markdown import, and validator live here—not on the upload page.</p>
+              <div data-admin-slot="builder"></div>
+            </div>
+          </section>
+
+          <section data-panel="tools" class="workspace-hidden">
+            <div class="workspace-panel admin-task-panel">
+              <p class="workspace-eyebrow">Optional review helpers</p>
+              <h2>Create a review-only draft or translation</h2>
+              <p>These helpers produce private suggestions only. An administrator must inspect and deliberately add any wording to the course.</p>
+              <div data-admin-slot="tools"></div>
+            </div>
+          </section>
+
+          <section data-panel="assessments" class="workspace-hidden">
+            <div class="workspace-panel admin-task-panel">
+              <p class="workspace-eyebrow">Assessment checks</p>
+              <h2>Review questions before learners receive them</h2>
+              <p>Question candidates, answer guides, and fallback MCQs remain private here until an authorised reviewer explicitly publishes an approved bank.</p>
+              <div data-admin-slot="assessments"></div>
             </div>
           </section>
 
@@ -76,6 +120,8 @@
                 <button class="workspace-button" data-begin-admin-review type="button">Begin administrator review</button>
               </div>
             </aside>
+
+            <div data-admin-slot="review"></div>
 
             <div class="workspace-panel admin-authoring-panel">
               <h2>Structured course authoring and review</h2>
@@ -144,7 +190,7 @@
   <!-- Bump deliberately after a form-lifecycle repair: this dashboard script
        is cacheable, so a stable URL could leave an older async upload handler
        in an administrator's browser after deployment. -->
-  <script type="module" src="/workspace.js?v=20260902-editable-preview1"></script>
+  <script type="module" src="/workspace.js?v=20260903-admin-sections1"></script>
   <script type="module" src="/admin/admin-ui.js"></script>
 </body>
 </html>

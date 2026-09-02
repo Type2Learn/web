@@ -476,7 +476,7 @@ const bindSubmission = () => {
       // Start the important, visible path before refreshing the optional
       // submission queue. A large existing queue must never make a successful
       // PDF upload look frozen while the browser waits on an unrelated list.
-      show('review');
+      show('source');
       setAdminSourceProgress(extracted ? 'extracting' : 'error', extracted
         ? 'Readable text was extracted privately. Building a bilingual Type2Learn review draft now…'
         : 'This source needs administrator transcription before it can be converted. The original file remains private.');
@@ -946,7 +946,7 @@ const bindAuthoring = () => {
     const button = event.target.closest('[data-review-submission]');
     if (!button) return;
     $('[data-authoring-submission]').value = button.dataset.reviewSubmission || '';
-    show('review');
+    show('source');
     openSourceReview(button.dataset.reviewSubmission);
   });
   $('[data-download-source]')?.addEventListener('click', async () => {
