@@ -275,7 +275,8 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   let COURSE_URDU = DEFAULT_COURSE_URDU;
   const LOCAL_AVA_VOICE_URI = 'type2learn-local-edge-ava';
 
-  const hasLocalAvaNarration = () => COURSE_AUDIO_MANIFEST.courseId === COURSE.id
+  const hasLocalAvaNarration = () => !reviewedManifestRequest().requested
+    && COURSE_AUDIO_MANIFEST.courseId === COURSE.id
     && COURSE_AUDIO_MANIFEST.courseVersion === COURSE.version
     && COURSE_AUDIO_MODULE_KEYS.length === COURSE.steps.length
     && COURSE_AUDIO_MODULE_KEYS.every((key) => {
@@ -4287,6 +4288,11 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
   ].map((filename) => urduReadingAudioSource(audioKey, filename));
 
   const preloadNextModuleNarration = () => {
+    // A reviewed course has no bundled legacy Ava paths. Its optional human
+    // narration is requested through the protected manifest route instead,
+    // so never warm the historical course audio while a reviewed route is
+    // resolving or displaying.
+    if (!usesLocalAvaNarration()) return;
     const nextAudioKey = COURSE_AUDIO_MODULE_KEYS[displayedModuleIndex() + 1];
     const nextAssets = COURSE_AUDIO_MANIFEST.modules?.[nextAudioKey];
     const sources = [
@@ -6540,7 +6546,9 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
         // Mapping deliberately refuses to play a full recording when the
         // visible excerpt no longer matches it. That safety rule must not stop
         // us from warming the verified module files for a later matching view.
-        const currentSources = [currentAssets?.read, currentAssets?.simpleAddon];
+        const currentSources = usesLocalAvaNarration()
+          ? [currentAssets?.read, currentAssets?.simpleAddon]
+          : [];
         preloadCurrentNarrationSources(currentSources);
         service.preloadAudioSources?.(currentSources);
       }

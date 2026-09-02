@@ -127,6 +127,13 @@ test('assessment requests translate the shared authoring selector version into t
   assert.match(assessment, /courseVersion: query\?\.courseVersion \|\| query\?\.version/);
 });
 
+test('a selected reviewed course never preloads historical bundled narration paths', async () => {
+  const player = await readFile(new URL('../../course/course.js', import.meta.url), 'utf8');
+  assert.match(player, /const hasLocalAvaNarration = \(\) => !reviewedManifestRequest\(\)\.requested/);
+  assert.match(player, /if \(!usesLocalAvaNarration\(\)\) return;\n    const nextAudioKey/);
+  assert.match(player, /const currentSources = usesLocalAvaNarration\(\)\n          \? \[currentAssets\?\.read, currentAssets\?\.simpleAddon\]\n          : \[\]/);
+});
+
 test('source conversion preserves the fast draft path, detailed timing evidence, and heavy repair only when structure needs it', async () => {
   const service = await readFile(new URL('../../server/course-authoring-service.mjs', import.meta.url), 'utf8');
   assert.match(service, /heavy: purpose === 'course-authoring-repair'/);
