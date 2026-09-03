@@ -81,6 +81,10 @@ export const createAdaptiveSupportService = ({ config, firebase, ledger, provide
         instructions,
         input,
         maxOutputTokens: 70,
+        // The deterministic policy has already selected a safe, reversible
+        // offer. Keep its optional AI phrasing inside one short deadline so a
+        // slow key rotation can never delay the learner's next step.
+        timeoutMs: 8_000,
         jsonSchema: { type: 'object', additionalProperties: false, required: ['description'], properties: { description: { type: 'string', maxLength: 180 } } }
       });
       const actualInput = Number(generated?.usage?.inputTokens) || estimatedInputTokens;
