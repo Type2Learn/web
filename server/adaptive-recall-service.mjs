@@ -131,7 +131,13 @@ export const createAdaptiveRecallService = ({ config, firebase, ledger, provider
     }
     let settled = false;
     try {
-      const generated = await provider.generate({ purpose: 'adaptive-recall', instructions, input, maxOutputTokens: MAX_OUTPUT_TOKENS, jsonSchema: schema });
+      // This is optional refinement of a response which remains in the
+      // browser. One deadline across every provider attempt means a learner
+      // can always continue with authored current-step support on outage.
+      const generated = await provider.generate({
+        purpose: 'adaptive-recall', instructions, input, maxOutputTokens: MAX_OUTPUT_TOKENS,
+        timeoutMs: 8_000, jsonSchema: schema
+      });
       const result = validate(JSON.parse(generated.text));
       if (!result) throw apiError(502, 'INVALID_ADAPTIVE_OUTPUT', 'The adaptive response was not safe to show.');
       await ledger.settle({
