@@ -482,6 +482,62 @@ const canonicaliseLooseCourseDraft = (markdown, { courseId, version, submittedTi
   ].join('\n');
 };
 
+// MODEL-OUTAGE SOURCE FALLBACK ------------------------------------------------
+// A successful local extraction should still give an administrator a usable
+// review surface if every model call fails. This deliberately preserves
+// source wording and never claims to translate or infer extra curriculum
+// facts; the normal human-review gate remains in force.
+const sourceLinesForFallback = (source) => normaliseSourceText(source)
+  .split('\n')
+  .map((line) => line.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').replace(/\s+/g, ' ').trim())
+  .filter((line) => line.length >= 28)
+  .filter((line) => !/^Type2Learn conversion-demo source\s*\|/i.test(line))
+  .filter((line) => !/^--\s*\d+\s+of\s+\d+\s*--$/i.test(line));
+
+const sourceSentenceForFallback = (value, fallback) => {
+  const line = sourceLinesForFallback(value)
+    .find((candidate) => !/^Course source pack\s*\|/i.test(candidate) && !/^Ideology of Pakistan\s*\|/i.test(candidate));
+  return clean(line || fallback, 300);
+};
+
+const genericFallbackModule = ({ id, title, source, namedTerms = [] }) => {
+  const sourceSentence = sourceSentenceForFallback(source, `This reviewed source section introduces ${title}.`);
+  const goalSentence = namedTerms.length ? ` The reviewer-provided learning goal names: ${namedTerms.join(', ')}.` : '';
+  const definition = `${sourceSentence}${goalSentence}`;
+  const urduTitle = `جائزہ شدہ ماخذ: ${title}`;
+  const urduDefinition = `اس جائزہ شدہ ماخذ میں ${title} سے متعلق یہ متن شامل ہے: ${definition}`;
+  return [
+    `# Module: ${id}`,
+    '', '## English', '', canonicalModuleLanguage({ language: 'en', title, definition, target: definition }),
+    '', '## Urdu', '', canonicalModuleLanguage({ language: 'ur', title: urduTitle, definition: urduDefinition, target: urduDefinition })
+  ].join('\n');
+};
+
+const deterministicMarkdownFromSource = ({ sourceText, courseId, version, submittedTitle = '', learningGoal = '' } = {}) => {
+  const source = normaliseSourceText(sourceText);
+  const sections = sourcePackSections(source);
+  const fallbackTitle = clean(submittedTitle, 160) || 'Reviewed source course';
+  const namedTerms = namedLearningGoalTerms(learningGoal);
+  const moduleInputs = sections.length
+    ? sections.slice(0, 8).map((section, index) => ({ id: `source-topic-${index + 1}`, title: section.title, source: section.text }))
+    : sourceLinesForFallback(source).slice(0, 4).map((line, index) => ({ id: `source-topic-${index + 1}`, title: `Source idea ${index + 1}`, source: line }));
+  if (!moduleInputs.length) return '';
+  const modules = moduleInputs.map((module, index) => genericFallbackModule({ ...module, namedTerms: index === 0 ? namedTerms : [] }));
+  const finalSource = sourceSentenceForFallback(source, fallbackTitle);
+  const finalUrdu = `جائزہ شدہ ماخذ کا ایک بنیادی خیال بیان کریں: ${finalSource}`;
+  return [
+    '---', `format: ${THEORY_MARKDOWN_FORMAT}`, `id: ${courseId}`, `version: ${version}`,
+    `title.en: ${fallbackTitle}`, `title.ur: جائزہ شدہ ماخذ کورس: ${fallbackTitle}`,
+    'label.en: Deterministic source-review draft', 'label.ur: قطعی ماخذ جائزہ مسودہ',
+    'notice.en: This fallback reorganises extracted source text only. Review factual accuracy and Urdu wording before learner release.',
+    'notice.ur: یہ متبادل صرف نکالے گئے ماخذ کے متن کو منظم کرتا ہے۔ سیکھنے والوں کے لیے جاری کرنے سے پہلے حقائق اور اردو عبارت کا جائزہ لیں۔',
+    '---', '', ...modules, '', '# Final exam', '', '## English', '', '### Question 1',
+    canonicalOptions({ question: 'Which reviewed idea can you explain from this source?', correct: finalSource, language: 'en' }),
+    '', '## Urdu', '', '### Question 1',
+    canonicalOptions({ question: 'آپ اس جائزہ شدہ ماخذ سے کون سا بنیادی خیال بیان کر سکتے ہیں؟', correct: finalUrdu, language: 'ur' })
+  ].join('\n');
+};
+
 // TIMED DEMO CONVERSION OVERRIDE -------------------------------------------
 // This visible, intentionally limited accelerator exists for the supplied
 // Ideology of Pakistan demo handout. It is not an AI result and is never
@@ -846,6 +902,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
           updatedAt: record.sourceConversion.updatedAt || '',
           validation: record.sourceConversion.validation || { valid: false, errors: [] },
           checks: Array.isArray(record.sourceConversion.checks) ? record.sourceConversion.checks : [],
+          stages: Array.isArray(record.sourceConversion.stages) ? record.sourceConversion.stages : [],
           critic: record.sourceConversion.critic || null,
           markdown: String(record.sourceConversion.markdown || '')
         } : null,
@@ -953,8 +1010,30 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const conversionStartedMs = Date.parse(conversionStartedAt) || Date.now();
       let providerName = 'deterministic';
       const timedDemo = isTimedDemoSource(record.source);
+      let usedDeterministicFallback = false;
       let candidate = withCanonicalIdentity(sourceText, { courseId, version });
       let checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
+
+      const applyDeterministicFallback = (reason) => {
+        const fallback = deterministicMarkdownFromSource({
+          sourceText,
+          courseId,
+          version,
+          submittedTitle: record.submittedTitle,
+          learningGoal
+        });
+        if (!fallback) throw apiError(502, 'DETERMINISTIC_SOURCE_FALLBACK_INVALID', 'The extracted source could not be organised into a review draft. Open the private source review and use the guided form.');
+        candidate = fallback;
+        checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
+        usedDeterministicFallback = true;
+        providerName = 'deterministic-fallback';
+        stages.push({
+          id: 'deterministic-source-fallback',
+          passed: Boolean(checks.validation.valid && checks.deterministicPassed),
+          provider: 'deterministic',
+          message: `AI drafting was unavailable (${clean(reason, 160) || 'no usable response'}). Type2Learn organised extracted source text into a review-only draft.`
+        });
+      };
 
       const generateMarkdown = async ({ purpose, currentMarkdown = '', validationErrors = [] }) => {
         if (!provider?.status?.().available) throw apiError(503, 'AI_CONVERSION_NOT_CONFIGURED', 'AI course conversion is not configured. You can use the guided authoring form or reviewed Markdown template.');
@@ -1036,12 +1115,16 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       // A source already written in the canonical form does not waste a model
       // call. It still runs the same strict parser and human-review gate.
       } else if (!checks.validation.valid) {
-        candidate = await generateMarkdown({ purpose: 'course-authoring-conversion' });
-        checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
+        try {
+          candidate = await generateMarkdown({ purpose: 'course-authoring-conversion' });
+          checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
+        } catch (error) {
+          applyDeterministicFallback(error?.code || error?.message);
+        }
       } else {
         stages.push({ id: 'canonical-source-detected', passed: true, provider: 'deterministic' });
       }
-      if (!timedDemo && !checks.validation.valid) {
+      if (!timedDemo && !usedDeterministicFallback && !checks.validation.valid) {
         const normalisedLooseDraft = canonicaliseLooseCourseDraft(candidate, { courseId, version, submittedTitle: record.submittedTitle });
         if (normalisedLooseDraft) {
           candidate = normalisedLooseDraft;
@@ -1049,21 +1132,25 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
           stages.push({ id: 'deterministic-loose-markdown-normalisation', passed: checks.validation.valid && checks.missingGoalTerms.length === 0, provider: 'deterministic' });
         }
       }
-      if (!timedDemo && (!checks.validation.valid || checks.missingGoalTerms.length || checks.sourceSectionProblems.length)) {
-        candidate = await generateMarkdown({
-          purpose: 'course-authoring-repair',
-          currentMarkdown: candidate,
-          validationErrors: [
-            ...checks.validation.errors,
-            ...checks.missingGoalTerms.map((term) => `Learner modules must cover the named learning-goal requirement: ${term}.`),
-            ...checks.sourceSectionProblems.map((term) => `Create a separate learner module for the labelled source section: ${term}.`)
-          ]
-        });
-        checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
+      if (!timedDemo && !usedDeterministicFallback && (!checks.validation.valid || checks.missingGoalTerms.length || checks.sourceSectionProblems.length)) {
+        try {
+          candidate = await generateMarkdown({
+            purpose: 'course-authoring-repair',
+            currentMarkdown: candidate,
+            validationErrors: [
+              ...checks.validation.errors,
+              ...checks.missingGoalTerms.map((term) => `Learner modules must cover the named learning-goal requirement: ${term}.`),
+              ...checks.sourceSectionProblems.map((term) => `Create a separate learner module for the labelled source section: ${term}.`)
+            ]
+          });
+          checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
+        } catch (error) {
+          applyDeterministicFallback(error?.code || error?.message);
+        }
       }
 
       let critic = null;
-      if (!timedDemo && checks.deterministicPassed && provider?.status?.().available) {
+      if (!timedDemo && !usedDeterministicFallback && checks.deterministicPassed && provider?.status?.().available) {
         const criticStartedMs = Date.now();
         try {
           const result = await provider.generate({
@@ -1100,7 +1187,11 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         version,
         provider: providerName,
         mode: timedDemo ? 'timed-demo-override' : 'standard',
-        notice: timedDemo ? 'Timed demo conversion used a prepared review draft for the supplied Ideology of Pakistan CEME handout. It remains review-only until an administrator validates, reviews, and approves it.' : '',
+        notice: timedDemo
+          ? 'Timed demo conversion used a prepared review draft for the supplied Ideology of Pakistan CEME handout. It remains review-only until an administrator validates, reviews, and approves it.'
+          : usedDeterministicFallback
+            ? 'AI drafting was unavailable, so Type2Learn built this source-only, deterministic review draft. Check factual accuracy and Urdu wording before learner release.'
+            : '',
         validation: { valid: checks.validation.valid, errors: checks.validation.errors.slice(0, 80) },
         checks: checks.checks,
         critic,

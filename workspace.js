@@ -653,8 +653,8 @@ const bindAuthoring = () => {
         } else if (conversion.state === 'failed') {
           conversionOutput.textContent = conversion.failure || 'Automated conversion did not complete. Re-open the source review and retry, or use the guided form and reviewed Markdown template.';
         } else {
-          const timedDemoNotice = conversion.mode === 'timed-demo-override'
-            ? `${conversion.notice || 'Timed demo conversion used a prepared review draft for this supplied demonstration handout.'}\n\n`
+          const conversionNotice = conversion.notice
+            ? `${conversion.notice}\n\n`
             : '';
           const summary = {
             state: conversion.state || 'complete',
@@ -665,10 +665,11 @@ const bindAuthoring = () => {
             durationMs: Number(conversion.durationMs || 0),
             validation: conversion.validation,
             checks: conversion.checks,
+            stages: conversion.stages,
             critic: conversion.critic,
             updatedAt: conversion.updatedAt
           };
-          conversionOutput.textContent = `${timedDemoNotice}Saved conversion draft — still requires human review:\n${JSON.stringify(summary, null, 2)}`;
+          conversionOutput.textContent = `${conversionNotice}Saved conversion draft — still requires human review:\n${JSON.stringify(summary, null, 2)}`;
           if (conversion.markdown && template) {
             template.value = conversion.markdown;
             syncAuthoringMetadata(conversion.markdown);

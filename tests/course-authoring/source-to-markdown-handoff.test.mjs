@@ -662,7 +662,7 @@ test('a long source conversion persists a running state, prevents duplicate jobs
   assert.match(complete.conversion.markdown, /^format: type2learn-theory-course\/v1$/m);
 });
 
-test('a failed background conversion is persisted as a reviewable failure instead of leaving the source reviewed forever', async () => {
+test('a failed AI background conversion persists a validated deterministic review draft instead of leaving the source stalled', async () => {
   const provider = { status: () => ({ available: true }), generate: async () => { throw new Error('provider unavailable'); } };
   const firestore = new MemoryFirestore();
   const storage = new MemoryStorage();
@@ -679,10 +679,18 @@ test('a failed background conversion is persisted as a reviewable failure instea
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
   const review = await service.submissionReview({ authorization: authorisation, submissionId: source.submission.submissionId });
-  assert.equal(review.submission.status, 'conversion-needs-review');
-  assert.equal(review.conversion.state, 'failed');
-  assert.match(review.conversion.failure, /Automated conversion did not complete/);
-  assert.equal(review.conversion.markdown, '');
+  assert.equal(review.submission.status, 'conversion-ready');
+  assert.equal(review.conversion.state, 'complete');
+  assert.equal(review.conversion.provider, 'deterministic-fallback');
+  assert.equal(review.conversion.readyForHumanReview, true);
+  assert.equal(review.conversion.validation.valid, true, review.conversion.validation.errors.join('\n'));
+  assert.match(review.conversion.notice, /AI drafting was unavailable/);
+  assert.match(review.conversion.markdown, /^format: type2learn-theory-course\/v1$/m);
+  assert.ok(review.conversion.stages.some((stage) => stage.id === 'deterministic-source-fallback' && stage.passed));
+  const saved = await service.saveMarkdown({ authorization: authorisation, body: {
+    courseId: 'unavailable-model-course', version: '1.0.0', submissionId: source.submission.submissionId, markdown: review.conversion.markdown
+  } });
+  assert.equal(saved.validation.valid, true, saved.validation.errors.join('\n'));
 });
 
 test('reviewed Markdown cannot silently diverge from the form identifiers or source organisation', async () => {
