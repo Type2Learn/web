@@ -5274,7 +5274,14 @@ import { downloadLearningForOffline, getOfflineStatus, registerOffline, requestO
     const speech = canSpeak
       ? '<div class="course-assessment-input-tools"><button class="course-secondary-button" type="button" data-action="assessment-dictation"' + (understandingCheck.listening ? ' aria-pressed="true"' : '') + '>' + escapeHtml(understandingCheck.listening ? courseUi('Listening…', 'سن رہا ہے…') : courseUi('Speak response', 'آواز سے جواب دیں')) + '</button><p class="course-input-help">' + escapeHtml(courseUi('Your spoken words appear here for you to review and edit before submitting.', 'آپ کے بولے گئے الفاظ یہاں آئیں گے تاکہ آپ جمع کرنے سے پہلے انہیں دیکھ اور بدل سکیں۔')) + '</p></div>'
       : '';
-    return '<label class="course-input-label" for="course-assessment-response">' + escapeHtml(courseUi('Your response', 'آپ کا جواب')) + '</label><textarea id="course-assessment-response" data-assessment-response rows="5" maxlength="1400" autocomplete="off" spellcheck="true" placeholder="' + escapeHtml(courseUi('Answer in your own words.', 'اپنے الفاظ میں جواب دیں۔')) + '">' + escapeHtml(understandingCheck.response) + '</textarea>' + speech + '<p class="course-input-help">' + escapeHtml(courseUi('There is no target text, timer, or score. Your response stays editable until you submit it.', 'کوئی ہدف متن، ٹائمر یا اسکور نہیں ہے۔ جمع کرنے تک آپ اپنا جواب بدل سکتے ہیں۔')) + '</p>';
+    // Open-response questions need their prompt rendered explicitly. MCQs use
+    // their fieldset legend above; without this line an open check could show
+    // only an empty response box, leaving the learner without a question.
+    const prompt = String(question?.prompt || '').trim();
+    const questionMarkup = prompt
+      ? '<p class="course-assessment-question">' + escapeHtml(prompt) + '</p>'
+      : '';
+    return questionMarkup + '<label class="course-input-label" for="course-assessment-response">' + escapeHtml(courseUi('Your response', 'آپ کا جواب')) + '</label><textarea id="course-assessment-response" data-assessment-response rows="5" maxlength="1400" autocomplete="off" spellcheck="true" placeholder="' + escapeHtml(courseUi('Answer in your own words.', 'اپنے الفاظ میں جواب دیں۔')) + '">' + escapeHtml(understandingCheck.response) + '</textarea>' + speech + '<p class="course-input-help">' + escapeHtml(courseUi('There is no target text, timer, or score. Your response stays editable until you submit it.', 'کوئی ہدف متن، ٹائمر یا اسکور نہیں ہے۔ جمع کرنے تک آپ اپنا جواب بدل سکتے ہیں۔')) + '</p>';
   };
 
   const understandingCheckTask = () => {

@@ -130,3 +130,9 @@ test('completed understanding checks retain one explicit return path without mal
   assert.match(courseJs, /Understanding check complete[\s\S]*<div class="course-task-actions">[\s\S]*return-from-understanding-check/);
   assert.match(courseJs, /existing\.classList\.remove\('course-primary-button'\);[\s\S]*existing\.classList\.add\('course-secondary-button', 'course-task-back-button'\);/);
 });
+
+test('open-response understanding checks always display the reviewed question before the response field', () => {
+  assert.match(courseJs, /const prompt = String\(question\?\.prompt \|\| ''\)\.trim\(\);/);
+  assert.match(courseJs, /const questionMarkup = prompt[\s\S]*course-assessment-question/);
+  assert.match(courseJs, /return questionMarkup \+ '<label class="course-input-label" for="course-assessment-response">'/);
+});
