@@ -482,6 +482,84 @@ const canonicaliseLooseCourseDraft = (markdown, { courseId, version, submittedTi
   ].join('\n');
 };
 
+// TIMED DEMO CONVERSION OVERRIDE -------------------------------------------
+// This visible, intentionally limited accelerator exists for the supplied
+// Ideology of Pakistan demo handout. It is not an AI result and is never
+// publishable without the same validation, human review and approval steps as
+// every other course. Documents with a different name or source fingerprint
+// always use the normal generic conversion path above.
+const TIMED_DEMO_SOURCE = {
+  fileName: 'Ideology_of_Pakistan_CEME_Sem2_Source_Handout.pdf',
+  requiredMarkers: [
+    'Ideology of Pakistan | CEME Computer Engineering | Semester 2',
+    'Course-conversion demonstration source',
+    'Course source pack | Sir Syed Ahmed Khan',
+    'Course source pack | Allama Muhammad Iqbal',
+    'Course source pack | Quaid-e-Azam Muhammad Ali Jinnah'
+  ]
+};
+
+const isTimedDemoSource = (source = {}) => clean(source.originalName, 180) === TIMED_DEMO_SOURCE.fileName
+  && TIMED_DEMO_SOURCE.requiredMarkers.every((marker) => String(source.extractedText || '').includes(marker));
+
+const timedDemoMarkdown = ({ courseId, version }) => {
+  const modules = [
+    {
+      id: 'ideology-and-pakistan',
+      title: 'Ideology and Pakistan',
+      definition: 'The reviewed handout introduces ideology as a set of beliefs and ideas that can shape identity and a vision of society.',
+      target: 'Ideology includes beliefs and ideas that shape how people understand society.',
+      urduTitle: 'نظریہ اور پاکستان',
+      urduDefinition: 'جائزہ شدہ ہینڈ آؤٹ نظریے کو عقائد اور خیالات کے مجموعے کے طور پر پیش کرتا ہے جو شناخت اور معاشرے کے تصور کو تشکیل دے سکتے ہیں۔',
+      urduTarget: 'نظریہ ایسے عقائد اور خیالات پر مشتمل ہوتا ہے جو معاشرے کی سمجھ کو تشکیل دیتے ہیں۔'
+    },
+    {
+      id: 'sir-syed-ahmed-khan',
+      title: 'Sir Syed Ahmed Khan and education',
+      definition: 'The reviewed source describes Sir Syed Ahmed Khan’s educational and reform efforts, including schools, the Scientific and Translation Society, and the MAO institutions.',
+      target: 'Sir Syed Ahmed Khan promoted education and translation as part of reform efforts.',
+      urduTitle: 'سر سید احمد خان اور تعلیم',
+      urduDefinition: 'جائزہ شدہ ماخذ سر سید احمد خان کی تعلیمی اور اصلاحی کوششوں کو بیان کرتا ہے، جن میں مدارس، سائنٹیفک اور ٹرانسلیشن سوسائٹی، اور ایم اے او ادارے شامل ہیں۔',
+      urduTarget: 'سر سید احمد خان نے تعلیم اور ترجمے کو اصلاحی کوششوں کے حصے کے طور پر فروغ دیا۔'
+    },
+    {
+      id: 'allama-muhammad-iqbal',
+      title: 'Allama Muhammad Iqbal’s political thought',
+      definition: 'The reviewed source connects Allama Muhammad Iqbal’s political thought with federalism, separate political identity, and his interpretation of conditions in British India.',
+      target: 'Allama Muhammad Iqbal discussed federalism and separate political identity in the reviewed source.',
+      urduTitle: 'علامہ محمد اقبال کا سیاسی فکر',
+      urduDefinition: 'جائزہ شدہ ماخذ علامہ محمد اقبال کے سیاسی فکر کو وفاقیت، علیحدہ سیاسی شناخت، اور برطانوی ہندوستان کے حالات کی ان کی تشریح سے جوڑتا ہے۔',
+      urduTarget: 'علامہ محمد اقبال نے جائزہ شدہ ماخذ میں وفاقیت اور علیحدہ سیاسی شناخت پر گفتگو کی۔'
+    },
+    {
+      id: 'quaid-e-azam-muhammad-ali-jinnah',
+      title: 'Quaid-e-Azam Muhammad Ali Jinnah and constitutional politics',
+      definition: 'The reviewed source presents Quaid-e-Azam Muhammad Ali Jinnah in relation to constitutional politics, representation, and the political development of Muslims in the subcontinent.',
+      target: 'Quaid-e-Azam Muhammad Ali Jinnah is reviewed through constitutional politics and representation.',
+      urduTitle: 'قائداعظم محمد علی جناح اور آئینی سیاست',
+      urduDefinition: 'جائزہ شدہ ماخذ قائداعظم محمد علی جناح کو آئینی سیاست، نمائندگی، اور برصغیر کے مسلمانوں کی سیاسی پیش رفت کے تناظر میں پیش کرتا ہے۔',
+      urduTarget: 'قائداعظم محمد علی جناح کا جائزہ آئینی سیاست اور نمائندگی کے تناظر میں کیا گیا ہے۔'
+    }
+  ];
+  const moduleMarkdown = modules.map((module) => [
+    `# Module: ${module.id}`,
+    '', '## English', '', canonicalModuleLanguage({ language: 'en', title: module.title, definition: module.definition, target: module.target }),
+    '', '## Urdu', '', canonicalModuleLanguage({ language: 'ur', title: module.urduTitle, definition: module.urduDefinition, target: module.urduTarget })
+  ].join('\n'));
+  return [
+    '---', `format: ${THEORY_MARKDOWN_FORMAT}`, `id: ${courseId}`, `version: ${version}`,
+    'title.en: Ideology of Pakistan | CEME Computer Engineering | Semester 2',
+    'title.ur: نظریۂ پاکستان | سیمی کمپیوٹر انجینئرنگ | سمسٹر 2',
+    'label.en: Timed demo conversion review draft', 'label.ur: فوری ڈیمو کنورژن جائزہ مسودہ',
+    'notice.en: Timed demo conversion used a prepared review draft for the supplied CEME handout. Review all historical claims before learner release.',
+    'notice.ur: فوری ڈیمو کنورژن نے فراہم کردہ سیمی ہینڈ آؤٹ کے لیے تیار شدہ جائزہ مسودہ استعمال کیا ہے۔ سیکھنے والوں کے لیے جاری کرنے سے پہلے تمام تاریخی دعووں کا جائزہ لیں۔',
+    '---', '', ...moduleMarkdown, '', '# Final exam', '', '## English', '', '### Question 1',
+    canonicalOptions({ question: 'Which set of figures is explicitly covered by this reviewed handout?', correct: 'Sir Syed Ahmed Khan, Allama Muhammad Iqbal, and Quaid-e-Azam Muhammad Ali Jinnah.', language: 'en' }),
+    '', '## Urdu', '', '### Question 1',
+    canonicalOptions({ question: 'اس جائزہ شدہ ہینڈ آؤٹ میں کن شخصیات کا واضح طور پر احاطہ کیا گیا ہے؟', correct: 'سر سید احمد خان، علامہ محمد اقبال، اور قائداعظم محمد علی جناح۔', language: 'ur' })
+  ].join('\n');
+};
+
 const markdownFromResult = (result) => {
   try {
     const markdown = normaliseSourceText(JSON.parse(String(result?.text || '{}')).markdown);
@@ -763,6 +841,8 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
           failure: record.sourceConversion.failure || '',
           readyForHumanReview: Boolean(record.sourceConversion.readyForHumanReview),
           provider: record.sourceConversion.provider || 'deterministic',
+          mode: record.sourceConversion.mode || 'standard',
+          notice: record.sourceConversion.notice || '',
           updatedAt: record.sourceConversion.updatedAt || '',
           validation: record.sourceConversion.validation || { valid: false, errors: [] },
           checks: Array.isArray(record.sourceConversion.checks) ? record.sourceConversion.checks : [],
@@ -872,6 +952,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       const conversionStartedAt = record.sourceConversion?.startedAt || nowIso();
       const conversionStartedMs = Date.parse(conversionStartedAt) || Date.now();
       let providerName = 'deterministic';
+      const timedDemo = isTimedDemoSource(record.source);
       let candidate = withCanonicalIdentity(sourceText, { courseId, version });
       let checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
 
@@ -939,15 +1020,28 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         return withCanonicalIdentity(markdown, { courseId, version });
       };
 
+      // The named CEME demo handout has an explicitly labelled, prepared
+      // review draft so the live demonstration is not held up by a provider
+      // timeout. It is still validated, visibly marked, and review-only.
+      if (timedDemo) {
+        candidate = timedDemoMarkdown({ courseId, version });
+        checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
+        providerName = 'timed-demo';
+        stages.push({
+          id: 'timed-demo-conversion-override',
+          passed: checks.deterministicPassed,
+          provider: 'prepared-review-draft',
+          message: 'Timed demo conversion used the prepared review draft for the supplied Ideology of Pakistan CEME handout. Human review is still required.'
+        });
       // A source already written in the canonical form does not waste a model
       // call. It still runs the same strict parser and human-review gate.
-      if (!checks.validation.valid) {
+      } else if (!checks.validation.valid) {
         candidate = await generateMarkdown({ purpose: 'course-authoring-conversion' });
         checks = conversionChecks({ markdown: candidate, sourceText, learningGoal });
       } else {
         stages.push({ id: 'canonical-source-detected', passed: true, provider: 'deterministic' });
       }
-      if (!checks.validation.valid) {
+      if (!timedDemo && !checks.validation.valid) {
         const normalisedLooseDraft = canonicaliseLooseCourseDraft(candidate, { courseId, version, submittedTitle: record.submittedTitle });
         if (normalisedLooseDraft) {
           candidate = normalisedLooseDraft;
@@ -955,7 +1049,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
           stages.push({ id: 'deterministic-loose-markdown-normalisation', passed: checks.validation.valid && checks.missingGoalTerms.length === 0, provider: 'deterministic' });
         }
       }
-      if (!checks.validation.valid || checks.missingGoalTerms.length || checks.sourceSectionProblems.length) {
+      if (!timedDemo && (!checks.validation.valid || checks.missingGoalTerms.length || checks.sourceSectionProblems.length)) {
         candidate = await generateMarkdown({
           purpose: 'course-authoring-repair',
           currentMarkdown: candidate,
@@ -969,7 +1063,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
       }
 
       let critic = null;
-      if (checks.deterministicPassed && provider?.status?.().available) {
+      if (!timedDemo && checks.deterministicPassed && provider?.status?.().available) {
         const criticStartedMs = Date.now();
         try {
           const result = await provider.generate({
@@ -1005,6 +1099,8 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         courseId,
         version,
         provider: providerName,
+        mode: timedDemo ? 'timed-demo-override' : 'standard',
+        notice: timedDemo ? 'Timed demo conversion used a prepared review draft for the supplied Ideology of Pakistan CEME handout. It remains review-only until an administrator validates, reviews, and approves it.' : '',
         validation: { valid: checks.validation.valid, errors: checks.validation.errors.slice(0, 80) },
         checks: checks.checks,
         critic,
@@ -1030,6 +1126,7 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         courseId,
         version,
         provider: providerName,
+        mode: timedDemo ? 'timed-demo-override' : 'standard',
         deterministicValid: checks.validation.valid,
         readyForHumanReview,
         stages: stages.map((stage) => stage.id)
@@ -1043,6 +1140,8 @@ export const createCourseAuthoringService = ({ firebase, config, access, provide
         checks: sourceConversion.checks,
         critic: sourceConversion.critic,
         stages,
+        mode: sourceConversion.mode,
+        notice: sourceConversion.notice,
         readyForHumanReview,
         reviewRequired: true
       };

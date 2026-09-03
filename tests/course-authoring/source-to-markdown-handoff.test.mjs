@@ -300,6 +300,61 @@ test('a PPTX keeps its original private while extracting only visible slide text
   assert.match(reviewed.extractedText, /Slide 2: Sunshine can help water evaporate\./);
 });
 
+test('the clearly labelled timed demo override compiles the supplied Ideology of Pakistan handout without calling an AI provider', async () => {
+  const calls = [];
+  const firestore = new MemoryFirestore();
+  const storage = new MemoryStorage();
+  const account = { uid: 'admin-1', roles: ['platform-admin'], organisations: [{ organisationId: 'org-water', active: true }] };
+  const service = createCourseAuthoringService({
+    firebase: { available: true, firestore, storage, auth: {} }, config: { educatorWorkspaceEnabled: true },
+    access: { accountFor: async () => account, assertAdmin: async () => account, assertOrganisationAccess: async () => account },
+    provider: { status: () => ({ available: true }), generate: async (request) => { calls.push(request); throw new Error('The timed demo must not call an AI provider.'); } }
+  });
+  const demoText = [
+    'Ideology of Pakistan | CEME Computer Engineering | Semester 2',
+    'Course-conversion demonstration source',
+    'Course source pack | Sir Syed Ahmed Khan | source slide 1',
+    'Sir Syed Ahmed Khan promoted education and translation in the reviewed source.',
+    'Course source pack | Allama Muhammad Iqbal | source slide 1',
+    'Allama Muhammad Iqbal is discussed in the reviewed source.',
+    'Course source pack | Quaid-e-Azam Muhammad Ali Jinnah | source slide 1',
+    'Quaid-e-Azam Muhammad Ali Jinnah is discussed in the reviewed source.'
+  ].join('\n');
+  const source = await service.submitSource({
+    authorization: authorisation,
+    form: form({ courseType: 'theory', organisationId: 'org-water', title: 'Ideology of Pakistan demo', sourceFile: binaryFile('demo-source.txt', 'text/plain', demoText) })
+  });
+  const reference = firestore.collection('type2learnCourseAuthoring').doc('workspace').collection('submissions').doc(source.submission.submissionId);
+  await reference.set({
+    source: {
+      originalName: 'Ideology_of_Pakistan_CEME_Sem2_Source_Handout.pdf',
+      extraction: 'safe-pdf-text-extracted',
+      extractedText: demoText,
+      sha256: 'timed-demo-test',
+      bytes: demoText.length
+    }
+  }, { merge: true });
+
+  const conversion = await service.convertSourceToMarkdown({
+    authorization: authorisation,
+    body: { submissionId: source.submission.submissionId, courseId: 'ideology-of-pakistan-demo', version: '1.0.0' }
+  });
+  assert.equal(conversion.mode, 'timed-demo-override');
+  assert.match(conversion.notice, /prepared review draft/i);
+  assert.equal(conversion.readyForHumanReview, true);
+  assert.equal(conversion.validation.valid, true, conversion.validation.errors.join('\n'));
+  assert.equal(calls.length, 0);
+  assert.ok(conversion.stages.some((stage) => stage.id === 'timed-demo-conversion-override' && stage.passed));
+  assert.match(conversion.markdown, /Timed demo conversion used a prepared review draft/);
+
+  const saved = await service.saveMarkdown({ authorization: authorisation, body: {
+    courseId: 'ideology-of-pakistan-demo', version: '1.0.0', submissionId: source.submission.submissionId, markdown: conversion.markdown
+  } });
+  assert.equal(saved.validation.valid, true, saved.validation.errors.join('\n'));
+  assert.equal(saved.learnerManifest.modules.length, 4);
+  assert.equal(saved.learnerManifest.modules[1].id, 'sir-syed-ahmed-khan');
+});
+
 test('an administrator can convert extracted source into canonical Markdown only after strict validation and independent critique', async () => {
   const calls = [];
   const markdown = THEORY_COURSE_TEMPLATE
